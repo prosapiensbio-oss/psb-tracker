@@ -1000,28 +1000,29 @@ export function buildAiContext(
       : null,
     kpi,
     /**
-     * Nezaplatené poplatky z PTminderu. Čo je v zozname, je otvorené —
-     * v PTminderi sa poplatok po zaplatení maže, takže sa nič nepáruje.
-     * Bez tohto by Jarvis na „kto nezaplatil“ odpovedal, že nevie.
+     * NEZAPLATENÉ — jedno pravidlo „zaplatený" (`data.dlhy`, 5. 10. 2026).
+     * Tie isté položky ako karta Nezaplatené na Dnes, karta dlžníkov,
+     * profil aj Prehľad peňazí. Dovtedy tu boli len poplatky z PTmindera.
      */
     nezaplatene: {
-      pocet: (data.poplatky || []).length,
-      spoluCzk: r0((data.poplatky || []).reduce((a, p) => a + p.suma, 0)),
+      pocet: (data.dlhy || []).length,
+      spoluCzk: r0((data.dlhy || []).reduce((a, d) => a + d.doplatit, 0)),
       // Rozpad podľa trénera je tu preto, že karta v Kokpite sa filtruje
       // prepínačom trénera. Bez neho by Jerry videl na obrazovke „3 · 22 181"
       // a Jarvis mu na tú istú otázku odpovedal „10 · 76 331" — dve čísla pre
       // tú istú vec, a to je presne ten druh rozporu, ktorý appku zdiskredituje.
-      podlaTrenera: (data.poplatky || []).reduce((m: Record<string, { pocet: number; spoluCzk: number }>, p) => {
-        const t = clients[p.klient]?.primaryTrainer || "neznámy";
+      podlaTrenera: (data.dlhy || []).reduce((m: Record<string, { pocet: number; spoluCzk: number }>, d) => {
+        const t = clients[d.klient]?.primaryTrainer || "neznámy";
         const z = m[t] || (m[t] = { pocet: 0, spoluCzk: 0 });
-        z.pocet++; z.spoluCzk = r0(z.spoluCzk + p.suma);
+        z.pocet++; z.spoluCzk = r0(z.spoluCzk + d.doplatit);
         return m;
       }, {}),
-      polozky: (data.poplatky || []).map((p) => ({
-        klient: p.klient, suma: r0(p.suma), datum: p.datum, popis: p.popis,
-        trener: clients[p.klient]?.primaryTrainer || "neznámy",
+      polozky: (data.dlhy || []).map((d) => ({
+        klient: d.klient, sumaCzk: r0(d.doplatit), cenaCzk: r0(d.cena), datum: d.den, zaCo: d.nazov,
+        zdroj: d.zdroj === "kokpit" ? "balíček z Kokpitu" : "poplatok z PTmindera",
+        trener: clients[d.klient]?.primaryTrainer || "neznámy",
       })),
-      poznamka: "Zrkadlo posledného importu Transactions z PTminderu; v PTminderi sa poplatok po zaplatení maže, takže čo je v zozname, je otvorené a s ničím sa to nepáruje. NIE je to živý stav — nehovor „X dlhuje dnes“, ale „v poslednom exporte stálo otvorených N poplatkov“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera, nie celkový súčet.",
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Jedno pravidlo „zaplatený“ pre celý Kokpit: otvorené poplatky z PTmindera mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili (sumaCzk = koľko ešte chýba, cenaCzk = celá cena), a ten istý predaj zapísaný v oboch systémoch len raz. Kto má nezaplatený balíček, nemá z neho hodiny. Je to stav k poslednému importu a stiahnutiu banky — nehovor „dlhuje dnes“, ale „podľa Kokpitu je otvorené“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera. Surový dopyt do tabuľky poplatky alebo balicky dá iné čísla — odpovedaj odtiaľto.",
     },
     /**
      * KTO CHODÍ BEZ BALÍČKA a KTO DLŽÍ — to isté, čo ukazujú dve karty vo
@@ -1044,7 +1045,7 @@ export function buildAiContext(
         klient: d.meno, trener: d.trener, spoluCzk: d.spolu,
         zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
       })),
-      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sčítava DVA zdroje: otvorené poplatky z PTmindera (kľúč „nezaplatene“, už po odrátaní platieb zapísaných v Kokpite) a balíčky nahodené v Kokpite, na ktoré neprišla platba. Na otázku „kto dlží“ odpovedaj odtiaľto; „nezaplatene“ je len jedna polovica.",
+      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto.",
     },
     platnostAHodiny: {
       pocet: (fronty?.platnost || []).length,

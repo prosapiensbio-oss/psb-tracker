@@ -139,6 +139,12 @@ export function osCasuKlienta(
     historia?: Balicek[];
     services?: Sluzba[]; poplatky?: Poplatok[]; nezaplateneKokpit?: { klient: string; den: string }[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[];
     /**
+     * Jedno pravidlo „zaplatený" (`data.bezHodin`). Keď je, rozhoduje
+     * o príznaku nezaplateného balíčka on — `poplatky` a `nezaplateneKokpit`
+     * sa na to nepoužijú.
+     */
+    bezHodin?: { klient: string; den: string }[];
+    /**
      * Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`.
      *
      * Export to nenesie (223× ten istý riadok s cenou 0) a vyrátať sa to
@@ -193,11 +199,13 @@ export function osCasuKlienta(
     out.push({ druh: "platba", den: den(p.date), suma: p.amount, metoda: p.method, poznamka: p.note });
   }
 
-  const nezaplateneDni = new Set([
-    ...(zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
-    // Balíček z Kokpitu bez platby — viď `nezaplateneZKokpitu`.
-    ...(zdroj.nezaplateneKokpit || []).filter((b) => normName(b.klient) === k).map((b) => den(b.den)),
-  ]);
+  const nezaplateneDni = new Set(zdroj.bezHodin
+    ? zdroj.bezHodin.filter((d) => normName(d.klient) === k).map((d) => den(d.den))
+    : [
+      ...(zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
+      // Balíček z Kokpitu bez platby — viď `nezaplateneZKokpitu`.
+      ...(zdroj.nezaplateneKokpit || []).filter((b) => normName(b.klient) === k).map((b) => den(b.den)),
+    ]);
   /** Kľúče `deň|názov` a `deň|hhodiny` balíčkov z Kokpitu — PTminder im ustúpi. */
   const zKokpitu = new Set<string>();
   /**
@@ -222,7 +230,23 @@ export function osCasuKlienta(
    * Vaško videl na odkaze riadok z PTmindera, hoci ten istý predaj má
    * zapísaný v Kokpite.
    */
-  for (const b of zdroj.balicky || []) {
+  /**
+   * TVAR RIADKU BALÍČKA. Profil posiela riadky z API (`platnost_od`), App,
+   * Workspace a automatické balíčky ich mali prepísané do camelCase
+   * (`platnostOd`) — os ich potom ticho preskočila (deň = "") a Kokpitove
+   * balíčky na tých osiach chýbali (nález 5. 10. 2026). Berú sa oba tvary.
+   */
+  const riadky = (zdroj.balicky || []).map((x) => {
+    const r = x as BalicekKokpitu & { platnostOd?: string; platnostDo?: string | null; cenaCzk?: number | null; zruseneAt?: string | null };
+    return {
+      ...r,
+      platnost_od: r.platnost_od ?? r.platnostOd ?? "",
+      platnost_do: r.platnost_do ?? r.platnostDo ?? null,
+      cena_czk: r.cena_czk ?? r.cenaCzk ?? null,
+      zrusene_at: r.zrusene_at ?? r.zruseneAt ?? null,
+    };
+  });
+  for (const b of riadky) {
     if (b.zdroj !== "rucne") continue;
     if (normName(b.klient) !== k || b.zrusene_at) continue;
     const d = den(b.platnost_od);

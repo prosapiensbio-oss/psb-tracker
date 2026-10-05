@@ -2,7 +2,7 @@ import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { dlhKlienta } from "../../lib/psb/dlhKlienta";
+import { dlhyKlienta } from "../../lib/psb/zaplatene";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
 import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
@@ -238,6 +238,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
+      bezHodin: data.bezHodin,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -247,7 +248,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       balicky: balicky as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.treningyZdarma, balicky, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.treningyZdarma, balicky, kalUdalosti],
   );
 
   /**
@@ -317,28 +318,19 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   );
 
   /**
-   * Čo klient dlží za balíčky nahodené v Kokpite.
-   *
-   * Jerry, 26. 9. 2026: „vytvoril som balíček, ale nevznikol dlh."
-   * Podrobné pravidlá (prečo len ručné balíčky a prečo len platby od prvého
-   * z nich) sú v `dlhKlienta.ts`.
+   * ČO KLIENT DLŽÍ — jeho položky v `data.dlhy` (jedno pravidlo „zaplatený",
+   * 5. 10. 2026). Dovtedy profil sčítal poplatky z PTmindera s dlhom za
+   * balíčky z Kokpitu bez toho, aby odstránil ten istý predaj zapísaný
+   * v oboch — Vaškovi tak ukazoval dvojnásobok, kým karta dlžníkov nie.
    */
-  const dlh = useMemo(
-    // Server spočítal dlh aj s ohľadom na PTminder (`data.dlhKokpit`) — ten
-    // istý, aký vidí zoznam dlžníkov a QR za odkazom.
-    () => {
-      const lokal = dlhKlienta(
-        balicky.filter((b) => normName(b.klient) === normName(meno))
-          .map((b) => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
-        vlastnePlatby.filter((x) => normName(x.klient) === normName(meno))
-          .map((x) => ({ suma: x.suma_czk, datum: x.datum, zruseneAt: x.zrusene_at, vopred: x.vopred })),
-      );
-      // Rozpis (za koľko, koľko zaplatené) z vlastného výpočtu, samotný dlh
-      // zo servera — ten pozná aj PTminder.
-      return data.dlhKokpit ? { ...lokal, ...(data.dlhKokpit[normName(meno)] || { dlzi: 0, pocet: 0 }) } : lokal;
-    },
-    [balicky, vlastnePlatby, meno, data.dlhKokpit],
-  );
+  const mojeDlhy = useMemo(() => dlhyKlienta(data.dlhy, meno), [data.dlhy, meno]);
+  /** Za balíčky z Kokpitu — rozpis „balíček za X, zaplatené Y". */
+  const dlh = useMemo(() => {
+    const kokpit = mojeDlhy.filter((d) => d.zdroj === "kokpit");
+    const zaBalicky = kokpit.reduce((a, d) => a + d.cena, 0);
+    const dlzi = kokpit.reduce((a, d) => a + d.doplatit, 0);
+    return { dlzi, pocet: kokpit.length, zaBalicky, zaplatene: zaBalicky - dlzi, od: kokpit[0]?.den || "" };
+  }, [mojeDlhy]);
 
   const mojePlatby = useMemo(
     () => vlastnePlatby.filter((x) => normName(x.klient) === normName(meno) && !x.zrusene_at).sort((a, b) => b.datum.localeCompare(a.datum)),
@@ -421,14 +413,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     [clients, meno],
   );
 
-  /** Nezaplatené poplatky z PTmindera. */
+  /** Nezaplatené poplatky z PTmindera — tie, čo nie sú ten istý predaj ako balíček z Kokpitu. */
   const poplatkyKlienta = useMemo(
-    // Pole sa volá `klient`, nie `client`. Kým sa tu čítalo `client`, zoznam
-    // bol VŽDY prázdny a karta každému hlásila „nič nedlhuje" — aj Dominike,
-    // ktorá má otvorený poplatok 6 622 Kč. Pretypovanie na `{ client?: string }`
-    // umlčalo kontrolu typov presne tam, kde mala zakričať.
-    () => (data.poplatky || []).filter((x) => normName(x.klient || "") === normName(meno)),
-    [data.poplatky, meno],
+    () => mojeDlhy.filter((d) => d.zdroj === "ptminder")
+      .map((d) => ({ klient: d.klient, datum: d.den, popis: d.nazov, suma: d.doplatit })),
+    [mojeDlhy],
   );
 
   /** Závery z debát s Jarvisom, ktoré sa týkajú tohto klienta. */
@@ -597,12 +586,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * poslednom; Jerry ju pred odoslaním vidí a vie ju prepísať.
    */
   const datumDlhu = useMemo(() => {
-    const dni = [
-      ...poplatkyKlienta.map((x) => String(x.datum || "")),
-      ...(dlh.dlzi > 0 ? mojeBalicky.map((b) => String(b.platnost_od || "")) : []),
-    ].filter(Boolean).sort();
+    // Deň predaja, ktorý je nezaplatený — nie najnovší balíček klienta vôbec.
+    const dni = mojeDlhy.map((d) => d.den).filter(Boolean).sort();
     return dni.length ? fmtDMY(dni[dni.length - 1]) : undefined;
-  }, [poplatkyKlienta, mojeBalicky, dlh.dlzi]);
+  }, [mojeDlhy]);
 
   const pridajPlatbu = async () => {
     setPracujem(true); setChyba("");
@@ -1051,6 +1038,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             aby bolo vidieť, kde sa rozchádzajú. Dovtedy nech aspoň povie,
             odkiaľ je. */}
         {/* DVA ZDROJE DLHU, JEDNA DLAŽDICA.
+            Obe čísla sú z `data.dlhy` (jedno pravidlo „zaplatený"):
             `dlzi` sú nezaplatené poplatky z PTmindera; `dlh.dlzi` je balíček
             nahodený v Kokpite, za ktorý ešte neprišla platba. Jerry, 26. 9.
             2026: „vytvoril som balíček, ale nevznikol dlh" — karta mu vtedy
@@ -1072,7 +1060,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           {!!mojePlatby.length && (
             <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
               + {fmtCZK(mojePlatby.reduce((a, x) => a + x.suma_czk, 0))} zapísané v Kokpite
-              {dlzi > 0 ? " — kým nepríde nový export, dlh o ne nevie" : ""}
             </div>
           )}
           {/* SMS rovno odtiaľto (Jerry, 1. 10. 2026: „strašne mi chýba

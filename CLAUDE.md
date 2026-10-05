@@ -2568,3 +2568,35 @@ tréningov (do 60 dní pred ním) prevezme — aj s platbami od prvého z nich
 používa (tréning za posledných 60 dní od dneška) — inak by si ho zobral aj
 klient s prepadnutými hodinami (Holubová). Overené nad celou DB: mení presne
 Broskvu a Krčmara. `priebehBalickov` vo `vypisHodin.ts`, testy tam.
+
+## Jedno pravidlo „zaplatený" — `dlhyKlientov` (5. 10. 2026)
+
+Do toho dňa rozhodovalo o „zaplatený / dlh" 13 miest a 12 si vedelo
+protirečiť (okná ±3, ±14, 0–30, −10…+60 dní; Dnes a karta dlžníkov
+odstraňovali zdvojený predaj z opačných strán; profil ho sčítal dvakrát —
+Vaško 13 980 namiesto 6 990). Odteraz:
+
+- **`lib/psb/zaplatene.ts` `dlhyKlientov`** — jediné miesto. Kroky:
+  poplatky PTmindera − platby Kokpitu → balíčky Kokpitu FIFO → poistka
+  z PTmindera → poplatok, ktorý je ten istý predaj ako balíček z Kokpitu
+  (rovnaká cena do 3 dní), ustúpi balíčku.
+- `loadData` z neho plní `data.dlhy` (položky dlhu: klient, deň, za čo,
+  cena, doplatit, zdroj, id balíčka) a `data.bezHodin` (dni, ktoré hodiny
+  nedávajú = položky dlhu + **dvojčatá** — poplatok, ktorý ustúpil balíčku;
+  pod ním je v PTminderi riadok toho istého predaja a nesmie dať hodiny).
+- Čítajú LEN toto: karta klienta (hodiny), os času, karta dlžníkov, dlh
+  jedného klienta (stránka `/v/`, QR, SMS), Dnes, profil, Prehľad peňazí,
+  Jarvis (`nezaplatene`, `dlznici`), otázka „suma nesedí" (`otazkyPlatieb`)
+  aj príznak „vopred" pri zápise platby (`jeVopred` volá tú istú funkciu
+  pre jedného klienta).
+- **`loadData` musí brať `id` balíčkov** — bez neho `otazkyPlatieb` mlčí
+  (nález nezávislej kontroly; test v `dlznici.test.ts`).
+- Zámerne mimo: tržby z kalendára (`platnyBalicek` — tržba vzniká
+  tréningom) a karta „Bez balíčka" (nezaplatený balíček je balíček; patrí
+  do „Dlhujú").
+- **Os času berie riadky `balicky` v oboch tvaroch** (`platnost_od` aj
+  `platnostOd`) — App, Workspace a automatické balíčky posielali camelCase
+  a Kokpitove balíčky im na osi ticho chýbali.
+- Overenie: snímka pred/po nad kópiou ostrej DB pre všetkých 127 klientov
+  (hodiny, dlh, dlžníci, príznaky na osi, mínus, otázky, návrhy balíčkov) —
+  zhodné; jediná zmena na obrazovkách je oprava Vaškovho profilu.

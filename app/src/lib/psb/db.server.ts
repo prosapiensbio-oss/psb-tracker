@@ -2,13 +2,12 @@
 import { zjednotOverrides } from "./zjednotOverrides";
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
-import { nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
+import { dlhyKlientov } from "./zaplatene";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
   detectCSVType,
@@ -74,7 +73,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
           AND u.zaciatok >= ?1`,
     ).bind(KOKPIT_OD).all().catch(() => ({ results: [] })),
     // Balíčky v Kokpite — z nich cena tréningu z kalendára.
-    DB.prepare("SELECT klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
+    DB.prepare("SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
       .all().catch(() => ({ results: [] })),
     /**
      * Pocitovka — tri otázky 1–10, ktoré si klepne klient sám na svojej
@@ -153,15 +152,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * Dnes, Prehľad peňazí aj Jarvis, a tri kópie toho istého pravidla by sa
      * rozišli.
      */
-    poplatky: poplatkyPoOdrataniPlatieb(
-      (poplatky.results as any[]).map((r) => ({
-        id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
-      })),
-      (vlastnePlatby.results as any[]).map((r) => ({
-        id: r.id, klient: r.klient, datum: r.datum, sumaCzk: Number(r.suma_czk) || 0,
-        sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
-      })),
-    ).otvorene,
+    // Surové poplatky; očistené o platby z Kokpitu ich nižšie prepíše
+    // `dlhyKlientov` (jedno pravidlo „zaplatený").
+    poplatky: (poplatky.results as any[]).map((r) => ({
+      id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
+    })),
     /**
      * Odpovede na „koľko hodín pridalo doplnenie" — kľúč `klient|deň`.
      *
@@ -307,47 +302,35 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       payment: r.platba ?? undefined, kind: r.druh, stav: r.stav || undefined,
     }));
     /**
-     * Nezaplatené balíčky z Kokpitu — platby sa kladú na najstarší
-     * (`nezaplateneZKokpitu`). Počíta sa TU, na serveri, raz: kartu, os
-     * klienta aj stránku za odkazom tak rozhoduje to isté pravidlo.
+     * ČO JE NEZAPLATENÉ — jedno pravidlo (`dlhyKlientov` v `zaplatene.ts`,
+     * Jerry 5. 10. 2026). Počíta sa TU, raz: hodiny na karte aj na osi, dlh,
+     * karta dlžníkov, Dnes, Prehľad peňazí, stránka za odkazom aj Jarvis
+     * čítajú ten istý zoznam `data.dlhy`.
      */
     {
-      const bal: Record<string, BalicekDlh[]> = {};
-      for (const r of balickyK.results as any[]) {
-        (bal[normName(r.klient)] ||= []).push({
-          cena: r.cena_czk == null ? null : Number(r.cena_czk), platnostOd: String(r.platnost_od || "").slice(0, 10),
-          zdroj: r.zdroj, zruseneAt: r.zrusene_at || null, nazov: r.nazov,
-        });
-      }
-      const pl: Record<string, PlatbaDlh[]> = {};
-      for (const r of vlastnePlatby.results as any[]) {
-        (pl[normName(r.klient)] ||= []).push({
-          suma: Number(r.suma_czk) || 0, datum: String(r.datum || "").slice(0, 10), zruseneAt: r.zrusene_at || null, vopred: !!r.vopred,
-        });
-      }
-      const mena = new Map((balickyK.results as any[]).map((r) => [normName(r.klient), String(r.klient)]));
-      const podlaKokpitu = Object.entries(bal).flatMap(([k, bs]) =>
-        nezaplateneZKokpitu(bs, pl[k] || []).map((b) => ({ ...b, klient: mena.get(k) || k })));
-      data.nezaplateneKokpit = zaplateneVPtminderi(
-        podlaKokpitu,
-        (payments.results as any[]).map((r) => ({ klient: String(r.client_name || ""), datum: String(r.date || "").slice(0, 10), suma: Number(r.amount_czk) || 0 })),
-        (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),
-        (data.poplatky || []).map((p) => ({ klient: p.klient, datum: String(p.datum || "").slice(0, 10) })),
-        normName,
-      ).map((b) => ({ klient: b.klient, den: b.platnostOd, cena: b.cena || 0, nazov: b.nazov || "", doplatit: b.doplatit }));
-      /**
-       * DLH ZA BALÍČKY Z KOKPITU — z tých istých nezaplatených balíčkov.
-       * Karta (hodiny) aj zoznam dlžníkov a QR za odkazom tak čítajú jedno
-       * rozhodnutie; keby si dlh počítal každý sám, Papiež by mal hodiny
-       * a zároveň dlh za ten istý zaplatený balíček.
-       */
-      data.dlhKokpit = {};
-      for (const b of data.nezaplateneKokpit) {
-        const k = normName(b.klient);
-        const d = data.dlhKokpit[k] || { dlzi: 0, pocet: 0 };
-        d.dlzi += b.doplatit ?? b.cena; d.pocet += 1;
-        data.dlhKokpit[k] = d;
-      }
+      const { polozky, otvorenePoplatky, dvojcata } = dlhyKlientov({
+        poplatky: (poplatky.results as any[]).map((r) => ({
+          id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
+        })),
+        platby: (vlastnePlatby.results as any[]).map((r) => ({
+          id: r.id, klient: r.klient, datum: String(r.datum || "").slice(0, 10), suma: Number(r.suma_czk) || 0,
+          zruseneAt: r.zrusene_at || null, vopred: !!r.vopred, sposob: r.sposob, fioId: r.fio_id,
+        })),
+        balicky: (balickyK.results as any[]).map((r) => ({
+          id: r.id, klient: r.klient, nazov: r.nazov, cena: r.cena_czk == null ? null : Number(r.cena_czk),
+          platnostOd: String(r.platnost_od || "").slice(0, 10), zdroj: r.zdroj, zruseneAt: r.zrusene_at || null,
+        })),
+        ptPlatby: (payments.results as any[]).map((r) => ({ klient: String(r.client_name || ""), datum: String(r.date || "").slice(0, 10), suma: Number(r.amount_czk) || 0 })),
+        ptHistoria: (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),
+      });
+      data.poplatky = otvorenePoplatky as PSBData["poplatky"];
+      data.dlhy = polozky;
+      // Dni balíčkov, ktoré hodiny nedávajú: nezaplatené predaje a dvojča
+      // predaja z Kokpitu v PTminderi (viď `dvojcata`).
+      data.bezHodin = [...polozky.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata];
+      // Odvodený pohľad na ten istý zoznam (párovanie platieb vo Workspace).
+      data.nezaplateneKokpit = polozky.filter((d) => d.zdroj === "kokpit")
+        .map((d) => ({ klient: d.klient, den: d.den, cena: d.cena, nazov: d.nazov, doplatit: d.doplatit }));
     }
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
       klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,

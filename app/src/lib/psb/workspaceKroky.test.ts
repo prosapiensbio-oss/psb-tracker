@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import type { Udalost } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
 import { kandidatiPlatby, navrhNovehoBalicka, otazkyPlatieb, zoznamSms } from "./workspaceKroky";
+import { dlhyKlientov } from "./zaplatene";
 
 const trening = (den: string): Udalost => ({ druh: "trening", den, cas: "11:00" });
 const balicek = (den: string, hodin = 6, nazov = "OFF - 6h BEZ viazanosti", doDna?: string): Udalost =>
@@ -72,20 +73,26 @@ describe("nový balíček z prvého tréningu", () => {
 });
 
 describe("platba nesedí na balíček", () => {
-  const bal = (id: string, nazov: string, cena: number, od = "2026-11-05") => ({ id, klient: "A", nazov, hodiny: 18, cena, platnostOd: od, zdroj: "rucne" });
+  const bal = (id: string, nazov: string, cena: number, od = "2026-11-05") => ({ id, klient: "A", nazov, cena, platnostOd: od, zdroj: "rucne" });
+  // Otázky sa pýtajú jedného pravidla „zaplatený" — ako v appke.
+  const otazky = (b: ReturnType<typeof bal>[], p: { klient: string; datum: string; suma: number }[], ptPlatby: { klient: string; datum: string; suma: number }[] = []) =>
+    otazkyPlatieb(dlhyKlientov({ poplatky: [], platby: p, balicky: b, ptPlatby, ptHistoria: [] }).polozky);
   it("7 790 na 18 h: ponúkne 6h Balíček", () => {
-    const o = otazkyPlatieb([bal("b1", "18h Balíček", 21150)], [{ klient: "A", datum: "2026-11-06", suma: 7790 }]);
+    const o = otazky([bal("b1", "18h Balíček", 21150)], [{ klient: "A", datum: "2026-11-06", suma: 7790 }]);
     expect(o).toHaveLength(1);
     expect(o[0].moznosti.find((m) => m.druh === "velkost")).toMatchObject({ nazov: "6h Balíček", hodiny: 6, cena: 7790 });
   });
   it("7 011 na 7 790: zľava 10 %", () => {
-    const o = otazkyPlatieb([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7011 }]);
+    const o = otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7011 }]);
     expect(o[0].veta).toContain("10 %");
     expect(o[0].moznosti.some((m) => m.druh === "cena" && m.dovod.includes("10 %"))).toBe(true);
   });
   it("balíček bez platby nie je otázka, plná platba tiež nie", () => {
-    expect(otazkyPlatieb([bal("b1", "6h Balíček", 7790)], [])).toEqual([]);
-    expect(otazkyPlatieb([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7790 }])).toEqual([]);
+    expect(otazky([bal("b1", "6h Balíček", 7790)], [])).toEqual([]);
+    expect(otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7790 }])).toEqual([]);
+  });
+  it("balíček, ktorý PTminder pozná ako zaplatený, sa nepýta", () => {
+    expect(otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7011 }], [{ klient: "A", datum: "2026-11-05", suma: 7790 }])).toEqual([]);
   });
 });
 

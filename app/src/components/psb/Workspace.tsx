@@ -249,6 +249,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
+      bezHodin: data.bezHodin,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -272,26 +273,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
   /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */
   const dlzniciRiadky = useMemo<Dlznik[]>(() => {
-    const podlaKlienta = <T extends { klient: string }>(xs: T[]) => {
-      const m: Record<string, T[]> = {};
-      for (const x of xs) (m[x.klient] ||= []).push(x);
-      return m;
-    };
+    // Všetci klienti, aj bez trénera — podľa kľúčov sa dlžník pomenuje
+    // menom z karty, nie tvarom z poplatku.
     const treneri: Record<string, string> = {};
-    for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
-    return spocitajDlznikov(
-      (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
-      Object.fromEntries(Object.entries(podlaKlienta(balicky)).map(([m, bs]) => [m, bs.map((b) => ({
-        cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
-      }))])),
-      Object.fromEntries(Object.entries(podlaKlienta(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
-        suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at, vopred: p.vopred,
-      }))])),
-      treneri,
-      undefined,
-      data.dlhKokpit,
-    );
-  }, [data.poplatky, data.dlhKokpit, balicky, vlastnePlatby, clients]);
+    for (const [meno, c] of Object.entries(clients)) treneri[meno] = c.primaryTrainer || "";
+    // Jedno pravidlo „zaplatený" — dlžníci sú len zoskupený `data.dlhy`.
+    return spocitajDlznikov(data.dlhy, treneri);
+  }, [data.dlhy, clients]);
 
   const nacitajAnamnezy = useCallback(async () => {
     const r = await fetch("/api/anamneza?zoznam=1", { credentials: "same-origin" })
@@ -1488,18 +1476,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         && (!trenerKroku || clients[b.klient]?.primaryTrainer === trenerKroku)).length;
       const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
         && (!trenerKroku || x.trener === trenerKroku)).length;
-      const sumaOtazok = otazkyPlatieb(
-        balicky.filter((b) => b.id).map((b) => ({
-          id: String(b.id), klient: b.klient, nazov: b.nazov, hodiny: b.hodiny, cena: b.cena_czk,
-          platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
-        })),
-        vlastnePlatby.map((p) => ({ klient: p.klient, datum: p.datum, suma: p.suma_czk, zruseneAt: p.zrusene_at, vopred: p.vopred })),
-      ).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
+      const sumaOtazok = otazkyPlatieb(data.dlhy).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
       const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok;
       return (
         <>
           <FioPrijmy onZapisane={poZapise} />
-          <OtazkyPlatieb balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} />
+          <OtazkyPlatieb dlhy={data.dlhy} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} />
           {sekcieKresli}
           <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} />
           <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} />

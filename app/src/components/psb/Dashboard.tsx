@@ -1340,30 +1340,22 @@ export function Dashboard({
   }, [data.uploadLog]);
 
   /**
-   * Nezaplatené poplatky. Filtruje sa podľa prepínača trénera rovnako ako
-   * zvyšok karty — inak by Terezka videla Jerryho dlžníkov a naopak.
+   * NEZAPLATENÉ — jedno pravidlo „zaplatený" (`data.dlhy`, 5. 10. 2026).
+   * Dovtedy si karta skladala poplatky a balíčky z Kokpitu sama a ten istý
+   * predaj odstraňovala z opačnej strany a v inom okne dní (±14) než karta
+   * dlžníkov (±3). Filtruje sa podľa prepínača trénera rovnako ako zvyšok
+   * karty — inak by Terezka videla Jerryho dlžníkov a naopak.
    */
-
-  const nezaplatene = useMemo(
-    () => (data.poplatky || []).filter((p) => {
-      const c = clients[p.klient];
-      return !c || matchT(c.primaryTrainer);
-    }),
-    [data.poplatky, clients, matchT],
+  const nezaplateneNaKarte = useMemo(
+    () => (data.dlhy || [])
+      .filter((d) => { const c = clients[d.klient]; return !c || matchT(c.primaryTrainer); })
+      .map((d, i) => ({
+        id: `${d.zdroj}|${d.klient}|${d.den}|${i}`, klient: d.klient, datum: d.den,
+        popis: d.zdroj === "kokpit" ? `${d.nazov} · z Kokpitu` : d.nazov, suma: d.doplatit,
+      }))
+      .sort((a, b) => b.suma - a.suma),
+    [data.dlhy, clients, matchT],
   );
-  const nezaplateneSpolu = useMemo(() => nezaplatene.reduce((a, p) => a + p.suma, 0), [nezaplatene]);
-  /**
-   * V bete aj balíčky z Kokpitu, ktoré platby nepokryli (`data.nezaplateneKokpit`)
-   * — okrem tých, ktoré už stoja ako poplatok z PTmindera (tá istá suma do 14 dní).
-   */
-  const nezaplateneNaKarte = useMemo(() => {
-    const dni = (a: string, b: string) => Math.abs(Date.parse(`${a.slice(0, 10)}T00:00:00Z`) - Date.parse(`${b.slice(0, 10)}T00:00:00Z`)) / 86400000;
-    const zKokpitu = (data.nezaplateneKokpit || [])
-      .filter((b) => { const c = clients[b.klient]; return !c || matchT(c.primaryTrainer); })
-      .filter((b) => !nezaplatene.some((p) => normName(p.klient) === normName(b.klient) && Math.round(p.suma) === Math.round(b.doplatit ?? b.cena) && dni(p.datum, b.den) <= 14))
-      .map((b) => ({ id: `kokpit|${b.klient}|${b.den}`, klient: b.klient, datum: b.den, popis: `${b.nazov} · z Kokpitu`, suma: b.doplatit ?? b.cena }));
-    return [...zKokpitu, ...nezaplatene].sort((a, b) => b.suma - a.suma);
-  }, [nezaplatene, data.nezaplateneKokpit, clients, matchT]);
 
   const platnostKonci = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);

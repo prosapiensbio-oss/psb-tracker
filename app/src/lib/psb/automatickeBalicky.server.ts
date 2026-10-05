@@ -37,6 +37,7 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
     services: (data.services || []) as never,
     poplatky: (data.poplatky || []) as never,
     nezaplateneKokpit: data.nezaplateneKokpit || [],
+    bezHodin: data.bezHodin,
     treningyZdarma: (data.treningyZdarma || []) as never,
     doplneniaHodiny: data.doplneniaHodiny || {},
     historia: (data.historiaBalickov || []) as never,

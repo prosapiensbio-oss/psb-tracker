@@ -8,6 +8,7 @@
  * Pravidlá (kto patrí do zoznamu, aký balíček vznikne, kedy sa pýtať na
  * sumu) sú v `lib/psb/workspaceKroky.ts` a majú testy. Tu je len obrazovka.
  */
+import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { useEffect, useMemo, useState } from "react";
 
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
@@ -461,7 +462,9 @@ export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
  * SUMA NESEDÍ NA BALÍČEK — otázka a jedným klikom oprava.
  * Pravidlá v `otazkyPlatieb`; tu sa balíček len prepíše.
  */
-export function OtazkyPlatieb({ balicky, platby, trener, clients, onOpravene }: {
+export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOpravene }: {
+  /** Jedno pravidlo „zaplatený" — `data.dlhy`. */
+  dlhy: DlhPolozka[] | undefined;
   balicky: BalicekRiadokKroku[];
   platby: PlatbaRiadokKroku[];
   trener: string | null;
@@ -473,13 +476,8 @@ export function OtazkyPlatieb({ balicky, platby, trener, clients, onOpravene }: 
   const [chyba, setChyba] = useState("");
   const [odlozene, setOdlozene] = useState<Set<string>>(new Set());
 
-  const otazky = useMemo(() => otazkyPlatieb(
-    balicky.filter((b) => b.id).map((b) => ({
-      id: String(b.id), klient: b.klient, nazov: b.nazov, hodiny: b.hodiny, cena: b.cena_czk,
-      platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
-    })),
-    platby.map((p) => ({ klient: p.klient, datum: p.datum, suma: p.suma_czk, zruseneAt: p.zrusene_at, vopred: p.vopred })),
-  ).filter((o) => !odlozene.has(o.balicekId) && (!trener || clients[o.klient]?.primaryTrainer === trener)), [balicky, platby, trener, clients, odlozene]);
+  const otazky = useMemo(() => otazkyPlatieb(dlhy)
+    .filter((o) => !odlozene.has(o.balicekId) && (!trener || clients[o.klient]?.primaryTrainer === trener)), [dlhy, trener, clients, odlozene]);
 
   if (!otazky.length) return null;
 

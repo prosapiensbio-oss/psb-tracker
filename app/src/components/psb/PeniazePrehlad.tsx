@@ -125,7 +125,17 @@ export function PeniazePrehlad({ data, onNavigate }: {
     [btcCzk, ucet, hotovost, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const nezaplatene = (data.poplatky || []).reduce((a, x) => a + x.suma, 0);
+  // Jedno pravidlo „zaplatený" (`data.dlhy`): poplatky z PTmindera aj
+  // balíčky z Kokpitu bez platby, ten istý predaj raz. Dovtedy tu boli len
+  // poplatky a balíček nahodený v Kokpite sa do čísla nedostal vôbec.
+  const dlhy = useMemo(
+    () => (data.dlhy || []).map((d, i) => ({
+      id: `${d.zdroj}|${d.klient}|${d.den}|${i}`, klient: d.klient, datum: d.den,
+      popis: d.zdroj === "kokpit" ? `${d.nazov} · z Kokpitu` : d.nazov, suma: d.doplatit,
+    })),
+    [data.dlhy],
+  );
+  const nezaplatene = dlhy.reduce((a, x) => a + x.suma, 0);
   const zisk = v.p.hrubyZisk[v.i];
   const trzby = v.p.prijmy[v.i];
   const beMes = v.be[v.i];
@@ -214,12 +224,12 @@ export function PeniazePrehlad({ data, onNavigate }: {
       id: "pp-nezaplatene",
       label: "Nezaplatené",
       hodnota: fmtCZK(nezaplatene),
-      podnadpis: `${(data.poplatky || []).length} poplatkov · obaja tréneri`,
+      podnadpis: `${dlhy.length} ${dlhy.length === 1 ? "položka" : dlhy.length < 5 ? "položky" : "položiek"} · obaja tréneri`,
       pasmo: nezaplatene === 0 ? "ok" : nezaplatene > 30000 ? "zle" : "pozor",
       poznamka: nezaplatene === 0
         ? "Nikto nič nedlhuje."
-        : `Predané balíčky a úvodné tréningy, ktoré PTminder eviduje ako nezaplatené. Klik ${nezaplateneOtvorene ? "zoznam zavrie" : "ukáže, kto a za čo"}.`,
-      vysvetlenie: "Otvorené položky z PTminderu (Transactions). Po zaplatení sa tam mažú, takže čo je v zozname, je podľa PTmindera otvorené — ale platba a balíček sa nemusia stretnúť: kto poslal peniaze na účet a v PTminderi sa to nespárovalo, tu stále visí. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
+        : `Predané balíčky a úvodné tréningy bez platby — z PTmindera aj z Kokpitu. Klik ${nezaplateneOtvorene ? "zoznam zavrie" : "ukáže, kto a za čo"}.`,
+      vysvetlenie: "Jedno pravidlo „zaplatený“ pre celý Kokpit: otvorené poplatky z PTmindera mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili, a ten istý predaj zapísaný v oboch systémoch len raz. To isté číslo ukazuje karta dlžníkov, profil klienta aj stránka za odkazom. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
       dobreHore: false,
       // Preklik viedol na Dnes a človek pristál hore na dashboarde — číslo
       // teda poslalo hľadať. Teraz rozbalí zoznam pod sebou a druhý klik ho
@@ -267,8 +277,8 @@ export function PeniazePrehlad({ data, onNavigate }: {
         <Card id="pp-zoznam-nezaplatene">
           <H3>
             <Info
-              label={`Nezaplatené · ${(data.poplatky || []).length} položiek · ${fmtCZK(nezaplatene)}`}
-              text="Zoznam je presne to, čo v PTminderi stojí ako otvorená transakcia — predaný balíček alebo úvodný tréning, ku ktorému sa nepripísala platba. Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
+              label={`Nezaplatené · ${dlhy.length} položiek · ${fmtCZK(nezaplatene)}`}
+              text="Predaný balíček alebo úvodný tréning, ku ktorému nie je platba — z PTmindera aj z Kokpitu (jedno pravidlo „zaplatený“). Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
             />
             <button
               onClick={() => setNezaplateneOtvorene(false)}
@@ -278,7 +288,7 @@ export function PeniazePrehlad({ data, onNavigate }: {
             </button>
           </H3>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {[...(data.poplatky || [])].sort((a, b) => b.datum.localeCompare(a.datum)).map((x) => (
+            {[...dlhy].sort((a, b) => b.datum.localeCompare(a.datum)).map((x) => (
               <button
                 key={x.id}
                 onClick={onNavigate ? () => onNavigate("klienti", undefined, { client: x.klient, nonce: Date.now() }) : undefined}

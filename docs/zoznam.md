@@ -21,8 +21,10 @@ Stav k **5. 10. 2026**.
 Platby z banky si Jerry potvrdzuje sám. Moje kroky v tomto poradí — pri
 každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 
-1. [ ] **Jedno pravidlo „zaplatený"** — hodiny, dlh, zoznam dlžníkov,
-       evidencia platieb a tržby z kalendára sa pýtajú jednej funkcie.
+1. [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026 (`zaplatene.ts`,
+       `data.dlhy`, `data.bezHodin`); overené pred/po nad ostrou DB a
+       nezávislou kontrolou subagenta. Zostatok: `dlhKlienta()` a
+       `hodinyBezBalicka.ts` už nikto v appke nevolá (len testy) — upratať.
 2. [ ] **Deň podľa Prahy, nie UTC** — medzi polnocou a druhou ráno appka
        žije vo včerajšku (30+ miest).
 3. [ ] **Platby z Kokpitu na osi času klienta a v maili s históriou.**
@@ -299,11 +301,7 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   a Active by zmizlo; treba vlastnú cestu do `balicky` (parsePackages ich
   číta, dedup klient|názov|platnosť_od). Dopad: hodiny sa pohnú u veľkej
   časti klientov — preto najprv simulácia, potom Jerry.
-- [ ] **Jedno pravidlo „zaplatený"** aj pre dlh: `dlhKlienta` (ceny ručných −
-  platby), `platbyEvidencia` (poplatok vs platba s oknom), `vypisHodin`
-  (platba do 30 dní). Hodiny už čítajú jedno (otvorený poplatok z dňa
-  začiatku); dlh ešte tri. Pri tom `platnyBalicek` v `sedeniaZKalendara`
-  oceňuje hodinu aj z nezaplateného balíčka (tržby, nie hodiny).
+- [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
 - [ ] **Deň z UTC** (audit D): 30+ miest s `toISOString().slice(0,10)` alebo
   `Date.parse(pražský reťazec)` — medzi polnocou a druhou ráno appka žije
   vo včerajšku. Najhoršie: `compute.ts` `dnesneTreningy` ignoruje parameter

@@ -1,3 +1,4 @@
+import type { DlhPolozka } from "./zaplatene";
 // Shared PSB Tracker data types (used both server- and client-side; keep pure).
 
 export type SessionRow = {
@@ -182,13 +183,20 @@ export type PSBData = {
    * Hodiny nedávajú, kým sa nezaplatí — karta aj os ich berú ako
    * nezaplatené, rovnako ako otvorený poplatok z PTmindera.
    */
-  nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
   /**
-   * Dlh za balíčky z Kokpitu podľa klienta (kľúč `normName`) — súčet
-   * `nezaplateneKokpit`. Jediný zdroj pre kartu dlžníkov, profil aj QR.
+   * ČO JE NEZAPLATENÉ — jedno pravidlo pre celý Kokpit (`dlhyKlientov`
+   * v `zaplatene.ts`). Hodiny, dlh, Dnes, Prehľad peňazí aj Jarvis čítajú
+   * tento zoznam; nič iné o „zaplatený" nerozhoduje.
    */
-  dlhKokpit?: Record<string, { dlzi: number; pocet: number }>;
-  clientOverrides: Record<string, ClientOverride>;
+  dlhy?: DlhPolozka[];
+  /**
+   * Klient + deň balíčkov, ktoré hodiny NEDÁVAJÚ: deň každej položky `dlhy`
+   * a deň poplatku z PTmindera, ktorý ustúpil balíčku z Kokpitu ako ten istý
+   * predaj (hodiny dáva len balíček z Kokpitu, a to keď je zaplatený).
+   */
+  bezHodin?: { klient: string; den: string }[];
+  nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
+    clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];
   leads: Lead[];

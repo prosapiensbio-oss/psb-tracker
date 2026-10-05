@@ -37,9 +37,10 @@ export function KlientOsCasu({ meno, data, kalUdalosti }: {
       historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
+      bezHodin: data.bezHodin,
       kalUdalosti,
     }),
-    [meno, data.sessions, data.payments, data.packages, data.historiaBalickov, data.poplatky, data.nezaplateneKokpit, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.historiaBalickov, data.poplatky, data.nezaplateneKokpit, data.bezHodin, kalUdalosti],
   );
 
   if (!os.length) return null;

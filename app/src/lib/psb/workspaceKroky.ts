@@ -12,6 +12,7 @@
  * Tu sú len pravidlá, bez Reactu, aby sa dali overiť testami na skutočných
  * prípadoch (Dan Kouřil, Kateřina Matlová, Daniela Šašinková).
  */
+import type { DlhPolozka } from "./zaplatene";
 import { CENNIK, platnostDo, type Sablona } from "./cennik";
 import { normName } from "./format";
 import type { Udalost } from "./klientOsCasu";
@@ -192,47 +193,42 @@ export type OtazkaPlatby = {
  * balíčku, ktorý dostal NIEČO, ale nie celú cenu. Balíček bez platby nie je
  * otázka — ten len čaká na platbu.
  */
-export function otazkyPlatieb(balicky: BalicekPlatby[], platby: PlatbaPlatby[]): OtazkaPlatby[] {
-  const podla = new Map<string, { b: BalicekPlatby[]; p: PlatbaPlatby[] }>();
-  const daj = (k: string) => { const x = podla.get(k) || { b: [], p: [] }; podla.set(k, x); return x; };
-  for (const b of balicky) if (!b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0) daj(normName(b.klient)).b.push(b);
-  for (const p of platby) if (!p.zruseneAt) daj(normName(p.klient)).p.push(p);
-
+export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined): OtazkaPlatby[] {
+  /**
+   * Jedno pravidlo „zaplatený" (`data.dlhy`, 5. 10. 2026): otázka vzniká pri
+   * balíčku z Kokpitu, ktorý v zozname nezaplatených je, a dostal z ceny
+   * NIEČO. Dovtedy tu bola tretia kópia kladenia platieb na balíčky — bez
+   * poistky z PTmindera — a pýtala sa aj na balíček, ktorý PTminder pozná
+   * ako zaplatený.
+   */
   const out: OtazkaPlatby[] = [];
-  for (const { b, p } of podla.values()) {
-    if (!b.length) continue;
-    b.sort((x, y) => den(x.platnostOd).localeCompare(den(y.platnostOd)));
-    const od = den(b[0].platnostOd);
-    let zostava = p.filter((x) => den(x.datum) >= od || !!x.vopred).reduce((a, x) => a + x.suma, 0);
-    for (const x of b) {
-      const cena = x.cena || 0;
-      if (zostava + 1 >= cena) { zostava -= cena; continue; }
-      const zaplatene = Math.round(zostava);
-      zostava = 0;
-      if (zaplatene <= 0) continue;
-      const moznosti: MoznostPlatby[] = [];
-      for (const s of CENNIK) {
-        if (!s.hodiny || !s.cena || s.cena !== zaplatene || s.nazov === nazovProduktu(x.nazov)) continue;
-        moznosti.push({
-          druh: "velkost", popis: `je to ${s.nazov}`, nazov: s.nazov, hodiny: s.hodiny, cena: s.cena,
-          platnostDo: platnostDo(den(x.platnostOd), s.tyzdnov, s.mesiacov),
-        });
-      }
-      const zlava = Math.round((1 - zaplatene / cena) * 100);
-      if (Math.abs(zaplatene - cena * 0.9) <= 2) {
-        moznosti.push({ druh: "cena", popis: "zľava 10 % za odporúčanie", cena: zaplatene, dovod: "zľava 10 % za odporúčanie" });
-      }
-      moznosti.push({ druh: "cena", popis: `iná cena: ${zaplatene} Kč`, cena: zaplatene, dovod: "" });
-      out.push({
-        klient: x.klient, balicekId: x.id, balicek: nazovProduktu(x.nazov), platnostOd: den(x.platnostOd), cena, zaplatene,
-        veta: moznosti.some((m) => m.druh === "velkost")
-          ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč. Sedí veľkosť balíčka?`
-          : zlava > 0 && zlava < 50
-            ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč — o ${zlava} % menej. Prečo?`
-            : `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč.`,
-        moznosti,
+  for (const x of dlhy || []) {
+    if (x.zdroj !== "kokpit" || !x.id) continue;
+    const cena = x.cena;
+    const zaplatene = Math.round(cena - x.doplatit);
+    if (zaplatene <= 0 || zaplatene >= cena) continue;
+    const moznosti: MoznostPlatby[] = [];
+    for (const s of CENNIK) {
+      if (!s.hodiny || !s.cena || s.cena !== zaplatene || s.nazov === nazovProduktu(x.nazov)) continue;
+      moznosti.push({
+        druh: "velkost", popis: `je to ${s.nazov}`, nazov: s.nazov, hodiny: s.hodiny, cena: s.cena,
+        platnostDo: platnostDo(den(x.den), s.tyzdnov, s.mesiacov),
       });
     }
+    const zlava = Math.round((1 - zaplatene / cena) * 100);
+    if (Math.abs(zaplatene - cena * 0.9) <= 2) {
+      moznosti.push({ druh: "cena", popis: "zľava 10 % za odporúčanie", cena: zaplatene, dovod: "zľava 10 % za odporúčanie" });
+    }
+    moznosti.push({ druh: "cena", popis: `iná cena: ${zaplatene} Kč`, cena: zaplatene, dovod: "" });
+    out.push({
+      klient: x.klient, balicekId: x.id, balicek: nazovProduktu(x.nazov), platnostOd: den(x.den), cena, zaplatene,
+      veta: moznosti.some((m) => m.druh === "velkost")
+        ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč. Sedí veľkosť balíčka?`
+        : zlava > 0 && zlava < 50
+          ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč — o ${zlava} % menej. Prečo?`
+          : `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč.`,
+      moznosti,
+    });
   }
   return out.sort((a, b) => b.platnostOd.localeCompare(a.platnostOd));
 }

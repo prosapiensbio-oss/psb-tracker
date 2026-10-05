@@ -2320,13 +2320,8 @@ function skupinaFaktur(
       platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
       cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
     }));
-    const podla = <T extends { klient: string }>(xs: T[]) => {
-      const m: Record<string, T[]> = {};
-      for (const x of xs) (m[x.klient] ||= []).push(x);
-      return m;
-    };
     const treneri: Record<string, string> = {};
-    for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
+    for (const [meno, c] of Object.entries(clients)) treneri[meno] = c.primaryTrainer || "";
     /** Zdroj osi času — ten istý, aký používa profil klienta. */
     const ZDROJ_OSI = {
       sessions: data.sessions as never,
@@ -2335,6 +2330,7 @@ function skupinaFaktur(
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
+      bezHodin: data.bezHodin,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -2350,20 +2346,10 @@ function skupinaFaktur(
         Object.values(clients), evidencia, treningyZObochZdrojov(data.sessions, kalUdalosti || []), undefined,
         (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
       ),
-      dlznici: spocitajDlznikov(
-        (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
-        Object.fromEntries(Object.entries(podla(balickyRiadky)).map(([m, bs]) => [m, bs.map((b) => ({
-          cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
-        }))])),
-        Object.fromEntries(Object.entries(podla(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
-          suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at, vopred: p.vopred,
-        }))])),
-        treneri,
-        undefined,
-        data.dlhKokpit,
-      ),
+      // Jedno pravidlo „zaplatený" — dlžníci sú len zoskupený `data.dlhy`.
+      dlznici: spocitajDlznikov(data.dlhy, treneri),
     };
-  }, [clients, balickyRiadky, vlastnePlatby, data, kalUdalosti]);
+  }, [clients, balickyRiadky, data, kalUdalosti]);
 
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi,
