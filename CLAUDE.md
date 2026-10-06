@@ -2746,6 +2746,12 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
   počas platného členstva pokryje svoj tréning a obdobie neotvára
   (`samostatne`). Druh tréningu rozhoduje len keď je známy; prísne „online
   len z online" nie — Lucia Podolová má ON balíček a tréningy vedené offline.
+- **Pripomienka pri dnešnom tréningu hovorí stav PRED ním** (`dnesneTreningy`):
+  karta ráta len tréningy, ktoré začali, takže ráno a poobede je zostatok
+  iný. Veta „dnes je posledná hodina, ktorú mu appka pozná" pri nule aj
+  mínuse sa čítala ako „má poslednú hodinu" (Hanus, 6. 10. 2026 — −1, lebo
+  platba z 3. 10. nebola priradená). Teraz „dnes má poslednú hodinu
+  z balíčka" alebo „hodiny má minuté — dnešný tréning je nad rámec (−N)".
 - **Kontrolór profilov reže kalendár po TERAZ.** Ráno inak hlásil „odkaz −1
   · karta 0" pri každom, kto má tréning neskôr v ten deň.
 
