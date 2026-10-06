@@ -68,9 +68,10 @@ Rozhodnutia z 6. 10. sú zapracované (prenos mínusu, online/offline,
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
 
-- [x] **Navádzač kariet ako 3D kolotoč** — naostro 6. 10. 2026, variant
-  A · Valec (`KolotocKariet.tsx`); menšie písmo, všetky názvy čitateľné
-  (hĺbka stlačená). Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
+- [x] ~~**Navádzač kariet ako 3D kolotoč**~~ — postavené 6. 10. 2026 (koleso,
+  potom valec A z ukážky `navrhy-kokpitu/kolotoc-kariet.html`) a v ten istý
+  deň VRÁTENÉ na pôvodný rad (Jerry: „v mojej predstave to vyzeralo lepšie
+  ako v skutočnosti"). Neotvárať znova bez novej predstavy. Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
   v Need for Speed"). Kolotoč v rade (`poradieKolesa`) Jerryho ideu netrafil;
   ukážka mimo Kokpitu: `navrhy-kokpitu/kolotoc-kariet.html` — A valec,
   B obežná dráha, C bubon. Čaká na výber, potom do Workspace.

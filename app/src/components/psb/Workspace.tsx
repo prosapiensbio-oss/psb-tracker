@@ -6,7 +6,6 @@ import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KolotocKariet } from "./KolotocKariet";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
@@ -460,6 +459,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * raz a potom siahol po tlačidle.
    */
   const kopa = useRef<HTMLDivElement | null>(null);
+  /** Navádzač kariet hore — otvorená karta sa drží v jeho strede. */
+  const navKariet = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const nav = navKariet.current;
+    const el = nav?.querySelector<HTMLElement>("[data-aktivna]");
+    if (!nav || !el) return;
+    // scrollTo, nie scrollIntoView — ten by posunul aj celú stránku zvisle.
+    const ciel = Math.max(0, el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2);
+    nav.scrollTo({ left: ciel, behavior: menejPohybu ? "auto" : "smooth" });
+    // Plynulé rolovanie v skrytom okne nebeží vôbec (ako rAF) — poistka
+    // dorovná polohu natvrdo.
+    const t = setTimeout(() => { if (Math.abs(nav.scrollLeft - ciel) > 2) nav.scrollLeft = ciel; }, 450);
+    return () => clearTimeout(t);
+  }, [i, zive.length, menejPohybu]);
   const gesto = useRef(novyStavGesta());
   const svih = useRef(novyStavSvihu());
   const uzke = useUzke();
@@ -1527,18 +1540,46 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // trik: 100vw a posun o polovicu rozdielu doľava.
     <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: "0 20px", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
-        {/* NAVÁDZAČ KARIET — 3D valec (Jerry, 6. 10. 2026: „ako výber áut
-            v Need for Speed", variant A). Klik na názov preskočí rovno na
-            kartu, kratšou cestou okolo kruhu. */}
-        <KolotocKariet
-          polozky={zive.map((x) => ({
-            kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
-            nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? x.sekcie.reduce((a, y) => a + zostava(y), 0) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
-          }))}
-          aktivna={Math.min(i, zive.length - 1)}
-          onVyber={(j, smer) => prepni(smer, j)}
-        />
+        {/* NAVÁDZAČ KARIET (Jerry, 5. 10. 2026): všetky karty vedľa seba
+            malým písmom, otvorená je väčšia, zvýraznená a v strede. Klik
+            preskočí rovno na kartu — predtým len „Karta 4 z 9" a šípky. */}
+        <div ref={navKariet} style={{
+          // `relative`, aby `offsetLeft` tlačidla rátal od navádzača, nie od stránky.
+          position: "relative", flex: "1 1 320px", minWidth: 0, display: "flex", alignItems: "center", gap: 2, overflowX: "auto",
+          scrollbarWidth: "none", padding: "2px 0",
+          maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
+          WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
+        }}>
+          <div style={{ flex: "0 0 40%" }} aria-hidden="true" />
+          {zive.map((x, j) => {
+            const akt = Math.min(i, zive.length - 1);
+            const d = Math.abs(j - akt);
+            const n = x.druh === "krok" ? x.sekcie.reduce((a, y) => a + zostava(y), 0) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x);
+            return (
+              <button
+                key={x.druh === "krok" ? `krok|${x.krok}` : x.druh}
+                data-aktivna={d === 0 ? "1" : undefined}
+                onClick={() => (d === 0 ? undefined : prepni(j > akt ? 1 : -1, j))}
+                aria-current={d === 0 ? "true" : undefined}
+                style={{
+                  flex: "0 0 auto", whiteSpace: "nowrap", cursor: d === 0 ? "default" : "pointer", fontFamily: "inherit",
+                  fontSize: d === 0 ? 14.5 : d === 1 ? 12 : 11,
+                  fontWeight: d === 0 ? 700 : 500,
+                  padding: d === 0 ? "6px 14px" : "4px 8px", borderRadius: 999,
+                  border: `1px solid ${d === 0 ? C.accent : "transparent"}`,
+                  background: d === 0 ? C.accentBg : "transparent",
+                  color: d === 0 ? C.accentLight : d === 1 ? C.textMuted : C.textDim,
+                  opacity: d >= 3 ? 0.75 : 1,
+                  transition: "color .2s, background .2s",
+                }}
+              >
+                {x.nadpis}
+                {n > 0 && <span style={{ marginLeft: 5, fontSize: "0.85em", fontWeight: 700, color: d === 0 ? C.accentLight : C.orange }}>{n}</span>}
+              </button>
+            );
+          })}
+          <div style={{ flex: "0 0 40%" }} aria-hidden="true" />
+        </div>
         <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
           {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
         </div>
