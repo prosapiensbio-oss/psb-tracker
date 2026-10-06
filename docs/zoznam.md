@@ -218,6 +218,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
+- **Anonymný dotazník o ProSapiens cez SMS (Jerry, 6. 10. 2026 — „ok, všetko mi sedí"):** varianta **B** — osobný odkaz len na „vyplniť raz", odpovede uložené ODDELENE bez väzby na odkaz; čas odpovede len deň, výsledky až od 5 odpovedí, pri textových otázkach upozornenie na spoznateľnosť. Stránka v češtine bez prihlásenia (ako pocitovka), ~7 otázok: NPS 0–10, čo je najcennejšie, komunikácia, cena, prostredie, jedna vec na zmenu, odkaz. Rozoslanie cez hromadnú správu v kroku 2 · SMS, jedna pripomienka po týždni. Výsledky na jednej obrazovke + Jarvis. Plus **hlasovanie o funkciách pre klientov** (návrh v chate 6. 10.: pripomienka pred tréningom, rezervácia, domáce cviky, môj prehľad, náhradník na uvoľnený termín, pokrok). Otvorené: aktívni aj bývalí klienti (bývalí s inou otázkou)?
+
 - **Dizajn stiahnutého JPEG z editora fotiek (Jerry, 6. 10. 2026):** „doladiť finálnu podobu stiahnutého JPEG z editora — viem si tam predstaviť nejaký design." Dnes je to holý štvorec s popiskami. Návrh: rámik so značkou PSB (logo/nápis zo `znacka-napis*.svg`, Agrandir v exporte nie je — plátno ho musí mať načítané), meno klienta voliteľne, dátumy predtým/potom ako nadpisy nad polovicami, nenápadný pásik dole. Pripraviť 3–5 náčrtov mimo Kokpitu (ako rozloženia) a nechať Jerryho vybrať. Pozor na súhlas: verejné zdieľanie chce samostatný súhlas klienta.
 
 - ~~**Dávkové potvrdzovanie bankových platieb**~~ — HOTOVÉ (akcia
