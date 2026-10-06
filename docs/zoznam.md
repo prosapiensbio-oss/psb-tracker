@@ -210,6 +210,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Skladačka predtým / potom (6. 10. 2026)** — editor ako appka Layout: štvorec rozdelený na polovicu, v každej fotka, ťahom a dvoma prstami sa ostrihá, aby postava sedela vedľa seba; dátumy na fotke, zrkadlo, export JPEG. Jerry: „postav zvlášť najprv len do návrhu" → `navrhy-kokpitu/skladacka-predtym-potom.html`. Matematika výrezu aj s testami čaká v `navrhy-kokpitu/skladacka-do-kokpitu.patch` (fotka „porovnanie" v kartotéke). Do Kokpitu až po jeho slove. Pozor: súhlas v anamnéze hovorí „nikde se nezveřejňují" — export na sociálne siete chce samostatný súhlas.
+
 | Vec | Odkedy | Otázka |
 |---|---|---|
 | ~~PSI kľúč~~ — HOTOVÉ 6. 10. 2026: nový kľúč (projekt Kokpit kalendar, obmedzený na PageSpeed Insights API) v Údajoch; 3 merania cez appku prešli (07:09 UTC), priamy test u Google 200. Pozn.: „41 znakov" bola dĺžka s úvodzovkami JSON v `vzas_settings`, nie chyba kľúča. | 1. 10. | — |
