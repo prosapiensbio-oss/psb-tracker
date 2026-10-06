@@ -25,6 +25,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
+import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
@@ -127,7 +128,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [menoVnutri, setMenoVnutri] = useState("");
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
-  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "poznamky">("zdravie");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "fotky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
@@ -1339,7 +1340,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
             ))}
           </div>
@@ -1768,6 +1769,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           )}
 
           {filter === "anamneza" && <AnamnezaZhrnutie meno={meno} onOtvor={(m) => onOtvorAnamnezu?.(m)} />}
+
+          {/* Fotky držania tela aj v profile (Jerry, 6. 10. 2026) — ďalšie
+              fotenie sa nahrá tu, nemusí sa kvôli nemu otvárať anamnéza. */}
+          {filter === "fotky" && <KartotekaFotiek meno={meno} uzke={uzke} />}
 
           {filter === "poznamky" && (
             <>

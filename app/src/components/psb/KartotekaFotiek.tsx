@@ -146,6 +146,8 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
 
   const fs = d.fotky || [];
   const dni = fotenia(fs, d.poznamky || {});
+  /** Najstaršie fotenie — od neho je všetko ďalšie „potom". */
+  const prveFotenie = fs.length ? fs.reduce((a, f) => (f.den < a ? f.den : a), fs[0].den) : "";
   const porov = porovnania(fs);
   const mozeNahrat = !!d.ulozisko && !!d.sifra && (d.suhlas || osobne);
   const obrazok = (f: Fotka) => `/api/fotky?id=${encodeURIComponent(f.id)}`;
@@ -159,7 +161,7 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
       {/* ── NAHRATIE ── */}
       <div style={{ padding: 14, borderRadius: 12, background: C.surface, border: `1px solid ${mix(C.border, 120)}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>Nové fotenie</span>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>{prveFotenie ? "Nahrať ďalšie fotky" : "Prvé fotenie"}</span>
           {d.suhlas ? nalepka("súhlas z anamnézy", C.green) : nalepka("bez súhlasu v anamnéze", C.orange)}
         </div>
         {!d.ulozisko && (
@@ -213,7 +215,12 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
             }}
           >{nahravam || "Odfotiť alebo vybrať"}</button>
         </div>
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
+          {prveFotenie
+            ? <>Prvé fotenie je z {denCz(prveFotenie)}. Fotky z iného dňa sú ďalšie fotenie („potom") a prvá s poslednou sa postavia vedľa seba.</>
+            : <>Robí sa na úvodnom tréningu. Každé ďalšie fotenie sa nahrá sem s jeho dňom.</>}
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.55 }}>
           Fotky sú zašifrované a nikde sa nezverejňujú — vidí ich len prihlásený tréner. Viac fotiek naraz dostane
           zvolený pohľad; zmeniť sa dá pri každej.
         </div>
@@ -251,7 +258,16 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
         <div key={x.den} style={{ borderTop: `1px solid ${mix(C.border, 60)}`, paddingTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{denCz(x.den)}</span>
-            <span style={{ fontSize: 11.5, color: C.textDim }}>{x.fotky.length} {x.fotky.length === 1 ? "fotka" : x.fotky.length < 5 ? "fotky" : "fotiek"}</span>
+            <span style={{ fontSize: 11.5, color: C.textDim }}>
+              {x.den === prveFotenie ? "prvé fotenie · " : ""}{x.fotky.length} {x.fotky.length === 1 ? "fotka" : x.fotky.length < 5 ? "fotky" : "fotiek"}
+            </span>
+            <span style={{ flexGrow: 1 }} />
+            {/* Doplniť fotku k už existujúcemu foteniu — deň sa vezme z neho. */}
+            <button
+              type="button" disabled={!mozeNahrat || !!nahravam}
+              onClick={() => { setDen(x.den); vstup.current?.click(); }}
+              style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: mozeNahrat && !nahravam ? "pointer" : "default", opacity: mozeNahrat && !nahravam ? 1 : 0.5 }}
+            >+ pridať fotky k tomuto dňu</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 120 : 150}px, 1fr))`, gap: 8, marginTop: 9 }}>
             {x.fotky.map((f) => (

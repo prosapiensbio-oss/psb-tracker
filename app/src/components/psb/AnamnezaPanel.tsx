@@ -337,10 +337,10 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
         {fotkyOtvorene ? (
           <>
             <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Po úvodnom tréningu · kartotéka</div>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Úvodné aj ďalšie fotenia · kartotéka</div>
               <div style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.3, marginTop: 5 }}>Fotky držania tela</div>
               <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 6, lineHeight: 1.6, maxWidth: "62ch" }}>
-                Zboku, spredu, zozadu — a poznámka k foteniu. Pri ďalšom fotení sa priložia k tomu istému klientovi a prvá s poslednou stoja vedľa seba.
+                Zboku, spredu, zozadu — a poznámka k foteniu. Ďalšie fotky sa nahrajú sem (aj v profile klienta → fotky) a prvá s poslednou stoja vedľa seba.
               </div>
             </div>
             <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 14 }}>
