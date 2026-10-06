@@ -199,7 +199,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 | Vec | Odkedy | Otázka |
 |---|---|---|
-| PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
+| ~~PSI kľúč~~ — HOTOVÉ 6. 10. 2026: nový kľúč (projekt Kokpit kalendar, obmedzený na PageSpeed Insights API) v Údajoch; 3 merania cez appku prešli (07:09 UTC), priamy test u Google 200. Pozn.: „41 znakov" bola dĺžka s úvodzovkami JSON v `vzas_settings`, nie chyba kľúča. | 1. 10. | — |
 
 ## 2 · Prijaté, nezačaté
 
