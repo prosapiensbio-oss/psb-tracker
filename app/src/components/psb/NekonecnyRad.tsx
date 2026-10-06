@@ -15,6 +15,12 @@ import { C } from "../../lib/psb/theme";
  *
  * Poloha sa počíta mimo Reactu (rAF a priamy zápis štýlu). React kreslí len
  * to, KTORÁ karta stojí v ktorom slote — mení sa raz za krok, nie za snímok.
+ *
+ * DVA PRSTY / ŤAH (Jerry, 6. 10.: „tak ako to fungovalo predtým"). Starý rad
+ * bol rolovací pás — dvoma prstami sa ním hýbalo, kartu to neprepínalo. Tu
+ * je to isté: pás ide za prstami („voľný"), zvýraznená ostáva otvorená
+ * karta (jej najbližšia kópia) a do stredu sa pás vráti až pri ďalšom
+ * prepnutí karty.
  */
 export type PolozkaRadu = { kluc: string; nadpis: string; pocet: number };
 
@@ -22,6 +28,12 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
 const MEDZERA = 14;
 /** Koľko názvov je naraz v rade z každej strany stredu. */
 const POL = 10;
+
+/** Index (neohraničený) kópie karty `karta` najbližšej k polohe `p`. */
+export function najblizsiaKopia(p: number, karta: number, n: number): number {
+  const z = Math.round(p);
+  return z + posunRadu(z, karta, n);
+}
 
 /** Kratšia cesta okolo kruhu z `od` na `na` (−n/2 … n/2). */
 export function posunRadu(od: number, na: number, n: number): number {
@@ -57,11 +69,19 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
   const poloha = useRef(aktivna);
   const [zaklad, setZaklad] = useState(aktivna);
   const zakladRef = useRef(aktivna);
+  const aktivnaRef = useRef(aktivna);
+  aktivnaRef.current = aktivna;
+  /** Pás ide za prstami — nepritahuje sa k cieľu, kým sa neprepne karta. */
+  const volny = useRef(false);
+  const tahRef = useRef<{ x: number; id: number; pohol: boolean } | null>(null);
   const menejPohybu = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
   // Otvorená karta sa zmenila zvonku (šípka, gesto, obnovenie) → kratšou cestou.
+  // Ak bol pás posunutý prstami, ide sa od miesta, kde práve stojí.
   useEffect(() => {
-    if (n) ciel.current += posunRadu(ciel.current, aktivna, n);
+    if (!n) return;
+    if (volny.current) { volny.current = false; ciel.current = najblizsiaKopia(poloha.current, aktivna, n); }
+    else ciel.current += posunRadu(ciel.current, aktivna, n);
   }, [aktivna, n]);
 
   // Šírky názvov — zmerajú sa raz pri každej zmene zoznamu alebo počtov.
@@ -84,7 +104,7 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
         if (!b) return;
         const o = k - POL;
         b.style.transform = `translate(-50%, -50%) translateX(${stredy[k] - posunX}px)`;
-        const akt = Math.abs(o - (p - z)) < 0.5;
+        const akt = z + o === najblizsiaKopia(p, aktivnaRef.current, n);
         b.style.color = akt ? C.accentLight : C.textMuted;
         b.style.fontWeight = akt ? "800" : "600";
         b.style.borderColor = akt ? C.accent : "transparent";
@@ -97,7 +117,7 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
     const snimka = () => {
       if (!zije) return;
       const d = ciel.current - poloha.current;
-      if (Math.abs(d) > 0.0005) {
+      if (!volny.current && Math.abs(d) > 0.0005) {
         poloha.current = menejPohybu || Math.abs(d) < 0.001 ? ciel.current : poloha.current + d * 0.16;
         kresli();
       }
@@ -108,10 +128,69 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
     // rAF v skrytej záložke nebeží (28. 9. 2026 to zamklo kopu) — po návrate
     // sa rad postaví rovno na cieľ.
     const navrat = () => {
-      if (document.visibilityState === "visible") { poloha.current = ciel.current; kresli(); }
+      if (document.visibilityState === "visible" && !volny.current) { poloha.current = ciel.current; kresli(); }
     };
     document.addEventListener("visibilitychange", navrat);
-    return () => { zije = false; cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", navrat); };
+
+    // Posun o `px` pixelov (kladné = pás doľava). Prepočet na kroky podľa
+    // šírky aktuálneho kroku; pri prechode cez ďalší názov sa vezme jeho.
+    const posunPx = (px: number) => {
+      volny.current = true;
+      let zvysok = px;
+      for (let i = 0; i < 50 && Math.abs(zvysok) > 0.01; i++) {
+        const p = poloha.current;
+        // úsek [z, z+1], v ktorom sa pohyb deje (doľava z celého čísla = predošlý)
+        const z = zvysok > 0 ? Math.floor(p) : Math.ceil(p) - 1;
+        const krok = stredyRadu(z, sirky.current, 1)[2] || 80;
+        const f = p - z;
+        // koľko pixelov ostáva po hranicu úseku v smere pohybu
+        const doHranice = zvysok > 0 ? (1 - f) * krok : -f * krok;
+        if (Math.abs(zvysok) < Math.abs(doHranice)) { poloha.current = p + zvysok / krok; zvysok = 0; }
+        else { poloha.current = zvysok > 0 ? z + 1 : z; zvysok -= doHranice; }
+      }
+      kresli();
+    };
+    const el = scena.current;
+    // Dva prsty na touchpade. `passive: false`, inak Safari zo šmyku urobí
+    // „späť v histórii".
+    const naKoleso = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      posunPx(e.deltaX);
+    };
+    // Ťah prstom na telefóne (wheel tam nechodí). Myš ťahať nemusí — klik.
+    // Ťah žije v refe: pri prechode cez názov sa efekt prestavia (nový `zaklad`).
+    const tah = tahRef;
+    const zac = (e: PointerEvent) => { if (e.pointerType !== "mouse") tah.current = { x: e.clientX, id: e.pointerId, pohol: false }; };
+    const pohyb = (e: PointerEvent) => {
+      const t = tah.current;
+      if (!t || e.pointerId !== t.id) return;
+      const dx = t.x - e.clientX;
+      if (!t.pohol && Math.abs(dx) < 6) return;
+      t.pohol = true;
+      t.x = e.clientX;
+      posunPx(dx);
+    };
+    const kon = (e: PointerEvent) => {
+      const t = tah.current;
+      if (!t || e.pointerId !== t.id) return;
+      // Ťah nie je klik — inak by pustenie prsta otvorilo kartu pod ním.
+      if (t.pohol) { const stop = (c: Event) => { c.stopPropagation(); c.preventDefault(); }; el?.addEventListener("click", stop, { capture: true, once: true }); setTimeout(() => el?.removeEventListener("click", stop, { capture: true }), 400); }
+      tah.current = null;
+    };
+    el?.addEventListener("wheel", naKoleso, { passive: false });
+    el?.addEventListener("pointerdown", zac);
+    el?.addEventListener("pointermove", pohyb);
+    el?.addEventListener("pointerup", kon);
+    el?.addEventListener("pointercancel", kon);
+    return () => {
+      zije = false; cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", navrat);
+      el?.removeEventListener("wheel", naKoleso);
+      el?.removeEventListener("pointerdown", zac);
+      el?.removeEventListener("pointermove", pohyb);
+      el?.removeEventListener("pointerup", kon);
+      el?.removeEventListener("pointercancel", kon);
+    };
   }, [n, zaklad, podpis, menejPohybu]);
 
   const tlacidlo = {
@@ -132,7 +211,7 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
       role="tablist"
       aria-label="Karty Workspace"
       style={{
-        position: "relative", flex: "1 1 320px", minWidth: 0, height: 36, overflow: "hidden",
+        position: "relative", flex: "1 1 320px", minWidth: 0, height: 36, overflow: "hidden", touchAction: "pan-y",
         maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)",
         WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)",
       }}
@@ -152,8 +231,12 @@ export function NekonecnyRad({ polozky, aktivna, onVyber }: {
             ref={(el) => { sloty.current[k] = el; }}
             role="tab"
             onClick={() => {
-              const posun = o - (poloha.current - Math.floor(poloha.current));
-              if (Math.abs(posun) < 0.5) return;
+              if (j === aktivna) {
+                // Klik na otvorenú kartu (napr. po posune prstami) ju len vráti do stredu.
+                volny.current = false;
+                ciel.current = Math.floor(poloha.current) + o;
+                return;
+              }
               // Pás pôjde kratšou cestou (efekt nad `aktivna`); keby si cieľ
               // nastavil sám a prepnutie by kopa odmietla (beží animácia),
               // rad by ukazoval inú kartu, než je otvorená.
