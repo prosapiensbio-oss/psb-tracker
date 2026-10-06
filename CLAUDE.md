@@ -86,8 +86,9 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
 - **Peniaze z Google Ads sú v mikrách.** Zabudnuté delenie miliónom vyrobí
   číslo, ktoré má správny počet číslic na to, aby vyzeralo ako suma.
 - **Token vývojára na úrovni „prieskumník" nepustí plánovač kľúčových slov.**
-  Objem hľadania čaká na Basic (žiadosť podaná 14. 8. 2026). Nepíš do appky
-  odhady objemu — Search Console meria len tam, kde sa web už zobrazil.
+  Basic bol pridelený (overené 6. 10. 2026 naživo cez `akcia: "skus-planovac"`
+  v `/api/google-ads`). Niektoré všeobecné semienka („bolest zad") vrátia
+  NULU nápadov — prázdna odpoveď nie je dôkaz, že sa to nehľadá.
 - **GAQL chce rozsah dátumov ohraničený z OBOCH strán.** `WHERE segments.date
   >= '...'` Google odmietne s `EXPECTED_FILTERS_ON_DATE_RANGE`; musí to byť
   `BETWEEN od AND do`. Test na to je v `googleAds.test.ts` — otvorený rozsah
@@ -2747,3 +2748,18 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
   len z online" nie — Lucia Podolová má ON balíček a tréningy vedené offline.
 - **Kontrolór profilov reže kalendár po TERAZ.** Ráno inak hlásil „odkaz −1
   · karta 0" pri každom, kto má tréning neskôr v ten deň.
+
+## Peniaze z Kokpitu — prepínač od mesiaca (6. 10. 2026)
+
+`lib/psb/peniazeZKokpitu.ts`: `loadData` skladá `data.payments` ako pri
+dochádzke — pred `peniaze_kokpit_od` (vzas_settings) export PTmindera, od
+neho tabuľka `platby`. Celý export ostáva v `data.paymentsPtminder`.
+- **Prepína sa len mesiac, ktorý SEDÍ** (`mozePrepnut`: 200 Kč / 1 %, žiadny
+  nepriradený klientsky príjem). Pri meraní 6. 10. mal september v Kokpite
+  190 026 proti 324 849 — chýbal zošit od 28. 8., bitcoin a 10 príjmov.
+  Pevný dátum ako pri dochádzke by tržby zrazil o tretinu.
+- Rozhoduje SERVER (`akcia: "peniaze-od"`), tlačidlo len pýta. Späť sa dá vždy.
+- Od prepnutia sa ručný príjem (split `prijem`) do P&L nepripočíta — úvodný
+  v hotovosti je platba klienta, inak by bol dvakrát.
+- Bitcoin a prevod z cudzieho účtu sa do tržieb dostanú LEN ručným zápisom
+  so spôsobom (formulár „Zapísať platbu mimo banky").

@@ -35,7 +35,7 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        Platby len v Kokpite vyriešené 5. 10. 2026 s Jerrym: 56 000 Kč (zošit
        „Jarek“) patrí Jaroslavovi Broskvovi, nie Heinrichovi. Jerry 6. 10.:
        priniesol 56 000, 1 400 mu vrátili o pár dní (nebolo vydať) — platba
-       opravená na 54 600 = PTminder. Vrátenie 1 400 v zošite NIE JE; Heinrich 24. 9. = 7 790 (Terka
+       opravená na 54 600 = PTminder. Vrátenie 1 400 (28. 6.) Jerry: ignorovať; Heinrich 24. 9. = 7 790 (Terka
        poslala 5 390, 2 400 si nechala); Miřejovský 752 zrušené; Dvořák 1 100
        za tréning 16. 9. platí (mama), balíček 6 h je preventívny a nezaplatený.
        Opravené v kóde: pravidlo platiteľa sa učí len z priezviska, zápis zo
@@ -224,7 +224,18 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
   balíčku, niesť QR platbu a odísť mailom.
 
-- **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Meradlo
+- **6. 10. 2026 — PREPÍNAČ PEŇAZÍ POSTAVENÝ** (`peniazeZKokpitu.ts`): tržby,
+  grafy aj P&L berú platby pred zvoleným mesiacom z PTmindera, od neho
+  z vlastnej evidencie; prepína sa v Prechode → Platby a server pustí len
+  mesiac, ktorý sedí (200 Kč / 1 %) a nečaká v ňom nepriradený príjem.
+  Tréningy od 1. 10. už idú z kalendára, takže staré názvy v kalendári mapovať
+  netreba (pred 1. 10. platí PTminder). **Čaká na Jerryho:** priradiť
+  októbrové príjmy z banky (4, 33 580 Kč), zapisovať hotovosť a bitcoin do
+  Kokpitu (zošit nie je v Kokpite od 28. 8.), potom tlačidlo „Prepnúť peniaze
+  na Kokpit od 10/2026". Stav 6. 10.: október Kokpit 0 / PTminder 17 190.
+  Pozn.: v dávke návrhov stojí znova Miřejovský 752 (platba bola 5. 10.
+  zrušená, pohyb v banke ostal) — rozhodne Jerry.
+  Pôvodný text: **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Meradlo
   beží v Prechode („Vlastné dáta proti exportu", dvojitý výpočet za posledné
   tri mesiace). Stav k 26. 9. — august, jediný uzavretý mesiac:
   tréningy 186/183, hodiny 186/183, klienti 54/54 sedia; **peniaze
@@ -407,8 +418,9 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   klientov, ktorých fotky sa už niekde použili, nemá zmysel stavať úložisko.
   Je to jediná zostávajúca cesta, ako dokázať výsledok obrazom (meranie
   bolesti Jerry 24. 9. zrušil natrvalo — pozri „Zavreté").
-- **Google Ads „Basic"** — žiadosť podaná 14. 8. 2026, stále bez verdiktu.
-  Dovtedy sa objem hľadania merať nedá a do appky sa odhady nepíšu.
+- ~~**Google Ads „Basic"**~~ — PRIDELENÉ (overené 6. 10. 2026 v API Center
+  aj naživo: `akcia: "skus-planovac"`, „osobní trenér praha" 260/mes.).
+  Objem hľadania sa teda dá ťahať — zatiaľ nie je postavená obrazovka.
 ## 4 · Odložené do vypnutia PTmindera
 
 - Na karte klienta nahradiť „zaplatil podľa PTmindera" **dvoma číslami vedľa
@@ -429,7 +441,7 @@ k 25. 9. 2026:
 | | koľko |
 |---|---|
 | bankové príjmy bez priradenia | ~125 z 238 (priradených 113) |
-| dopyty bez dôvodu, prečo sa z nich nestal klient | 46 |
+| dopyty bez dôvodu, prečo sa z nich nestal klient | 46 → 0: od 6. 10. 2026 sa pýta len pri nových (`DOVOD_DOPYTU_OD`) |
 | dopyty bez času prvej odpovede | 46 |
 | nevysvetlené zmeny v kalendári | 36 |
 | závery po termíne overenia | 13 z 18 otvorených |
