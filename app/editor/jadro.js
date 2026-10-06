@@ -502,13 +502,12 @@
   addEventListener("resize", kresli);
 
   // ── EXPORT: ten istý výrez vo veľkom rozlíšení ──
-  document.getElementById("stiahnut").onclick = async () => {
-    const N = 2000;
+  /** Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c. */
+  function kresliCelok(c) {
+    const N = c.width;
     const medzeraObr = Number(document.getElementById("medzera").value);
     const pomer = N / stvorec.clientWidth;
     const g = Math.round(medzeraObr * pomer);
-    const c = document.createElement("canvas");
-    c.width = N; c.height = N;
     const x = c.getContext("2d");
     x.fillStyle = "#fff"; x.fillRect(0, 0, N, N);
     const vedla = rozdelenie === "vedla", cez = rozdelenie === "cez";
@@ -560,7 +559,16 @@
       ciaryNaPlatno(x, R, pomer, N);
       vybrana = predVyber;
     }
-    const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
+  }
+  /** Hotový štvorec ako JPEG — na stiahnutie aj do kartotéky klienta. */
+  async function vyrobJpeg(N = 2000) {
+    const c = document.createElement("canvas");
+    c.width = N; c.height = N;
+    kresliCelok(c);
+    return new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
+  }
+  document.getElementById("stiahnut").onclick = async () => {
+    const blob = await vyrobJpeg();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "predtym-potom.jpg";
@@ -569,7 +577,7 @@
   };
 
   window.skladacka = {
-    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor,
+    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg,
     get rezimCiar() { return rezimCiar; },
     get vybrana() { return vybrana; },
     get pocetCiar() { return ciary.length; },

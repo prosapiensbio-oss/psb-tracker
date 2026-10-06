@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
-import { fotenia, MAX_STRANA, nazovPohladu, porovnania, POHLADY, type Fotka } from "../../lib/psb/kartoteka";
+import { pocuvaj } from "../../lib/psb/obnovaSignal";
+import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -58,6 +59,8 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   const [osobne, setOsobne] = useState(false);
   const [nahravam, setNahravam] = useState<string | null>(null);
   const [zvacsena, setZvacsena] = useState<Fotka | null>(null);
+  /** Prehrávané video z editora: zašifrované ide celé cez fetch, potom z pamäte. */
+  const [video, setVideo] = useState<{ f: Fotka; url: string } | null>(null);
   /** Rozpísané poznámky po dňoch — zapisujú sa pri odchode z políčka. */
   const [koncepty, setKoncepty] = useState<Record<string, string>>({});
   const vstup = useRef<HTMLInputElement | null>(null);
@@ -70,14 +73,33 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
     setKoncepty({});
   }, [meno]);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
+  // Editor (Workspace → Editor) uloží porovnanie či video ku klientovi —
+  // kartotéka v profile ostáva načítaná, tak sa obnoví na signál.
+  useEffect(() => pocuvaj("fotky", () => void nacitaj()), [nacitaj]);
 
-  // Esc zavrie zväčšenú fotku.
+  // Esc zavrie zväčšenú fotku aj video.
   useEffect(() => {
-    if (!zvacsena) return;
-    const na = (e: KeyboardEvent) => { if (e.key === "Escape") setZvacsena(null); };
+    if (!zvacsena && !video) return;
+    const na = (e: KeyboardEvent) => { if (e.key === "Escape") { setZvacsena(null); setVideo(null); } };
     document.addEventListener("keydown", na);
     return () => document.removeEventListener("keydown", na);
-  }, [zvacsena]);
+  }, [zvacsena, video]);
+  // Adresa videa v pamäti sa po zavretí uvoľní.
+  useEffect(() => () => { if (video) URL.revokeObjectURL(video.url); }, [video]);
+  const prehraj = async (f: Fotka) => {
+    setHlaska("Načítavam video…");
+    try {
+      // Celé cez fetch, nie <video src>: Safari chce pri videu čiastočné
+      // odpovede (Range) a server vracia rozšifrovaný súbor naraz.
+      const r = await fetch(`/api/fotky?id=${encodeURIComponent(f.id)}`, { credentials: "same-origin" });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `HTTP ${r.status}`);
+      setVideo({ f, url: URL.createObjectURL(await r.blob()) });
+      setChyba("");
+    } catch (e) {
+      setChyba(`Video sa nenačítalo: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`);
+    }
+    setHlaska("");
+  };
 
   const posli = async (telo: Record<string, unknown>): Promise<boolean> => {
     const j = await fetch("/api/fotky", {
@@ -128,7 +150,7 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
 
   const zmaz = async (f: Fotka) => {
     if (!window.confirm(`Zmazať fotku ${nazovPohladu(f.pohlad)} z ${denCz(f.den)}? Vrátiť sa to nedá.`)) return;
-    if (await posli({ akcia: "zmaz", id: f.id })) { setZvacsena(null); await nacitaj(); }
+    if (await posli({ akcia: "zmaz", id: f.id })) { setZvacsena(null); setVideo(null); await nacitaj(); }
   };
 
   const ulozPoznamku = async (dn: string) => {
@@ -144,7 +166,11 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
     return <div style={{ padding: 16, fontSize: 13, color: chyba ? C.red : C.textDim }}>{chyba || "Načítavam kartotéku…"}</div>;
   }
 
-  const fs = d.fotky || [];
+  // Fotky tela zvlášť od výstupov editora (porovnanie, video) — tie sa
+  // neporovnávajú a nepatria do fotení.
+  const vsetky = d.fotky || [];
+  const fs = vsetky.filter(jeFotkaTela);
+  const zEditora = vsetky.filter((f) => !jeFotkaTela(f));
   const dni = fotenia(fs, d.poznamky || {});
   /** Najstaršie fotenie — od neho je všetko ďalšie „potom". */
   const prveFotenie = fs.length ? fs.reduce((a, f) => (f.den < a ? f.den : a), fs[0].den) : "";
@@ -250,6 +276,29 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
         </div>
       )}
 
+      {/* ── Z EDITORA ── porovnania predtým/potom a videá (Workspace → Editor) */}
+      {zEditora.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim, marginBottom: 8 }}>Z editora</div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 130 : 170}px, 1fr))`, gap: 8 }}>
+            {zEditora.map((f) => (
+              <button
+                key={f.id} type="button"
+                onClick={() => (f.pohlad === VIDEO ? void prehraj(f) : setZvacsena(f))}
+                style={{ padding: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", background: C.card, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: C.text }}
+              >
+                {f.pohlad === VIDEO ? (
+                  <div style={{ aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, fontSize: 34, color: C.accentLight }}>▶</div>
+                ) : (
+                  <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
+                )}
+                <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── FOTENIA ── */}
       {!dni.length && (
         <div style={{ fontSize: 13, color: C.textDim }}>Zatiaľ žiadne fotky. Prvé sa robia na úvodnom tréningu — zboku, spredu, zozadu.</div>
@@ -298,6 +347,22 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
           />
         </div>
       ))}
+
+      {/* ── VIDEO Z EDITORA ── */}
+      {video && (
+        <div
+          role="dialog" aria-label="Video" onClick={() => setVideo(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: C.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, gap: 10 }}
+        >
+          <video src={video.url} controls autoPlay muted playsInline onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "calc(100vh - 110px)", borderRadius: 8, background: "#000" }} />
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: C.textMuted }}>
+            <span>video · {denCz(video.f.den)}{video.f.kto ? ` · ${video.f.kto}` : ""}</span>
+            <a href={video.url} download={`video-${meno}-${video.f.den}.${(video.f.typ || "").includes("webm") ? "webm" : "mp4"}`} style={{ color: C.accentLight, fontSize: 12.5 }}>stiahnuť</a>
+            <button type="button" onClick={() => void zmaz(video.f)} style={{ background: "none", border: "none", color: C.red, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zmazať</button>
+            <button type="button" onClick={() => setVideo(null)} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>
+          </div>
+        </div>
+      )}
 
       {/* ── ZVÄČŠENIE ── nepriehľadné pozadie (pravidlo z 30. 9.: okno nad obsahom nesmie byť priesvitné) */}
       {zvacsena && (

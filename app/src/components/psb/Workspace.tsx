@@ -692,7 +692,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const obsahKarty = (k: Karta): React.ReactNode => (
     <>
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
-              {k.druh === "editor" && <EditorKarta />}
+              {k.druh === "editor" && <EditorKarta mena={mena} />}
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}

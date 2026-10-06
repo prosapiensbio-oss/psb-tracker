@@ -11,6 +11,7 @@ a do stránok sa VKLADAJÚ (jedna stránka = jeden súbor):
   jadro.js / jadro.css  — fotkový editor (štvorec, výrez, mriežka, čiary)
   ui.css                — panel, skupiny, tlačidlá, zásobník
   sklad.js              — zásobník snímok (IndexedDB), spoločný pre oba editory
+  kartoteka.js          — kto je klient (správa z Kokpitu) a ukladanie do jeho kartotéky
 
 Po každej zmene:  python3 editor/zostav.py   (z priečinka app/)
 Test `src/lib/psb/editorZostava.test.ts` stráži, že public/editor je zostavený z aktuálnych častí.
@@ -19,7 +20,7 @@ import re, pathlib
 tu = pathlib.Path(__file__).parent
 von = tu.parent / "public" / "editor"
 von.mkdir(parents=True, exist_ok=True)
-js = {"jadro-js": (tu / "jadro.js").read_text(), "sklad-js": (tu / "sklad.js").read_text()}
+js = {"jadro-js": (tu / "jadro.js").read_text(), "sklad-js": (tu / "sklad.js").read_text(), "kartoteka-js": (tu / "kartoteka.js").read_text()}
 css = {"jadro-css": (tu / "jadro.css").read_text(), "ui-css": (tu / "ui.css").read_text()}
 for sablona, ciel in [("foto.sablona.html", "foto.html"), ("video.sablona.html", "video.html")]:
     s = (tu / sablona).read_text()

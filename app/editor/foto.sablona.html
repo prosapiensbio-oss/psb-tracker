@@ -26,7 +26,15 @@
 
   <aside class="panel">
     <div class="skupiny">
-      <details data-skupina="fotky" open>
+      <details data-skupina="kartoteka" open>
+        <summary><span class="sipka">▸</span>Kartotéka klienta<span class="stav" id="stavKartoteka"></span></summary>
+        <div class="obsah">
+          <div class="napoveda" id="kartNapoveda">Vyber klienta hore nad editorom — tu sa ukážu jeho fotky z kartotéky a hotové porovnanie sa mu uloží.</div>
+          <div class="zasobnik" id="kartGrid"></div>
+        </div>
+      </details>
+
+      <details data-skupina="fotky">
         <summary><span class="sipka">▸</span>Fotky<span class="stav" id="stavFotky"></span></summary>
         <div class="obsah">
           <div class="vyber-okna" id="vyberOkna">
@@ -108,8 +116,10 @@
         </div>
       </details>
     </div>
+    <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
       <button class="tl" id="stiahnut">Stiahnuť JPEG</button>
+      <button class="tl hlavne" id="ulozitKlientovi" disabled title="Uloží hotový štvorec do kartotéky klienta">Uložiť ku klientovi</button>
     </div>
   </aside>
 </div>
@@ -117,6 +127,9 @@
 
 <script>
 <!--sklad-js--><!--/sklad-js-->
+</script>
+<script>
+<!--kartoteka-js--><!--/kartoteka-js-->
 </script>
 <script>
 <!--jadro-js--><!--/jadro-js-->
@@ -136,6 +149,56 @@
   addEventListener("keydown", (e) => {
     if (e.key === "Escape") vsetky.forEach((d) => { if (d.dataset.skupina === "ciary") d.open = false; });
   });
+
+  // ── Kartotéka klienta: jeho fotky do polovíc, hotový štvorec k nemu ──
+  const kt = window.kartotekaKlienta;
+  let fotkyKlienta = [];
+  const pohladNazov = { bok: "zboku", predok: "spredu", zadok: "zozadu", ine: "iné" };
+  async function nacitajKartoteku() {
+    const meno = kt.klient;
+    $("kartNapoveda").hidden = !!meno;
+    $("stavKartoteka").textContent = meno || "bez klienta";
+    $("ulozitKlientovi").disabled = !meno;
+    if (!meno) { $("kartGrid").innerHTML = ""; return; }
+    try { fotkyKlienta = await kt.fotky(); }
+    catch (e) { $("kartGrid").innerHTML = `<div class="napoveda" style="color:var(--accentLight)">${String(e.message || e)}</div>`; return; }
+    if (meno !== kt.klient) return; // medzitým iný klient
+    $("stavKartoteka").textContent = `${meno} · ${fotkyKlienta.length}`;
+    $("kartGrid").innerHTML = fotkyKlienta.length ? fotkyKlienta.map((f) => `
+      <div class="sn" draggable="true" data-id="${f.id}" title="Pretiahni do polovice">
+        <img src="${kt.adresa(f.id)}" alt="" loading="lazy">
+        <div class="popis"><b>${sk.denCz(f.den)}</b><br>${pohladNazov[f.pohlad] || f.pohlad}</div>
+        <div class="akcie">
+          <button data-a="vlavo" title="Do ľavej / hornej polovice">◧</button>
+          <button data-a="vpravo" title="Do pravej / dolnej polovice">◨</button>
+        </div>
+      </div>`).join("") : `<div class="napoveda">${meno} zatiaľ nemá v kartotéke žiadne fotky. Nahrajú sa v profile klienta → fotky, alebo sem vlož fotku z počítača a výsledok ulož.</div>`;
+    $("kartGrid").querySelectorAll(".sn").forEach((el) => {
+      const f = fotkyKlienta.find((x) => x.id === el.dataset.id);
+      el.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/x-kartoteka", f.id));
+      el.querySelectorAll("button").forEach((b) => b.onclick = () => sk.vlozObrazok(b.dataset.a === "vlavo" ? 0 : 1, kt.adresa(f.id), f.den, false));
+    });
+  }
+  // Pretiahnutie z kartotéky do polovice (jadro pozná len súbory a snímky).
+  document.querySelectorAll(".okno").forEach((el) => el.addEventListener("drop", (e) => {
+    const id = e.dataTransfer?.getData("text/x-kartoteka");
+    const f = id && fotkyKlienta.find((x) => x.id === id);
+    if (f) sk.vlozObrazok(Number(el.dataset.i), kt.adresa(f.id), f.den, false);
+  }));
+  kt.priZmene(nacitajKartoteku);
+  nacitajKartoteku();
+
+  $("ulozitKlientovi").onclick = async () => {
+    const b = $("ulozitKlientovi"), st = $("ulozStav");
+    if (!sk.stav.some((x) => x.src)) { st.hidden = false; st.textContent = "Najprv vlož aspoň jednu fotku."; return; }
+    b.disabled = true; b.textContent = "Ukladám…";
+    st.hidden = false; st.style.color = ""; st.textContent = `Ukladám do kartotéky — ${kt.klient}…`;
+    const blob = await sk.vyrobJpeg(2000);
+    const r = await kt.nahraj({ blob, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg" });
+    b.disabled = false; b.textContent = "Uložiť ku klientovi";
+    st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
+    st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
+  };
 
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];

@@ -23,9 +23,21 @@ export const POHLADY = [
   { id: "zadok", nazov: "zozadu" },
   { id: "ine", nazov: "iné" },
 ] as const;
-export type Pohlad = (typeof POHLADY)[number]["id"];
-export const jePohlad = (v: unknown): v is Pohlad => POHLADY.some((p) => p.id === v);
-export const nazovPohladu = (id: string) => POHLADY.find((p) => p.id === id)?.nazov ?? "iné";
+/**
+ * Z EDITORA (Workspace → Editor, 6. 10. 2026) chodia do kartotéky dva
+ * ďalšie druhy: poskladané porovnanie predtým/potom a video (strihnutý,
+ * spomalený klip chôdze či behu). Nie sú v POHLADY — nemajú sa ponúkať pri
+ * nahrávaní fotky ani sa porovnávať samy so sebou.
+ */
+export const POROVNANIE = "porovnanie";
+export const VIDEO = "video";
+export const Z_EDITORA = [POROVNANIE, VIDEO] as const;
+export type Pohlad = (typeof POHLADY)[number]["id"] | typeof POROVNANIE | typeof VIDEO;
+export const jePohlad = (v: unknown): v is Pohlad => v === POROVNANIE || v === VIDEO || POHLADY.some((p) => p.id === v);
+/** Fotka tela (zboku, spredu, zozadu, iné) — nie výstup editora. */
+export const jeFotkaTela = (f: { pohlad: string }) => !(Z_EDITORA as readonly string[]).includes(f.pohlad);
+export const nazovPohladu = (id: string) =>
+  id === POROVNANIE ? "predtým / potom" : id === VIDEO ? "video" : POHLADY.find((p) => p.id === id)?.nazov ?? "iné";
 
 export type Fotka = {
   id: string;
@@ -37,12 +49,21 @@ export type Fotka = {
   suhlas?: string;
   kto?: string | null;
   createdAt?: string;
+  /** MIME súboru; chýba = image/jpeg. */
+  typ?: string | null;
 };
 
 export type Fotenie = { den: string; fotky: Fotka[]; poznamka: string };
 
 /** Najväčší povolený súbor po zmenšení v prehliadači (a strop na serveri). */
 export const MAX_BAJTOV = 6 * 1024 * 1024;
+/**
+ * Strop na video. Editor ukladá len strih (pár sekúnd chôdze či behu),
+ * nie celý súbor z telefónu, a v 720p — takto to worker zašifruje naraz
+ * v pamäti. Pôvodné video z telefónu by malo stovky MB.
+ */
+export const MAX_VIDEO_BAJTOV = 40 * 1024 * 1024;
+export const TYPY_VIDEA = ["video/mp4", "video/webm"];
 /** Dlhšia strana fotky po zmenšení — dosť na detail postoja, málo na úložisko. */
 export const MAX_STRANA = 2000;
 
@@ -107,3 +128,4 @@ export function suhlasFotky(suhlasy: unknown): boolean {
 
 /** Kľúč objektu v R2. Bez mena klienta — kľúč sa objavuje v logoch. */
 export const klucFotky = (id: string, den: string) => `fotky/${den.slice(0, 4)}/${id}.bin`;
+

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { fotenia, jeDenFotenia, jePohlad, klucFotky, porovnania, suhlasFotky, type Fotka } from "./kartoteka";
+import { fotenia, jeDenFotenia, jeFotkaTela, jePohlad, klucFotky, porovnania, POROVNANIE, suhlasFotky, VIDEO, type Fotka } from "./kartoteka";
 
 const f = (o: Partial<Fotka> & { id: string; den: string }): Fotka => ({ klient: "Anna Nová", pohlad: "ine", ...o });
 
@@ -56,5 +56,23 @@ describe("súhlas a kľúč", () => {
     expect(jePohlad("bok")).toBe(true);
     expect(jePohlad("hore")).toBe(false);
     expect(klucFotky("f1", "2026-10-05")).toBe("fotky/2026/f1.bin");
+  });
+});
+
+// Jerry, 6. 10. 2026: „napoj editor na kartotéku klienta, nech sa to ukladá."
+describe("výstupy editora v kartotéke", () => {
+  it("porovnanie aj video sú platné druhy, ale nie fotky tela", () => {
+    expect(jePohlad(POROVNANIE)).toBe(true);
+    expect(jePohlad(VIDEO)).toBe(true);
+    expect(jeFotkaTela({ pohlad: VIDEO })).toBe(false);
+    expect(jeFotkaTela({ pohlad: POROVNANIE })).toBe(false);
+    expect(jeFotkaTela({ pohlad: "bok" })).toBe(true);
+  });
+  it("neporovnávajú sa samy so sebou", () => {
+    const fs = [
+      f({ id: "p1", den: "2026-06-01", pohlad: POROVNANIE }), f({ id: "p2", den: "2026-10-01", pohlad: POROVNANIE }),
+      f({ id: "v1", den: "2026-06-01", pohlad: VIDEO }), f({ id: "v2", den: "2026-10-01", pohlad: VIDEO }),
+    ];
+    expect(porovnania(fs)).toEqual([]);
   });
 });

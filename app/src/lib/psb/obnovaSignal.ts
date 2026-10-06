@@ -39,7 +39,9 @@ export type Oblast =
   /** Klienti a ich polia → `/api/data`, teda skoro celá appka. */
   | "klienti"
   /** Nápady, sloty v mape cyklu, marketingové plány. */
-  | "marketing";
+  | "marketing"
+  /** Kartotéka fotiek a čo do nej uloží editor → kartotéka v profile aj v anamnéze. */
+  | "fotky";
 
 type Poslucháč = () => void;
 const poslucháči = new Map<Oblast, Set<Poslucháč>>();

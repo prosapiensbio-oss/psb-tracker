@@ -20,6 +20,8 @@ describe("editor fotiek a videa", () => {
     expect(foto).toContain(citaj("sklad.js"));
     expect(video).toContain(citaj("ui.css"));
     expect(video).toContain(citaj("sklad.js"));
+    expect(foto).toContain(citaj("kartoteka.js"));
+    expect(video).toContain(citaj("kartoteka.js"));
   });
   it("v <style> nie je HTML komentár — pokazil by prvé pravidlo štvorca", () => {
     for (const s of [citaj("../public/editor/foto.html"), citaj("../public/editor/video.html")]) {

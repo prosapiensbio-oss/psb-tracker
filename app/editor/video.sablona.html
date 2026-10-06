@@ -136,15 +136,19 @@
         <summary><span class="sipka">▸</span>Snímky<span class="stav" id="stavSnimky"></span></summary>
         <div class="obsah">
           <label class="check"><input type="checkbox" id="snimkaSCiarami"> snímka aj s čiarami</label>
+          <label class="check" id="snimkaKlientRiadok"><input type="checkbox" id="snimkaKlientovi"> ukladať aj do kartotéky klienta</label>
+          <div class="riadok" id="snimkaPohladRiadok">ako <select id="snimkaPohlad"><option value="bok">zboku</option><option value="predok">spredu</option><option value="zadok">zozadu</option><option value="ine">iné</option></select></div>
           <div class="zasobnik" id="zasobnik"></div>
           <div class="napoveda" id="zasobnikPrazdny">📷 alebo kláves <b>S</b> uloží snímku. Snímky čakajú v editore fotiek (hore prepni na <b>Foto</b>, skupina „Snímky z videa") — tam ich dáš vedľa seba a upravíš ako fotky.</div>
           <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Tento prehliadač nedovolil uložiť snímky natrvalo — do editora fotiek ich prenesieš len stiahnutím (⤓).</div>
         </div>
       </details>
     </div>
+    <div class="napoveda" id="ulozStav" style="padding:8px 14px 0" hidden></div>
     <div class="spodok">
       <label class="check" style="flex:0 0 auto" title="Popis a čas vo videu"><input type="checkbox" id="popisVoVideu" checked> popis</label>
       <button class="tl" id="stiahnutVideo" disabled>Stiahnuť video</button>
+      <button class="tl hlavne" id="ulozitKlientovi" disabled title="Uloží strih (so spomalením a čiarami) do kartotéky klienta">Uložiť ku klientovi</button>
     </div>
   </aside>
 </div>
@@ -154,10 +158,15 @@
 <!--sklad-js--><!--/sklad-js-->
 </script>
 <script>
+<!--kartoteka-js--><!--/kartoteka-js-->
+</script>
+<script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const scena = $("scena"), video = $("video"), svg = $("ciary");
   const desatinne = (n) => n.toFixed(1).replace(".", ",");
+  const kt = window.kartotekaKlienta;
+  const ukazStav = (text, ok) => { const st = $("ulozStav"); st.hidden = false; st.style.color = ok ? "var(--accentLight)" : "#ff8a7a"; st.textContent = text; };
   const casText = (t) => `${(t || 0).toFixed(2).replace(".", ",")} s`;
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
 
@@ -307,8 +316,13 @@
     const dl = v?.dlzka || 0;
     $("cas").innerHTML = `${casText(video.currentTime)} / ${casText(dl)}<small>snímka ${Math.round(video.currentTime * fps)} / ${Math.round(dl * fps)}</small>`;
     for (const id of ["play", "spat", "vpred", "snimka", "stiahnutVideo", "strihOd", "strihDo", "strihZrus"]) $(id).disabled = !v;
-    $("stiahnutVideo").textContent = nahravam ? "■ Zastaviť nahrávanie" : "Stiahnuť video";
-    $("stiahnutVideo").classList.toggle("hlavne", !!nahravam);
+    $("stiahnutVideo").textContent = nahravam && !nahravam.doKartoteky ? "■ Zastaviť nahrávanie" : "Stiahnuť video";
+    $("stiahnutVideo").classList.toggle("hlavne", !!nahravam && !nahravam.doKartoteky);
+    $("stiahnutVideo").disabled = !v || (!!nahravam && nahravam.doKartoteky);
+    $("ulozitKlientovi").textContent = nahravam?.doKartoteky ? "■ Zastaviť" : "Uložiť ku klientovi";
+    $("ulozitKlientovi").disabled = !v || !kt.klient || (!!nahravam && !nahravam.doKartoteky);
+    $("snimkaKlientRiadok").style.opacity = kt.klient ? "1" : ".45";
+    $("snimkaKlientovi").disabled = !kt.klient;
     // panel
     $("stavVidea").textContent = videa.length ? `${videa.length}` : "žiadne";
     $("stavStrih").textContent = v?.strih ? `${casText(v.strih.od)} – ${casText(v.strih.do)}` : "celé video";
@@ -669,6 +683,12 @@
     await window.skladSnimok.pridaj({ blob, den: v.den, cas: video.currentTime, zdroj: v.nazov, oznacenie: v.oznacenie });
     const b = $("snimka");
     b.textContent = "✓ uložená";
+    // Aj do kartotéky klienta — ako fotka tela (zmenšená, strop kartotéky je 6 MB).
+    if ($("snimkaKlientovi").checked && kt.klient) {
+      const z = await kt.zmensi(blob, 2000);
+      const r = await kt.nahraj({ ...z, pohlad: $("snimkaPohlad").value, den: v.den, nazov: "snimka.jpg" });
+      ukazStav(r.ok ? `✓ Snímka je aj v kartotéke — ${kt.klient}.` : r.error, r.ok);
+    }
     clearTimeout(b._t);
     b._t = setTimeout(() => { b.textContent = "📷 Snímka"; }, 1400);
     nacitajSnimky();
@@ -708,13 +728,16 @@
     cancelAnimationFrame(n.raf);
     n.rec.stop();
   }
-  async function stiahniVideo() {
+  async function stiahniVideo(doKartoteky = false) {
     if (nahravam) { zastavNahravanie(); return; }
+    if (doKartoteky && !kt.klient) { ukazStav("Najprv vyber klienta hore nad editorom.", false); return; }
     const v = akt();
     if (!v || !v.fw) return;
     const typ = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"].find((t) => window.MediaRecorder?.isTypeSupported?.(t));
     if (!typ) { alert("Tento prehliadač nevie nahrávať video."); return; }
-    const k = Math.min(1, 1080 / Math.max(v.fw, v.fh));
+    // Do kartotéky menšie (1280 px, 4 Mb/s): ide zašifrované do úložiska
+    // a server ho šifruje naraz v pamäti. Stiahnuté 1080 px, 8 Mb/s.
+    const k = Math.min(1, (doKartoteky ? 1280 : 1080) / Math.max(v.fw, v.fh));
     const c = document.createElement("canvas");
     c.width = Math.round(v.fw * k / 2) * 2; c.height = Math.round(v.fh * k / 2) * 2;
     const x = c.getContext("2d");
@@ -731,20 +754,28 @@
         x.fillStyle = "#fff"; x.textBaseline = "middle"; x.fillText(t, 22 * mierka, 12 * mierka + h / 2);
       }
     };
-    const rec = new MediaRecorder(c.captureStream(30), { mimeType: typ, videoBitsPerSecond: 8_000_000 });
+    const rec = new MediaRecorder(c.captureStream(30), { mimeType: typ, videoBitsPerSecond: doKartoteky ? 4_000_000 : 8_000_000 });
     const kusy = [];
     rec.ondataavailable = (e) => e.data.size && kusy.push(e.data);
-    rec.onstop = () => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob(kusy, { type: typ.split(";")[0] }));
-      a.download = `${v.oznacenie || v.nazov}-${v.den || ""}.${typ.includes("mp4") ? "mp4" : "webm"}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    rec.onstop = async () => {
+      const blob = new Blob(kusy, { type: typ.split(";")[0] });
+      const nazov = `${v.oznacenie || v.nazov}-${v.den || ""}.${typ.includes("mp4") ? "mp4" : "webm"}`;
+      if (doKartoteky) {
+        ukazStav(`Ukladám do kartotéky — ${kt.klient} (${(blob.size / 1048576).toFixed(1).replace(".", ",")} MB)…`, true);
+        const r = await kt.nahraj({ blob, pohlad: "video", den: v.den, sirka: c.width, vyska: c.height, nazov });
+        ukazStav(r.ok ? `✓ Video je v kartotéke — ${kt.klient} (profil → fotky → Z editora).` : r.error, r.ok);
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = nazov;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
       kresli();
     };
     casNa(v.strih?.od ?? 0);
     await new Promise((r) => setTimeout(r, 250));
-    nahravam = { rec, raf: 0 };
+    nahravam = { rec, raf: 0, doKartoteky };
     const dalsia = () => { snimka(); if (nahravam) nahravam.raf = requestAnimationFrame(dalsia); };
     snimka();
     rec.start(200);
@@ -753,7 +784,8 @@
     nahravam.raf = requestAnimationFrame(dalsia);
     kresli();
   }
-  $("stiahnutVideo").onclick = stiahniVideo;
+  $("stiahnutVideo").onclick = () => stiahniVideo(false);
+  $("ulozitKlientovi").onclick = () => stiahniVideo(true);
 
   // ── OVLÁDANIE ──
   $("play").onclick = prehraj;
@@ -779,6 +811,7 @@
     else if (d.open && rezimCiar) nastavRezim(false);
   }));
   addEventListener("resize", kresli);
+  kt.priZmene(() => kresli()); // klient prišiel z Kokpitu → tlačidlá „ku klientovi"
 
   // na skúšanie zvonku
   window.editorVidea = { vlozVideo, prehraj, krok, casNa, strih, ulozSnimku, stiahniVideo, nastavRezim, get video() { return video; }, get aktivne() { return akt(); }, get nahravam() { return !!nahravam; } };

@@ -130,7 +130,15 @@
 
   <aside class="panel">
     <div class="skupiny">
-      <details data-skupina="fotky" open>
+      <details data-skupina="kartoteka" open>
+        <summary><span class="sipka">▸</span>Kartotéka klienta<span class="stav" id="stavKartoteka"></span></summary>
+        <div class="obsah">
+          <div class="napoveda" id="kartNapoveda">Vyber klienta hore nad editorom — tu sa ukážu jeho fotky z kartotéky a hotové porovnanie sa mu uloží.</div>
+          <div class="zasobnik" id="kartGrid"></div>
+        </div>
+      </details>
+
+      <details data-skupina="fotky">
         <summary><span class="sipka">▸</span>Fotky<span class="stav" id="stavFotky"></span></summary>
         <div class="obsah">
           <div class="vyber-okna" id="vyberOkna">
@@ -212,8 +220,10 @@
         </div>
       </details>
     </div>
+    <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
       <button class="tl" id="stiahnut">Stiahnuť JPEG</button>
+      <button class="tl hlavne" id="ulozitKlientovi" disabled title="Uloží hotový štvorec do kartotéky klienta">Uložiť ku klientovi</button>
     </div>
   </aside>
 </div>
@@ -281,6 +291,98 @@ window.skladSnimok = (() => {
   };
 })();
 <!--/sklad-js-->
+</script>
+<script>
+<!--kartoteka-js-->
+/**
+ * KARTOTÉKA KLIENTA — spoločná pre editor fotiek aj editor videa
+ * (Jerry, 6. 10. 2026: „napoj editor na kartotéku klienta, nech sa to ukladá").
+ *
+ * Klienta vyberá Kokpit nad editorom (karta Editor) a pošle ho správou
+ * `psb-klient`. Editor sa naňho pri načítaní spýta sám (`psb-kto-je-klient`),
+ * lebo správa z Kokpitu mohla prísť skôr, než tu niekto počúval.
+ *
+ * Ukladá sa cez to isté `/api/fotky` ako kartotéka v profile — zašifrovane
+ * v R2, so súhlasom z anamnézy alebo osobným (ten sa potvrdí tu, otázkou).
+ * Po uložení editor ohlási `psb-ulozene` a Kokpit obnoví kartotéku v profile.
+ */
+window.kartotekaKlienta = (() => {
+  let klient = "";
+  const poslucháči = new Set();
+  const vKokpite = window.parent && window.parent !== window;
+  addEventListener("message", (e) => {
+    if (e.origin !== location.origin || e.data?.typ !== "psb-klient") return;
+    const meno = String(e.data.meno || "");
+    if (meno === klient) return;
+    klient = meno;
+    for (const f of poslucháči) { try { f(klient); } catch { /* nič */ } }
+  });
+  if (vKokpite) window.parent.postMessage({ typ: "psb-kto-je-klient" }, location.origin);
+
+  /** Dnešok v Prahe (RRRR-MM-DD) — tak ako ho počíta server. */
+  const dnes = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Prague" }).format(new Date());
+
+  /** Zmenší obrázok na najviac `strana` px dlhšej strany (JPEG) — strop kartotéky je 6 MB. */
+  async function zmensi(blob, strana = 2000) {
+    const bmp = await createImageBitmap(blob);
+    const k = Math.min(1, strana / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    const von = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.88));
+    return { blob: von, sirka: c.width, vyska: c.height };
+  }
+
+  /**
+   * Nahrá súbor ku klientovi. { blob, pohlad, den?, sirka?, vyska?, nazov? }
+   * → { ok, id } alebo { ok: false, error }. Pri chýbajúcom súhlase sa spýta.
+   */
+  async function nahraj(z, osobne = false) {
+    if (!klient) return { ok: false, error: "Najprv vyber klienta nad editorom." };
+    const fd = new FormData();
+    fd.append("klient", klient);
+    fd.append("den", z.den || dnes());
+    fd.append("pohlad", z.pohlad);
+    if (z.sirka) fd.append("sirka", String(z.sirka));
+    if (z.vyska) fd.append("vyska", String(z.vyska));
+    if (osobne) fd.append("suhlasOsobne", "1");
+    fd.append("subor", z.blob, z.nazov || "subor");
+    let j;
+    try {
+      const r = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd });
+      j = await r.json().catch(async () => ({ ok: false, error: `HTTP ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}` }));
+      if (r.status === 403 && !osobne && /súhlas/i.test(j?.error || "")) {
+        const ano = confirm(`${klient} nemá v anamnéze súhlas s fotkami.\n\nSúhlasil osobne? Pri uložení sa zapíše, že súhlas bol osobný a kto ho potvrdil.`);
+        if (!ano) return { ok: false, error: "Neuložené — chýba súhlas klienta." };
+        return nahraj(z, true);
+      }
+    } catch (e) {
+      return { ok: false, error: `Spojenie zlyhalo: ${String(e).slice(0, 160)}` };
+    }
+    if (!j?.ok) return { ok: false, error: j?.error || "Neuložilo sa." };
+    if (vKokpite) window.parent.postMessage({ typ: "psb-ulozene" }, location.origin);
+    return j;
+  }
+
+  /** Fotky tela klienta (bez výstupov editora) — na vloženie do polovíc. */
+  async function fotky() {
+    if (!klient) return [];
+    const j = await fetch(`/api/fotky?klient=${encodeURIComponent(klient)}`, { credentials: "same-origin" })
+      .then((r) => r.json()).catch(() => ({ ok: false }));
+    if (!j?.ok) throw new Error(j?.error || "Kartotéka sa nenačítala.");
+    return (j.fotky || []).filter((f) => f.pohlad !== "porovnanie" && f.pohlad !== "video");
+  }
+
+  return {
+    get klient() { return klient; },
+    get vKokpite() { return vKokpite; },
+    priZmene(f) { poslucháči.add(f); },
+    nahraj, fotky, zmensi, dnes,
+    adresa: (id) => `/api/fotky?id=${encodeURIComponent(id)}`,
+  };
+})();
+<!--/kartoteka-js-->
 </script>
 <script>
 <!--jadro-js-->
@@ -788,13 +890,12 @@ window.skladSnimok = (() => {
   addEventListener("resize", kresli);
 
   // ── EXPORT: ten istý výrez vo veľkom rozlíšení ──
-  document.getElementById("stiahnut").onclick = async () => {
-    const N = 2000;
+  /** Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c. */
+  function kresliCelok(c) {
+    const N = c.width;
     const medzeraObr = Number(document.getElementById("medzera").value);
     const pomer = N / stvorec.clientWidth;
     const g = Math.round(medzeraObr * pomer);
-    const c = document.createElement("canvas");
-    c.width = N; c.height = N;
     const x = c.getContext("2d");
     x.fillStyle = "#fff"; x.fillRect(0, 0, N, N);
     const vedla = rozdelenie === "vedla", cez = rozdelenie === "cez";
@@ -846,7 +947,16 @@ window.skladSnimok = (() => {
       ciaryNaPlatno(x, R, pomer, N);
       vybrana = predVyber;
     }
-    const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
+  }
+  /** Hotový štvorec ako JPEG — na stiahnutie aj do kartotéky klienta. */
+  async function vyrobJpeg(N = 2000) {
+    const c = document.createElement("canvas");
+    c.width = N; c.height = N;
+    kresliCelok(c);
+    return new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
+  }
+  document.getElementById("stiahnut").onclick = async () => {
+    const blob = await vyrobJpeg();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "predtym-potom.jpg";
@@ -855,7 +965,7 @@ window.skladSnimok = (() => {
   };
 
   window.skladacka = {
-    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor,
+    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg,
     get rezimCiar() { return rezimCiar; },
     get vybrana() { return vybrana; },
     get pocetCiar() { return ciary.length; },
@@ -884,6 +994,56 @@ window.skladSnimok = (() => {
   addEventListener("keydown", (e) => {
     if (e.key === "Escape") vsetky.forEach((d) => { if (d.dataset.skupina === "ciary") d.open = false; });
   });
+
+  // ── Kartotéka klienta: jeho fotky do polovíc, hotový štvorec k nemu ──
+  const kt = window.kartotekaKlienta;
+  let fotkyKlienta = [];
+  const pohladNazov = { bok: "zboku", predok: "spredu", zadok: "zozadu", ine: "iné" };
+  async function nacitajKartoteku() {
+    const meno = kt.klient;
+    $("kartNapoveda").hidden = !!meno;
+    $("stavKartoteka").textContent = meno || "bez klienta";
+    $("ulozitKlientovi").disabled = !meno;
+    if (!meno) { $("kartGrid").innerHTML = ""; return; }
+    try { fotkyKlienta = await kt.fotky(); }
+    catch (e) { $("kartGrid").innerHTML = `<div class="napoveda" style="color:var(--accentLight)">${String(e.message || e)}</div>`; return; }
+    if (meno !== kt.klient) return; // medzitým iný klient
+    $("stavKartoteka").textContent = `${meno} · ${fotkyKlienta.length}`;
+    $("kartGrid").innerHTML = fotkyKlienta.length ? fotkyKlienta.map((f) => `
+      <div class="sn" draggable="true" data-id="${f.id}" title="Pretiahni do polovice">
+        <img src="${kt.adresa(f.id)}" alt="" loading="lazy">
+        <div class="popis"><b>${sk.denCz(f.den)}</b><br>${pohladNazov[f.pohlad] || f.pohlad}</div>
+        <div class="akcie">
+          <button data-a="vlavo" title="Do ľavej / hornej polovice">◧</button>
+          <button data-a="vpravo" title="Do pravej / dolnej polovice">◨</button>
+        </div>
+      </div>`).join("") : `<div class="napoveda">${meno} zatiaľ nemá v kartotéke žiadne fotky. Nahrajú sa v profile klienta → fotky, alebo sem vlož fotku z počítača a výsledok ulož.</div>`;
+    $("kartGrid").querySelectorAll(".sn").forEach((el) => {
+      const f = fotkyKlienta.find((x) => x.id === el.dataset.id);
+      el.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/x-kartoteka", f.id));
+      el.querySelectorAll("button").forEach((b) => b.onclick = () => sk.vlozObrazok(b.dataset.a === "vlavo" ? 0 : 1, kt.adresa(f.id), f.den, false));
+    });
+  }
+  // Pretiahnutie z kartotéky do polovice (jadro pozná len súbory a snímky).
+  document.querySelectorAll(".okno").forEach((el) => el.addEventListener("drop", (e) => {
+    const id = e.dataTransfer?.getData("text/x-kartoteka");
+    const f = id && fotkyKlienta.find((x) => x.id === id);
+    if (f) sk.vlozObrazok(Number(el.dataset.i), kt.adresa(f.id), f.den, false);
+  }));
+  kt.priZmene(nacitajKartoteku);
+  nacitajKartoteku();
+
+  $("ulozitKlientovi").onclick = async () => {
+    const b = $("ulozitKlientovi"), st = $("ulozStav");
+    if (!sk.stav.some((x) => x.src)) { st.hidden = false; st.textContent = "Najprv vlož aspoň jednu fotku."; return; }
+    b.disabled = true; b.textContent = "Ukladám…";
+    st.hidden = false; st.style.color = ""; st.textContent = `Ukladám do kartotéky — ${kt.klient}…`;
+    const blob = await sk.vyrobJpeg(2000);
+    const r = await kt.nahraj({ blob, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg" });
+    b.disabled = false; b.textContent = "Uložiť ku klientovi";
+    st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
+    st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
+  };
 
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];

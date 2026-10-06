@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { C, mix } from "../../lib/psb/theme";
+import { VyberMena } from "./VyberMena";
 
 /**
  * KARTA EDITOR vo Workspace (Jerry, 6. 10. 2026): „pridaj ešte jednu kartu
@@ -13,6 +15,12 @@ import { C, mix } from "../../lib/psb/theme";
  * oddelený (jeho slová), spája ich len zásobník snímok: 📷 vo videu →
  * „Snímky z videa" vo fotkách.
  *
+ * KLIENT (6. 10. 2026, „napoj editor na kartotéku klienta, nech sa to
+ * ukladá"): vyberá sa tu, nad editormi, a obom sa pošle správou
+ * (`postMessage`, ten istý pôvod). Editor fotiek z neho berie fotky do
+ * polovíc a ukladá porovnanie, editor videa ukladá strih a snímky. Po
+ * uložení editor ohlási `psb-ulozene` a kartotéka v profile sa obnoví.
+ *
  * Raz otvorený editor ostane načítaný aj po prepnutí na druhý (aj na inú
  * kartu Workspace) — inak by prepnutie zahodilo rozrobenú prácu
  * (pravidlo „Workspace drží prácu").
@@ -24,9 +32,37 @@ const EDITORY: { druh: Druh; ikona: string; nazov: string; popis: string }[] = [
   { druh: "video", ikona: "▶", nazov: "Video", popis: "chôdza a beh — spomalenie, krok po snímke, strih, uhly a 📷 snímky do fotiek" },
 ];
 
-export function EditorKarta() {
+const KLUC_KLIENTA = "psb-editor-klient";
+
+export function EditorKarta({ mena }: { mena: string[] }) {
   const [otvoreny, setOtvoreny] = useState<Druh | null>(null);
   const [nacitane, setNacitane] = useState<Druh[]>([]);
+  const [klient, setKlient] = useState(() => {
+    try { return sessionStorage.getItem(KLUC_KLIENTA) || ""; } catch { return ""; }
+  });
+  const ramiky = useRef<Partial<Record<Druh, HTMLIFrameElement | null>>>({});
+  /** Editorom ide len meno, ktoré naozaj patrí klientovi — rozpísané nie. */
+  const platny = mena.includes(klient) ? klient : "";
+  const posliKlienta = useCallback((d?: Druh) => {
+    for (const [k, el] of Object.entries(ramiky.current)) {
+      if (d && k !== d) continue;
+      el?.contentWindow?.postMessage({ typ: "psb-klient", meno: platny }, location.origin);
+    }
+  }, [platny]);
+  useEffect(() => {
+    posliKlienta();
+    try { sessionStorage.setItem(KLUC_KLIENTA, platny); } catch { /* len pohodlie */ }
+  }, [posliKlienta, platny]);
+  // Editor po uložení ku klientovi ohlási zmenu — kartotéka v profile sa obnoví.
+  useEffect(() => {
+    const na = (e: MessageEvent) => {
+      if (e.origin !== location.origin) return;
+      if (e.data?.typ === "psb-ulozene") oznam("fotky");
+      if (e.data?.typ === "psb-kto-je-klient") posliKlienta();
+    };
+    addEventListener("message", na);
+    return () => removeEventListener("message", na);
+  }, [posliKlienta]);
   const otvor = (d: Druh) => {
     setOtvoreny(d);
     setNacitane((n) => (n.includes(d) ? n : [...n, d]));
@@ -76,14 +112,26 @@ export function EditorKarta() {
             >{e.ikona} {e.nazov}</button>
           ))}
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: C.textMuted }}>klient</span>
+          <VyberMena
+            hodnota={klient} mena={mena} onZmen={setKlient} placeholder="komu to patrí…"
+            varovanie={!!klient && !platny}
+            style={{ width: 230 }}
+          />
+        </div>
         <span style={{ fontSize: 11.5, color: C.textDim }}>
-          rozrobené ostáva, aj keď prepneš · snímky z videa nájdeš vo Foto v „Snímky z videa"
+          {platny
+            ? `ukladá sa do kartotéky — ${platny}`
+            : "bez klienta sa dá upravovať aj sťahovať, len nie uložiť ku klientovi"}
         </span>
       </div>
       <div style={{ position: "relative", flexGrow: 1, minHeight: 420, borderRadius: 12, overflow: "hidden", border: `1px solid ${mix(C.border, 100)}` }}>
         {nacitane.map((d) => (
           <iframe
             key={d}
+            ref={(el) => { ramiky.current[d] = el; }}
+            onLoad={() => posliKlienta(d)}
             // Bez .html — Cloudflare assets by ho presmerovali (307) na túto adresu.
             src={`/editor/${d}`}
             title={d === "foto" ? "Editor fotiek" : "Editor videa"}
