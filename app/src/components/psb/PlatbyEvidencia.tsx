@@ -119,7 +119,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
             <b>Tržby a grafy berú zatiaľ platby z PTmindera.</b> Na Kokpit sa prepnú od {prepnutie ? mesiacKratko(prepnutie.od) : "zvoleného mesiaca"}, keď bude sedieť:
             {(prepnutie?.dovody || []).map((d) => <div key={d} style={{ color: C.textMuted, marginLeft: 10 }}>• {d}</div>)}
             <div style={{ color: C.textDim, marginTop: 4 }}>
-              Čo chýba býva hotovosť zo zošita (formulár nižšie), bitcoin (zapíš ako platbu so spôsobom „bitcoin") a príjmy z banky na priradenie.
+              Čo chýba býva hotovosť zo zošita (formulár nižšie) a príjmy z banky na priradenie. Bitcoin sa berie sám z BTC knihy — ručne len klient, ktorého meno v knihe Kokpit nespoznal.
             </div>
           </>
         )}

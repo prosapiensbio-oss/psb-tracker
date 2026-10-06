@@ -2761,5 +2761,12 @@ neho tabuľka `platby`. Celý export ostáva v `data.paymentsPtminder`.
 - Rozhoduje SERVER (`akcia: "peniaze-od"`), tlačidlo len pýta. Späť sa dá vždy.
 - Od prepnutia sa ručný príjem (split `prijem`) do P&L nepripočíta — úvodný
   v hotovosti je platba klienta, inak by bol dvakrát.
-- Bitcoin a prevod z cudzieho účtu sa do tržieb dostanú LEN ručným zápisom
-  so spôsobom (formulár „Zapísať platbu mimo banky").
+- **Bitcoin sa berie SÁM z BTC knihy** (`btcNaPlatby`, `akcia: "btc-import"`;
+  Jerry, 6. 10. 2026: „prečo sa BTC platby nečítajú, keď je na to celá
+  appka?"). Knihu sťahuje prehliadač (worker → worker padá na 522) a pošle
+  ju serveru najviac raz za 10 min. Zapíše sa len od `platby_od`, len
+  klient, ktorého meno `najdiKlienta` nájde jednoznačne, `fio_id` =
+  `btc:deň|meno|sats` (nič sa nezdvojí). Staršie BTC platby zámerne nie —
+  `jeVopred` z dnešného stavu by starej platbe dal „vopred" a tá by ticho
+  zaplatila budúci balíček. Prevod z cudzieho účtu a hotovosť ostávajú
+  ručné (formulár „Zapísať platbu mimo banky").

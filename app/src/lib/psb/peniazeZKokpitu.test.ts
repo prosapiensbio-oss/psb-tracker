@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mozePrepnut, spojPlatby } from "./peniazeZKokpitu";
+import { btcNaPlatby, mozePrepnut, spojPlatby } from "./peniazeZKokpitu";
 
 const pt = (date: string, amount: number) => ({ date: `${date}T00:00:00.000Z`, client: "A", amount, method: "bank" });
 
@@ -40,5 +40,19 @@ describe("mozePrepnut", () => {
   });
   it("mesiac bez PTminder platieb sa nesúdi — samotný nestačí", () => {
     expect(mozePrepnut("2026-11", [{ mesiac: "2026-11", kokpit: 500, ptminder: 0 }], []).ok).toBe(false);
+  });
+});
+
+describe("btcNaPlatby", () => {
+  const najdi = (m: string) => (m === "Prochazka Matej" || m === "Matej Prochadzka" ? "Matej Prochadzka" : m === "Jan" ? null : null);
+  it("zapíše len jednoznačne nájdeného klienta od dňa súbežného chodu", () => {
+    const r = btcNaPlatby([
+      { klient: "Prochazka Matej", datum: "2026-10-03T10:00:00Z", czk: 6990.4, sats: 3000000 },
+      { klient: "Jan", datum: "2026-10-04", czk: 1000 },
+      { klient: "Matej Prochadzka", datum: "2026-09-20", czk: 7790 },
+      { klient: null, datum: "2026-10-05", czk: 500 },
+    ], najdi, "2026-10-01");
+    expect(r.zapisat).toEqual([{ klient: "Matej Prochadzka", datum: "2026-10-03", suma: 6990, sats: 3000000, kluc: "btc:2026-10-03|Prochazka Matej|3000000" }]);
+    expect(r.nesparovane).toEqual([{ meno: "Jan", datum: "2026-10-04", suma: 1000 }]);
   });
 });

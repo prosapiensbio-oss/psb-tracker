@@ -80,3 +80,40 @@ export function mozePrepnut(
   }
   return { ok: dovody.length === 0, dovody };
 }
+
+/**
+ * BITCOIN Z KNIHY DO VLASTNEJ EVIDENCIE.
+ *
+ * Jerry, 6. 10. 2026: „prečo sa BTC platby nečítajú, keď je na to celá appka,
+ * ktorá to eviduje?" Kokpit si ich zoznam sťahoval (karta „Platby v bitcoine",
+ * kontrola proti PTminderu), ale do `platby` ich nezapisoval — po prepnutí
+ * peňazí by z tržieb zmizli (júl 2026: 119 tis. Kč).
+ *
+ * Je to obdoba stiahnutia banky, s jedným rozdielom: v BTC knihe meno klienta
+ * napísal Jerry sám, takže priradenie už je ľudské rozhodnutie. Zapíše sa
+ * preto rovno — ale LEN keď meno ukazuje na jedného klienta (`najdiKlienta`:
+ * presne, alebo fuzzy bez kolízie). Zvyšok sa vráti na otázku.
+ *
+ * Kľúč (`fio_id`) je `btc:deň|meno|sats` — kniha riadky nečísluje a ten istý
+ * zápis musí pri ďalšom načítaní vyjsť rovnako, inak by sa zapísal znova.
+ */
+export type BtcZKnihy = { klient: string | null; datum: string; czk: number | null; sats?: number };
+
+export function btcNaPlatby(
+  kniha: BtcZKnihy[],
+  najdi: (meno: string) => string | null,
+  odDna: string,
+): { zapisat: { klient: string; datum: string; suma: number; kluc: string; sats: number }[]; nesparovane: { meno: string; datum: string; suma: number }[] } {
+  const zapisat: { klient: string; datum: string; suma: number; kluc: string; sats: number }[] = [];
+  const nesparovane: { meno: string; datum: string; suma: number }[] = [];
+  for (const b of kniha) {
+    const datum = String(b.datum || "").slice(0, 10);
+    const suma = Math.round(Number(b.czk) || 0);
+    if (!b.klient || !/^\d{4}-\d{2}-\d{2}$/.test(datum) || datum < odDna || suma <= 0) continue;
+    const klient = najdi(b.klient);
+    if (!klient) { nesparovane.push({ meno: b.klient, datum, suma }); continue; }
+    const sats = Math.round(Number(b.sats) || 0);
+    zapisat.push({ klient, datum, suma, sats, kluc: `btc:${datum}|${b.klient.trim()}|${sats || suma}` });
+  }
+  return { zapisat, nesparovane };
+}

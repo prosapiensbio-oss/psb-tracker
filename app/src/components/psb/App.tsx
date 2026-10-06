@@ -815,6 +815,26 @@ export function PSBApp() {
         setBtcPrijmy(bt);
         setBtcSatsKlienti(podlaKluca);
         setBtcPlatby(r.platby as BtcKnihaPlatba[]);
+        /**
+         * …A SÚ TO PLATBY KLIENTOV — do vlastnej evidencie (`btc-import`).
+         * Jerry, 6. 10. 2026: „prečo sa BTC platby nečítajú, keď je na to
+         * celá appka?" Bez toho by po prepnutí peňazí na Kokpit bitcoin
+         * z tržieb zmizol. Server zapíše len jednoznačne nájdených klientov
+         * a nič nezdvojí; najviac raz za 10 minút, ako automatické balíčky.
+         */
+        try {
+          const kluc = "psb-btc-import";
+          if (Date.now() - Number(sessionStorage.getItem(kluc) || 0) > 10 * 60 * 1000) {
+            sessionStorage.setItem(kluc, String(Date.now()));
+            void fetch("/api/platby", {
+              method: "POST", credentials: "same-origin",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ akcia: "btc-import", platby: r.platby }),
+            }).then((x) => x.json()).then((j: { ok?: boolean; nove?: number }) => {
+              if (j?.ok && j.nove) oznam("peniaze");
+            }).catch(() => null);
+          }
+        } catch { /* bez úložiska sa import pustí pri ďalšom otvorení */ }
       }
       // Nákupy platené bitcoinom sa do P&L NEPÍŠU.
       //

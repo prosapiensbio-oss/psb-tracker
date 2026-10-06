@@ -12,7 +12,8 @@ import {
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
-import { mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { btcNaPlatby, mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { najdiKlienta } from "../../lib/psb/compute";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -519,6 +520,36 @@ export const Route = createFileRoute("/api/platby")({
           await DB.prepare("UPDATE platby SET zrusene_at = ? WHERE id = ?").bind(akcia === "zrus" ? teraz() : null, id).run();
           await audit(DB, { action: akcia === "zrus" ? "platba-zrusena" : "platba-vratena", predmet: id, actor: kto });
           return Response.json({ ok: true });
+        }
+
+        /**
+         * BITCOIN Z BTC KNIHY → VLASTNÁ EVIDENCIA (`btcNaPlatby`).
+         *
+         * Knihu sťahuje PREHLIADAČ (worker → worker padá na 522, viď
+         * btc-reserve.ts) a posiela ju sem. Zapisuje sa od mesiaca, od
+         * ktorého sa súbežný chod súdi (`platby_od`) — staršie mesiace sa
+         * neporovnávajú a do dlhov by zasiahli bez dôvodu. Opakované
+         * načítanie nič nezdvojí: `fio_id` je kľúč zápisu v knihe a
+         * dvojica (fio_id, klient) je v DB unikátna.
+         */
+        if (akcia === "btc-import") {
+          const kniha = Array.isArray(b.platby) ? (b.platby as { klient: string | null; datum: string; czk: number | null; sats?: number }[]).slice(0, 2000) : [];
+          const od = String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, "") || dnesPraha().slice(0, 7);
+          const [s1, s2] = await DB.batch([
+            DB.prepare("SELECT DISTINCT client_name m FROM sessions WHERE date >= date('now','-400 days')"),
+            DB.prepare("SELECT DISTINCT klient m FROM balicky WHERE zrusene_at IS NULL"),
+          ]);
+          const mena = [...new Set([...(s1.results || []), ...(s2.results || [])].map((x) => String((x as { m: string }).m || "")).filter(Boolean))];
+          const { zapisat, nesparovane } = btcNaPlatby(kniha, (m) => najdiKlienta(mena, m) || null, `${od}-01`);
+          let nove = 0;
+          for (const z of zapisat) {
+            const r = await DB.prepare(
+              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'bitcoin',?,?,?,?,?)",
+            ).bind(uid(), z.klient, z.datum, z.suma, z.kluc, `z BTC knihy${z.sats ? ` · ${z.sats.toLocaleString("sk-SK")} sats` : ""}`, teraz(), "btc-kniha", (await jeVopred(DB, z.klient)) ? 1 : 0).run();
+            nove += r.meta?.changes || 0;
+          }
+          if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
+          return Response.json({ ok: true, nove, nesparovane });
         }
 
         /**
