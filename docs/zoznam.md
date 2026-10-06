@@ -384,13 +384,13 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   - Kadličková: kalendár 17. 6. 16:00, v PTminderi nie je.
   - Kouřil: kalendár 24. 5. (ne 10:00) a 14. 6. (ne 9:00), v PTminderi nie sú;
     6., 13. a 20. 3. má v PTminderi DVA tréningy, v kalendári je v ten deň
-    Monika 8:30 a Dan inokedy → Monikine hodiny na Danovom účte?
+    Monika 8:30 a Dan inokedy → áno, Monikine; preradené 6. 10.
   - Khamaziuk: v PTminderi druhá rezervácia o 11:00 (11. 3., 29. 4., 13. 5.,
     20. 5., 10. 6.; a 6. 5. 11:00), kalendár má len 9:00 → duplicity?
     A 22. 2. (ne 11:00) v kalendári, v PTminderi nie.
   - Vopalenský: zdroje sedia; skutočne nekrytý je len 14. 4. — deň po konci
     členstva 17. 2. – 13. 4., ďalšie začalo 7. 6.
-- [ ] ~~Pre Jerryho: Jarek Heinrich~~ (vyriešené vyššie) trénuje od 27. 7. bez platného členstva
+- [x] ~~Pre Jerryho: Jarek Heinrich~~ (vyriešené vyššie) trénuje od 27. 7. bez platného členstva
   (posledné 27. 4. – 21. 6., potom len doplnenia bez počtu hodín 23. 6.,
   5. 9., 20. 9.). Tréningy 27. 7., 31. 8., 14. 9., 5. 10. sú na osi bez čísla
   a automatický balíček zámerne nevznikne (história z PTmindera). Platba
@@ -459,7 +459,8 @@ odvtedy aj zaplnenie obrazovky a zeleň; `--tablet`, alebo rozmery `820x1180`):
   návštevník dostáva nové `?ver=`, na 820×1180 sa Cena a Otázky na Úvodnom
   tréningu zväčšia 1,345×, nič nepreteká, konzola bez chýb.
 
-Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
+Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10. — všetko
+vyriešené opravami 5. 10. vyššie, ponechané ako história):
 
 - tablet na šírku 1024×768 — pretekanie pod spodnú lištu na viacerých
   stránkach (Domov, Úvodný tréning, Vzdelávanie, Služby, Online, Test),
