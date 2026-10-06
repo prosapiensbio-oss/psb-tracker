@@ -565,11 +565,13 @@ const VELKOSTI = CENNIK.filter((s) => (s.hodiny || 0) > 0 && (s.cena || 0) > 0 &
  * `anomaly_ack` s tým istým kľúčom ako upozornenie, takže sa nevráti ani po
  * obnovení stránky — doteraz sa vracala.
  */
-export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
+export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
   polozky: ZostavaPoPlatnosti[];
   acks: Record<string, unknown>;
   trener: string | null;
   onVybavene: () => void;
+  /** Klik na meno otvorí profil klienta (Jerry, 6. 10. 2026). */
+  onKlient?: (meno: string) => void;
 }) {
   const [hodnoty, setHodnoty] = useState<Record<string, number>>({});
   const [bezi, setBezi] = useState("");
@@ -637,7 +639,10 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
         return (
           <div key={kluc} style={{ ...riadok, alignItems: "center" }}>
             <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 150 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{x.meno}</span>
+              <button
+                type="button" onClick={() => onKlient?.(x.meno)} title="Otvoriť profil klienta"
+                style={{ padding: 0, border: "none", background: "none", fontFamily: "inherit", textAlign: "left", fontSize: 13.5, fontWeight: 600, color: C.text, cursor: onKlient ? "pointer" : "default" }}
+              >{x.meno}</button>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                 <span style={{
                   fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",

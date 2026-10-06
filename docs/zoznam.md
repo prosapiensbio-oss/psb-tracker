@@ -218,6 +218,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
+- **Dizajn stiahnutého JPEG z editora fotiek (Jerry, 6. 10. 2026):** „doladiť finálnu podobu stiahnutého JPEG z editora — viem si tam predstaviť nejaký design." Dnes je to holý štvorec s popiskami. Návrh: rámik so značkou PSB (logo/nápis zo `znacka-napis*.svg`, Agrandir v exporte nie je — plátno ho musí mať načítané), meno klienta voliteľne, dátumy predtým/potom ako nadpisy nad polovicami, nenápadný pásik dole. Pripraviť 3–5 náčrtov mimo Kokpitu (ako rozloženia) a nechať Jerryho vybrať. Pozor na súhlas: verejné zdieľanie chce samostatný súhlas klienta.
+
 - ~~**Dávkové potvrdzovanie bankových platieb**~~ — HOTOVÉ (akcia
   `priradz-davka`, použité 28. 9.; pravidlá od 5. 10. len z priezviska).
   Pôvodne (Jerry, 25. 9.): Z 238 príjmov

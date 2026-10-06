@@ -1503,7 +1503,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           <FioPrijmy onZapisane={poZapise} />
           <OtazkyPlatieb dlhy={data.dlhy} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} />
           {sekcieKresli}
-          <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} />
+          <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
           <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} />
           {prazdne && <VsetkoVybavene text="Všetko vybavené — každá platba má klienta, nikto nedlží a o balíčkoch netreba nič rozhodnúť." />}
         </>
