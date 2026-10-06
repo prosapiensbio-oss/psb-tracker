@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
-import { maTermin, najdiKlienta, objednaneVerzia, type ClientAgg } from "../../lib/psb/compute";
+import { DOVOD_DOPYTU_OD, maTermin, najdiKlienta, objednaneVerzia, type ClientAgg } from "../../lib/psb/compute";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
@@ -143,6 +143,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
    */
   const nevyrieseny = (l: Lead) => {
     if (converted(l)) return false;
+    if (String(l.date || "").slice(0, 10) < DOVOD_DOPYTU_OD) return false;
     if (String(l.dovod || "").trim()) return false;
     if (maTermin(l.name || "")) return false;
     if (l.status === "dohodnuty") {

@@ -198,6 +198,31 @@ export const Route = createFileRoute("/api/google-ads")({
             });
           }
 
+          // ── skúška plánovača kľúčových slov ──────────────────────────
+          //
+          // Objem hľadania chce úroveň Basic. API Center v Google Ads ju
+          // 6. 10. 2026 ukazuje ako „Základný prístup", ale sám píše, že to už
+          // nemusí byť presné — rozhodne len skutočné volanie. Jeden výraz,
+          // čeština (1021), Česko (2203).
+          if (b.akcia === "skus-planovac") {
+            const cid = String((await DB.prepare("SELECT id FROM gads_ucty WHERE je_manager = 0 ORDER BY nazov LIMIT 1").first<{ id: string }>().catch(() => null))?.id || "");
+            if (!cid) return Response.json({ ok: false, error: "Nie je známy reklamný účet — najprv stiahni dáta z Google Ads." }, { status: 400 });
+            const r = await volaj(adsUrl(`customers/${cid}:generateKeywordIdeas`), h, {
+              language: "languageConstants/1021",
+              geoTargetConstants: ["geoTargetConstants/2203"],
+              keywordPlanNetwork: "GOOGLE_SEARCH",
+              keywordSeed: { keywords: [String(b.vyraz || "bolest zad")] },
+            });
+            if (!r.ok) return Response.json({ ok: false, error: r.chyba }, { status: 502 });
+            const vysledky = ((r.data as { results?: { text?: string; keywordIdeaMetrics?: { avgMonthlySearches?: string } }[] })?.results || []);
+            return Response.json({
+              ok: true,
+              ucet: cid,
+              napadov: vysledky.length,
+              ukazka: vysledky.slice(0, 5).map((x) => ({ vyraz: x.text, mesacne: Number(x.keywordIdeaMetrics?.avgMonthlySearches || 0) })),
+            });
+          }
+
           // ── stiahnutie ────────────────────────────────────────────────
           const od = odKedy(new Date(), MESIACOV);
           // Koniec rozsahu je dnes. Google chce ohraničenie z OBOCH strán —

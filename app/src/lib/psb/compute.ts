@@ -3828,6 +3828,16 @@ export type NezapisaneVstup = {
 const DOHODNUTY_PLATI_DNI = 30;
 
 /**
+ * „PREČO Z TOHO NEBOL KLIENT" SA PÝTA LEN PRI DOPYTOCH OD 6. 10. 2026.
+ *
+ * Jerry, 6. 10. 2026: „staré dopyty uzavri, nebudeme ich už dopĺňať, iba
+ * nové." Bolo ich 46 a nikto sa k nim spätne nevráti — zoznam, ktorý sa nedá
+ * vyčistiť, sa prestane čítať a s ním aj nové dopyty. Jedno miesto pre
+ * register, Workspace aj Marketing → Dopyty.
+ */
+export const DOVOD_DOPYTU_OD = "2026-10-06";
+
+/**
  * Je dopyt ešte otvorený — teda taký, pri ktorom má zmysel pýtať sa „prečo nič"?
  *
  * NIE, keď: sa z neho stal klient · dôvod už niekto zapísal · má termín
@@ -3840,6 +3850,7 @@ function zivyDopyt(
 ): boolean {
   const meno = String(l.name || "").trim();
   if (!meno) return false;
+  if (String(l.date || "").slice(0, 10) < DOVOD_DOPYTU_OD) return false;
   if (String(l.dovod || "").trim()) return false;
   if (najdiKlienta(menaKlientov, meno)) return false;
   if (maTermin(meno)) return false;

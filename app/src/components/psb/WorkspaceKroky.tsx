@@ -12,7 +12,7 @@ import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { useEffect, useMemo, useState } from "react";
 
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
-import { maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
+import { DOVOD_DOPYTU_OD, maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -821,6 +821,7 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
     .sort((a, b) => a.date.localeCompare(b.date));
   const bezVysledku = dopyty.filter((l) => {
     if (cakaju.includes(l) || jeKlient(l) || (l.dovod || "").trim() || maTermin(l.name || "")) return false;
+    if (l.date < DOVOD_DOPYTU_OD) return false;
     if (l.status === "dohodnuty" && (Date.now() - Date.parse(`${l.date}T12:00:00Z`)) / 86400000 <= 30) return false;
     return l.status !== "novy" || !!l.odpovedaneAt;
   });

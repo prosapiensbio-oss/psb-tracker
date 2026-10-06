@@ -433,12 +433,12 @@ describe("maTermin", () => {
 describe("nezapisaneDoRegistra", () => {
   const dopyt = (name: string, date: string, dovod = "", status: Lead["status"] = "novy") =>
     ({ id: `l-${name}`, name, date, dovod, status, odpovedaneAt: "", createdAt: `${date}T09:00:00.000Z`, druh: "dopyt" as const });
-  const DNES = "2026-08-14";
+  const DNES = "2027-08-14";
 
   test("dopyty bez dôvodu idú Terezke, nie obom", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
-      leads: [dopyt("Jana Antonická", "2026-07-27"), dopyt("Karolína Frk", "2026-02-07")],
+      leads: [dopyt("Jana Antonická", "2027-07-27"), dopyt("Karolína Frk", "2027-02-07")],
       menaKlientov: [], zmeny: [], dnes: DNES,
     });
     const d = v.find((x) => x.key === "dopyt|nevyriesene")!;
@@ -451,9 +451,9 @@ describe("nezapisaneDoRegistra", () => {
     nastavObjednaneZKalendara({ "Terezie Pehalová": 1 });
     const v = nezapisaneDoRegistra({
       leads: [
-        dopyt("Lucie Podolová", "2026-08-04"),      // klient
-        dopyt("Terezie Pehalová", "2026-07-27"),    // má termín
-        dopyt("Jana Antonická", "2026-07-27"),      // naozaj otvorený
+        dopyt("Lucie Podolová", "2027-08-04"),      // klient
+        dopyt("Terezie Pehalová", "2027-07-27"),    // má termín
+        dopyt("Jana Antonická", "2027-07-27"),      // naozaj otvorený
       ],
       menaKlientov: ["Lucie Podolova"],             // bez diakritiky, ako v PTminderi
       zmeny: [], dnes: DNES,
@@ -464,7 +464,7 @@ describe("nezapisaneDoRegistra", () => {
   test("vyplnený dôvod položku zavrie", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
-      leads: [dopyt("Jana Antonická", "2026-07-27", "nezdvíhala telefón")],
+      leads: [dopyt("Jana Antonická", "2027-07-27", "nezdvíhala telefón")],
       menaKlientov: [], zmeny: [], dnes: DNES,
     });
     expect(v.some((x) => x.key === "dopyt|nevyriesene")).toBe(false);
@@ -523,14 +523,14 @@ describe("patriTrenerovi — priame priradenie", () => {
 });
 
 describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
-  const DNES2 = "2026-08-14";
+  const DNES2 = "2027-08-14";
   const d = (name: string, date: string, status: Lead["status"]) =>
     ({ id: `l-${name}`, name, date, dovod: "", status, odpovedaneAt: "", createdAt: `${date}T09:00:00.000Z`, druh: "dopyt" as const });
 
   test("čerstvo dohodnutý dopyt v zozname nie je — ešte sa rieši", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
-      leads: [d("Terezie Pehalová", "2026-08-01", "dohodnuty")],
+      leads: [d("Terezie Pehalová", "2027-08-01", "dohodnuty")],
       menaKlientov: [], zmeny: [], dnes: DNES2,
     });
     expect(v.some((x) => x.key === "dopyt|nevyriesene")).toBe(false);
@@ -541,7 +541,7 @@ describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
     // ktorá už bola — a to je práve to, čo treba zapísať.
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
-      leads: [d("Jaromír čanda", "2026-03-10", "dohodnuty")],
+      leads: [d("Jaromír čanda", "2027-03-10", "dohodnuty")],
       menaKlientov: [], zmeny: [], dnes: DNES2,
     });
     expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
@@ -550,10 +550,25 @@ describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
   test("nový dopyt sa počíta bez ohľadu na vek", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
-      leads: [d("Karolína Frk", "2026-08-13", "novy")],
+      leads: [d("Karolína Frk", "2027-08-13", "novy")],
       menaKlientov: [], zmeny: [], dnes: DNES2,
     });
     expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
+  });
+});
+
+describe("staré dopyty sa na dôvod nepýtajú (Jerry, 6. 10. 2026)", () => {
+  test("dopyt spred DOVOD_DOPYTU_OD v registri nesvieti, nový áno", () => {
+    nastavObjednaneZKalendara({});
+    const d = (name: string, date: string) =>
+      ({ id: `l-${name}`, name, date, dovod: "", status: "novy" as const, odpovedaneAt: "", createdAt: `${date}T09:00:00.000Z`, druh: "dopyt" as const });
+    const v = nezapisaneDoRegistra({
+      leads: [d("Starý Dopyt", "2026-10-05"), d("Nový Dopyt", "2026-10-06")],
+      menaKlientov: [], zmeny: [], dnes: "2026-10-20",
+    });
+    const p = v.find((x) => x.key === "dopyt|nevyriesene")!;
+    expect(p.title).toContain("(1)");
+    expect(p.detail).toContain("Nový Dopyt");
   });
 });
 
