@@ -657,3 +657,59 @@ describe("nový balíček preberá nekryté tréningy pred sebou (overené v PTm
     expect(st.usek).toBe("2026-01-01");
   });
 });
+
+describe("tréning po skončenom a minutom členstve je prvá hodina ďalšieho", () => {
+  // Markéta Resnerová, 6. 10. 2026: 8 h do 5. 10. minuté, doplnenie bez
+  // počtu hodín počas platnosti, karta 0 — tréning 6. 10. mlčal a nový
+  // balíček nevznikol.
+  const os = (koniec: string, treningPo: string): Udalost[] => [
+    bal("2026-08-11", 2, { doDna: koniec }), tre("2026-08-12"),
+    { druh: "balicekOd", den: "2026-09-20", nazov: "Doplnenie členstva", hodin: 0, doplnenie: true },
+    tre("2026-09-25"), tre(treningPo),
+  ];
+
+  it("členstvo skončilo v Kokpite → mínus a budúca hodina", () => {
+    const { stavy } = priebehBalickov(os("2026-10-05", "2026-10-06"), 0, "2026-10-06");
+    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-10-06")![1];
+    expect(st.dlh).toBe(1);
+    expect(st.buduca).toBe(2);
+  });
+
+  it("členstvo skončilo ešte za PTmindera → appka nehádže, mlčí ako doteraz", () => {
+    const { stavy } = priebehBalickov(os("2026-09-28", "2026-10-02"), 0, "2026-10-06");
+    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-10-02")![1];
+    expect(st.dlh).toBeNull();
+  });
+
+  it("karta hlási hodiny → nekrytý nie je", () => {
+    const { stavy } = priebehBalickov(os("2026-10-05", "2026-10-06"), 1, "2026-10-06");
+    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-10-06")![1];
+    expect(st.dlh).toBeNull();
+  });
+});
+
+describe("samostatná hodina iného druhu členstvo neuťne", () => {
+  // Marcela Hrůzová: ON 6 h od 27. 8., 18. 9. „OFF - 1 hodina offline".
+  const on = (den: string): Udalost => ({ druh: "balicekOd", den, nazov: "ON - 6h BEZ viazanosti", hodin: 6, doDna: "2026-10-21" });
+  const off1 = (den: string): Udalost => ({ druh: "balicekOd", den, nazov: "OFF - 1 hodina offline", hodin: 1, doDna: "2026-10-15" });
+  const t = (den: string, nazov: string): Udalost => ({ druh: "trening", den, nazov });
+  const os: Udalost[] = [
+    on("2026-08-27"), t("2026-08-27", "OFFLINE - 60min"), t("2026-09-03", "OFFLINE - 60min"),
+    off1("2026-09-18"), t("2026-09-18", "OFFLINE - 60min"), t("2026-09-24", "ONLINE - 60min"), t("2026-10-01", "ONLINE - 60min"),
+  ];
+  const zost = (den: string) => [...priebehBalickov(os, 2, "2026-10-06").stavy].find(([u]) => u.druh === "trening" && u.den === den)![1].zostatok;
+
+  it("offline tréning ide z kúpenej hodiny, online beží z ON ďalej", () => {
+    expect(zost("2026-09-03")).toBe(5);
+    expect(zost("2026-09-18")).toBe(1);
+    expect(zost("2026-09-24")).toBe(4);
+    expect(zost("2026-10-01")).toBe(3);
+    expect(priebehBalickov(os, 2, "2026-10-06").koniec).toBe(2);
+  });
+
+  it("hodina rovnakého druhu je nové členstvo ako doteraz", () => {
+    const os2: Udalost[] = [on("2026-08-27"), t("2026-08-27", ""), { ...(off1("2026-09-18") as any), nazov: "ON - 1 hodina" }, t("2026-09-24", "")];
+    const st = [...priebehBalickov(os2, null, "2026-10-06").stavy].find(([u]) => u.druh === "trening" && u.den === "2026-09-24")![1];
+    expect(st.usek).toBe("2026-09-18");
+  });
+});

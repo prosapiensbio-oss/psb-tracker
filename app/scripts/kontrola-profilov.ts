@@ -145,7 +145,12 @@ const data: PSBData = {
 
 const clients = deriveClients(data);
 const mena = Object.keys(clients);
-const kalUdalosti = kal.map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
+// Len udalosti, ktoré už začali — ako appka (`osKlientaZoServera` s hodinou).
+// Ráno by inak dnešný tréning o 17:00 stál na osi ako odtrénovaný a kontrolór
+// hlásil „odkaz −1 · karta 0" pri každom, kto dnes trénuje (6. 10. 2026: 13×).
+const terazKontroly = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+const kalUdalosti = kal.filter((r: any) => String(r.zaciatok).slice(0, 16) <= terazKontroly)
+  .map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
 const osi = new Map<string, Udalost[]>();
 for (const m of mena) {
   osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny } as never, DNES));

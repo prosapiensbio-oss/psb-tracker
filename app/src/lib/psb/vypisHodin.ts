@@ -2,6 +2,11 @@ import type { Udalost } from "./klientOsCasu";
 import { denVTyzdni } from "./format";
 import { nazovProduktu } from "./nazvyProduktov";
 import { dnesPraha } from "./cas";
+import { KOKPIT_OD } from "./sedeniaZKalendara";
+import { CENNIK } from "./cennik";
+
+/** Členstvo, ktoré skončilo deň pred KOKPIT_OD alebo neskôr, už končilo v Kokpite. */
+const KONIEC_ZA_KOKPITU = new Date(Date.parse(`${KOKPIT_OD}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
 
 /**
  * VÝPIS HODÍN — čo klient kúpil, čo odtrénoval a koľko mu zostáva.
@@ -254,6 +259,16 @@ export type StavRiadku = {
  * taký, aký bol (6, 5, 4, 3, 2, 1 sú pevné), len KONIEC sa dorovná na číslo
  * z karty — od 1. 10. 2026 je to číslo z Kokpitu, nie z exportu PTmindera.
  */
+/** Druh balíčka z názvu: „ON - …"/„… online" → on, „OFF - …"/offline z cenníka → off; inak neznámy. */
+export function kanalBalicka(nazov: string): "on" | "off" | null {
+  const n = String(nazov || "");
+  if (/^\s*ON\b|online/i.test(n)) return "on";
+  if (/^\s*OFF\b|offline/i.test(n)) return "off";
+  return CENNIK.find((s) => s.nazov === n.trim())?.skupina === "Offline" ? "off" : null;
+}
+const kanalTreningu = (u: Extract<Udalost, { druh: "trening" }>): "on" | "off" | null =>
+  /online/i.test(u.nazov || "") ? "on" : /offline/i.test(u.nazov || "") ? "off" : null;
+
 export function priebehBalickov(
   os: Udalost[],
   zostatokTeraz: number | null = null,
@@ -265,6 +280,23 @@ export function priebehBalickov(
   // Hranice členstiev: každý balíček s hodinami otvára nové obdobie.
   type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[]; prevzate?: number; prevzateDni?: string[] };
   const useky: Usek[] = [{ balicek: null, hodin: 0, riadky: [] }];
+  /**
+   * SAMOSTATNÁ HODINA INÉHO DRUHU NEDELÍ ČLENSTVO.
+   *
+   * Jerry, 6. 10. 2026: „Veronika chodí online a občas ide na offline, ale to
+   * si platí ako samostatný tréning." Marcela Hrůzová to isté: ON 6 h od
+   * 27. 8. a 18. 9. „OFF - 1 hodina offline" za 1 450 Kč. Os doteraz každým
+   * balíčkom otvorila nové obdobie, takže jednotlivá offline hodina online
+   * členstvo uťala — tréningy 24. 9. a 1. 10. stáli bez čísla, hoci z ON
+   * zostávali hodiny. Kúpená hodina (najviac jedna) iného druhu než bežiace
+   * členstvo preto pokryje svoj tréning a členstvo beží ďalej.
+   *
+   * Druh sa berie LEN z názvu balíčka. Z druhu tréningu nie: Lucia Podolová
+   * má „ON - 6h" a tréningy vedené ako offline — prísne „online len z online"
+   * by jej balíček nikdy nemínalo.
+   */
+  const samostatne = new Map<Udalost, Extract<Udalost, { druh: "balicekOd" }>>();
+  const cakajuce: Extract<Udalost, { druh: "balicekOd" }>[] = [];
   /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
    * −1 = všetko sa zmestilo (alebo je to obdobie bez hodín).
@@ -321,7 +353,7 @@ export function priebehBalickov(
     for (let i = 0; i < u.riadky.length; i++) {
       const r = u.riadky[i];
       if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, u.balicek)) zostava += r.hodin;
-      const h = hodinTreningu(r);
+      const h = samostatne.has(r) ? 0 : hodinTreningu(r);
       if (!h) continue;
       if (zostava < h) return i;
       zostava -= h;
@@ -330,8 +362,21 @@ export function priebehBalickov(
   };
 
   for (const u of rad) {
+    if (u.druh === "trening" && u.zdarma === undefined && cakajuce.length) {
+      const k = kanalTreningu(u);
+      const i = cakajuce.findIndex((x) => (!x.doDna || u.den <= x.doDna) && (!k || k === kanalBalicka(x.nazov)));
+      if (i >= 0) samostatne.set(u, cakajuce.splice(i, 1)[0]);
+    }
     if (u.druh === "balicekOd" && !u.doplnenie) {
       const posl = useky[useky.length - 1];
+      const hlavny = posl.balicek;
+      const kanal = kanalBalicka(u.nazov);
+      if (hlavny && u.hodin > 0 && u.hodin <= 1 && hlavny.hodin > 1 && (!hlavny.doDna || hlavny.doDna >= u.den)
+        && kanal && kanalBalicka(hlavny.nazov) && kanal !== kanalBalicka(hlavny.nazov)) {
+        cakajuce.push(u);
+        posl.riadky.push(u);
+        continue;
+      }
       // Dve členstvá kúpené v ten istý deň sa SČÍTAJÚ, nezačínajú odznova.
       // PTminder ich vyváža ako dva riadky (Peter Gažo, Anna Nova) a Jerry to
       // pozná ako „akoby dve členstvá" — hodiny má klient obe.
@@ -396,7 +441,9 @@ export function priebehBalickov(
     useky[useky.length - 1].riadky.push(u);
   }
 
-  const posledny = poslednyBalicek(os, dnes);
+  // Samostatná hodina nie je „posledné členstvo“ — to beží ďalej popri nej.
+  const singleBalicky = new Set<Udalost>([...samostatne.values(), ...cakajuce]);
+  const posledny = poslednyBalicek(os.filter((u) => !singleBalicky.has(u)), dnes);
   // Číslo z karty platí ku dňu EXPORTU. Tréningy, ktoré prišli po ňom len
   // z kalendára, o nich PTminder ešte nevedel — zrovnávať sa musí k tomu dňu,
   // inak by sa balíček Dana Kouřila nafúkol zo 6 na 7 hodín.
@@ -440,7 +487,7 @@ export function priebehBalickov(
       let k = hodinUseku(usek);
       for (const r of usek.riadky) {
         if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, nb)) k += r.hodin;
-        if (r.druh === "trening" && r.zdarma === undefined && r.den <= (denExportu || dnes)) k -= hodinTreningu(r);
+        if (r.druh === "trening" && r.zdarma === undefined && !samostatne.has(r) && r.den <= (denExportu || dnes)) k -= hodinTreningu(r);
       }
       const navyse = k - zostatokTeraz;
       if (navyse > 0) {
@@ -448,7 +495,7 @@ export function priebehBalickov(
         const nekryte: number[] = [];
         prev.riadky.forEach((r, i) => {
           if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, prev.balicek)) bezi += r.hodin;
-          if (r.druh !== "trening" || r.zdarma !== undefined) return;
+          if (r.druh !== "trening" || r.zdarma !== undefined || samostatne.has(r)) return;
           const h = hodinTreningu(r);
           if (bezi < h) nekryte.push(i); else bezi -= h;
         });
@@ -536,7 +583,13 @@ export function priebehBalickov(
       if (u.druh === "platba") dlhPocet = 0;
       // Tréning zadarmo do odpočtu ani do dlhu nevstupuje — je darovaný,
       // takže zaň nemá čo chýbať ani hodina, ani platba.
-      if (u.druh === "trening" && u.zdarma === undefined) {
+      const single = samostatne.get(u);
+      if (single) {
+        // Tréning na samostatnej hodine: jeho číslo je tá hodina, členstvo
+        // sa nemení a séria mínusu tiež nie.
+        zostatok = single.nezaplatene ? null : single.hodin;
+        dlh = single.nezaplatene ? 1 : null;
+      } else if (u.druh === "trening" && u.zdarma === undefined) {
         // Číslo pri tréningu je stav PRED ním. Keď už hodiny nie sú, riadok
         // číslo nemá a tréning sa počíta do dlhu.
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
@@ -563,7 +616,27 @@ export function priebehBalickov(
          * tréningy by jej ukázala ako −1, −2; karta sčíta oba a hovorí 1 h.
          */
         const kartaVMinuse = zostatokTeraz != null && zostatokTeraz < 0;
-        if (neznameHodiny && !(vycerpane && b === posledny && kartaVMinuse)) dlh = null;
+        /**
+         * PO SKONČENÍ PLATNOSTI NEZNÁME DOPLNENIE UŽ NIČ NEKRYJE.
+         *
+         * Jerry, 6. 10. 2026: „nové členstvo vzniká prvou hodinou (6 h), ak
+         * nie je zaplatené, je to (6 h −1)." Markéta Resnerová: členstvo 8 h
+         * do 5. 10. minuté, doplnenie z 20. 9. bez počtu hodín, tréning 6. 10.
+         * Karta (z PTmindera, v Kokpite aktívny balíček nemá) hovorí 0, takže
+         * stráž vyššie riadok umlčala — bez mínusu a bez budúcej hodiny a nový
+         * balíček z prvého tréningu (`navrhNovehoBalicka`) nevznikol.
+         * Tréning po konci platnosti, keď karta hodiny nemá, je prvá hodina
+         * ďalšieho členstva.
+         *
+         * LEN PRI ČLENSTVE, KTORÉ SKONČILO, KEĎ UŽ PRAVDOU BOL KOKPIT. Staršia
+         * história z PTmindera tomu nesedí (prepočet 6. 10. 2026: prenos
+         * mínusu zo skončeného členstva dal pri 4 z 4 overiteľných klientov
+         * iné číslo než PTminder) a návrh z nej by založil balíček do minulosti
+         * — Jarek Heinrich trénuje od júla bez členstva a s doplneniami bez
+         * počtu; to rozhodne Jerry, nie appka.
+         */
+        const poPlatnosti = !!(b?.doDna && b.doDna >= KONIEC_ZA_KOKPITU && u.den > b.doDna && zostatokTeraz != null && zostatokTeraz <= 0);
+        if (neznameHodiny && !(vycerpane && b === posledny && (kartaVMinuse || poPlatnosti))) dlh = null;
         else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
@@ -611,7 +684,7 @@ export function priebehBalickov(
       const bezHodiny: StavRiadku[] = [];
       for (let i = usek.riadky.length - 1; i >= 0; i--) {
         const u = usek.riadky[i];
-        if (u.druh !== "trening" || u.zdarma !== undefined) continue;
+        if (u.druh !== "trening" || u.zdarma !== undefined || samostatne.has(u)) continue;
         const st = stavy.get(u);
         if (!st || st.zostatok != null || !st.dlh) break;
         bezHodiny.unshift(st);

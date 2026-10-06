@@ -16,6 +16,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { deriveClients } from "./compute";
 import { loadData } from "./db.server";
+import { terazPraha } from "./cas";
 import { normName } from "./format";
 import { osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
@@ -59,7 +60,10 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
      */
     const doDna = String(c.packageValidTo || "").slice(0, 10);
     if (doDna && doDna < dnes && c.packageRemaining > 0 && !data.anomalyAck?.[`platnost|${c.name}|${doDna}`]) continue;
-    const os = osCasuKlienta(c.name, zdroj, dnes);
+    // Os po TERAZ, nie po celý deň: tréning o 8:30 nesmie založiť balíček
+    // o 6:40 — keby sa zrušil, balíček s dlhom by zostal (6. 10. 2026,
+    // Markéta Resnerová). Profil a stránka klienta počítajú tiež s hodinou.
+    const os = osCasuKlienta(c.name, zdroj, terazPraha());
     const { stavy } = priebehBalickov(os, c.packageTotal > 0 ? c.packageRemaining : null, dnes);
     const k = normName(c.name);
     const ceny = [
