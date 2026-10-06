@@ -73,7 +73,10 @@ Rozhodnutia z 6. 10. sú zapracované (prenos mínusu, online/offline,
   deň VRÁTENÉ na pôvodný rad (Jerry: „v mojej predstave to vyzeralo lepšie
   ako v skutočnosti"). Hneď nato Jerry: „sprav to tak, že to ide dokola —
   vedľa Klienta je 1 · Kalendár" → rovný rad DOKOLA (`poradieKolesa`) je
-  naostro; 3D valec nie. Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
+  naostro; 3D valec nie. Rovný rad „dokola" Jerry hneď odmietol („to je
+  stále posúvanie pásu zľava doprava") a z náčrtov `navrhy-kokpitu/nekonecny-rad.html`
+  vybral 1 · NEKONEČNÝ RAD (`NekonecnyRad.tsx`): názvy sa opakujú cez celú
+  šírku, kraj neexistuje. Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
   v Need for Speed"). Kolotoč v rade (`poradieKolesa`) Jerryho ideu netrafil;
   ukážka mimo Kokpitu: `navrhy-kokpitu/kolotoc-kariet.html` — A valec,
   B obežná dráha, C bubon. Čaká na výber, potom do Workspace.
