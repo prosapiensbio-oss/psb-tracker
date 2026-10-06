@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Editor videa</title>
+<style>
+/*ui-css*/
+  :root {
+    --bg: #1d2418; --bg2: #273021; --surface: #232b1e; --card: #2b3425; --card2: #323c2b; --text: #f3efe4; --muted: #b9b39f; --dim: #7f7b6a;
+    --accent: #e8893a; --accentLight: #ffb36b; --accentBg: rgba(232,137,58,.16); --line: rgba(255,255,255,.09); --line2: rgba(255,255,255,.16);
+    --panel: 370px; --hlavicka: 54px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--surface); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+
+  .hlavicka { height: var(--hlavicka); display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+  .hlavicka b { font-size: 15px; }
+  .hlavicka small { color: var(--dim); font-size: 13px; }
+  .telo { display: flex; height: calc(100% - var(--hlavicka)); }
+  .platno { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 22px; background: radial-gradient(90% 90% at 50% 40%, var(--bg2), var(--bg)); }
+
+  .panel { width: var(--panel); flex-shrink: 0; border-left: 1px solid var(--line); background: var(--card); display: flex; flex-direction: column; }
+  .skupiny { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+  details { border-radius: 12px; border: 1px solid var(--line); background: transparent; }
+  details[open] { background: var(--card2); border-color: var(--line2); }
+  summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  details[open] summary { color: var(--text); }
+  summary .stav { margin-left: auto; font-weight: 500; font-size: 12px; color: var(--dim); }
+  summary .sipka { color: var(--dim); transition: transform .15s; }
+  details[open] summary .sipka { transform: rotate(90deg); }
+  .obsah { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .spodok { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  .spodok .tl { flex: 1; text-align: center; }
+
+  .prepinac { display: flex; gap: 3px; padding: 3px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); }
+  .prepinac button { flex: 1; padding: 7px 6px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .prepinac button.on { background: rgba(232,137,58,.22); color: var(--accentLight); font-weight: 600; }
+  .riadok { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); }
+  .riadok input[type=range] { flex: 1; accent-color: var(--accent); }
+  .riadok input[type=date] { padding: 5px 7px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; color-scheme: dark; }
+  .tlacidla { display: flex; gap: 7px; flex-wrap: wrap; }
+  .tl { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.05); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .tl.hlavne { border-color: var(--accent); background: var(--accentBg); color: var(--accentLight); font-weight: 600; }
+  .tl:disabled { opacity: .45; cursor: default; }
+  .napoveda { font-size: 11.5px; color: var(--dim); line-height: 1.55; }
+  .napoveda b { color: var(--muted); font-weight: 600; }
+  label.check { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  label.check input { accent-color: var(--accent); }
+  /* karty fotiek */
+  .vyber-okna { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vyber-okna button { display: flex; gap: 9px; align-items: center; padding: 7px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); color: var(--muted); font: inherit; cursor: pointer; text-align: left; }
+  .vyber-okna button.on { border-color: var(--accent); background: var(--accentBg); }
+  .vyber-okna img { width: 36px; height: 48px; object-fit: cover; border-radius: 5px; background: #ccc; flex-shrink: 0; }
+  .vyber-okna .t { display: block; font-size: 12px; font-weight: 600; color: var(--text); }
+  .vyber-okna .d { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+  /* zásobník snímok */
+  .zasobnik { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .zasobnik .sn { border: 1px solid var(--line2); border-radius: 9px; overflow: hidden; background: var(--surface); cursor: grab; }
+  .zasobnik img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #ccc; }
+  .zasobnik .popis { font-size: 11px; color: var(--muted); padding: 4px 6px 2px; }
+  .zasobnik .akcie { display: flex; gap: 2px; padding: 2px 4px 5px; }
+  .zasobnik .akcie button { flex: 1; padding: 4px 0; border: 0; border-radius: 6px; background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-size: 11.5px; cursor: pointer; }
+  .zasobnik .akcie button:hover { background: var(--accentBg); color: var(--accentLight); }
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .telo { flex-direction: column; height: auto; }
+    .panel { width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+  }
+/*/ui-css*/
+  /* V Kokpite je hlavička na karte Workspace, tu nie. */
+  :root { --hlavicka: 0px; }
+  /* ── ĽAVÝ STĹPEC: scéna + ovládanie prehrávania ── */
+  .lavy { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #0d100b; }
+  .scena { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; }
+  .scena.tahanie { cursor: grabbing; }
+  .scena video { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; max-width: none; background: #000; }
+  .scena .prazdne { position: absolute; inset: 24px; border: 2px dashed var(--line2); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 14px; text-align: center; cursor: pointer; }
+  .scena .prazdne b { font-size: 34px; font-weight: 300; color: var(--accentLight); }
+  .scena.nad .prazdne, .scena.nad { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .scena .stitok-videa { position: absolute; left: 12px; top: 12px; padding: 5px 10px; border-radius: 7px; background: rgba(20,20,20,.62); color: #fff; font-size: 13px; font-weight: 600; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .scena .stitok-videa small { font-weight: 400; opacity: .85; margin-left: 6px; }
+  .ciary { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; touch-action: none; overflow: visible; }
+  .ciary.kreslim { pointer-events: all; cursor: crosshair; }
+  .ciary text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+  .prehravac { border-top: 1px solid var(--line); background: var(--card); padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 9px; }
+  .prehravac .rad { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .prehravac .tl { padding: 7px 11px; font-size: 14px; }
+  .prehravac .play { min-width: 48px; }
+  .prehravac .cas { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text); min-width: 118px; }
+  .prehravac .cas small { color: var(--dim); display: block; font-size: 11px; }
+  .prehravac .rychlost { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); flex: 1 1 200px; min-width: 180px; }
+  .prehravac .rychlost input { flex: 1; accent-color: var(--accent); }
+  .prehravac .rychlost b { width: 48px; text-align: right; color: var(--accentLight); font-variant-numeric: tabular-nums; }
+  .prehravac select { padding: 5px 7px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; }
+
+  /* časová os s bodkami: začiatok strihu, koniec strihu, hlava prehrávania */
+  .os { position: relative; height: 34px; cursor: pointer; touch-action: none; user-select: none; }
+  .os .draha { position: absolute; left: 0; right: 0; top: 14px; height: 6px; border-radius: 3px; background: var(--line2); }
+  .os .strih { position: absolute; top: 14px; height: 6px; border-radius: 3px; background: var(--accent); }
+  .os .mimo { position: absolute; top: 10px; height: 14px; background: rgba(0,0,0,.35); }
+  .os .ucho { position: absolute; top: 5px; width: 14px; height: 24px; margin-left: -7px; border-radius: 5px; background: var(--accentLight); border: 2px solid #1d2418; cursor: ew-resize; z-index: 2; }
+  .os .ucho::after { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; border-left: 1px solid rgba(0,0,0,.35); border-right: 1px solid rgba(0,0,0,.35); }
+  .os .hlava { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(232,137,58,.55); z-index: 3; cursor: grab; }
+  .os .znacka { position: absolute; top: 24px; width: 2px; height: 8px; margin-left: -1px; border-radius: 1px; }
+
+  .videa { display: flex; flex-direction: column; gap: 7px; }
+  .videa .v { display: flex; gap: 9px; align-items: center; padding: 7px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); cursor: pointer; }
+  .videa .v.on { border-color: var(--accent); background: var(--accentBg); }
+  .videa .v img { width: 40px; height: 52px; object-fit: cover; border-radius: 5px; background: #222; flex-shrink: 0; }
+  .videa .v .t { font-size: 12.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .videa .v .d { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .videa .v select { padding: 4px 6px; border-radius: 7px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; font-size: 12px; }
+  .videa .v .x { margin-left: auto; background: none; border: 0; color: var(--dim); cursor: pointer; font-size: 14px; padding: 4px; }
+
+  @media (max-width: 860px) {
+    .lavy { min-height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<div class="telo">
+  <div class="lavy">
+    <div class="scena" id="scena">
+      <video id="video" muted playsinline preload="auto"></video>
+      <svg class="ciary" id="ciary"></svg>
+      <div class="stitok-videa" id="stitokVidea" hidden></div>
+      <div class="prazdne" id="prazdne"><b>+</b>Pretiahni sem video chôdze alebo behu<br><span style="color:var(--dim);font-size:12.5px">alebo klikni a vyber ho</span></div>
+    </div>
+    <div class="prehravac" id="prehravac">
+      <div class="os" id="os" title="Bodky = začiatok a koniec strihu, biela = kde práve si">
+        <div class="draha"></div>
+        <div class="mimo" id="mimoL"></div><div class="mimo" id="mimoP"></div>
+        <div class="strih" id="osStrih"></div>
+        <div id="osZnacky"></div>
+        <div class="ucho" id="uchoOd" title="Začiatok strihu (I)"></div>
+        <div class="ucho" id="uchoDo" title="Koniec strihu (O)"></div>
+        <div class="hlava" id="hlava"></div>
+      </div>
+      <div class="rad">
+        <button class="tl" id="spat" title="O snímku späť (←, so Shiftom o 10)">⏮</button>
+        <button class="tl hlavne play" id="play" title="Prehrať / zastaviť (medzerník)">▶</button>
+        <button class="tl" id="vpred" title="O snímku vpred (→, so Shiftom o 10)">⏭</button>
+        <div class="cas" id="cas">0,00 s<small>snímka 0</small></div>
+        <div class="rychlost" title="Dvojklik = normálna rýchlosť">rýchlosť <input type="range" id="rychlost" min="0" max="1000" step="1"><b id="rychlostH">1×</b></div>
+        <button class="tl hlavne" id="snimka" title="Uložiť túto snímku (S)">📷 Snímka</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="skupiny">
+      <details data-skupina="videa" open>
+        <summary><span class="sipka">▸</span>Videá<span class="stav" id="stavVidea"></span></summary>
+        <div class="obsah">
+          <div class="videa" id="zoznamVidei"></div>
+          <button class="tl" id="vlozit">Vložiť video…</button>
+          <div class="riadok">natočené pri <select id="fps"><option>30</option><option>60</option><option>120</option><option>240</option></select> snímkach/s</div>
+          <div class="napoveda">Video môžeš aj <b>pretiahnuť z Findera</b>. Vlož predtým aj potom — prepínaš klikom v zozname. Snímky/s určujú, o koľko skočí ← →.</div>
+        </div>
+      </details>
+
+      <details data-skupina="strih">
+        <summary><span class="sipka">▸</span>Strih<span class="stav" id="stavStrih"></span></summary>
+        <div class="obsah">
+          <div class="tlacidla">
+            <button class="tl" id="strihOd">⇤ začiatok tu <span style="color:var(--dim)">I</span></button>
+            <button class="tl" id="strihDo">koniec tu ⇥ <span style="color:var(--dim)">O</span></button>
+            <button class="tl" id="strihZrus">zrušiť</button>
+          </div>
+          <div class="napoveda" id="strihInfo">Strih nastavíš aj ťahaním oranžových bodiek na časovej osi. Prehráva sa potom len strih, dokola.</div>
+        </div>
+      </details>
+
+      <details data-skupina="ciary">
+        <summary><span class="sipka">▸</span>Čiary a uhly<span class="stav" id="stavCiary"></span></summary>
+        <div class="obsah">
+          <button class="tl" id="kreslit">✎ kresliť čiary</button>
+          <div class="prepinac" id="farbaCiar">
+            <button data-v="#ff8a1f" class="on">oranžová</button>
+            <button data-v="#ffffff">biela</button>
+            <button data-v="#38e07b">zelená</button>
+            <button data-v="#ff4d4d">červená</button>
+          </div>
+          <div id="vybranaInfo" class="napoveda" hidden style="font-size:13px;color:var(--text)"></div>
+          <div class="tlacidla">
+            <button class="tl" id="zmazVybranu" disabled>zmazať vybranú</button>
+            <button class="tl" id="zmazVsetky" disabled>zmazať všetky</button>
+          </div>
+          <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
+          <label class="check"><input type="checkbox" id="naSnimke" checked> len na snímke, kde vznikli</label>
+          <div class="napoveda">Kým je skupina otvorená, kreslíš (video stojí). Novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Čiara patrí k snímke — pri ďalšej zmizne, pri návrate sa vráti. <b>Shift</b> = presne vodorovne/zvisle.</div>
+        </div>
+      </details>
+
+      <details data-skupina="snimky">
+        <summary><span class="sipka">▸</span>Snímky<span class="stav" id="stavSnimky"></span></summary>
+        <div class="obsah">
+          <label class="check"><input type="checkbox" id="snimkaSCiarami"> snímka aj s čiarami</label>
+          <div class="zasobnik" id="zasobnik"></div>
+          <div class="napoveda" id="zasobnikPrazdny">📷 alebo kláves <b>S</b> uloží snímku. Snímky čakajú v editore fotiek (hore prepni na <b>Foto</b>, skupina „Snímky z videa") — tam ich dáš vedľa seba a upravíš ako fotky.</div>
+          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Tento prehliadač nedovolil uložiť snímky natrvalo — do editora fotiek ich prenesieš len stiahnutím (⤓).</div>
+        </div>
+      </details>
+    </div>
+    <div class="spodok">
+      <label class="check" style="flex:0 0 auto" title="Popis a čas vo videu"><input type="checkbox" id="popisVoVideu" checked> popis</label>
+      <button class="tl" id="stiahnutVideo" disabled>Stiahnuť video</button>
+    </div>
+  </aside>
+</div>
+<input type="file" id="subor" accept="video/*" hidden>
+
+<script>
+<!--sklad-js-->
+/**
+ * ZÁSOBNÍK SNÍMOK — spoločný pre video editor a fotkový editor.
+ *
+ * Video editor sem ukladá snímky („screenshot" momentu z videa), fotkový
+ * editor si ich odtiaľ berie do polovíc. V prehliadači je to IndexedDB, takže
+ * snímky prežijú aj zatvorenie stránky. V Kokpite bude namiesto toho
+ * kartotéka klienta (zašifrovaná v R2).
+ *
+ * Keď IndexedDB nejde (súkromné okno, niektoré náhľady), drží sa zásobník
+ * aspoň v pamäti stránky — a povie to.
+ */
+window.skladSnimok = (() => {
+  let dbP = null;
+  let pamat = null; // náhradný zásobník, keď IndexedDB nejde
+  let dalsieId = 1;
+  const kanal = (() => { try { return new BroadcastChannel("skladacka-snimky"); } catch { return null; } })();
+  const db = () => dbP || (dbP = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open("skladacka", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("snimky", { keyPath: "id", autoIncrement: true });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  }));
+  const poziadavka = async (mod, f) => {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const t = d.transaction("snimky", mod);
+      const r = f(t.objectStore("snimky"));
+      t.oncomplete = () => res(r?.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  const ohlas = () => { try { kanal?.postMessage("zmena"); } catch { /* nič */ } };
+  const naPamat = () => { if (!pamat) pamat = []; return pamat; };
+
+  return {
+    /** { blob, den, cas, zdroj, oznacenie } → id */
+    async pridaj(z) {
+      const zaznam = { ...z, vytvorene: new Date().toISOString() };
+      try { const id = await poziadavka("readwrite", (s) => s.add(zaznam)); ohlas(); return id; }
+      catch { const id = dalsieId++; naPamat().push({ ...zaznam, id }); return id; }
+    },
+    async vsetky() {
+      try { return (await poziadavka("readonly", (s) => s.getAll())) || []; }
+      catch { return naPamat().slice(); }
+    },
+    async zmaz(id) {
+      try { await poziadavka("readwrite", (s) => s.delete(id)); ohlas(); }
+      catch { pamat = naPamat().filter((x) => x.id !== id); }
+    },
+    /** Zavolá f, keď druhá stránka (editor) zásobník zmení. */
+    priZmene(f) {
+      kanal?.addEventListener("message", f);
+      addEventListener("focus", f);
+    },
+    get lenVPamati() { return pamat !== null; },
+  };
+})();
+<!--/sklad-js-->
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const scena = $("scena"), video = $("video"), svg = $("ciary");
+  const desatinne = (n) => n.toFixed(1).replace(".", ",");
+  const casText = (t) => `${(t || 0).toFixed(2).replace(".", ",")} s`;
+  const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
+
+  // ── STAV ──
+  const videa = []; // { id, src, nazov, den, oznacenie, fw, fh, dlzka, strih, ciary, cas, view, nahlad }
+  let aktivneId = null;
+  let dalsieId = 1, dalsiaCiara = 1;
+  let fps = 30, rychlost = 1;
+  let rezimCiar = false, vybrana = null, farbaCiar = "#ff8a1f";
+  let nahravam = null;
+  const akt = () => videa.find((v) => v.id === aktivneId) || null;
+
+  // ── GEOMETRIA: video vpísané do scény, dá sa zväčšiť a posunúť ──
+  const MAX_ZOOM = 8;
+  function rozlozenie(v = akt()) {
+    const W = scena.clientWidth, H = scena.clientHeight;
+    if (!v || !v.fw) return { W, H, w: 0, h: 0, l: 0, t: 0 };
+    const s = Math.min(W / v.fw, H / v.fh) * v.view.zoom;
+    const w = v.fw * s, h = v.fh * s;
+    return { W, H, w, h, l: W / 2 + v.view.x * W - w / 2, t: H / 2 + v.view.y * H - h / 2 };
+  }
+  function obmedz(v) {
+    v.view.zoom = Math.min(MAX_ZOOM, Math.max(1, v.view.zoom));
+    const L = rozlozenie(v);
+    const mx = Math.max(0, (L.w - L.W) / 2 / L.W), my = Math.max(0, (L.h - L.H) / 2 / L.H);
+    v.view.x = Math.min(mx, Math.max(-mx, v.view.x));
+    v.view.y = Math.min(my, Math.max(-my, v.view.y));
+  }
+  const bod = (L, p) => ({ x: L.l + p.u * L.w, y: L.t + p.v * L.h });
+  const zBodu = (L, x, y) => ({ u: Math.min(1, Math.max(0, (x - L.l) / L.w)), v: Math.min(1, Math.max(0, (y - L.t) / L.h)) });
+
+  // ── ČIARY (bod v súradniciach videa 0–1, patria k snímke) ──
+  const rovnakyBod = (p, q) => Math.abs(p.u - q.u) < 1e-9 && Math.abs(p.v - q.v) < 1e-9;
+  const viditelna = (c) => !$("naSnimke").checked || Math.abs(video.currentTime - c.cas) < 0.6 / fps;
+  const sklonText = (A, B) => {
+    const k = Math.atan2(Math.abs(B.y - A.y), Math.abs(B.x - A.x)) * 180 / Math.PI;
+    return k <= 45 ? `↔ ${desatinne(k)}°` : `↕ ${desatinne(90 - k)}°`;
+  };
+  /** Tvary na kreslenie — spoločné pre obrazovku (k = 1) a export (k = mierka). */
+  function tvary(L, k) {
+    const v = akt();
+    if (!v) return [];
+    const out = [];
+    const body = v.ciary.filter(viditelna).map((c) => ({ c, A: bod(L, c.a), B: bod(L, c.b) }));
+    for (const { c, A, B } of body) {
+      out.push({ typ: "ciara", A, B, farba: c.farba, vybrana: c.id === vybrana });
+      if ($("sklon").checked) {
+        const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1;
+        let nx = -dy / d, ny = dx / d;
+        if (ny > 0) { nx = -nx; ny = -ny; }
+        out.push({ typ: "text", x: (A.x + B.x) / 2 + nx * 16 * k, y: (A.y + B.y) / 2 + ny * 16 * k, text: sklonText(A, B), velkost: 12 });
+      }
+    }
+    for (let i = 0; i < body.length; i++) for (let j = i + 1; j < body.length; j++) {
+      const p = body[i], q = body[j];
+      for (const [kp, Vp, Op] of [["a", "A", "B"], ["b", "B", "A"]]) for (const [kq, , Oq] of [["a", "A", "B"], ["b", "B", "A"]]) {
+        if (!rovnakyBod(p.c[kp], q.c[kq])) continue;
+        const V = p[Vp], P1 = p[Op], P2 = q[Oq];
+        const a1 = Math.atan2(P1.y - V.y, P1.x - V.x), a2 = Math.atan2(P2.y - V.y, P2.x - V.x);
+        let uhol = Math.abs(a2 - a1) * 180 / Math.PI;
+        if (uhol > 180) uhol = 360 - uhol;
+        const r = 26 * k;
+        const kriz = (P1.x - V.x) * (P2.y - V.y) - (P1.y - V.y) * (P2.x - V.x);
+        const z = { x: V.x + r * Math.cos(a1), y: V.y + r * Math.sin(a1) }, na = { x: V.x + r * Math.cos(a2), y: V.y + r * Math.sin(a2) };
+        out.push({ typ: "oblúk", d: `M ${z.x} ${z.y} A ${r} ${r} 0 0 ${kriz > 0 ? 1 : 0} ${na.x} ${na.y}`, farba: p.c.farba });
+        let bx = Math.cos(a1) + Math.cos(a2), by = Math.sin(a1) + Math.sin(a2);
+        const bd = Math.hypot(bx, by);
+        if (bd < 1e-6) { bx = -Math.sin(a1); by = Math.cos(a1); } else { bx /= bd; by /= bd; }
+        out.push({ typ: "text", x: V.x + bx * (r + 20 * k), y: V.y + by * (r + 20 * k), text: `${desatinne(uhol)}°`, velkost: 15, tucne: true });
+      }
+    }
+    return out;
+  }
+  function kresliCiary() {
+    const L = rozlozenie();
+    const html = [];
+    for (const t of tvary(L, 1)) {
+      if (t.typ === "ciara") {
+        html.push(`<line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="rgba(0,0,0,.45)" stroke-width="${t.vybrana ? 6 : 4}" stroke-linecap="round"/>
+          <line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="${t.farba}" stroke-width="${t.vybrana ? 3.5 : 2}" stroke-linecap="round" ${t.vybrana ? 'stroke-dasharray="8 5"' : ""}/>
+          ${[t.A, t.B].map((b) => `<circle cx="${b.x}" cy="${b.y}" r="${rezimCiar ? 6 : 3.5}" fill="${rezimCiar ? "rgba(0,0,0,.35)" : t.farba}" stroke="${t.farba}" stroke-width="2"/>`).join("")}`);
+      } else if (t.typ === "oblúk") {
+        html.push(`<path d="${t.d}" fill="none" stroke="${t.farba}" stroke-width="2"/>`);
+      } else {
+        const sirka = t.text.length * t.velkost * 0.6 + 12, v = t.velkost + 9;
+        html.push(`<g transform="translate(${t.x} ${t.y})"><rect x="${-sirka / 2}" y="${-v / 2}" width="${sirka}" height="${v}" rx="6" fill="rgba(20,20,20,.72)"/><text x="0" y="0" fill="#fff" font-size="${t.velkost}" font-weight="${t.tucne ? 700 : 600}" text-anchor="middle" dominant-baseline="central">${t.text}</text></g>`);
+      }
+    }
+    svg.innerHTML = html.join("");
+  }
+  function ciaryNaPlatno(x, L, k) {
+    for (const t of tvary(L, k)) {
+      x.save();
+      if (t.typ === "ciara") {
+        x.lineCap = "round";
+        x.strokeStyle = "rgba(0,0,0,.45)"; x.lineWidth = 4 * k; x.beginPath(); x.moveTo(t.A.x, t.A.y); x.lineTo(t.B.x, t.B.y); x.stroke();
+        x.strokeStyle = t.farba; x.lineWidth = 2 * k; x.beginPath(); x.moveTo(t.A.x, t.A.y); x.lineTo(t.B.x, t.B.y); x.stroke();
+        x.fillStyle = t.farba; for (const b of [t.A, t.B]) { x.beginPath(); x.arc(b.x, b.y, 3.5 * k, 0, 7); x.fill(); }
+      } else if (t.typ === "oblúk") {
+        x.strokeStyle = t.farba; x.lineWidth = 2 * k; x.stroke(new Path2D(t.d));
+      } else {
+        x.font = `${t.tucne ? 700 : 600} ${t.velkost * k}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        const w = x.measureText(t.text).width + 12 * k, h = (t.velkost + 9) * k;
+        x.fillStyle = "rgba(20,20,20,.72)"; x.beginPath(); x.roundRect(t.x - w / 2, t.y - h / 2, w, h, 6 * k); x.fill();
+        x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(t.text, t.x, t.y);
+      }
+      x.restore();
+    }
+  }
+  function infoVybranej() {
+    const v = akt(), c = v?.ciary.find((q) => q.id === vybrana);
+    if (!c || !viditelna(c)) return null;
+    const L = rozlozenie(), A = bod(L, c.a), B = bod(L, c.b);
+    const uhly = [];
+    for (const d of v.ciary) {
+      if (d === c || !viditelna(d)) continue;
+      for (const kc of ["a", "b"]) for (const kd of ["a", "b"]) {
+        if (!rovnakyBod(c[kc], d[kd])) continue;
+        const V = bod(L, c[kc]), P1 = bod(L, c[kc === "a" ? "b" : "a"]), P2 = bod(L, d[kd === "a" ? "b" : "a"]);
+        let u = Math.abs(Math.atan2(P2.y - V.y, P2.x - V.x) - Math.atan2(P1.y - V.y, P1.x - V.x)) * 180 / Math.PI;
+        if (u > 180) u = 360 - u;
+        uhly.push(desatinne(u));
+      }
+    }
+    return { sklon: sklonText(A, B), uhly };
+  }
+
+  // ── KRESLENIE OBRAZOVKY ──
+  function kresli() {
+    const v = akt();
+    $("prazdne").hidden = !!v;
+    video.style.visibility = v ? "visible" : "hidden";
+    if (v && v.fw) {
+      obmedz(v);
+      const L = rozlozenie(v);
+      video.style.width = `${L.w}px`; video.style.height = `${L.h}px`;
+      video.style.transform = `translate(${L.l}px, ${L.t}px)`;
+    }
+    kresliCiary();
+    // štítok na videu
+    const st = $("stitokVidea");
+    st.hidden = !v;
+    if (v) st.innerHTML = `${v.oznacenie || v.nazov}<small>${denCz(v.den)}</small><small>${casText(video.currentTime)}</small>`;
+    kresliOs();
+    // prehrávač
+    $("play").textContent = !video.paused ? "❚❚" : "▶";
+    const dl = v?.dlzka || 0;
+    $("cas").innerHTML = `${casText(video.currentTime)} / ${casText(dl)}<small>snímka ${Math.round(video.currentTime * fps)} / ${Math.round(dl * fps)}</small>`;
+    for (const id of ["play", "spat", "vpred", "snimka", "stiahnutVideo", "strihOd", "strihDo", "strihZrus"]) $(id).disabled = !v;
+    $("stiahnutVideo").textContent = nahravam ? "■ Zastaviť nahrávanie" : "Stiahnuť video";
+    $("stiahnutVideo").classList.toggle("hlavne", !!nahravam);
+    // panel
+    $("stavVidea").textContent = videa.length ? `${videa.length}` : "žiadne";
+    $("stavStrih").textContent = v?.strih ? `${casText(v.strih.od)} – ${casText(v.strih.do)}` : "celé video";
+    if (v?.strih) {
+      const d = v.strih.do - v.strih.od;
+      $("strihInfo").innerHTML = `Strih má <b>${casText(d)}</b>; pri ${$("rychlostH").textContent} bude stiahnuté video dlhé <b>${casText(d / rychlost)}</b>. Prehráva sa len strih, dokola.`;
+    } else $("strihInfo").textContent = "Strih nastavíš aj ťahaním oranžových bodiek na časovej osi. Prehráva sa potom len strih, dokola.";
+    const pc = v?.ciary.length || 0;
+    $("stavCiary").textContent = `${rezimCiar ? "kreslím · " : ""}${pc ? `${pc} ${pc === 1 ? "čiara" : pc < 5 ? "čiary" : "čiar"}` : "žiadne"}`;
+    $("zmazVybranu").disabled = vybrana == null;
+    $("zmazVsetky").disabled = !pc;
+    const info = infoVybranej();
+    $("vybranaInfo").hidden = !info;
+    if (info) $("vybranaInfo").innerHTML = `Vybraná: <b style="font-size:17px">${info.sklon}</b>${info.uhly.length ? ` · s nadväzujúcou <b style="font-size:17px">${info.uhly.join("°, ")}°</b>` : ""}`;
+  }
+
+  // ── ČASOVÁ OS ──
+  const os = $("os");
+  const percento = (t) => { const dl = akt()?.dlzka || 1; return `${Math.min(100, Math.max(0, t / dl * 100))}%`; };
+  function kresliOs() {
+    const v = akt();
+    const dl = v?.dlzka || 1;
+    const od = v?.strih?.od ?? 0, dO = v?.strih?.do ?? dl;
+    $("uchoOd").style.left = percento(od);
+    $("uchoDo").style.left = percento(dO);
+    $("osStrih").style.left = percento(od);
+    $("osStrih").style.width = `calc(${percento(dO)} - ${percento(od)})`;
+    $("osStrih").style.opacity = v?.strih ? "1" : ".35";
+    $("mimoL").style.left = "0"; $("mimoL").style.width = percento(od);
+    $("mimoP").style.left = percento(dO); $("mimoP").style.right = "0";
+    $("hlava").style.left = percento(video.currentTime);
+    // značky: kde sú čiary
+    const z = v ? [...new Set(v.ciary.map((c) => c.cas.toFixed(3)))] : [];
+    $("osZnacky").innerHTML = z.map((t) => `<div class="znacka" style="left:${percento(Number(t))};background:${v.ciary.find((c) => c.cas.toFixed(3) === t).farba}"></div>`).join("");
+  }
+  (() => {
+    let tah = null;
+    const casZBodu = (e) => { const r = os.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (akt()?.dlzka || 0); };
+    os.addEventListener("pointerdown", (e) => {
+      const v = akt();
+      if (!v) return;
+      os.setPointerCapture(e.pointerId);
+      tah = e.target.id === "uchoOd" ? "od" : e.target.id === "uchoDo" ? "do" : "hlava";
+      video.pause();
+      if (tah === "hlava") casNa(casZBodu(e));
+    });
+    os.addEventListener("pointermove", (e) => {
+      if (!tah) return;
+      const v = akt(), t = casZBodu(e);
+      if (tah === "hlava") { casNa(t); return; }
+      const s = v.strih || { od: 0, do: v.dlzka };
+      if (tah === "od") s.od = Math.min(t, s.do - 0.05);
+      else s.do = Math.max(t, s.od + 0.05);
+      v.strih = s;
+      casNa(tah === "od" ? s.od : s.do); // ukáž snímku na hrane strihu
+    });
+    const pusti = () => { tah = null; kresli(); };
+    os.addEventListener("pointerup", pusti);
+    os.addEventListener("pointercancel", pusti);
+  })();
+
+  // ── PREHRÁVANIE ──
+  const casNa = (t) => { const v = akt(); if (!v) return; video.currentTime = Math.max(0, Math.min(t, (v.dlzka || video.duration || 0) - 0.001)); };
+  function prehraj() {
+    const v = akt();
+    if (!v) return;
+    if (!video.paused) { video.pause(); return; }
+    if (v.strih && (video.currentTime < v.strih.od || video.currentTime >= v.strih.do - 0.01)) casNa(v.strih.od);
+    video.playbackRate = rychlost;
+    video.play().catch(() => {});
+  }
+  function krok(n) {
+    if (!akt()) return;
+    video.pause();
+    casNa(video.currentTime + n / fps);
+  }
+  let slucka = 0;
+  const behaj = () => {
+    const v = akt();
+    if (v?.strih && !video.paused && video.currentTime >= v.strih.do - 0.001) {
+      if (nahravam) zastavNahravanie(); else casNa(v.strih.od);
+    }
+    kresli();
+    slucka = !video.paused ? requestAnimationFrame(behaj) : 0;
+  };
+  video.addEventListener("play", () => { if (!slucka) slucka = requestAnimationFrame(behaj); });
+  video.addEventListener("pause", kresli);
+  video.addEventListener("seeked", kresli);
+  video.addEventListener("ended", () => { if (nahravam) zastavNahravanie(); kresli(); });
+
+  // Rýchlosť bodkou na páse — logaritmicky, vľavo jemné pomalé rýchlosti.
+  const MIN_R = 0.07, MAX_R = 2;
+  const naRychlost = (x) => MIN_R * Math.pow(MAX_R / MIN_R, x / 1000);
+  const naPas = (r) => Math.round(1000 * Math.log(r / MIN_R) / Math.log(MAX_R / MIN_R));
+  const rp = $("rychlost");
+  rp.value = String(naPas(1));
+  rp.oninput = () => {
+    let r = naRychlost(Number(rp.value));
+    if (Math.abs(r - 1) < 0.03) r = 1;
+    rychlost = r;
+    video.playbackRate = r;
+    $("rychlostH").textContent = `${r >= 1 ? r.toFixed(2).replace(/\.?0+$/, "") : r.toFixed(2)}×`.replace(".", ",");
+    kresli();
+  };
+  rp.ondblclick = () => { rp.value = String(naPas(1)); rp.oninput(); };
+
+  // ── VIDEÁ ──
+  function vlozVideo(f) {
+    if (!f || !f.type.startsWith("video/")) return;
+    const v = {
+      id: dalsieId++, src: URL.createObjectURL(f), nazov: f.name.replace(/\.[^.]+$/, ""),
+      den: f.lastModified ? new Date(f.lastModified).toISOString().slice(0, 10) : "",
+      oznacenie: videa.length === 0 ? "predtým" : videa.length === 1 ? "potom" : "",
+      fw: 0, fh: 0, dlzka: 0, strih: null, ciary: [], cas: 0, view: { zoom: 1, x: 0, y: 0 }, nahlad: "",
+    };
+    videa.push(v);
+    prepni(v.id);
+  }
+  function prepni(id) {
+    const pred = akt();
+    if (pred) pred.cas = video.currentTime;
+    video.pause();
+    aktivneId = id;
+    vybrana = null;
+    const v = akt();
+    if (!v) { video.removeAttribute("src"); video.load(); kresli(); kresliZoznam(); return; }
+    video.src = v.src;
+    video.onloadedmetadata = () => {
+      v.fw = video.videoWidth; v.fh = video.videoHeight;
+      // Video bez dĺžky v hlavičke (napr. z webu) — zistí sa skokom na koniec.
+      if (!Number.isFinite(video.duration)) {
+        video.currentTime = 1e9;
+        video.addEventListener("seeked", () => { v.dlzka = video.duration; video.currentTime = v.cas; kresli(); }, { once: true });
+      } else { v.dlzka = video.duration; video.currentTime = v.cas; }
+      kresli();
+    };
+    video.onloadeddata = () => {
+      if (v.nahlad) return;
+      try {
+        const c = document.createElement("canvas");
+        c.width = 80; c.height = Math.round(80 * video.videoHeight / (video.videoWidth || 1)) || 104;
+        c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+        v.nahlad = c.toDataURL("image/jpeg", 0.7);
+        kresliZoznam();
+      } catch { /* náhľad nie je nutný */ }
+    };
+    kresli();
+    kresliZoznam();
+  }
+  function kresliZoznam() {
+    $("zoznamVidei").innerHTML = videa.map((v) => `
+      <div class="v ${v.id === aktivneId ? "on" : ""}" data-id="${v.id}">
+        <img src="${v.nahlad || ""}" alt="">
+        <div style="min-width:0">
+          <div class="t">${v.nazov}</div>
+          <div class="d">${denCz(v.den) || "bez dňa"}${v.dlzka ? ` · ${casText(v.dlzka)}` : ""}</div>
+          <select data-oznacenie title="Čo je to za video">
+            <option value="" ${!v.oznacenie ? "selected" : ""}>—</option>
+            <option value="predtým" ${v.oznacenie === "predtým" ? "selected" : ""}>predtým</option>
+            <option value="potom" ${v.oznacenie === "potom" ? "selected" : ""}>potom</option>
+          </select>
+        </div>
+        <button class="x" title="Zavrieť video">✕</button>
+      </div>`).join("");
+    $("zoznamVidei").querySelectorAll(".v").forEach((el) => {
+      const id = Number(el.dataset.id);
+      el.onclick = (e) => { if (!e.target.closest("select, .x") && id !== aktivneId) prepni(id); };
+      el.querySelector("select").onchange = (e) => { videa.find((v) => v.id === id).oznacenie = e.target.value; kresli(); };
+      el.querySelector(".x").onclick = () => {
+        const i = videa.findIndex((v) => v.id === id);
+        URL.revokeObjectURL(videa[i].src);
+        videa.splice(i, 1);
+        if (id === aktivneId) prepni(videa[0]?.id ?? null); else kresliZoznam();
+      };
+    });
+  }
+  $("vlozit").onclick = () => $("subor").click();
+  $("prazdne").onclick = () => $("subor").click();
+  $("subor").onchange = () => { vlozVideo($("subor").files?.[0]); $("subor").value = ""; };
+  scena.addEventListener("dragover", (e) => { e.preventDefault(); scena.classList.add("nad"); });
+  scena.addEventListener("dragleave", () => scena.classList.remove("nad"));
+  scena.addEventListener("drop", (e) => { e.preventDefault(); scena.classList.remove("nad"); vlozVideo(e.dataTransfer?.files?.[0]); });
+  $("fps").onchange = (e) => { fps = Number(e.target.value); kresli(); };
+
+  // ── STRIH ──
+  function strih(kde) {
+    const v = akt();
+    if (!v) return;
+    if (kde === null) v.strih = null;
+    else {
+      const s = v.strih || { od: 0, do: v.dlzka };
+      s[kde] = video.currentTime;
+      if (s.do - s.od < 0.05) { if (kde === "od") s.do = v.dlzka; else s.od = 0; }
+      v.strih = s;
+    }
+    kresli();
+  }
+  $("strihOd").onclick = () => strih("od");
+  $("strihDo").onclick = () => strih("do");
+  $("strihZrus").onclick = () => strih(null);
+
+  // ── MYŠ / PRSTY NA SCÉNE: posun a zväčšenie videa ──
+  (() => {
+    const prsty = new Map();
+    let posledne = null;
+    const stred = () => {
+      const p = [...prsty.values()];
+      return { x: p.reduce((a, q) => a + q.x, 0) / p.length, y: p.reduce((a, q) => a + q.y, 0) / p.length, d: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0 };
+    };
+    const zoomOkolo = (v, z, px, py) => {
+      const L = rozlozenie(v);
+      const bx = px / L.W - 0.5, by = py / L.H - 0.5;
+      z = Math.min(MAX_ZOOM, Math.max(1, z));
+      const k = z / v.view.zoom;
+      v.view = { zoom: z, x: bx - (bx - v.view.x) * k, y: by - (by - v.view.y) * k };
+    };
+    scena.addEventListener("pointerdown", (e) => {
+      const v = akt();
+      if (!v || rezimCiar || e.target.closest(".prazdne")) return;
+      scena.setPointerCapture(e.pointerId);
+      prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      posledne = stred();
+      scena.classList.add("tahanie");
+    });
+    scena.addEventListener("pointermove", (e) => {
+      if (!prsty.has(e.pointerId)) return;
+      prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const v = akt(), t = stred(), L = rozlozenie(v);
+      v.view.x += (t.x - posledne.x) / L.W;
+      v.view.y += (t.y - posledne.y) / L.H;
+      if (prsty.size > 1 && posledne.d > 0) { const r = scena.getBoundingClientRect(); zoomOkolo(v, v.view.zoom * t.d / posledne.d, t.x - r.left, t.y - r.top); }
+      posledne = t;
+      kresli();
+    });
+    const koniec = (e) => { prsty.delete(e.pointerId); posledne = prsty.size ? stred() : null; if (!prsty.size) scena.classList.remove("tahanie"); };
+    scena.addEventListener("pointerup", koniec);
+    scena.addEventListener("pointercancel", koniec);
+    // Touchpad: roztiahnutie (Ctrl) = zväčšenie; dva prsty do strán = posun
+    // po snímkach, keď je video v celku; keď je zväčšené, posúva výrez.
+    let suma = 0;
+    scena.addEventListener("wheel", (e) => {
+      const v = akt();
+      if (!v) return;
+      e.preventDefault();
+      const r = scena.getBoundingClientRect();
+      if (e.ctrlKey) { zoomOkolo(v, v.view.zoom * Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top); kresli(); return; }
+      if (v.view.zoom > 1.001) { const L = rozlozenie(v); v.view.x -= e.deltaX / L.W; v.view.y -= e.deltaY / L.H; kresli(); return; }
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        suma += e.deltaX;
+        while (Math.abs(suma) >= 14) { krok(Math.sign(suma)); suma -= 14 * Math.sign(suma); }
+      }
+    }, { passive: false });
+    scena.addEventListener("dblclick", () => { const v = akt(); if (v && !rezimCiar) { v.view = { zoom: 1, x: 0, y: 0 }; kresli(); } });
+  })();
+
+  // ── KRESLENIE ČIAR ──
+  (() => {
+    let tah = null;
+    const miesto = (e) => { const r = scena.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const odUsecky = (P, A, B) => {
+      const dx = B.x - A.x, dy = B.y - A.y, l = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((P.x - A.x) * dx + (P.y - A.y) * dy) / l));
+      return Math.hypot(P.x - A.x - t * dx, P.y - A.y - t * dy);
+    };
+    svg.addEventListener("pointerdown", (e) => {
+      const v = akt();
+      if (!rezimCiar || !v) return;
+      e.preventDefault();
+      video.pause();
+      const L = rozlozenie(), P = miesto(e);
+      let najblizsi = null;
+      for (const c of v.ciary) {
+        if (!viditelna(c)) continue;
+        for (const kl of ["a", "b"]) {
+          const B = bod(L, c[kl]), d = Math.hypot(B.x - P.x, B.y - P.y);
+          if (d < 12 && (!najblizsi || d < najblizsi.d)) najblizsi = { c, kl, d };
+        }
+      }
+      if (najblizsi && najblizsi.c.id === vybrana) {
+        const b0 = najblizsi.c[najblizsi.kl];
+        tah = { druh: "koniec", kluce: v.ciary.flatMap((c) => ["a", "b"].filter((kl) => rovnakyBod(c[kl], b0)).map((kl) => [c, kl])) };
+      } else {
+        const naCiare = !najblizsi && v.ciary.find((c) => viditelna(c) && odUsecky(P, bod(L, c.a), bod(L, c.b)) < 7);
+        if (naCiare) { vybrana = naCiare.id; kresli(); return; }
+        if (P.x < L.l || P.x > L.l + L.w || P.y < L.t || P.y > L.t + L.h) return;
+        const zac = najblizsi ? { ...najblizsi.c[najblizsi.kl] } : zBodu(L, P.x, P.y);
+        const c = { id: dalsiaCiara++, a: zac, b: { ...zac }, farba: farbaCiar, cas: video.currentTime };
+        v.ciary.push(c);
+        vybrana = c.id;
+        tah = { druh: "nova", ciara: c, kluce: [[c, "b"]] };
+      }
+      svg.setPointerCapture(e.pointerId);
+      kresli();
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!tah) return;
+      const v = akt(), L = rozlozenie(), P = miesto(e);
+      let ciel = zBodu(L, P.x, P.y);
+      for (const c of v.ciary) {
+        if (!viditelna(c) || tah.kluce.some(([cc]) => cc === c)) continue;
+        for (const kl of ["a", "b"]) { const B = bod(L, c[kl]); if (Math.hypot(B.x - P.x, B.y - P.y) < 10) ciel = { ...c[kl] }; }
+      }
+      if (e.shiftKey && tah.druh === "nova") {
+        const A = bod(L, tah.ciara.a);
+        const Q = Math.abs(P.x - A.x) > Math.abs(P.y - A.y) ? { x: P.x, y: A.y } : { x: A.x, y: P.y };
+        ciel = zBodu(L, Q.x, Q.y);
+      }
+      for (const [c, kl] of tah.kluce) c[kl] = { ...ciel };
+      kresli();
+    });
+    const pusti = () => {
+      if (!tah) return;
+      if (tah.druh === "nova") {
+        const v = akt(), L = rozlozenie(), A = bod(L, tah.ciara.a), B = bod(L, tah.ciara.b);
+        if (Math.hypot(B.x - A.x, B.y - A.y) < 5) v.ciary = v.ciary.filter((c) => c !== tah.ciara);
+        vybrana = null; // ďalší ťah z konca má začať novú čiaru (uhol)
+      }
+      tah = null;
+      kresli();
+    };
+    svg.addEventListener("pointerup", pusti);
+    svg.addEventListener("pointercancel", pusti);
+  })();
+  const nastavRezim = (zap) => {
+    rezimCiar = zap;
+    if (zap) video.pause();
+    svg.classList.toggle("kreslim", zap);
+    $("kreslit").classList.toggle("hlavne", zap);
+    $("kreslit").textContent = zap ? "✓ kreslím — vypnúť" : "✎ kresliť čiary";
+    kresli();
+  };
+  $("kreslit").onclick = () => nastavRezim(!rezimCiar);
+  const zmazVybranu = () => { const v = akt(); if (v) v.ciary = v.ciary.filter((c) => c.id !== vybrana); vybrana = null; kresli(); };
+  $("zmazVybranu").onclick = zmazVybranu;
+  $("zmazVsetky").onclick = () => { const v = akt(); if (v && confirm("Zmazať všetky čiary v tomto videu?")) { v.ciary = []; vybrana = null; kresli(); } };
+  $("sklon").onchange = kresli;
+  $("naSnimke").onchange = kresli;
+  document.querySelectorAll("#farbaCiar button").forEach((b) => b.onclick = () => {
+    document.querySelectorAll("#farbaCiar button").forEach((x) => x.classList.toggle("on", x === b));
+    farbaCiar = b.dataset.v;
+    const c = akt()?.ciary.find((q) => q.id === vybrana);
+    if (c) c.farba = farbaCiar;
+    kresli();
+  });
+
+  // ── SNÍMKA → zásobník (odtiaľ do editora fotiek) ──
+  async function ulozSnimku() {
+    const v = akt();
+    if (!v || !video.videoWidth) return;
+    video.pause();
+    const c = document.createElement("canvas");
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    const x = c.getContext("2d");
+    x.drawImage(video, 0, 0);
+    if ($("snimkaSCiarami").checked) ciaryNaPlatno(x, { W: c.width, H: c.height, w: c.width, h: c.height, l: 0, t: 0 }, c.width / 600);
+    const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.92));
+    if (!blob) return;
+    await window.skladSnimok.pridaj({ blob, den: v.den, cas: video.currentTime, zdroj: v.nazov, oznacenie: v.oznacenie });
+    const b = $("snimka");
+    b.textContent = "✓ uložená";
+    clearTimeout(b._t);
+    b._t = setTimeout(() => { b.textContent = "📷 Snímka"; }, 1400);
+    nacitajSnimky();
+  }
+  $("snimka").onclick = ulozSnimku;
+  const adresy = new Map();
+  const adresa = (z) => { if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
+  async function nacitajSnimky() {
+    const sn = (await window.skladSnimok.vsetky()).sort((a, b) => a.id - b.id);
+    $("stavSnimky").textContent = sn.length ? String(sn.length) : "žiadne";
+    $("zasobnikPrazdny").hidden = sn.length > 0;
+    $("zasobnikPamat").hidden = !window.skladSnimok.lenVPamati;
+    $("zasobnik").innerHTML = sn.map((z) => `
+      <div class="sn" data-id="${z.id}">
+        <img src="${adresa(z)}" alt="">
+        <div class="popis">${z.oznacenie ? `<b>${z.oznacenie}</b> · ` : ""}${denCz(z.den)}<br>${casText(z.cas)}</div>
+        <div class="akcie"><button data-a="stiahni" title="Stiahnuť JPEG">⤓</button><button data-a="zmaz" title="Zmazať">✕</button></div>
+      </div>`).join("");
+    $("zasobnik").querySelectorAll(".sn").forEach((el) => {
+      const id = Number(el.dataset.id), z = sn.find((q) => q.id === id);
+      el.querySelector('[data-a="stiahni"]').onclick = () => {
+        const a = document.createElement("a");
+        a.href = adresa(z); a.download = `snimka-${z.oznacenie || z.zdroj}-${casText(z.cas).replace(/[ ,]/g, "")}.jpg`; a.click();
+      };
+      el.querySelector('[data-a="zmaz"]').onclick = async () => { await window.skladSnimok.zmaz(id); nacitajSnimky(); };
+    });
+  }
+  window.skladSnimok.priZmene(nacitajSnimky);
+  nacitajSnimky();
+
+  // ── STIAHNUŤ VIDEO: strih + spomalenie (+ čiary a popis) zapečené ──
+  function zastavNahravanie() {
+    if (!nahravam) return;
+    const n = nahravam;
+    nahravam = null;
+    video.pause();
+    cancelAnimationFrame(n.raf);
+    n.rec.stop();
+  }
+  async function stiahniVideo() {
+    if (nahravam) { zastavNahravanie(); return; }
+    const v = akt();
+    if (!v || !v.fw) return;
+    const typ = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"].find((t) => window.MediaRecorder?.isTypeSupported?.(t));
+    if (!typ) { alert("Tento prehliadač nevie nahrávať video."); return; }
+    const k = Math.min(1, 1080 / Math.max(v.fw, v.fh));
+    const c = document.createElement("canvas");
+    c.width = Math.round(v.fw * k / 2) * 2; c.height = Math.round(v.fh * k / 2) * 2;
+    const x = c.getContext("2d");
+    const L = { W: c.width, H: c.height, w: c.width, h: c.height, l: 0, t: 0 };
+    const mierka = c.width / 600;
+    const snimka = () => {
+      x.drawImage(video, 0, 0, c.width, c.height);
+      ciaryNaPlatno(x, L, mierka);
+      if ($("popisVoVideu").checked) {
+        const t = `${v.oznacenie || v.nazov} · ${denCz(v.den)} · ${casText(video.currentTime)}${rychlost !== 1 ? ` · ${$("rychlostH").textContent}` : ""}`;
+        x.font = `600 ${14 * mierka}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        const w = x.measureText(t).width + 20 * mierka, h = 28 * mierka;
+        x.fillStyle = "rgba(20,20,20,.62)"; x.beginPath(); x.roundRect(12 * mierka, 12 * mierka, w, h, 7 * mierka); x.fill();
+        x.fillStyle = "#fff"; x.textBaseline = "middle"; x.fillText(t, 22 * mierka, 12 * mierka + h / 2);
+      }
+    };
+    const rec = new MediaRecorder(c.captureStream(30), { mimeType: typ, videoBitsPerSecond: 8_000_000 });
+    const kusy = [];
+    rec.ondataavailable = (e) => e.data.size && kusy.push(e.data);
+    rec.onstop = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob(kusy, { type: typ.split(";")[0] }));
+      a.download = `${v.oznacenie || v.nazov}-${v.den || ""}.${typ.includes("mp4") ? "mp4" : "webm"}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      kresli();
+    };
+    casNa(v.strih?.od ?? 0);
+    await new Promise((r) => setTimeout(r, 250));
+    nahravam = { rec, raf: 0 };
+    const dalsia = () => { snimka(); if (nahravam) nahravam.raf = requestAnimationFrame(dalsia); };
+    snimka();
+    rec.start(200);
+    video.playbackRate = rychlost;
+    video.play().catch(() => {});
+    nahravam.raf = requestAnimationFrame(dalsia);
+    kresli();
+  }
+  $("stiahnutVideo").onclick = stiahniVideo;
+
+  // ── OVLÁDANIE ──
+  $("play").onclick = prehraj;
+  $("spat").onclick = () => krok(-1);
+  $("vpred").onclick = () => krok(1);
+  addEventListener("keydown", (e) => {
+    if (e.target.closest?.("input, select, textarea") || e.metaKey || e.ctrlKey) return;
+    const k = e.key.toLowerCase();
+    if (e.key === " ") { e.preventDefault(); prehraj(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); krok(e.shiftKey ? 10 : 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); krok(e.shiftKey ? -10 : -1); }
+    else if (k === "s") { e.preventDefault(); ulozSnimku(); }
+    else if (k === "i") strih("od");
+    else if (k === "o") strih("do");
+    else if (e.key === "Escape" && rezimCiar) { document.querySelector('details[data-skupina="ciary"]').open = false; }
+    else if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
+  });
+  // skupiny: otvorená je len jedna; „Čiary a uhly" otvorené = kreslíš
+  const skupiny = [...document.querySelectorAll("details[data-skupina]")];
+  skupiny.forEach((d) => d.addEventListener("toggle", () => {
+    if (d.open) skupiny.forEach((x) => { if (x !== d) x.open = false; });
+    if (d.dataset.skupina === "ciary") { if (d.open !== rezimCiar) nastavRezim(d.open); }
+    else if (d.open && rezimCiar) nastavRezim(false);
+  }));
+  addEventListener("resize", kresli);
+
+  // na skúšanie zvonku
+  window.editorVidea = { vlozVideo, prehraj, krok, casNa, strih, ulozSnimku, stiahniVideo, nastavRezim, get video() { return video; }, get aktivne() { return akt(); }, get nahravam() { return !!nahravam; } };
+  kresli();
+})();
+</script>
+</body>
+</html>

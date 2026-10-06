@@ -6,6 +6,7 @@ import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { EditorKarta } from "./EditorKarta";
 import { NekonecnyRad } from "./NekonecnyRad";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
@@ -690,6 +691,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const obsahKarty = (k: Karta): React.ReactNode => (
     <>
+              {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
+              {k.druh === "editor" && <EditorKarta />}
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}
@@ -1655,7 +1658,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
                   takže rolovať musí karta, inak sa spodok profilu nedá
                   dosiahnuť (Jerry, 30. 9. 2026). */}
-              <div style={{ flexGrow: 1, minHeight: 0, overflowY: kk.druh === "klient" && !uzke ? "visible" : "auto", display: kk.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: kk.druh === "editor" ? "hidden" : kk.druh === "klient" && !uzke ? "visible" : "auto", display: kk.druh === "klient" || kk.druh === "editor" ? "flex" : "block", flexDirection: "column" }}>
               {kk.druh === "krok" ? kresliKrok(kk) : obsahKarty(kk)}
               </div>
             </div>

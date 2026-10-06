@@ -1,0 +1,65 @@
+  :root {
+    --bg: #1d2418; --bg2: #273021; --surface: #232b1e; --card: #2b3425; --card2: #323c2b; --text: #f3efe4; --muted: #b9b39f; --dim: #7f7b6a;
+    --accent: #e8893a; --accentLight: #ffb36b; --accentBg: rgba(232,137,58,.16); --line: rgba(255,255,255,.09); --line2: rgba(255,255,255,.16);
+    --panel: 370px; --hlavicka: 54px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--surface); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+
+  .hlavicka { height: var(--hlavicka); display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+  .hlavicka b { font-size: 15px; }
+  .hlavicka small { color: var(--dim); font-size: 13px; }
+  .telo { display: flex; height: calc(100% - var(--hlavicka)); }
+  .platno { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 22px; background: radial-gradient(90% 90% at 50% 40%, var(--bg2), var(--bg)); }
+
+  .panel { width: var(--panel); flex-shrink: 0; border-left: 1px solid var(--line); background: var(--card); display: flex; flex-direction: column; }
+  .skupiny { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+  details { border-radius: 12px; border: 1px solid var(--line); background: transparent; }
+  details[open] { background: var(--card2); border-color: var(--line2); }
+  summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  details[open] summary { color: var(--text); }
+  summary .stav { margin-left: auto; font-weight: 500; font-size: 12px; color: var(--dim); }
+  summary .sipka { color: var(--dim); transition: transform .15s; }
+  details[open] summary .sipka { transform: rotate(90deg); }
+  .obsah { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .spodok { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+  .spodok .tl { flex: 1; text-align: center; }
+
+  .prepinac { display: flex; gap: 3px; padding: 3px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); }
+  .prepinac button { flex: 1; padding: 7px 6px; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .prepinac button.on { background: rgba(232,137,58,.22); color: var(--accentLight); font-weight: 600; }
+  .riadok { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); }
+  .riadok input[type=range] { flex: 1; accent-color: var(--accent); }
+  .riadok input[type=date] { padding: 5px 7px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; color-scheme: dark; }
+  .tlacidla { display: flex; gap: 7px; flex-wrap: wrap; }
+  .tl { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.05); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .tl.hlavne { border-color: var(--accent); background: var(--accentBg); color: var(--accentLight); font-weight: 600; }
+  .tl:disabled { opacity: .45; cursor: default; }
+  .napoveda { font-size: 11.5px; color: var(--dim); line-height: 1.55; }
+  .napoveda b { color: var(--muted); font-weight: 600; }
+  label.check { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  label.check input { accent-color: var(--accent); }
+  /* karty fotiek */
+  .vyber-okna { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vyber-okna button { display: flex; gap: 9px; align-items: center; padding: 7px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); color: var(--muted); font: inherit; cursor: pointer; text-align: left; }
+  .vyber-okna button.on { border-color: var(--accent); background: var(--accentBg); }
+  .vyber-okna img { width: 36px; height: 48px; object-fit: cover; border-radius: 5px; background: #ccc; flex-shrink: 0; }
+  .vyber-okna .t { display: block; font-size: 12px; font-weight: 600; color: var(--text); }
+  .vyber-okna .d { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+  /* zásobník snímok */
+  .zasobnik { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .zasobnik .sn { border: 1px solid var(--line2); border-radius: 9px; overflow: hidden; background: var(--surface); cursor: grab; }
+  .zasobnik img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #ccc; }
+  .zasobnik .popis { font-size: 11px; color: var(--muted); padding: 4px 6px 2px; }
+  .zasobnik .akcie { display: flex; gap: 2px; padding: 2px 4px 5px; }
+  .zasobnik .akcie button { flex: 1; padding: 4px 0; border: 0; border-radius: 6px; background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-size: 11.5px; cursor: pointer; }
+  .zasobnik .akcie button:hover { background: var(--accentBg); color: var(--accentLight); }
+  @media (max-width: 860px) {
+    body { overflow: auto; }
+    .telo { flex-direction: column; height: auto; }
+    .panel { width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+  }

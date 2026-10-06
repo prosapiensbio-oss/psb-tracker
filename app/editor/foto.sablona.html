@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Editor fotiek</title>
+<style>
+/*ui-css*//*/ui-css*/
+  .platno .stvorec { --strana: min(calc(100vw - var(--panel) - 44px), calc(100vh - var(--hlavicka) - 44px)); width: var(--strana); height: var(--strana); }
+  @media (max-width: 860px) { .platno .stvorec { --strana: min(calc(100vw - 32px), 640px); } }
+/*jadro-css*//*/jadro-css*/
+  /* V Kokpite je hlavička na karte Workspace, tu nie. */
+  :root { --hlavicka: 0px; }
+</style>
+</head>
+<body>
+<div class="telo">
+  <div class="platno">
+    <div class="stvorec" id="stvorec">
+      <div class="okno" data-i="0" tabindex="0"></div>
+      <div class="okno" data-i="1" tabindex="0"></div>
+      <svg class="mriezka" id="mriezka" aria-hidden="true"></svg>
+      <svg class="ciary" id="ciary"></svg>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="skupiny">
+      <details data-skupina="fotky" open>
+        <summary><span class="sipka">▸</span>Fotky<span class="stav" id="stavFotky"></span></summary>
+        <div class="obsah">
+          <div class="vyber-okna" id="vyberOkna">
+            <button data-i="0" class="on"><img data-nahlad="0" alt=""><span><span class="t"></span><span class="d"></span></span></button>
+            <button data-i="1"><img data-nahlad="1" alt=""><span><span class="t"></span><span class="d"></span></span></button>
+          </div>
+          <div class="riadok">zväčšenie <input type="range" id="zoom" min="1" max="6" step="0.01" value="1"></div>
+          <div class="riadok">deň fotky <input type="date" id="den"></div>
+          <div class="tlacidla">
+            <button class="tl" id="vlozit">Vložiť fotku…</button>
+            <button class="tl" id="zrkadlo">↔ zrkadlo</button>
+            <button class="tl" id="reset">na stred</button>
+            <button class="tl" id="vymenit" title="Vymeniť ľavú a pravú">⇄</button>
+          </div>
+          <div class="napoveda"><b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
+        </div>
+      </details>
+
+      <details data-skupina="snimky">
+        <summary><span class="sipka">▸</span>Snímky z videa<span class="stav" id="stavSnimky"></span></summary>
+        <div class="obsah">
+          <div class="zasobnik" id="zasobnik"></div>
+          <div class="napoveda" id="zasobnikPrazdny">Zatiaľ žiadne. Snímky sa robia v editore videa (hore prepni na <b>Video</b>, tam 📷) a objavia sa tu samé. Do polovice ich dáš ◧ ◨ alebo pretiahnutím.</div>
+          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Tento prehliadač nedovolil uložiť snímky natrvalo — vidíš len tie z tejto stránky.</div>
+        </div>
+      </details>
+
+      <details data-skupina="rozlozenie">
+        <summary><span class="sipka">▸</span>Rozloženie<span class="stav" id="stavRozlozenie"></span></summary>
+        <div class="obsah">
+          <div class="prepinac" id="rozdelenie">
+            <button data-v="vedla" class="on">vedľa seba</button>
+            <button data-v="pod">pod sebou</button>
+            <button data-v="cez">cez seba</button>
+          </div>
+          <div class="riadok" id="riadokMedzera">medzera <input type="range" id="medzera" min="0" max="16" value="4"></div>
+          <div class="riadok" id="riadokPriehladnost" hidden>horná fotka <input type="range" id="priehladnost" min="0" max="100" value="50"><span id="priehladnostH" style="width:36px;text-align:right">50 %</span></div>
+          <div class="napoveda" id="napovedaCez" hidden>Obe fotky sú na sebe. Hýbe sa tá vybraná vo „Fotky"; posuvník mení, koľko presvitá spodná.</div>
+          <label class="check"><input type="checkbox" id="popisky" checked> dátumy na fotke</label>
+        </div>
+      </details>
+
+      <details data-skupina="mriezka">
+        <summary><span class="sipka">▸</span>Mriežka<span class="stav" id="stavMriezka"></span></summary>
+        <div class="obsah">
+          <div class="prepinac" id="mriezkaDruh">
+            <button data-v="ziadna" class="on">žiadna</button>
+            <button data-v="stvorce">štvorce</button>
+            <button data-v="vodorovna">vodorovná</button>
+          </div>
+          <div class="riadok">hustota <input type="range" id="hustota" min="4" max="24" value="10"><span id="hustotaH" style="width:24px;text-align:right">10</span></div>
+          <div class="prepinac" id="mriezkaFarba">
+            <button data-v="rgba(255,255,255,.75)" class="on">biela</button>
+            <button data-v="rgba(232,137,58,.9)">oranžová</button>
+            <button data-v="rgba(20,20,20,.6)">tmavá</button>
+          </div>
+          <label class="check"><input type="checkbox" id="mriezkaExport"> aj do stiahnutej fotky</label>
+        </div>
+      </details>
+
+      <details data-skupina="ciary">
+        <summary><span class="sipka">▸</span>Čiary a uhly<span class="stav" id="stavCiary"></span></summary>
+        <div class="obsah">
+          <button class="tl" id="kreslit">✎ kresliť čiary</button>
+          <div class="prepinac" id="farbaCiar">
+            <button data-v="#ff8a1f" class="on">oranžová</button>
+            <button data-v="#ffffff">biela</button>
+            <button data-v="#38e07b">zelená</button>
+            <button data-v="#ff4d4d">červená</button>
+          </div>
+          <div id="vybranaInfo" class="napoveda" hidden style="font-size:13px;color:var(--text)"></div>
+          <div class="tlacidla">
+            <button class="tl" id="zmazVybranu" disabled>zmazať vybranú</button>
+            <button class="tl" id="zmazVsetky" disabled>zmazať všetky</button>
+          </div>
+          <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
+          <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle.</div>
+        </div>
+      </details>
+    </div>
+    <div class="spodok">
+      <button class="tl" id="stiahnut">Stiahnuť JPEG</button>
+    </div>
+  </aside>
+</div>
+<input type="file" id="subor" accept="image/*" hidden>
+
+<script>
+<!--sklad-js--><!--/sklad-js-->
+</script>
+<script>
+<!--jadro-js--><!--/jadro-js-->
+</script>
+<script>
+(() => {
+  const sk = window.skladacka;
+  const $ = (id) => document.getElementById(id);
+  const vsetky = [...document.querySelectorAll("details[data-skupina]")];
+  // Otvorená je vždy len jedna skupina — tá, s ktorou robíš.
+  // Otvorené „Čiary a uhly" = kreslíš; zavreté = fotky sa dajú ťahať.
+  vsetky.forEach((d) => d.addEventListener("toggle", () => {
+    if (d.open) vsetky.forEach((x) => { if (x !== d) x.open = false; });
+    if (d.dataset.skupina === "ciary") { if (d.open !== sk.rezimCiar) sk.nastavRezim(d.open); }
+    else if (d.open && sk.rezimCiar) sk.nastavRezim(false);
+  }));
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape") vsetky.forEach((d) => { if (d.dataset.skupina === "ciary") d.open = false; });
+  });
+
+  // ── Snímky z videa (spoločný zásobník s editorom videa) ──
+  let snimky = [];
+  const adresy = new Map(); // id → objectURL
+  const adresa = (z) => { if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
+  window.snimkaDoPolovice = (id, i) => {
+    const z = snimky.find((x) => x.id === id);
+    if (z) sk.vlozObrazok(i, adresa(z), z.den, false);
+  };
+  async function nacitajSnimky() {
+    snimky = (await window.skladSnimok.vsetky()).sort((a, b) => a.id - b.id);
+    $("stavSnimky").textContent = snimky.length ? String(snimky.length) : "žiadne";
+    $("zasobnikPrazdny").hidden = snimky.length > 0;
+    $("zasobnikPamat").hidden = !window.skladSnimok.lenVPamati;
+    $("zasobnik").innerHTML = snimky.map((z) => `
+      <div class="sn" draggable="true" data-id="${z.id}" title="Pretiahni do polovice">
+        <img src="${adresa(z)}" alt="">
+        <div class="popis">${z.oznacenie ? `<b>${z.oznacenie}</b> · ` : ""}${sk.denCz(z.den) || ""}<br>${z.zdroj || ""} · ${(z.cas ?? 0).toFixed(2).replace(".", ",")} s</div>
+        <div class="akcie">
+          <button data-a="vlavo" title="Do ľavej / hornej polovice">◧</button>
+          <button data-a="vpravo" title="Do pravej / dolnej polovice">◨</button>
+          <button data-a="zmaz" title="Zmazať zo zásobníka">✕</button>
+        </div>
+      </div>`).join("");
+    $("zasobnik").querySelectorAll(".sn").forEach((el) => {
+      const id = Number(el.dataset.id);
+      el.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/x-snimka", String(id)));
+      el.querySelectorAll("button").forEach((b) => b.onclick = async () => {
+        if (b.dataset.a === "vlavo") window.snimkaDoPolovice(id, 0);
+        if (b.dataset.a === "vpravo") window.snimkaDoPolovice(id, 1);
+        if (b.dataset.a === "zmaz") { await window.skladSnimok.zmaz(id); nacitajSnimky(); }
+      });
+    });
+  }
+  window.skladSnimok.priZmene(nacitajSnimky);
+  nacitajSnimky();
+
+  const NAZVY = { vedla: "vedľa seba", pod: "pod sebou", cez: "cez seba" };
+  const MRIEZKA = { ziadna: "vypnutá", stvorce: "štvorce", vodorovna: "vodorovná" };
+  window.poZmene = () => {
+    const s = sk.stav;
+    $("stavFotky").textContent = `${sk.denCz(s[0].den) || "—"} · ${sk.denCz(s[1].den) || "—"}`;
+    $("stavRozlozenie").textContent = NAZVY[sk.rozdelenie];
+    const m = sk.mriezka;
+    $("stavMriezka").textContent = m.druh === "ziadna" ? "vypnutá" : `${MRIEZKA[m.druh]} · ${m.hustota}`;
+    $("stavCiary").textContent = `${sk.rezimCiar ? "kreslím · " : ""}${sk.pocetCiar ? `${sk.pocetCiar} ${sk.pocetCiar === 1 ? "čiara" : sk.pocetCiar < 5 ? "čiary" : "čiar"}` : "žiadne"}`;
+    const info = sk.infoVybranej();
+    $("vybranaInfo").hidden = !info;
+    if (info) $("vybranaInfo").innerHTML = `Vybraná: <b style="font-size:17px">${info.sklon.znak} ${info.sklon.hodnota}°</b> ${info.sklon.od}${info.uhly.length ? ` · s nadväzujúcou <b style="font-size:17px">${info.uhly.join("°, ")}°</b>` : ""}`;
+  };
+  document.addEventListener("click", () => requestAnimationFrame(() => window.poZmene()));
+  window.poZmene();
+})();
+</script>
+</body>
+</html>

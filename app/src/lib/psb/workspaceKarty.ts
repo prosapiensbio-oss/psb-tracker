@@ -90,6 +90,12 @@ export type Karta =
    */
   | { druh: "anamnezy"; nadpis: string; podnadpis: string; polozky: AnamnezaRiadok[] }
   /**
+   * Editor — fotky predtým/potom a videá chôdze a behu (Jerry, 6. 10. 2026:
+   * „pridaj ešte jednu kartu editor, tam budú dve možnosti, foto a video").
+   * Nástroj, nie fronta: nemá počet a nikdy nezmizne.
+   */
+  | { druh: "editor"; nadpis: string; podnadpis: string; polozky: never[] }
+  /**
    * KROK — jedna karta na jeden krok týždňa (beta, Jerry 4. 10. 2026).
    * V sebe nesie staré karty ako sekcie, takže sa nič nekreslí dvakrát.
    */
@@ -99,7 +105,7 @@ export type Karta =
 export type Krok = "kalendar" | "sms" | "platby" | "dopyty" | "uzavierka" | "kontroly";
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
-export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "krok"];
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "editor", "krok"];
 
 /**
  * KARTY BETY — štyri kroky namiesto ôsmich kariet.
@@ -148,6 +154,7 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     ] : []),
     ...daj("faktury"),
     ...daj("anamnezy"),
+    ...daj("editor"),
     // Klient na konci (Jerry, 5. 10. 2026): kroky 1, 2, 3 idú hneď za sebou;
     // na profil sa aj tak skáče klikom na meno odkiaľkoľvek.
     ...daj("klient"),
@@ -309,6 +316,13 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
       ? `${caka} ${pocet(caka, "rozpracovaná", "rozpracované", "rozpracovaných")} · založ novú alebo otvor hotovú`
       : "kartotéka anamnéz — založ novú alebo otvor hotovú",
     polozky: anamnezy,
+  });
+  // Editor hneď za anamnézami — fotky tela patria k tej istej kartotéke.
+  karty.push({
+    druh: "editor",
+    nadpis: "Editor",
+    podnadpis: "fotky predtým / potom a videá chôdze a behu",
+    polozky: [],
   });
   if (zmeny.length) karty.push({
     druh: "zmeny",

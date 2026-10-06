@@ -2776,3 +2776,26 @@ neho tabuľka `platby`. Celý export ostáva v `data.paymentsPtminder`.
   `jeVopred` z dnešného stavu by starej platbe dal „vopred" a tá by ticho
   zaplatila budúci balíček. Prevod z cudzieho účtu a hotovosť ostávajú
   ručné (formulár „Zapísať platbu mimo banky").
+
+## Editor fotiek a videa — karta Editor vo Workspace (6. 10. 2026)
+
+Jerry: „pridaj ešte jednu kartu editor, tam budú dve možnosti, foto a video."
+Karta `editor` (BEZ_FRONTY, za Anamnézami) → `EditorKarta.tsx` → dve
+samostatné stránky v rámiku: `public/editor/foto.html` (predtým/potom ako
+appka Layout: štvorec na polovicu, výrez, mriežka, prekrytie, čiary a uhly)
+a `public/editor/video.html` (chôdza a beh: krok o snímku, rýchlosť bodkou,
+strih bodkami na osi, uhly na snímke, 📷 snímka, stiahnutie MP4).
+
+- **Stránky NIE SÚ React** — sú to náčrty, ktoré si Jerry vyskúšal, prenesené
+  bez prepisu. Zdroj je `app/editor/` (jadro.js/.css, ui.css, sklad.js,
+  *.sablona.html); spoločné časti sa do stránok VKLADAJÚ cez
+  `python3 editor/zostav.py`. `editorZostava.test.ts` stráži, že public je
+  zostavený z aktuálnych častí. Meníš jadro → zostav → commit oboch.
+- **V `<style>` je značka vloženia CSS komentár, nie HTML** — `<!--` v CSS
+  pokazilo prvé pravidlo štvorca a ten mal výšku 0 (stalo sa v náčrte).
+- **Snímky z videa → fotky cez IndexedDB** (`sklad.js`, databáza
+  `skladacka`, rovnaký pôvod ako Kokpit). Zatiaľ len v prehliadači; ku
+  klientovi sa neukladá nič — ďalší krok je kartotéka (šifrovane v R2).
+- Rámiky ostávajú načítané aj po prepnutí Foto/Video a karty (pravidlo
+  „Workspace drží prácu"). Statické súbory idú cez assets bez workera —
+  CSP Kokpitu na ne nepadá; rámik povoľuje `frame-src 'self'`.
