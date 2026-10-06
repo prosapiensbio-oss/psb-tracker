@@ -1262,6 +1262,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {k.druh === "dlznici" && k.polozky.map((x) => {
                 const kluc = klucPolozky("dlznici", x);
                 if (hotove.has(kluc)) return null;
+                /**
+                 * PLATBA, KTORÁ UŽ PRIŠLA, MUSÍ BYŤ VIDNO BEZ KLIKNUTIA.
+                 * Jerry, 6. 10. 2026 nad Hanusom: „prečo má nepriradenú
+                 * platbu, kde by som mu ju mal priradiť?" Platba (meno aj suma
+                 * sedeli) bola schovaná za klikom na meno a v zbalenom „Všetky
+                 * platby z banky" — dlžník vyzeral ako dlžník, hoci zaplatil.
+                 */
+                const isty = poKrokoch ? kandidatiPlatby(x.meno, x, zdroje?.platby || [], data.nezaplateneKokpit || []).find((p) => p.preco === "meno+suma") : undefined;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
                     <button
@@ -1294,6 +1302,21 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         (Jerry, 4. 10. 2026: „keď dám vybavené, zmizne to a nič sa
                         nenapáruje"). */}
                     {!poKrokoch && <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>}
+                    {isty && denOtvoreny !== kluc && (
+                      <div style={{ flexBasis: "100%", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "2px 0 4px", fontSize: 12, color: C.green }}>
+                        <span>Platba už prišla: {kc(isty.suma)} · {fmtDMY(isty.datum)} — meno aj suma sedia</span>
+                        <button
+                          disabled={pracujem === isty.fioId}
+                          onClick={() => void (async () => {
+                            await vybav(isty.fioId, "/api/platby", { akcia: "priradz", fioId: isty.fioId, klient: x.meno, zapamataj: true });
+                            poZapise();
+                          })()}
+                          style={hlavne(true)}
+                        >
+                          {pracujem === isty.fioId ? "…" : `Spárovať s ${x.meno.split(" ")[0]}`}
+                        </button>
+                      </div>
+                    )}
                     {poKrokoch && denOtvoreny === kluc && (() => {
                       const pary = kandidatiPlatby(x.meno, x, zdroje?.platby || [], data.nezaplateneKokpit || []);
                       return (
