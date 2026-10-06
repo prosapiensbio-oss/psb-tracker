@@ -138,11 +138,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
   /**
-   * „Platby z banky" v kroku Platby a balíčky sú ZABALENÉ (Jerry, 5. 10. 2026:
-   * „daj ich schované do rolovacieho okna ‚všetky platby', trojuholník, klik
-   * a rozbalí sa; predvolene zabalené"). Pri dlžníkovi sa páry ukazujú aj tak.
+   * „Príjmy z banky" v kroku Platby a balíčky sú ROZBALENÉ.
+   *
+   * 5. 10. 2026 ich Jerry dal zabaliť („predvolene zabalené"), 6. 10. 2026 sa
+   * na tom zasekla Hanusova platba: prišla, ale nikto ju nevidel a Hanus
+   * svietil ako dlžník. Jerry: „existuje miesto, kde zapisujem všetky výdavky
+   * — platby a balíčky by malo byť to isté miesto pre príjmy; nemusia tam byť
+   * len dlžníci." Každý príjem má dostať klienta tak, ako výdavok dostane
+   * kategóriu — a to sa nedá, keď je zoznam schovaný. Jerry: „daj všetky
+   * platby z banky rozbalené defaultne, presne tak, ako to bolo pôvodne."
    */
-  const [platbyRozbalene, setPlatbyRozbalene] = useState(false);
+  const [platbyRozbalene, setPlatbyRozbalene] = useState(true);
   const [pocetSms, setPocetSms] = useState<number | null>(null);
   const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
@@ -1368,7 +1374,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "block", width: "100%", textAlign: "left" }}
           >
             <NadpisSekcie pocet={zivych(x)}>
-              <span style={{ display: "inline-block", width: 14 }}>{platbyRozbalene ? "▾" : "▸"}</span>Všetky platby z banky
+              <span style={{ display: "inline-block", width: 14 }}>{platbyRozbalene ? "▾" : "▸"}</span>{x.nadpis}
             </NadpisSekcie>
           </button>
           {platbyRozbalene && obsahKarty(x)}
