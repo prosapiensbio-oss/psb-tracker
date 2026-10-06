@@ -250,6 +250,8 @@ function cisloBodu(b: BodOsi): string {
    * předplatné a je tam vidieť, že 4 h je 9. 9." Platba číslo nikdy nemala.
    * Ľavý stĺpec je teda odpočet hodín a nič iné: 6, 5, 4, 3, 2, 1 a mínusy.
    */
+  // Staré obdobie z PTmindera: tréning nad rámec nie je mínus ani plus.
+  if (b.vyrovnane) return `<span style="color:${s.tlmeny}">—</span>`;
   return [minus, hodina].filter(Boolean).join(" ");
 }
 

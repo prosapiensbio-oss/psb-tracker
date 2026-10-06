@@ -524,8 +524,9 @@ describe("zo skončeného členstva sa tréningy neprenášajú", () => {
     ];
     const { stavy, koniec } = priebehBalickov(os, null, "2026-10-04");
     const st = (den: string) => [...stavy.entries()].find(([u]) => u.druh === "trening" && u.den === den)![1];
-    // August prekročil svojich 6 h o jeden tréning — ten si nechá mínus u seba…
-    expect(st("2026-09-05")).toMatchObject({ zostatok: null, dlh: 1 });
+    // August prekročil svojich 6 h o jeden tréning — ostáva u seba, a od
+    // 6. 10. 2026 ako vyrovnaný (staré obdobie z PTmindera: ani mínus, ani plus)…
+    expect(st("2026-09-05")).toMatchObject({ zostatok: null, dlh: null, vyrovnane: true });
     // …a balíček z 9. 9. začína na svojich šiestich.
     expect(["2026-09-09", "2026-09-14", "2026-09-16", "2026-09-21", "2026-09-25", "2026-09-29"].map((d) => st(d).zostatok)).toEqual([6, 5, 4, 3, 2, 1]);
     expect(st("2026-10-02")).toMatchObject({ zostatok: null, dlh: 1 });
@@ -731,5 +732,26 @@ describe("samostatná hodina iného druhu členstvo neuťne", () => {
     const os2: Udalost[] = [on("2026-08-27"), t("2026-08-27", ""), { ...(off1("2026-09-18") as any), nazov: "ON - 1 hodina" }, t("2026-09-24", "")];
     const st = [...priebehBalickov(os2, null, "2026-10-06").stavy].find(([u]) => u.druh === "trening" && u.den === "2026-09-24")![1];
     expect(st.usek).toBe("2026-09-18");
+  });
+});
+
+describe("staré obdobie z PTmindera: tréning nad rámec nie je mínus ani plus", () => {
+  // Jerry, 6. 10. 2026: „sú to staré hodiny — neber to ako mínus ani ako plus,
+  // dôležité je, aby to teraz sedelo."
+  const os: Udalost[] = [
+    bal("2026-06-30", 2, { doDna: "2026-08-24" }), tre("2026-07-07"), tre("2026-07-22"), tre("2026-08-18"),
+    bal("2026-08-24", 6, { doDna: "2026-10-18" }), tre("2026-08-24"), tre("2026-09-07"),
+  ];
+  const { stavy, koniec } = priebehBalickov(os, 4, "2026-10-06");
+  const st = (d: string) => [...stavy].find(([u]) => u.druh === "trening" && u.den === d)![1];
+
+  it("nekrytý tréning v starom členstve je vyrovnaný, nie −1", () => {
+    expect(st("2026-08-18").dlh).toBeNull();
+    expect(st("2026-08-18").vyrovnane).toBe(true);
+  });
+  it("súčasné členstvo sa nemení", () => {
+    expect(st("2026-08-24").zostatok).toBe(6);
+    expect(st("2026-09-07").zostatok).toBe(5);
+    expect(koniec).toBe(4);
   });
 });

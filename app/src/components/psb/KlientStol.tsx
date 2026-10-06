@@ -1985,6 +1985,9 @@ function doNarodenin(narodeniny: string): number | null {
  * tam prázdno. Vpravo odpočet hodín v členstve (6, 5, 4…).
  */
 function StavHodin({ stav }: { stav?: StavRiadku }) {
+  if (stav?.vyrovnane) {
+    return <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, color: C.textDim }} title="staré obdobie z PTmindera — tréning nad rámec sa nepočíta ani do mínusu, ani do plusu">—</span>;
+  }
   if (!stav || (stav.zostatok === null && !stav.dlh)) return null;
   return (
     <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: C.textDim }}>

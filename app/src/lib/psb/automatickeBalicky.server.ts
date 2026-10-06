@@ -56,8 +56,8 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
      * NEROZHODNUTÁ PLATNOSŤ UŽ NEBRZDÍ. Do 6. 10. 2026 balíček nevznikol,
      * kým Jerry nepovedal, či zvyšok hodín je doplnenie. Jerry: „nové
      * členstvo môže vzniknúť tak či tak automaticky — ide mínus, dokým to
-     * nedefinujeme." Keď neskôr padne „doplnenie", `/api/balicky` (pridaj)
-     * automatický balíček zruší a ďalšie otvorenie ho založí za doplnením.
+     * nedefinujeme." Minulosť sa potom už nepreskladá — čo doplnenie urobí
+     * s tréningami po konci platnosti, viď `docs/zoznam.md` (6. 10. 2026).
      */
     // Os po TERAZ, nie po celý deň: tréning o 8:30 nesmie založiť balíček
     // o 6:40 — keby sa zrušil, balíček s dlhom by zostal (6. 10. 2026,

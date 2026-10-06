@@ -61,6 +61,8 @@ export type RiadokVypisu = {
   doplnenie?: boolean;
   /** Koľkou hodinou ďalšieho balíčka sa tréning stane po zaplatení (`StavRiadku.buduca`). */
   buduca?: number;
+  /** Staré obdobie z PTmindera — tréning nad rámec sa nepočíta (`StavRiadku.vyrovnane`). */
+  vyrovnane?: boolean;
 };
 
 export type Vypis = {
@@ -203,6 +205,14 @@ export type StavRiadku = {
    * profil nie, lebo sa počítal len pri stránke. Odteraz tu, pre oboch.
    */
   buduca?: number;
+  /**
+   * Tréning nad rámec STARÉHO členstva z čias PTmindera — ani mínus, ani
+   * plus. Jerry, 6. 10. 2026: „sú to staré hodiny, nevynulovať ich ako mínus
+   * ani plus; dôležité je, aby to sedelo teraz — či to sedí v marci, je
+   * irelevantné." Príčina takých riadkov býva v zápise (Kadličková 17. 6.
+   * v kalendári, v PTminderi nie), nie v klientovi.
+   */
+  vyrovnane?: boolean;
 };
 
 /**
@@ -577,11 +587,14 @@ export function priebehBalickov(
       ? usek.riadky.reduce((a, r) => a + (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && r.den >= b!.doDna! ? r.hodin : 0), 0)
       : 0;
     let poKonci = false;
+    // Uzavreté členstvo z čias PTmindera: tréning nad rámec nie je mínus.
+    const stareObdobie = b !== posledny && (!b || b.den < KOKPIT_OD);
     let dlhPocet = 0;
     const doUseku: { u: Udalost; po: number | null }[] = [];
     for (const u of usek.riadky) {
       let dlh: number | null = null;
       let zostatok: number | null = null;
+      let vyrovnane = false;
       if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)
         && !(koniecVKokpite && u.den >= b!.doDna!)) bezi = (bezi || 0) + u.hodin;
       /**
@@ -659,7 +672,8 @@ export function priebehBalickov(
          * počtu; balíček mu 6. 10. nahodil Jerry, nie appka.
          */
         const poPlatnosti = koniecVKokpite && u.den > b!.doDna!;
-        if (neznameHodiny && !(vycerpane && b === posledny && (kartaVMinuse || poPlatnosti))) dlh = null;
+        if (vycerpane && stareObdobie) vyrovnane = true;
+        else if (neznameHodiny && !(vycerpane && b === posledny && (kartaVMinuse || poPlatnosti))) dlh = null;
         else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
@@ -667,6 +681,7 @@ export function priebehBalickov(
       doUseku.push({ u, po: u.druh === "trening" && bezi !== null ? bezi - nekryte : null });
       stavy.set(u, {
         zostatok, dlh, usek: b?.den || "",
+        vyrovnane: vyrovnane || undefined,
         prevzate: u === b && usek.prevzate ? usek.prevzate : undefined,
         prevzateDni: u === b && usek.prevzate ? usek.prevzateDni : undefined,
       });
@@ -767,6 +782,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       prevzate: stav?.prevzate,
       prevzateDni: stav?.prevzateDni,
       buduca: stav?.buduca,
+      vyrovnane: stav?.vyrovnane,
     });
   }
 

@@ -71,6 +71,8 @@ export type BodOsi = {
    * posledného balíčka — toho istého, ktorý stránka ponúka cez QR.
    */
   buduca?: number;
+  /** Staré obdobie z PTmindera — tréning nad rámec sa nepočíta (pomlčka). */
+  vyrovnane?: boolean;
   /**
    * Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku.
    *

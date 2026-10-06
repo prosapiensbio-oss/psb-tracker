@@ -402,7 +402,7 @@ sekcia("ODKAZ PRE KLIENTA");
      * vziať číslo a prázdno je pravda, nie chyba.
      */
     if (v.os.some((b) => b.druh === "balicekOd")) {
-      const bez = v.os.filter((b) => b.druh === "trening" && b.zostatok == null && !b.dlh);
+      const bez = v.os.filter((b) => b.druh === "trening" && b.zostatok == null && !b.dlh && !b.vyrovnane);
       if (bez.length) prazdne.push(`${m} — ${bez.length}× (naposledy ${bez[bez.length - 1].den})`);
     }
 
