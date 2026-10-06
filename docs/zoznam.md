@@ -329,8 +329,13 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   väčšinou artefakt delenia osi podľa dňa kúpy (Kadličková mala v členstve
   6/30–8/24 presne 6 tréningov). Pre históriu teda ostáva vypnutý.
   **6. 10. doplnené (Jerry):** po konci platnosti sa zvyšok hodín nečerpá,
-  kým nepadne rozhodnutie; balíček vzniká hneď a ide do mínusu, doplnenie
-  ho posunie za seba (automatický sa zruší a vznikne znova). Resnerová
+  kým nepadne rozhodnutie; balíček vzniká hneď a ide do mínusu. Rušenie
+  a nové založenie automatického balíčka po doplnení Jerry odmietol
+  („minulosť by som nemenil") — odstránené.
+  - [ ] **Otvorené: doplnenie rozhodnuté NESKORO** (po tréningoch po konci
+    platnosti, keď už automatický balíček stojí): Jerry chce, aby pri tých
+    tréningoch zmizol mínus a ostalo „6 h, 5 h" s poznámkou „doplnenie
+    členstva". Čaká na odpoveď, kam idú doplnené hodiny. Resnerová
   nemala čo presúvať — PTminder: 8 h, 8 tréningov 11. 8. – 1. 10.
   Dopredu (členstvo skončené v Kokpite) platí Jerryho logika: tréning po
   konci platnosti a bez hodín je prvá hodina nového členstva, nezaplatené =
@@ -362,7 +367,17 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   — overené v PTminderi: platba 21. 9. bez členstva, tréningy 27. 7., 31. 8.,
   14. 9. za 0 Kč na doplneniach. Nahodený „6h Balíček" 27. 7. – 15. 11.
   (koniec ako členstvo kúpené 21. 9.), 7 790 Kč; os 6/5/4/3, karta 2 h, dlh 0.
-- [ ] **Pre Jerryho — rozdiely kalendár ↔ PTminder (6. 10. 2026)**, príčina
+- [x] **Monikine hodiny na Danovi (6. 10. 2026, Jerry: „áno, oprav to")** —
+  sedenia 6., 13. a 20. 3. o 8:30 s Terezkou preradené z Dana Kouřila na
+  Moniku Schonwalderovú (sessions + dedup_key, audit `sedenie-preradene`).
+  Marec je zamknutý, import ich späť neprepíše. V PTminderi ostali na Danovi
+  — Kokpit je od 1. 10. pravda, netreba.
+- [x] **Staré obdobia vynulované (6. 10. 2026, Jerry: „neber to ako mínus ani
+  ako plus, dôležité je, aby to sedelo teraz")** — v uzavretom členstve spred
+  1. 10. je tréning nad rámec „—" (`vyrovnane`), nie −N. 39 mínusov a 124
+  prázdnych riadkov; karty, koniec osi ani návrhy sa nezmenili. Rozdiely
+  nižšie sú tým vybavené, netreba ich opravovať v PTminderi.
+- [x] ~~Pre Jerryho — rozdiely kalendár ↔ PTminder (6. 10. 2026)~~, príčina
   mínusov pri prenose; súčasné balíčky sedia, ide len o históriu:
   - Kadličková: kalendár 17. 6. 16:00, v PTminderi nie je.
   - Kouřil: kalendár 24. 5. (ne 10:00) a 14. 6. (ne 9:00), v PTminderi nie sú;
