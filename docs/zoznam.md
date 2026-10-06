@@ -71,7 +71,9 @@ Rozhodnutia z 6. 10. sú zapracované (prenos mínusu, online/offline,
 - [x] ~~**Navádzač kariet ako 3D kolotoč**~~ — postavené 6. 10. 2026 (koleso,
   potom valec A z ukážky `navrhy-kokpitu/kolotoc-kariet.html`) a v ten istý
   deň VRÁTENÉ na pôvodný rad (Jerry: „v mojej predstave to vyzeralo lepšie
-  ako v skutočnosti"). Neotvárať znova bez novej predstavy. Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
+  ako v skutočnosti"). Hneď nato Jerry: „sprav to tak, že to ide dokola —
+  vedľa Klienta je 1 · Kalendár" → rovný rad DOKOLA (`poradieKolesa`) je
+  naostro; 3D valec nie. Pôvodne (Jerry, 6. 10. 2026: „ako výber áut
   v Need for Speed"). Kolotoč v rade (`poradieKolesa`) Jerryho ideu netrafil;
   ukážka mimo Kokpitu: `navrhy-kokpitu/kolotoc-kariet.html` — A valec,
   B obežná dráha, C bubon. Čaká na výber, potom do Workspace.

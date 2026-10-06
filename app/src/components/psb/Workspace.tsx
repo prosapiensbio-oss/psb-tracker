@@ -5,7 +5,7 @@ import { SmsKlientovi } from "./SmsKlientovi";
 import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
@@ -472,6 +472,41 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // dorovná polohu natvrdo.
     const t = setTimeout(() => { if (Math.abs(nav.scrollLeft - ciel) > 2) nav.scrollLeft = ciel; }, 450);
     return () => clearTimeout(t);
+  }, [i, zive.length, menejPohybu]);
+  /**
+   * KOLESO, NIE ÚSEČKA — pohyb názvov pri prepnutí (FLIP).
+   *
+   * Jerry, 6. 10. 2026: „názvy kariet by mali byť, ako keby sa točili do
+   * kruhu, nie ako keby chodili po úsečke." Navádzač preto kreslí karty
+   * v poradí OKOLO otvorenej (`poradieKolesa`) a pri prepnutí každý názov
+   * doplynie z miesta, kde bol. Ten, ktorý pretiekol z jedného konca na
+   * druhý, sa nepresúva cez celý rad — len sa objaví (inak by preletel
+   * ponad ostatné a vyzeralo by to ako chyba).
+   */
+  const polohyNazvov = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const nav = navKariet.current;
+    if (!nav) return;
+    const tlacidla = [...nav.querySelectorAll<HTMLElement>("[data-kluc]")];
+    const nove = new Map<string, number>();
+    for (const el of tlacidla) nove.set(el.dataset.kluc || "", el.offsetLeft);
+    if (!menejPohybu) {
+      const sirka = nav.scrollWidth;
+      for (const el of tlacidla) {
+        const pred = polohyNazvov.current.get(el.dataset.kluc || "");
+        const teraz = nove.get(el.dataset.kluc || "") ?? 0;
+        if (pred == null || Math.abs(pred - teraz) < 1) continue;
+        const preskok = Math.abs(pred - teraz) > sirka * 0.45;
+        el.style.transition = "none";
+        el.style.transform = preskok ? "" : `translateX(${pred - teraz}px)`;
+        el.style.opacity = preskok ? "0" : "";
+        void el.offsetWidth; // vynúti prepočet, aby prechod mal odkiaľ ísť
+        el.style.transition = "transform .28s ease, opacity .28s ease";
+        el.style.transform = "";
+        el.style.opacity = "";
+      }
+    }
+    polohyNazvov.current = nove;
   }, [i, zive.length, menejPohybu]);
   const gesto = useRef(novyStavGesta());
   const svih = useRef(novyStavSvihu());
@@ -1551,15 +1586,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
         }}>
           <div style={{ flex: "0 0 40%" }} aria-hidden="true" />
-          {zive.map((x, j) => {
-            const akt = Math.min(i, zive.length - 1);
-            const d = Math.abs(j - akt);
+          {poradieKolesa(zive.length, Math.min(i, zive.length - 1)).map(({ j, posun }) => {
+            const x = zive[j];
+            const d = Math.abs(posun);
             const n = x.druh === "krok" ? x.sekcie.reduce((a, y) => a + zostava(y), 0) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x);
             return (
               <button
                 key={x.druh === "krok" ? `krok|${x.krok}` : x.druh}
+                data-kluc={x.druh === "krok" ? `krok|${x.krok}` : x.druh}
                 data-aktivna={d === 0 ? "1" : undefined}
-                onClick={() => (d === 0 ? undefined : prepni(j > akt ? 1 : -1, j))}
+                onClick={() => (d === 0 ? undefined : prepni(posun > 0 ? 1 : -1, j))}
                 aria-current={d === 0 ? "true" : undefined}
                 style={{
                   flex: "0 0 auto", whiteSpace: "nowrap", cursor: d === 0 ? "default" : "pointer", fontFamily: "inherit",
@@ -1821,6 +1857,20 @@ function pohybKarty(prechod: { smer: 1 | -1; faza: "von" | "dnu" } | null): Reac
     return { transform: `translateX(${-prechod.smer * 52}px) scale(.965)`, opacity: 0, transition: "transform .15s ease-in, opacity .15s ease-in" };
   }
   return { transform: `translateX(${prechod.smer * 52}px) scale(.965)`, opacity: 0, transition: "none" };
+}
+
+/**
+ * Poradie názvov v navádzači OKOLO otvorenej karty — koleso, nie úsečka.
+ * Otvorená je v strede, susedia z oboch strán dokola: pri prvej karte stojí
+ * vľavo posledná, pri poslednej vpravo prvá. Pri párnom počte je o jednu
+ * viac napravo (smer „ďalej").
+ */
+export function poradieKolesa(n: number, akt: number): { j: number; posun: number }[] {
+  if (n <= 0) return [];
+  const vlavo = Math.floor((n - 1) / 2);
+  const out: { j: number; posun: number }[] = [];
+  for (let posun = -vlavo; posun <= n - 1 - vlavo; posun++) out.push({ j: (((akt + posun) % n) + n) % n, posun });
+  return out;
 }
 
 /**
