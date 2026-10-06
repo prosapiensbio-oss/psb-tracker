@@ -2794,8 +2794,21 @@ strih bodkami na osi, uhly na snímke, 📷 snímka, stiahnutie MP4).
 - **V `<style>` je značka vloženia CSS komentár, nie HTML** — `<!--` v CSS
   pokazilo prvé pravidlo štvorca a ten mal výšku 0 (stalo sa v náčrte).
 - **Snímky z videa → fotky cez IndexedDB** (`sklad.js`, databáza
-  `skladacka`, rovnaký pôvod ako Kokpit). Zatiaľ len v prehliadači; ku
-  klientovi sa neukladá nič — ďalší krok je kartotéka (šifrovane v R2).
+  `skladacka`, rovnaký pôvod ako Kokpit) — pracovný zásobník v prehliadači.
+- **Kartotéka klienta (od 6. 10. 2026):** klienta vyberá `EditorKarta`
+  nad editormi a pošle ho `postMessage` (`psb-klient`; editor sa pri
+  načítaní spýta `psb-kto-je-klient`). Spoločná časť `kartoteka.js`.
+  Ukladá sa cez `/api/fotky` do `klient_fotky` s `pohlad`
+  **`porovnanie`** (hotový štvorec 2000 px) a **`video`** (strih so
+  spomalením a čiarami, 1280 px, 4 Mb/s; `typ` = MIME, migrácia 0099);
+  snímka z videa voliteľne rovno ako fotka tela (zmenšená na 2000 px).
+  Bez súhlasu v anamnéze sa editor spýta na osobný (confirm). Po uložení
+  `psb-ulozene` → `oznam("fotky")` → kartotéka v profile sa obnoví
+  (sekcia „Z editora", video sa prehrá cez fetch → blob, nie `<video src>`
+  — Safari chce pri videu Range a server vracia celý súbor).
+  `jeFotkaTela` oddeľuje fotky tela od výstupov editora (fotenia,
+  porovnania prvá/posledná). Zmerané naostro: 20 MB video worker zašifruje
+  (nahratie 10,6 s, späť 1,8 s); strop `MAX_VIDEO_BAJTOV` 40 MB.
 - Rámiky ostávajú načítané aj po prepnutí Foto/Video a karty (pravidlo
   „Workspace drží prácu"). Statické súbory idú cez assets bez workera —
   CSP Kokpitu na ne nepadá; rámik povoľuje `frame-src 'self'`.
