@@ -2821,16 +2821,24 @@ export function dnesneTreningy(
         const [, m, d] = c.narodeniny.split("-");
         if (m && d && `${m}-${d}` === dnesIso.slice(5)) dovody.push("má dnes narodeniny");
       }
-      if (c.packageRemaining != null && c.packageTotal != null && c.packageRemaining <= 1) {
+      /**
+       * ZOSTATOK PRED DNEŠNÝM TRÉNINGOM, NIE PO ŇOM.
+       *
+       * Karta počíta len tréningy, ktoré už začali, takže ráno je dnešný
+       * tréning ešte v zostatku a po ňom už nie. Veta sa preto skladá zo
+       * stavu PRED ním. Do 6. 10. 2026 tu pri nule aj mínuse stálo „dnes je
+       * posledná hodina, ktorú mu appka pozná" — Lukáš Hanus mal −1 (členstvo
+       * z 2. 10. čakalo na platbu) a Jerry to čítal ako „má poslednú hodinu".
+       */
+      if (c.packageRemaining != null && c.packageTotal != null) {
+        const zacal = u.zaciatok.slice(0, 16) <= terazPraha(dnes);
+        const pred = c.packageRemaining + (zacal ? 1 : 0);
         // Keď zostatok appka dopočítala (export ho pri offline členstvách
         // nedáva), musí to v pripomienke zaznieť — inak by Jerry pred
         // klientom tvrdil číslo, ktoré v PTminderi nikde nestojí.
         const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín — over v PTminderi)" : "";
-        dovody.push(
-          (c.packageRemaining <= 0
-            ? "balíček má vyčerpaný — dnes je posledná hodina, ktorú mu appka pozná"
-            : "v balíčku mu zostáva posledná hodina") + odkial,
-        );
+        if (pred === 1) dovody.push(`dnes má poslednú hodinu z balíčka${odkial}`);
+        else if (pred <= 0) dovody.push(`hodiny má minuté — dnešný tréning je nad rámec (−${1 - pred})${odkial}`);
       }
       // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
       // z fázy a mesiaca druhýkrát a inak než Prevádzka.
