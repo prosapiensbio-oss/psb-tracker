@@ -68,6 +68,11 @@ Rozhodnutia z 6. 10. sú zapracované (prenos mínusu, online/offline,
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
 
+- [ ] **Navádzač kariet ako 3D kolotoč** (Jerry, 6. 10. 2026: „ako výber áut
+  v Need for Speed"). Kolotoč v rade (`poradieKolesa`) Jerryho ideu netrafil;
+  ukážka mimo Kokpitu: `navrhy-kokpitu/kolotoc-kariet.html` — A valec,
+  B obežná dráha, C bubon. Čaká na výber, potom do Workspace.
+
 Jerry: štyri kroky týždňa, každý jedna karta (Kalendár · SMS · Platby ·
 Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
 
