@@ -34,6 +34,11 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   platby: {
     zrusene_at: "mäkké zrušenie — nová platba zrušená nevzniká",
   },
+  // Balíček sa ruší mäkko (krok späť, doplnenie, ktoré posunie automatický
+  // balíček). Nový balíček zrušený nevzniká.
+  balicky: {
+    zrusene_at: "mäkké zrušenie — nový balíček zrušený nevzniká",
+  },
   // Odber vzniká v prehliadači; ako mu potom chodia správy, sa zisťuje až
   // pri prvom odoslaní. Predvyplniť to pri zápise by znamenalo tvrdiť niečo,
   // čo sa ešte nestalo.
