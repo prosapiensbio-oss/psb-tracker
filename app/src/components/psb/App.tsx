@@ -70,6 +70,7 @@ import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
+import { jeBeta } from "../../lib/psb/beta";
 import { C, S, mix, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
@@ -768,6 +769,13 @@ export function PSBApp() {
    * isté, a tá horšia znela istejšie.
    */
   const [btcCelkom, setBtcCelkom] = useState<number | null>(null);
+  /**
+   * Bitcoinová kniha sa NENAČÍTALA (chýba kľúč — beta — alebo appka neodpovedá).
+   * Bez nej P&L nevidí faktúry zaplatené bitcoinom ani výplaty v BTC a zisk
+   * vyskočí nahor bez jediného slova. Tak vznikol „odskok augusta" 25. 9. 2026:
+   * beta ukazovala +18 072 Kč, ostrý Kokpit správne −26 154 Kč.
+   */
+  const [btcNenacitane, setBtcNenacitane] = useState(false);
   /** Účet z hlavičky výpisu (`fio_zostatok`), hotovosť z ručného zápisu. */
   const [ucetStav, setUcetStav] = useState<{ suma: number; datum: string } | null>(null);
   const [hotovostStav, setHotovostStav] = useState<{ suma: number; datum: string } | null>(null);
@@ -777,6 +785,7 @@ export function PSBApp() {
   // vzal menej, než naozaj vzal.
   useEffect(() => {
     void fetchBtcReserve(true, true, true).then((r) => {
+      setBtcNenacitane(!r);
       if (typeof r?.czk === "number") setBtcCelkom(r.czk);
       setBtcKurz({ kurz: r?.rateCzkPerBtc ?? null, kedy: r?.rateUpdatedAt ?? null });
       setBtcKniha({
@@ -2772,6 +2781,12 @@ function skupinaFaktur(
         )}
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
+        {active === "vzas" && btcNenacitane && (
+          <div role="alert" style={{ margin: "0 0 12px", padding: "11px 14px", borderRadius: 10, background: mix(C.orange, 14), border: `1px solid ${mix(C.orange, 55)}`, color: C.text, fontSize: 13, lineHeight: 1.55 }}>
+            <b>Bitcoinová kniha sa nenačítala</b> — náklady z faktúr zaplatených bitcoinom a výplaty v BTC v týchto číslach chýbajú,
+            takže zisk vyzerá lepší, než je.{jeBeta() ? " V bete je to vždy (nemá kľúč k bitcoinovej appke) — peniaze over v ostrom Kokpite." : " Skús obnoviť stránku; keď to trvá, je chyba v bitcoinovej appke."}
+          </div>
+        )}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} onNavigate={navigate} />}
         {active === "prechod" && (

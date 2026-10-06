@@ -200,7 +200,6 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 | 17 potvrdení mien z kalendára (Terezka) | 25. 9. | zlúčiť do jedného riadku registra, alebo nechať po jednom? |
 | 9 falošných zrušení („zmizol tréning", ktorý sa nezmizol) | 25. 9. | označiť ako vysvetlené, alebo prejde sám? |
 | Dovolenka Anny Kadličkovej a Jakuba Kaňovského zapísaná k 7. 10. | 25. 9. | patrí k 30. 9.; tlačidlo „Vrátiť späť" už existuje |
-| Odskok augusta: zisk 18 072 → −26 154 Kč za pár hodín | 25. 9. | mám zistiť, odkiaľ ten rozdiel 44 226 Kč prišiel? |
 | PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
 
 ## 2 · Prijaté, nezačaté
@@ -422,6 +421,13 @@ Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **„Odskok augusta" 18 072 → −26 154 Kč** (vyšetrené 6. 10. 2026) — mesiac sa
+  nezmenil. Ranné číslo bolo z BETY, ktorá nemá kľúč k bitcoinovej appke,
+  a bez knihy P&L nevidí faktúry zaplatené bitcoinom: polovica iPhonu 17
+  (11 495), činky a plyo box (7 014), odvápňovač (299) a výplaty z tých istých
+  nákupov (25 419). Ostrý Kokpit (−26 154) má pravdu; beta dnes stále ukazuje
+  18 072. Nad Peniazmi odteraz svieti upozornenie, keď sa kniha nenačíta.
 
 - **Luky Kríž má vlastný profil** (3. 10. 2026). Nie je to preklep mena —
   je to SYN Lukáša Kríža. Udalosť „Luky Kriz" v kalendári bola namapovaná
