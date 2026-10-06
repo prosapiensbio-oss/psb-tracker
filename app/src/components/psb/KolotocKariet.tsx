@@ -57,7 +57,7 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
     const kresli = () => {
       const el = scena.current;
       if (!el) return;
-      const R = Math.min(uzke ? 170 : 430, el.clientWidth * 0.46);
+      const R = Math.min(uzke ? 180 : 560, el.clientWidth * 0.47);
       const krok = (2 * Math.PI) / n;
       const p = poloha.current;
       slova.current.forEach((b, i) => {
@@ -68,10 +68,12 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
         const vpredu = (Math.cos(th) + 1) / 2; // 1 vpredu, 0 vzadu
         const x = R * Math.sin(th);
         const z = R * Math.cos(th) - R;
-        const y = -(uzke ? 26 : 44) * (1 - vpredu);
-        b.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) scale(${0.55 + 0.6 * vpredu ** 2})`;
-        b.style.opacity = String(0.18 + 0.82 * vpredu ** 2);
-        b.style.filter = vpredu > 0.97 ? "none" : `blur(${(1 - vpredu) * 2.2}px)`;
+        const y = -(uzke ? 30 : 50) * (1 - vpredu);
+        b.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) scale(${0.78 + 0.32 * vpredu ** 2})`;
+        // Všetky názvy majú byť čitateľné (Jerry, 6. 10. 2026: „aby boli vidno
+        // všetky možnosti") — hĺbku nesie veľkosť a výška, nie zmiznutie.
+        b.style.opacity = String(0.55 + 0.45 * vpredu ** 2);
+        b.style.filter = vpredu > 0.97 ? "none" : `blur(${(1 - vpredu) * 0.5}px)`;
         b.style.zIndex = String(Math.round(vpredu * 100));
         b.style.pointerEvents = vpredu > 0.2 ? "auto" : "none";
       });
@@ -111,7 +113,7 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
       role="tablist"
       aria-label="Karty Workspace"
       style={{
-        position: "relative", flex: "1 1 320px", minWidth: 0, height: uzke ? 78 : 100,
+        position: "relative", flex: "1 1 320px", minWidth: 0, height: uzke ? 78 : 96,
         perspective: 900, perspectiveOrigin: "50% 40%", overflow: "hidden",
         maskImage: "linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent)",
         WebkitMaskImage: "linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent)",
@@ -130,7 +132,7 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
             style={{
               position: "absolute", left: "50%", top: "64%", whiteSpace: "nowrap", fontFamily: "inherit",
               cursor: akt ? "default" : "pointer", willChange: "transform, opacity, filter",
-              fontSize: uzke ? 13.5 : 15, fontWeight: akt ? 800 : 600, padding: "6px 15px", borderRadius: 999,
+              fontSize: uzke ? 11.5 : 12.5, fontWeight: akt ? 800 : 600, padding: akt ? "5px 13px" : "3px 9px", borderRadius: 999,
               border: `1px solid ${akt ? C.accent : "transparent"}`,
               // Nepriehľadné pozadie: názvy vzadu nesmú presvitať cez ten vpredu.
               background: akt ? `linear-gradient(${C.accentBg}, ${C.accentBg}), ${C.surface}` : "transparent",
