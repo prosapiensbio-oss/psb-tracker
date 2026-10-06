@@ -233,6 +233,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   októbrové príjmy z banky (4, 33 580 Kč), zapisovať hotovosť a bitcoin do
   Kokpitu (zošit nie je v Kokpite od 28. 8.), potom tlačidlo „Prepnúť peniaze
   na Kokpit od 10/2026". Stav 6. 10.: október Kokpit 0 / PTminder 17 190.
+  **Bitcoin sa berie sám z BTC knihy** (6. 10., Jerry: „prečo sa BTC platby
+  nečítajú?") — od začiatku súbežného chodu, nespoznané mená ukáže karta.
+  V knihe zatiaľ žiadna októbrová platba (posledná 17. 9.).
   Pozn.: v dávke návrhov stojí znova Miřejovský 752 (platba bola 5. 10.
   zrušená, pohyb v banke ostal) — rozhodne Jerry.
   Pôvodný text: **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Meradlo
