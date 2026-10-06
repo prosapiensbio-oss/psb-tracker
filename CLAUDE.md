@@ -2726,6 +2726,12 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
   skončenom od 30. 9. — inak by `navrhNovehoBalicka` zakladal balíčky do
   minulosti (Heinrich od júla). Automatický balíček sa zakladá až z
   tréningu, ktorý ZAČAL (`terazPraha`), nie z dnešného o 17:00.
+- **Po konci platnosti zvyšok NEPLATÍ, kým nepadne rozhodnutie** (Jerry,
+  6. 10.: „ide mínus, dokým to nedefinujeme, či je to doplnenie alebo
+  prepadnutie"). Tréning po konci čerpá len doplnenie zapísané od toho dňa
+  (`poKonciHodin` — NAHRÁDZA zvyšok, nesčíta sa). Automatický balíček na
+  rozhodnutie nečaká; `pridaj` doplnenia zruší neskorší automatický balíček
+  a ďalšie otvorenie appky ho založí za doplnením.
 - **Samostatná hodina iného druhu** (najviac 1 h, ON/OFF z NÁZVU balíčka)
   počas platného členstva pokryje svoj tréning a obdobie neotvára
   (`samostatne`). Druh tréningu rozhoduje len keď je známy; prísne „online

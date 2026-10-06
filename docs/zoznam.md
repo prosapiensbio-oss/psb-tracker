@@ -328,6 +328,10 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   Tsiolis by si stiahol 20 tréningov až z 11/2025). „Mínusy" v histórii sú
   väčšinou artefakt delenia osi podľa dňa kúpy (Kadličková mala v členstve
   6/30–8/24 presne 6 tréningov). Pre históriu teda ostáva vypnutý.
+  **6. 10. doplnené (Jerry):** po konci platnosti sa zvyšok hodín nečerpá,
+  kým nepadne rozhodnutie; balíček vzniká hneď a ide do mínusu, doplnenie
+  ho posunie za seba (automatický sa zruší a vznikne znova). Resnerová
+  nemala čo presúvať — PTminder: 8 h, 8 tréningov 11. 8. – 1. 10.
   Dopredu (členstvo skončené v Kokpite) platí Jerryho logika: tréning po
   konci platnosti a bez hodín je prvá hodina nového členstva, nezaplatené =
   „6 h −1", balíček vznikne sám (Resnerová 6. 10. — predtým ticho).
@@ -354,7 +358,22 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
 - [x] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
   5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
-- [ ] **Pre Jerryho: Jarek Heinrich** trénuje od 27. 7. bez platného členstva
+- [x] **Jarek Heinrich (6. 10. 2026, Jerry: „zaplatil 7 790 za 6 h od 27. 7.")**
+  — overené v PTminderi: platba 21. 9. bez členstva, tréningy 27. 7., 31. 8.,
+  14. 9. za 0 Kč na doplneniach. Nahodený „6h Balíček" 27. 7. – 15. 11.
+  (koniec ako členstvo kúpené 21. 9.), 7 790 Kč; os 6/5/4/3, karta 2 h, dlh 0.
+- [ ] **Pre Jerryho — rozdiely kalendár ↔ PTminder (6. 10. 2026)**, príčina
+  mínusov pri prenose; súčasné balíčky sedia, ide len o históriu:
+  - Kadličková: kalendár 17. 6. 16:00, v PTminderi nie je.
+  - Kouřil: kalendár 24. 5. (ne 10:00) a 14. 6. (ne 9:00), v PTminderi nie sú;
+    6., 13. a 20. 3. má v PTminderi DVA tréningy, v kalendári je v ten deň
+    Monika 8:30 a Dan inokedy → Monikine hodiny na Danovom účte?
+  - Khamaziuk: v PTminderi druhá rezervácia o 11:00 (11. 3., 29. 4., 13. 5.,
+    20. 5., 10. 6.; a 6. 5. 11:00), kalendár má len 9:00 → duplicity?
+    A 22. 2. (ne 11:00) v kalendári, v PTminderi nie.
+  - Vopalenský: zdroje sedia; skutočne nekrytý je len 14. 4. — deň po konci
+    členstva 17. 2. – 13. 4., ďalšie začalo 7. 6.
+- [ ] ~~Pre Jerryho: Jarek Heinrich~~ (vyriešené vyššie) trénuje od 27. 7. bez platného členstva
   (posledné 27. 4. – 21. 6., potom len doplnenia bez počtu hodín 23. 6.,
   5. 9., 20. 9.). Tréningy 27. 7., 31. 8., 14. 9., 5. 10. sú na osi bez čísla
   a automatický balíček zámerne nevznikne (história z PTmindera). Platba
