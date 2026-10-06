@@ -273,7 +273,25 @@ export const Route = createFileRoute("/api/balicky")({
             return Response.json({ ok: true, id });
           }
           const { id, prenesene } = await zapisBalicek(DB, { klient, nazov, hodiny, od, doDna, cena, poznamka }, kto);
-          return Response.json({ ok: true, id, prenesene });
+          /**
+           * DOPLNENIE POSUNIE AUTOMATICKÝ BALÍČEK ZA SEBA.
+           *
+           * Jerry, 6. 10. 2026: nový balíček po konci platnosti vzniká hneď
+           * a ide do mínusu, „dokým to nedefinujeme, či je to doplnenie alebo
+           * prepadnutie". Keď je to doplnenie, prvé tréningy po konci platnosti
+           * patria jemu — automatický balíček, ktorý na nich vznikol, sa zruší
+           * a ďalšie otvorenie appky ho založí znova od prvého tréningu, na
+           * ktorý doplnenie nestačí. Ručne nahodený balíček sa nehýbe.
+           */
+          let posunute = 0;
+          if (/doplnenie/i.test(nazov)) {
+            const r = await DB.prepare(
+              "UPDATE balicky SET zrusene_at = ?1 WHERE klient = ?2 AND zrusene_at IS NULL AND platnost_od >= ?3 AND id <> ?4 AND poznamka LIKE 'automaticky%'",
+            ).bind(teraz(), klient, od, id).run();
+            posunute = r.meta?.changes || 0;
+            if (posunute) await audit(DB, { action: "balicek-zruseny", predmet: klient, neu: `${posunute}× automatický balíček od ${od} — prednosť má doplnenie, vznikne znova za ním`, actor: kto });
+          }
+          return Response.json({ ok: true, id, prenesene, posunute });
         }
 
         /**

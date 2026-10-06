@@ -53,13 +53,12 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
   for (const c of Object.values(clients)) {
     if (c.status === "Neaktívny") continue;
     /**
-     * NEROZHODNUTÁ PLATNOSŤ — starému balíčku skončila platnosť a hodiny
-     * zostali. Kým Jerry nepovie, či ich dostane ako doplnenie, nový balíček
-     * nevznikne: doplnenie má ísť PRED ním a posunie mu začiatok
-     * (Jerry, 4. 10. 2026). Po odpovedi ho ďalšie otvorenie appky založí.
+     * NEROZHODNUTÁ PLATNOSŤ UŽ NEBRZDÍ. Do 6. 10. 2026 balíček nevznikol,
+     * kým Jerry nepovedal, či zvyšok hodín je doplnenie. Jerry: „nové
+     * členstvo môže vzniknúť tak či tak automaticky — ide mínus, dokým to
+     * nedefinujeme." Keď neskôr padne „doplnenie", `/api/balicky` (pridaj)
+     * automatický balíček zruší a ďalšie otvorenie ho založí za doplnením.
      */
-    const doDna = String(c.packageValidTo || "").slice(0, 10);
-    if (doDna && doDna < dnes && c.packageRemaining > 0 && !data.anomalyAck?.[`platnost|${c.name}|${doDna}`]) continue;
     // Os po TERAZ, nie po celý deň: tréning o 8:30 nesmie založiť balíček
     // o 6:40 — keby sa zrušil, balíček s dlhom by zostal (6. 10. 2026,
     // Markéta Resnerová). Profil a stránka klienta počítajú tiež s hodinou.

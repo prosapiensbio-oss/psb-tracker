@@ -559,12 +559,31 @@ export function priebehBalickov(
       : usek.riadky.find((u) => u.druh === "platba")?.den;
 
     const neznameHodiny = neznameDoplnenie(usek);
+    /**
+     * PO KONCI PLATNOSTI ZVYŠOK HODÍN NEPLATÍ, KÝM NEPADNE ROZHODNUTIE.
+     *
+     * Jerry, 6. 10. 2026: „má byť otázka presunúť alebo prepadnúť a nové
+     * členstvo môže vzniknúť tak či tak automaticky — ide mínus, dokým to
+     * nedefinujeme, či je to doplnenie alebo prepadnutie." Tréning po konci
+     * platnosti teda nečerpá zvyšok skončeného členstva; čerpá LEN doplnenie
+     * zapísané od toho dňa (a to zvyšok NAHRÁDZA, nepripočítava sa k nemu —
+     * doplnenie je „presne toľko, koľko mu ostalo"). Bez doplnenia je tréning
+     * nekrytý, nový balíček vznikne sám a ide do mínusu.
+     *
+     * Len pri členstve skončenom v Kokpite — história z PTmindera tomu nesedí.
+     */
+    const koniecVKokpite = !!(b?.doDna && b.doDna >= KONIEC_ZA_KOKPITU);
+    const poKonciHodin = koniecVKokpite
+      ? usek.riadky.reduce((a, r) => a + (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && r.den >= b!.doDna! ? r.hodin : 0), 0)
+      : 0;
+    let poKonci = false;
     let dlhPocet = 0;
     const doUseku: { u: Udalost; po: number | null }[] = [];
     for (const u of usek.riadky) {
       let dlh: number | null = null;
       let zostatok: number | null = null;
-      if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)) bezi = (bezi || 0) + u.hodin;
+      if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)
+        && !(koniecVKokpite && u.den >= b!.doDna!)) bezi = (bezi || 0) + u.hodin;
       /**
        * MÍNUS SA PLATBOU VYNULUJE.
        *
@@ -592,6 +611,10 @@ export function priebehBalickov(
       } else if (u.druh === "trening" && u.zdarma === undefined) {
         // Číslo pri tréningu je stav PRED ním. Keď už hodiny nie sú, riadok
         // číslo nemá a tréning sa počíta do dlhu.
+        if (koniecVKokpite && u.den > b!.doDna! && !poKonci) {
+          poKonci = true;
+          if (bezi !== null) bezi = poKonciHodin;
+        }
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null && !vycerpane) zostatok = bezi;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
@@ -625,17 +648,17 @@ export function priebehBalickov(
          * Karta (z PTmindera, v Kokpite aktívny balíček nemá) hovorí 0, takže
          * stráž vyššie riadok umlčala — bez mínusu a bez budúcej hodiny a nový
          * balíček z prvého tréningu (`navrhNovehoBalicka`) nevznikol.
-         * Tréning po konci platnosti, keď karta hodiny nemá, je prvá hodina
-         * ďalšieho členstva.
+         * Tréning po konci platnosti bez doplnenia je prvá hodina ďalšieho
+         * členstva (`poKonciHodin` vyššie) — aj keď karta ešte hodiny hlási.
          *
          * LEN PRI ČLENSTVE, KTORÉ SKONČILO, KEĎ UŽ PRAVDOU BOL KOKPIT. Staršia
          * história z PTmindera tomu nesedí (prepočet 6. 10. 2026: prenos
          * mínusu zo skončeného členstva dal pri 4 z 4 overiteľných klientov
          * iné číslo než PTminder) a návrh z nej by založil balíček do minulosti
-         * — Jarek Heinrich trénuje od júla bez členstva a s doplneniami bez
-         * počtu; to rozhodne Jerry, nie appka.
+         * — Jarek Heinrich trénoval od júla bez členstva a s doplneniami bez
+         * počtu; balíček mu 6. 10. nahodil Jerry, nie appka.
          */
-        const poPlatnosti = !!(b?.doDna && b.doDna >= KONIEC_ZA_KOKPITU && u.den > b.doDna && zostatokTeraz != null && zostatokTeraz <= 0);
+        const poPlatnosti = koniecVKokpite && u.den > b!.doDna!;
         if (neznameHodiny && !(vycerpane && b === posledny && (kartaVMinuse || poPlatnosti))) dlh = null;
         else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;

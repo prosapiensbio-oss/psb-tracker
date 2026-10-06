@@ -681,10 +681,30 @@ describe("tréning po skončenom a minutom členstve je prvá hodina ďalšieho"
     expect(st.dlh).toBeNull();
   });
 
-  it("karta hlási hodiny → nekrytý nie je", () => {
-    const { stavy } = priebehBalickov(os("2026-10-05", "2026-10-06"), 1, "2026-10-06");
-    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-10-06")![1];
-    expect(st.dlh).toBeNull();
+  it("zvyšok hodín po konci platnosti nečerpá, kým nie je doplnenie — mínus", () => {
+    // Jerry, 6. 10. 2026: „ide mínus, dokým to nedefinujeme, či je to
+    // doplnenie alebo prepadnutie."
+    const os3: Udalost[] = [bal("2026-08-11", 6, { doDna: "2026-10-05" }), tre("2026-08-12"), tre("2026-10-06"), tre("2026-10-07")];
+    const { stavy } = priebehBalickov(os3, 5, "2026-10-08");
+    const st = (d: string) => [...stavy].find(([u]) => u.druh === "trening" && u.den === d)![1];
+    expect(st("2026-08-12").zostatok).toBe(6);
+    expect(st("2026-10-06").zostatok).toBeNull();
+    expect(st("2026-10-06").dlh).toBe(1);
+    expect(st("2026-10-07").dlh).toBe(2);
+  });
+
+  it("doplnenie po konci platnosti kryje — a zvyšok nahrádza, nepripočítava", () => {
+    const os4: Udalost[] = [
+      bal("2026-08-11", 6, { doDna: "2026-10-05" }), tre("2026-08-12"),
+      { druh: "balicekOd", den: "2026-10-05", nazov: "Doplnenie členstva", hodin: 2, doplnenie: true, zKokpitu: true },
+      tre("2026-10-06"), tre("2026-10-07"), tre("2026-10-08"),
+    ];
+    const { stavy } = priebehBalickov(os4, null, "2026-10-08");
+    const st = (d: string) => [...stavy].find(([u]) => u.druh === "trening" && u.den === d)![1];
+    expect(st("2026-10-06").zostatok).toBe(2);
+    expect(st("2026-10-07").zostatok).toBe(1);
+    expect(st("2026-10-08").zostatok).toBeNull();
+    expect(st("2026-10-08").dlh).toBe(1);
   });
 });
 
