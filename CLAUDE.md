@@ -2712,3 +2712,23 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
 - **Fotka ide s `cache-control: private, no-cache`.** S `max-age` išla
   zmazaná fotka v tom istom prehliadači ešte hodinu z keše.
 - Beta nemá `ANAMNEZA_KLUC`, takže kartotéka tam nič neuloží.
+
+## Hodiny: koniec platnosti a samostatná hodina (6. 10. 2026)
+
+- **Prenos mínusu zo skončeného členstva ostáva pre históriu vypnutý.**
+  Prepočet nad kópiou ostrej DB: pri 4 z 4 overiteľných klientoch dal iné
+  číslo než PTminder a pri Tsiolisovi stiahol 20 tréningov z 11/2025. Mínus
+  pred novým členstvom je v histórii väčšinou artefakt delenia osi podľa dňa
+  kúpy, nie pretrénovanie. Simulácia: `globalThis` prepínač v kópii osi
+  a snímka všetkých klientov pred/po (riadky, koniec, návrh balíčka).
+- **Dopredu platí: tréning po konci platnosti bez hodín = prvá hodina
+  ďalšieho členstva** (`poPlatnosti` v `priebehBalickov`), len pri členstve
+  skončenom od 30. 9. — inak by `navrhNovehoBalicka` zakladal balíčky do
+  minulosti (Heinrich od júla). Automatický balíček sa zakladá až z
+  tréningu, ktorý ZAČAL (`terazPraha`), nie z dnešného o 17:00.
+- **Samostatná hodina iného druhu** (najviac 1 h, ON/OFF z NÁZVU balíčka)
+  počas platného členstva pokryje svoj tréning a obdobie neotvára
+  (`samostatne`). Druh tréningu rozhoduje len keď je známy; prísne „online
+  len z online" nie — Lucia Podolová má ON balíček a tréningy vedené offline.
+- **Kontrolór profilov reže kalendár po TERAZ.** Ráno inak hlásil „odkaz −1
+  · karta 0" pri každom, kto má tréning neskôr v ten deň.

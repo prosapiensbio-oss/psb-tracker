@@ -61,8 +61,8 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        (stránky /jerry/ a /terezia/ existujú, odkaz z /u/ vedie na profil
        toho, kto úvodný vedie; `ODKAZY.profilTrenera` v uvodnaStranka.ts).
 
-Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
-online z offline balíčka, Čechová/Gažo/Kalva-Martinek-Vaško).
+Rozhodnutia z 6. 10. sú zapracované (prenos mínusu, online/offline,
+Čechová/Gažo/Kalva-Martinek-Vaško) — viď 2c.
 
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
@@ -250,7 +250,14 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   Čaká na Jerryho: stiahnuť z PTmindera kompletný export za celé obdobie.
   Urobiť to treba TAK ČI TAK, kým PTminder beží — po vypnutí sú dáta preč.
 
-- **Tréningy pod balíčkom ignorujú DRUH sedenia.** Jerry, 28. 9. 2026:
+- [x] **6. 10. 2026 vyriešené:** Jerry — „Veronika chodí online a občas ide na
+  offline, ale to si platí ako samostatný tréning." Kúpená 1 h iného druhu
+  (ON/OFF z NÁZVU balíčka) počas platného členstva pokryje svoj tréning
+  a členstvo beží ďalej (`samostatne` v `priebehBalickov`); Marcela Hrůzová
+  24. 9. a 1. 10. má odvtedy 3 a 2 namiesto prázdneho riadku. Prísne „online
+  len z online" ZÁMERNE nie: Lucia Podolová má „ON - 6h" a tréningy vedené
+  ako offline — balíček by sa jej nemínal. Pôvodný text:
+  **Tréningy pod balíčkom ignorujú DRUH sedenia.** Jerry, 28. 9. 2026:
   „prečo má Veronika 2 tréningy na 1 hodinu?" Rozbalenie balíčka berie
   všetko, čo padne do jeho platnosti — Veronika Stoklasková má „OFF -
   1 hodina offline" (2. 9. – 29. 9.) a v tom okne dve sedenia: OFFLINE 2. 9.
@@ -315,7 +322,16 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   karta 0 správne. Gerich: karta 6 správne, 15 580 = členstvo + kredit vopred.
 - [x] **Šnirychová** (5. 10. 2026) — Janke zrušený duplicitný ručný „SPECIAL 3"
   z 22. 9. (Jerry odklepol); karta aj zoznam 2 h = PTminder (doplnenie 3 h).
-- [ ] **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
+- [x] **6. 10. 2026 prepočítané nad kópiou ostrej DB:** prenos mínusu zo
+  skončeného členstva NESEDÍ s PTminderom (Kouřil, Vopalenský, Kadličková,
+  Khamaziuk — 4 z 4 overiteľných dávajú o 1–3 h menej než PTminder aj karta;
+  Tsiolis by si stiahol 20 tréningov až z 11/2025). „Mínusy" v histórii sú
+  väčšinou artefakt delenia osi podľa dňa kúpy (Kadličková mala v členstve
+  6/30–8/24 presne 6 tréningov). Pre históriu teda ostáva vypnutý.
+  Dopredu (členstvo skončené v Kokpite) platí Jerryho logika: tréning po
+  konci platnosti a bez hodín je prvá hodina nového členstva, nezaplatené =
+  „6 h −1", balíček vznikne sám (Resnerová 6. 10. — predtým ticho).
+  Pôvodný text: **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
   proti vymysleným deficitom). Jerryho pravidlo z 28. 9. hovorí, že nový
   balíček mínus preberá — 13 klientov má skutočne pretrénované skončené
   členstvo (napr. Vaňková −1 tesne pred súčasným). Zapnúť späť sa dá, až
@@ -338,6 +354,11 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
 - [x] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
   5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
+- [ ] **Pre Jerryho: Jarek Heinrich** trénuje od 27. 7. bez platného členstva
+  (posledné 27. 4. – 21. 6., potom len doplnenia bez počtu hodín 23. 6.,
+  5. 9., 20. 9.). Tréningy 27. 7., 31. 8., 14. 9., 5. 10. sú na osi bez čísla
+  a automatický balíček zámerne nevznikne (história z PTmindera). Platba
+  7 790 z 24. 9. — za čo? Ak je to 6 h od 27. 7., stačí ho nahodiť ručne.
 - [x] **Jerry 6. 10. 2026 vysvetlil:** Kalva/Martinek/Vaško 8/8/7 h = presun
   nevychodených hodín do ďalšieho mesiaca (PTminder má pravdu); Čechová 5 h =
   odpočítaný nevychodený tréning po letnej pauze (správne); Gerich = nový
