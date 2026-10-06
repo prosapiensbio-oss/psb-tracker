@@ -2732,6 +2732,15 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
   (`poKonciHodin` — NAHRÁDZA zvyšok, nesčíta sa). Automatický balíček na
   rozhodnutie nečaká; `pridaj` doplnenia zruší neskorší automatický balíček
   a ďalšie otvorenie appky ho založí za doplnením.
+- **Doplnenie po konci platnosti = „2 h, 1 h · doplnenie", potom nový balíček
+  od 6 h** (`zDoplnenia`). Neskoro rozhodnuté doplnenie zruší automatický
+  balíček za koncom platnosti a obrazovka ho hneď založí znova. Prepadnutie
+  je značka `balicekDo.prepadlo` z vety odpovede („N h prepadlo") —
+  `prepadnuteHodiny` v klientOsCasu; keď sa zmení znenie odpovede v
+  KrokPlatnost, musí sa zmeniť aj tento regex.
+- **Staré obdobia z PTmindera sa nesúdia** (`vyrovnane`): tréning nad rámec
+  uzavretého členstva spred 1. 10. je „—", nie mínus (Jerry: „či to sedí
+  v marci, je irelevantné").
 - **Samostatná hodina iného druhu** (najviac 1 h, ON/OFF z NÁZVU balíčka)
   počas platného členstva pokryje svoj tréning a obdobie neotvára
   (`samostatne`). Druh tréningu rozhoduje len keď je známy; prísne „online

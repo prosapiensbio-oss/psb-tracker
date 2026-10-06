@@ -332,10 +332,12 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   kým nepadne rozhodnutie; balíček vzniká hneď a ide do mínusu. Rušenie
   a nové založenie automatického balíčka po doplnení Jerry odmietol
   („minulosť by som nemenil") — odstránené.
-  - [ ] **Otvorené: doplnenie rozhodnuté NESKORO** (po tréningoch po konci
-    platnosti, keď už automatický balíček stojí): Jerry chce, aby pri tých
-    tréningoch zmizol mínus a ostalo „6 h, 5 h" s poznámkou „doplnenie
-    členstva". Čaká na odpoveď, kam idú doplnené hodiny. Resnerová
+  - [x] **Doplnenie a prepadnutie na osi (6. 10. 2026, Jerry):** zvyšok 2 h
+    po konci platnosti → doplnenie: tréningy „2 h, 1 h · doplnenie", potom
+    nový balíček od 6 h (pri neskorom rozhodnutí sa automatický balíček zruší
+    a hneď založí za doplnením). Prepadnutie: v deň konca platnosti značka
+    „2 h, 1 h · prepadlo" bez tréningu (z odpovede v `anomaly_ack`). Značka
+    je v profile, klientovi na stránke/v maili sa nekreslí. Resnerová
   nemala čo presúvať — PTminder: 8 h, 8 tréningov 11. 8. – 1. 10.
   Dopredu (členstvo skončené v Kokpite) platí Jerryho logika: tréning po
   konci platnosti a bez hodín je prvá hodina nového členstva, nezaplatené =
