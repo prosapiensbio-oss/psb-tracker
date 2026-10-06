@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { dlhyKlienta } from "../../lib/psb/zaplatene";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
-import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
+import { cas24, hod, prepadnuteRad, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { vetaPrevzatych } from "../../lib/psb/mailKlientovi";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
@@ -244,12 +244,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
       doplneniaHodiny: data.doplneniaHodiny || {},
+      // Odpovede o konci platnosti — prepadnuté hodiny sú na osi značkou.
+      acks: data.anomalyAck,
       // Vlastná evidencia balíčkov: bez nej by sa po nahodení nového balíčka
       // na osi nezmenilo nič a odpočet by ostal stáť na vyčerpanom členstve.
       balicky: balicky as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti, data.anomalyAck, data.historiaBalickov, data.doplneniaHodiny],
   );
 
   /**
@@ -1993,7 +1995,7 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
     <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: C.textDim }}>
       {stav.dlh ? <b style={{ color: C.orange }} title="tréning na nezaplatenom členstve">−{stav.dlh}</b> : null}
       {stav.zostatok !== null ? (
-        <span style={{ marginLeft: stav.dlh ? 8 : 0, color: stav.zostatok <= 1 ? C.orange : C.textDim }}>{hod(stav.zostatok)} h</span>
+        <span style={{ marginLeft: stav.dlh ? 8 : 0, color: stav.zostatok <= 1 && !stav.zDoplnenia ? C.orange : C.textDim }} title={stav.zDoplnenia ? "doplnenie členstva — zvyšok hodín po konci platnosti" : undefined}>{hod(stav.zostatok)} h{stav.zDoplnenia ? " · doplnenie" : ""}</span>
       ) : stav.buduca != null ? (
         // Tá istá hodina, akú vidí klient za odkazom: čím sa tréning stane po zaplatení.
         <span style={{ marginLeft: 8, color: C.textDim }} title="hodina z ďalšieho balíčka, keď ho zaplatí">{hod(stav.buduca)} h</span>
@@ -2064,6 +2066,9 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
       )}
       </div>
     );
+  }
+  if (u.druh === "balicekDo" && u.prepadlo) {
+    return <div style={{ ...riadok, color: C.textDim }}><span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span><span style={{ flex: 1 }}>skončila platnosť</span><span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5 }} title="zvyšok hodín po konci platnosti prepadol — bez tréningu">{prepadnuteRad(u.prepadlo)} · prepadlo</span></div>;
   }
   if (u.druh === "balicekDo") {
     return <div style={{ ...riadok, color: C.textDim }}><span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span><span style={{ flex: 1 }}>skončila platnosť — {u.nazov}</span></div>;

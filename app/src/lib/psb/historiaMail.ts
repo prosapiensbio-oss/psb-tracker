@@ -136,6 +136,7 @@ export function historiaPreMail(
       prevzateDni: r.prevzateDni,
       buduca: r.buduca,
       vyrovnane: r.vyrovnane,
+      zDoplnenia: r.zDoplnenia,
     }));
   return {
     klient: meno,

@@ -273,7 +273,25 @@ export const Route = createFileRoute("/api/balicky")({
             return Response.json({ ok: true, id });
           }
           const { id, prenesene } = await zapisBalicek(DB, { klient, nazov, hodiny, od, doDna, cena, poznamka }, kto);
-          return Response.json({ ok: true, id, prenesene });
+          /**
+           * DOPLNENIE ROZHODNUTÉ NESKORO POSUNIE AUTOMATICKÝ BALÍČEK ZA SEBA.
+           *
+           * Jerry, 6. 10. 2026: po konci platnosti so zvyškom 2 h majú prvé dva
+           * tréningy ukázať „2 h, 1 h · doplnenie členstva" a nový balíček
+           * prirodzene pokračovať od 6 h. Keď automatický balíček už stojí
+           * (vznikol na tých tréningoch skôr, než padlo rozhodnutie), zruší sa
+           * a obrazovka hneď zavolá `automaticky` — vznikne od prvého tréningu,
+           * na ktorý doplnenie nestačí. Ručne nahodený balíček sa nehýbe.
+           */
+          let posunute = 0;
+          if (/doplnenie/i.test(nazov)) {
+            const r = await DB.prepare(
+              "UPDATE balicky SET zrusene_at = ?1 WHERE klient = ?2 AND zrusene_at IS NULL AND platnost_od > ?3 AND id <> ?4 AND poznamka LIKE 'automaticky%'",
+            ).bind(teraz(), klient, od, id).run();
+            posunute = r.meta?.changes || 0;
+            if (posunute) await audit(DB, { action: "balicek-zruseny", predmet: klient, neu: `${posunute}× automatický balíček po ${od} — prednosť má doplnenie, vznikne znova za ním`, actor: kto });
+          }
+          return Response.json({ ok: true, id, prenesene, posunute });
         }
 
         /**

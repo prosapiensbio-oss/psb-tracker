@@ -252,7 +252,8 @@ function cisloBodu(b: BodOsi): string {
    */
   // Staré obdobie z PTmindera: tréning nad rámec nie je mínus ani plus.
   if (b.vyrovnane) return `<span style="color:${s.tlmeny}">—</span>`;
-  return [minus, hodina].filter(Boolean).join(" ");
+  const doplnenie = b.zDoplnenia ? `<span style="color:${s.tlmeny};font-size:12px;font-weight:400">doplnění</span>` : "";
+  return [minus, hodina, doplnenie].filter(Boolean).join(" ");
 }
 
 const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));

@@ -73,6 +73,8 @@ export type BodOsi = {
   buduca?: number;
   /** Staré obdobie z PTmindera — tréning nad rámec sa nepočíta (pomlčka). */
   vyrovnane?: boolean;
+  /** Tréning pokrytý doplnením členstva (zvyšok hodín po konci platnosti). */
+  zDoplnenia?: boolean;
   /**
    * Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku.
    *
@@ -350,7 +352,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     v.uplna ? "Tréningy a platby:" : "Ako sa míňal balíček:",
     ...os.map((b) => {
       const cislo = b.druh !== "trening" ? "" : [
-        b.zostatok != null ? `${b.zostatok} h` : "",
+        b.zostatok != null ? `${b.zostatok} h${b.zDoplnenia ? " · doplnění" : ""}` : "",
         b.dlh ? `−${b.dlh}` : "",
       ].filter(Boolean).join(", ");
       const kedy = b.den ? `${denSK(b.den)}${b.cas ? ` · ${b.cas}` : ""} — ` : "";
@@ -382,7 +384,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     const posledna = i === os.length - 1;
     const velka = b.druh !== "trening";
     const cislo = b.druh !== "trening" ? "" : [
-      b.zostatok != null ? `<b>${b.zostatok} h</b>` : "",
+      b.zostatok != null ? `<b>${b.zostatok} h</b>${b.zDoplnenia ? ` <span style="color:${F.slaba}">doplnění</span>` : ""}` : "",
       b.dlh ? `<span style="color:${F.minus};font-weight:700">−${b.dlh}</span>` : "",
     ].filter(Boolean).join(" ");
     /**

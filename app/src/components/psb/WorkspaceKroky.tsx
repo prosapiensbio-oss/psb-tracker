@@ -597,6 +597,9 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
         platnostOd: x.platnostDo, cenaCzk: 0, poznamka: `nedočerpané hodiny z členstva do ${x.platnostDo}`,
       });
       if (!j.ok) { setBezi(""); setChyba(j.error || "Doplnenie sa nezapísalo."); return; }
+      // Automatický balíček, ktorý stál na tréningoch po konci platnosti,
+      // server zrušil — založí sa hneď znova, už za doplnenými hodinami.
+      if ((j as { posunute?: number }).posunute) await posli("/api/balicky", { akcia: "automaticky" });
     }
     if (presun > 0) {
       const j = await posli("/api/balicky", { akcia: "presun", klient: x.meno, hodiny: presun, zPlatnostiDo: x.platnostDo });

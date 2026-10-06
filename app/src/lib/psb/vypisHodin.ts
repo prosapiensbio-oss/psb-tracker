@@ -63,6 +63,8 @@ export type RiadokVypisu = {
   buduca?: number;
   /** Staré obdobie z PTmindera — tréning nad rámec sa nepočíta (`StavRiadku.vyrovnane`). */
   vyrovnane?: boolean;
+  /** Tréning po konci platnosti pokrytý doplnením členstva (`StavRiadku.zDoplnenia`). */
+  zDoplnenia?: boolean;
 };
 
 export type Vypis = {
@@ -133,10 +135,18 @@ const suma = (n: number): string => Math.round(n).toLocaleString("sk-SK").replac
 /** Hodiny bez zbytočnej nuly: 1 h, 1,5 h. */
 export const hod = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "").replace(".", ","));
 
+/** „2 h, 1 h" — prepadnuté hodiny ako zvyšok odpočtu, od najvyššej. */
+export const prepadnuteRad = (n: number): string => {
+  const out: string[] = [];
+  for (let x = n; x > 0; x -= 1) out.push(`${hod(Math.min(x, n))} h`);
+  return out.join(", ");
+};
+
 const METODY: Record<string, string> = { bank: "prevodom", cash: "v hotovosti", card: "kartou" };
 
 const popisZ = (u: Udalost): string => {
   if (u.druh === "balicekOd") return `${nazovProduktu(u.nazov)}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
+  if (u.druh === "balicekDo" && u.prepadlo) return `prepadlo ${prepadnuteRad(u.prepadlo)} — koniec platnosti`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   const zdarma = u.zdarma !== undefined ? ` · zdarma${u.zdarma ? ` (${u.zdarma})` : ""}` : "";
@@ -213,6 +223,12 @@ export type StavRiadku = {
    * v kalendári, v PTminderi nie), nie v klientovi.
    */
   vyrovnane?: boolean;
+  /**
+   * Tréning po konci platnosti, ktorý pokrylo doplnenie členstva (zvyšok
+   * hodín). Jerry, 6. 10. 2026: „ostali by 2 h a 1 h, tie sa označia ako
+   * doplnenie členstva, a potom sa prirodzene pokračuje na 6 h, 5 h."
+   */
+  zDoplnenia?: boolean;
 };
 
 /**
@@ -595,6 +611,7 @@ export function priebehBalickov(
       let dlh: number | null = null;
       let zostatok: number | null = null;
       let vyrovnane = false;
+      let zDoplnenia = false;
       if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)
         && !(koniecVKokpite && u.den >= b!.doDna!)) bezi = (bezi || 0) + u.hodin;
       /**
@@ -630,6 +647,7 @@ export function priebehBalickov(
         }
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null && !vycerpane) zostatok = bezi;
+        if (koniecVKokpite && u.den > b!.doDna! && !vycerpane) zDoplnenia = true;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
         if (bezi !== null && vycerpane) nekryte += 1;
         /**
@@ -682,6 +700,7 @@ export function priebehBalickov(
       stavy.set(u, {
         zostatok, dlh, usek: b?.den || "",
         vyrovnane: vyrovnane || undefined,
+        zDoplnenia: zDoplnenia || undefined,
         prevzate: u === b && usek.prevzate ? usek.prevzate : undefined,
         prevzateDni: u === b && usek.prevzate ? usek.prevzateDni : undefined,
       });
@@ -783,6 +802,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       prevzateDni: stav?.prevzateDni,
       buduca: stav?.buduca,
       vyrovnane: stav?.vyrovnane,
+      zDoplnenia: stav?.zDoplnenia,
     });
   }
 

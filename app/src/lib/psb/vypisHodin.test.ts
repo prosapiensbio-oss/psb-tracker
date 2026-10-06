@@ -755,3 +755,29 @@ describe("staré obdobie z PTmindera: tréning nad rámec nie je mínus ani plus
     expect(koniec).toBe(4);
   });
 });
+
+describe("koniec platnosti: doplnenie a prepadnutie na osi", () => {
+  it("doplnené hodiny sú 2 h, 1 h · doplnenie, potom nový balíček od 6 h", () => {
+    const os: Udalost[] = [
+      bal("2026-08-11", 6, { doDna: "2026-10-05" }), tre("2026-08-12"), tre("2026-08-19"), tre("2026-08-26"), tre("2026-09-02"),
+      { druh: "balicekOd", den: "2026-10-05", nazov: "Doplnenie členstva", hodin: 2, doplnenie: true, zKokpitu: true },
+      tre("2026-10-06"), tre("2026-10-08"),
+      bal("2026-10-13", 6, { doDna: "2026-12-07", zKokpitu: true }), tre("2026-10-13"),
+    ];
+    const { stavy } = priebehBalickov(os, null, "2026-10-14");
+    const st = (d: string) => [...stavy].find(([u]) => u.druh === "trening" && u.den === d)![1];
+    expect(st("2026-10-06")).toMatchObject({ zostatok: 2, dlh: null, zDoplnenia: true });
+    expect(st("2026-10-08")).toMatchObject({ zostatok: 1, zDoplnenia: true });
+    expect(st("2026-10-13").zostatok).toBe(6);
+    expect(st("2026-10-13").zDoplnenia).toBeUndefined();
+  });
+
+  it("prepadnuté hodiny sú značka v deň konca, nie tréning", () => {
+    const os = osCasuKlienta("Anna Test", {
+      sessions: [], payments: [], packages: [],
+      acks: { "platnost|Anna Test|2026-10-05": { note: "2 h prepadlo — platnosť do 2026-10-05" }, "platnost|Iný|2026-10-05": { note: "3 h prepadlo" } },
+    }, "2026-10-06");
+    expect(os).toEqual([{ druh: "balicekDo", den: "2026-10-05", nazov: "prepadnuté hodiny", hodin: 2, prepadlo: 2 }]);
+    expect(vypisHodin(os, "", "2026-10-06").riadky[0].popis).toBe("prepadlo 2 h, 1 h — koniec platnosti");
+  });
+});

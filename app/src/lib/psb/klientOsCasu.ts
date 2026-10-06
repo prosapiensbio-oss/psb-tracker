@@ -29,7 +29,7 @@ export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string; zKokpitu?: boolean }
   | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number; zdarma?: string }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean }
-  | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
+  | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean; prepadlo?: number };
 
 /**
  * DVA ROVNAKÉ BALÍČKY V JEDEN DEŇ — KOĽKO ICH NAOZAJ JE, POVIE KNIHA PREDAJOV.
@@ -196,6 +196,25 @@ export function zlucPlatby(
   ];
 }
 
+/**
+ * Koľko hodín prepadlo — z odpovede na otázku o konci platnosti. Veta má
+ * tvar „doplnenie 1 h, 1 h prepadlo — platnosť do 2026-10-05" (KrokPlatnost),
+ * staršie odpovede z registra „prepadlo".
+ */
+export function prepadnuteHodiny(meno: string, acks?: Record<string, { note?: string }>): { den: string; hodin: number }[] {
+  if (!acks) return [];
+  const k = normName(meno);
+  const out: { den: string; hodin: number }[] = [];
+  for (const [kluc, a] of Object.entries(acks)) {
+    const m = /^platnost\|(.+)\|(\d{4}-\d{2}-\d{2})$/.exec(kluc);
+    if (!m || normName(m[1]) !== k) continue;
+    const h = /(\d+(?:[.,]\d+)?)\s*h prepadl/.exec(a?.note || "");
+    const hodin = h ? Number(h[1].replace(",", ".")) : 0;
+    if (hodin > 0) out.push({ den: m[2], hodin });
+  }
+  return out;
+}
+
 export function osCasuKlienta(
   meno: string,
   zdroj: {
@@ -224,6 +243,13 @@ export function osCasuKlienta(
      * rozhodnutia. Preto sa na to Kokpit pýta — viď migráciu 0085.
      */
     doplneniaHodiny?: Record<string, number>;
+    /**
+     * Odpovede na „platnosť skončila a hodiny zostali" (`anomaly_ack`,
+     * kľúč `platnost|meno|deň`). Keď časť prepadla, os to ukáže značkou
+     * v deň konca platnosti — bez tréningu (Jerry, 6. 10. 2026: „2 h a 1 h
+     * by sa označili ako prepadlo, bolo by tam iba označenie").
+     */
+    acks?: Record<string, { note?: string }>;
   },
   dnes: string = dnesPraha(),
 ): Udalost[] {
@@ -350,6 +376,10 @@ export function osCasuKlienta(
     });
   }
 
+
+  for (const p of prepadnuteHodiny(meno, zdroj.acks)) {
+    if (p.den <= dnes) out.push({ druh: "balicekDo", den: p.den, nazov: "prepadnuté hodiny", hodin: p.hodin, prepadlo: p.hodin });
+  }
 
   for (const b of bezDuplicitBalickov(moje(zdroj.packages), zdroj.services)) {
     /**
