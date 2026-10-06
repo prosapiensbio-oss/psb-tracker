@@ -55,3 +55,27 @@ describe("nahradenieObdobia", () => {
     expect(nahradenieObdobia([], [vKokpite("2026-09-20", "9:00am", "A")], nicZamknute).odstranit).toEqual([]);
   });
 });
+
+describe("nahradenie pri službách (6. 10. 2026)", () => {
+  const k = (id: string, date: string, trener: string, kluc: string): RiadokVKokpite =>
+    ({ id, date, time: "", client_name: "X", session_trainer: trener, dedup_key: kluc });
+  it("opravený predaj zmizne, cudzí tréner a deň mimo súboru ostanú", () => {
+    const subor: RiadokVSubore[] = [
+      { date: "2026-09-02", sessionTrainer: "Jerry", kluc: "2026-09-02|Anna|6h nový popis" },
+      { date: "2026-09-20", sessionTrainer: "Jerry", kluc: "2026-09-20|Boris|Doplnenie" },
+    ];
+    const kokpit = [
+      k("1", "2026-09-02", "Jerry", "2026-09-02|Anna|6h starý popis"),
+      k("2", "2026-09-02", "Jerry", "2026-09-02|Anna|6h nový popis"),
+      k("3", "2026-09-05", "Terezka", "2026-09-05|Cyril|ONE YEAR"),
+      k("4", "2026-08-30", "Jerry", "2026-08-30|Dana|6h"),
+    ];
+    const v = nahradenieObdobia(subor, kokpit, () => false, "služieb");
+    expect(v.odstranit.map((x) => x.id)).toEqual(["1"]);
+  });
+  it("poistka hovorí o službách", () => {
+    const subor: RiadokVSubore[] = [{ date: "2026-09-01", sessionTrainer: "Jerry", kluc: "a" }, { date: "2026-09-30", sessionTrainer: "Jerry", kluc: "b" }];
+    const kokpit = Array.from({ length: 30 }, (_, i) => k(String(i), "2026-09-15", "Jerry", `x${i}`));
+    expect(nahradenieObdobia(subor, kokpit, () => false, "služieb").zastavene).toContain("služieb");
+  });
+});

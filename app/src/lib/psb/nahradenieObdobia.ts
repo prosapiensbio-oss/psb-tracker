@@ -46,6 +46,8 @@ export function nahradenieObdobia(
   subor: RiadokVSubore[],
   kokpit: RiadokVKokpite[],
   jeZamknuty: (isoDen: string) => boolean,
+  /** Čo sa nahrádza — do hlášky poistky („tréningov", „služieb"). */
+  coto = "tréningov",
 ): Nahradenie {
   if (!subor.length) return { odstranit: [], od: null, do: null };
   const dni = subor.map((r) => den(r.date)).filter(Boolean).sort();
@@ -65,7 +67,7 @@ export function nahradenieObdobia(
   if (odstranit.length > strop) {
     return {
       odstranit: [], od, do: do_,
-      zastavene: `import by zmazal ${odstranit.length} z ${vRozsahu.length} tréningov v tom období — to nie sú opravy, to vyzerá na iný tvar exportu. Nezmazal som nič.`,
+      zastavene: `import by zmazal ${odstranit.length} z ${vRozsahu.length} ${coto} v tom období — to nie sú opravy, to vyzerá na iný tvar exportu. Nezmazal som nič.`,
     };
   }
   return { odstranit, od, do: do_ };

@@ -182,7 +182,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - [x] Dan Kouřil 9. 7. (7 790 Kč) — zmazaný, platil len členstvo od 2. 7.
 - [ ] **SMS od „ProSapiens"** — Jerry chce. Objednať odosielateľa v SmsManageri
   (500 Kč + 500 Kč/mes.), po schválení zapísať „ProSapiens" v Údaje → SMS.
-- [ ] Import služieb stále len pridáva (oprava v PTminderi → zdvojený predaj).
+- [x] Import služieb nahrádza obdobie súboru (6. 10. 2026) — rovnaké poistky
+  ako tréningy (`nahradenieObdobia`): len dni a tréneri zo súboru, uzamknutý
+  mesiac nie, pri veľkom mazaní nič. Nanečisto na exporte z 3. 10.: 0 zmien.
 - [ ] Export Sessions s 28.–29. 9., keď ich Jerry dopíše.
 - [x] **Nahadzovanie tréningov do Google kalendára z Kokpitu** — hotové 29. 9.
   (servisný účet kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com,
@@ -352,13 +354,6 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   bolesti Jerry 24. 9. zrušil natrvalo — pozri „Zavreté").
 - **Google Ads „Basic"** — žiadosť podaná 14. 8. 2026, stále bez verdiktu.
   Dovtedy sa objem hľadania merať nedá a do appky sa odhady nepíšu.
-- **Kotva `#cenik` na webe** (od 3. 10. 2026) — odkaz „Celý ceník na webu"
-  pristane na obrazovke „Co je součástí vašeho balíčku", nie na cenách.
-  Kotva je o jednu obrazovku nižšie, než má byť (CENÍK je 02/07 v
-  `parts/sluzby.html` v téme psb-spready). Opraviť vo WordPresse — do
-  Kokpitu to nepatrí. Na stránke pred úvodným už ceny sú priamo, takže to
-  klienta nebrzdí.
-
 ## 4 · Odložené do vypnutia PTmindera
 
 - Na karte klienta nahradiť „zaplatil podľa PTmindera" **dvoma číslami vedľa
@@ -421,6 +416,13 @@ Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **Kotva `#cenik` na webe** — opravené 6. 10. 2026. Na menšom telefóne
+  (390×664) sa kapitola Ceník delí a jej prvá obrazovka je „Co je součástí
+  vašeho balíčku"; kotva bola na kapitole, preto pristála vedľa cien. Teraz je
+  na prvej cene (`<li id="cenik">` — zoznam sa pri delení kopíruje bez id,
+  položka sa presúva aj s ním). Overené na 5 rozmeroch, nahraté cez Editor
+  šablón (`parts/sluzby.html`), prototyp aj téma v repe opravené.
 
 - **„Odskok augusta" 18 072 → −26 154 Kč** (vyšetrené 6. 10. 2026) — mesiac sa
   nezmenil. Ranné číslo bolo z BETY, ktorá nemá kľúč k bitcoinovej appke,

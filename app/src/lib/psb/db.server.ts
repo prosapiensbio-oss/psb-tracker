@@ -466,6 +466,36 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       added++;
     }
     if (stmts.length) await DB.batch(stmts);
+
+    /**
+     * NAHRADENIE OBDOBIA AJ PRI SLUŽBÁCH (6. 10. 2026).
+     *
+     * Do toho dňa import služby len pridával. Kľúč je deň + klient + popis,
+     * takže predaj OPRAVENÝ v PTminderi (iný popis, iný deň) prišiel ako nový
+     * riadok a pôvodný ostal — v knihe predajov bol dvakrát a os času klienta
+     * mu otvárala dve členstvá. Export služieb je úplný obraz svojho obdobia,
+     * rovnako ako export tréningov: čo v ňom za tie dni (a toho trénera) nie
+     * je, zmizne. Poistky sú tie isté — uzamknutý mesiac sa nedotkne, cudzí
+     * tréner tiež a pri podozrivo veľkom mazaní sa nezmaže nič.
+     */
+    if (rows.length) {
+      const dni = rows.map((r) => String(r.date).slice(0, 10)).filter(Boolean).sort();
+      const vRozsahu = ((await DB.prepare(
+        "SELECT id, date, client_name, COALESCE(trainer, '') trainer, service_description, dedup_key FROM services WHERE substr(date,1,10) BETWEEN ?1 AND ?2",
+      ).bind(dni[0], dni[dni.length - 1]).all()).results as unknown as { id: string; date: string; client_name: string; trainer: string; service_description: string; dedup_key: string }[])
+        .map((x) => ({ id: x.id, date: x.date, time: "", client_name: x.client_name, session_trainer: x.trainer, dedup_key: x.dedup_key, popis: x.service_description }));
+      const n = nahradenieObdobia(
+        rows.map((r) => ({ date: r.date, sessionTrainer: r.trainer || "", kluc: serviceKey(r) })),
+        vRozsahu,
+        (d) => jeZamknuty(zamky, d),
+        "služieb",
+      );
+      odstraneneSedenia = n.odstranit.map((r) => `${String(r.date).slice(0, 10)} ${r.client_name} — ${(r as { popis?: string }).popis || ""}`);
+      nahradenieZastavene = n.zastavene || "";
+      for (let i = 0; i < n.odstranit.length; i += 50) {
+        await DB.batch(n.odstranit.slice(i, i + 50).map((r) => DB.prepare("DELETE FROM services WHERE id = ?1").bind(r.id)));
+      }
+    }
   } else if (type === "payments") {
     const rows = parsePayments(text);
     const existing = new Set(
