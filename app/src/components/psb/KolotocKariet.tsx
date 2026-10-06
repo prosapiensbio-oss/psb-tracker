@@ -67,9 +67,10 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
         const th = rel * krok;
         const vpredu = (Math.cos(th) + 1) / 2; // 1 vpredu, 0 vzadu
         const x = R * Math.sin(th);
-        const z = R * Math.cos(th) - R;
+        // Hĺbka stlačená na šestinu: plná by zadné názvy zmenšila na nečitateľné.
+        const z = (R * Math.cos(th) - R) * 0.16;
         const y = -(uzke ? 30 : 50) * (1 - vpredu);
-        b.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) scale(${0.78 + 0.32 * vpredu ** 2})`;
+        b.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) scale(${0.88 + 0.22 * vpredu ** 2})`;
         // Všetky názvy majú byť čitateľné (Jerry, 6. 10. 2026: „aby boli vidno
         // všetky možnosti") — hĺbku nesie veľkosť a výška, nie zmiznutie.
         b.style.opacity = String(0.55 + 0.45 * vpredu ** 2);
