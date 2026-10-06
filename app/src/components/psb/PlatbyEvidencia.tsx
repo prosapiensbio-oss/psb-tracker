@@ -58,14 +58,15 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   const [f, setF] = useState({ klient: "", datum: dnesPraha(), suma: "", poznamka: "", sposob: "hotovost" });
   const [peniazeOd, setPeniazeOd] = useState("");
   const [prepnutie, setPrepnutie] = useState<{ od: string; ok: boolean; dovody: string[] } | null>(null);
+  const [btcNes, setBtcNes] = useState<{ meno: string; datum: string; suma: number }[]>([]);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/platby", { credentials: "same-origin" });
-    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string; odMesiaca?: string; celkomNepriradenych?: number; peniazeOd?: string; prepnutie?: { od: string; ok: boolean; dovody: string[] } };
+    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string; odMesiaca?: string; celkomNepriradenych?: number; peniazeOd?: string; prepnutie?: { od: string; ok: boolean; dovody: string[] }; btcNesparovane?: { meno: string; datum: string; suma: number }[] };
     if (j.ok) {
       setPlatby(j.platby || []); setNepriradene(j.nepriradene || []); setP(j.porovnanie || null);
       setPoExport(j.poExport || ""); setOdMesiaca(j.odMesiaca || ""); setCelkom(j.celkomNepriradenych ?? (j.nepriradene || []).length);
-      setPeniazeOd(j.peniazeOd || ""); setPrepnutie(j.prepnutie || null);
+      setPeniazeOd(j.peniazeOd || ""); setPrepnutie(j.prepnutie || null); setBtcNes(j.btcNesparovane || []);
     }
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -124,6 +125,13 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
           </>
         )}
       </div>
+
+      {btcNes.length > 0 && (
+        <div style={{ fontSize: 12, lineHeight: 1.55, margin: "0 0 12px", color: C.orange }}>
+          V BTC knihe {btcNes.length === 1 ? "je platba" : `sú ${btcNes.length} platby`}, ku {btcNes.length === 1 ? "ktorej" : "ktorým"} Kokpit nenašiel klienta — zapíš {btcNes.length === 1 ? "ju" : "ich"} nižšie so spôsobom „bitcoin":
+          {btcNes.map((x) => <div key={`${x.meno}|${x.datum}`} style={{ color: C.textMuted, marginLeft: 10 }}>• {x.meno} · {denKratko(x.datum)} · {kc(x.suma)}</div>)}
+        </div>
+      )}
 
       {p && p.mesiace.length > 0 && (
         <>

@@ -258,6 +258,7 @@ async function stavPlatieb(DB: D1Database) {
     (ceny.results || []) as unknown as CenaBalicka[],
   );
   const celkomNepriradenych = vsetkyNepriradene.length;
+  const btcNes = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'btc_nesparovane'").first().catch(() => null);
 
   const porovnanie = porovnajPlatby(
     platby.map(naPlatbu),
@@ -278,6 +279,10 @@ async function stavPlatieb(DB: D1Database) {
      */
     peniazeOd: String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, ""),
     prepnutie: { od: odMesiaca, ...mozePrepnut(odMesiaca, porovnanie.mesiace, vsetkyNepriradene.filter((x) => x.klientsky)) },
+    /** BTC platby, ktorých klienta import nespoznal — treba ich zapísať ručne. */
+    btcNesparovane: (() => {
+      try { return JSON.parse(String((btcNes as { value?: string } | null)?.value || "[]")) as { meno: string; datum: string; suma: number }[]; } catch { return []; }
+    })(),
     poExport,
     odMesiaca,
     celkomNepriradenych,
@@ -549,6 +554,10 @@ export const Route = createFileRoute("/api/platby")({
             nove += r.meta?.changes || 0;
           }
           if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
+          // Nespoznané mená sa ODLOŽIA — inak by ticho chýbali v tržbách a
+          // nikto by sa to nedozvedel. Karta Platieb ich ukáže (GET).
+          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('btc_nesparovane',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(JSON.stringify(nesparovane.slice(0, 50))).run();
           return Response.json({ ok: true, nove, nesparovane });
         }
 
