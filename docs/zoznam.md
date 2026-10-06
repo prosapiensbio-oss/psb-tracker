@@ -33,8 +33,9 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 3. [x] **Platby z Kokpitu na osi času klienta a v maili s históriou** —
        hotové 5. 10. 2026 (`zlucPlatby`, `data.platbyKokpit`).
        Platby len v Kokpite vyriešené 5. 10. 2026 s Jerrym: 56 000 Kč (zošit
-       „Jarek“) patrí Jaroslavovi Broskvovi, nie Heinrichovi (PTminder má
-       54 600 hotovosť — rozdiel 1 400 ostáva); Heinrich 24. 9. = 7 790 (Terka
+       „Jarek“) patrí Jaroslavovi Broskvovi, nie Heinrichovi. Jerry 6. 10.:
+       priniesol 56 000, 1 400 mu vrátili o pár dní (nebolo vydať) — platba
+       opravená na 54 600 = PTminder. Vrátenie 1 400 v zošite NIE JE; Heinrich 24. 9. = 7 790 (Terka
        poslala 5 390, 2 400 si nechala); Miřejovský 752 zrušené; Dvořák 1 100
        za tréning 16. 9. platí (mama), balíček 6 h je preventívny a nezaplatený.
        Opravené v kóde: pravidlo platiteľa sa učí len z priezviska, zápis zo
@@ -112,8 +113,8 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 - [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
 - [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. (Platby z Kokpitu
   na osi času a v maili sú od 5. 10. 2026 — `zlucPlatby`.)
-- [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
-  čo začalo. ±1 h do konca dňa.
+- [x] **Os času a „dnes"** — 6. 10. 2026: profil, os pri karte aj mínus
+  v zozname dlžníkov berú len tréningy, ktoré už začali (`terazPraha`), ako karta.
 
 ## 0c · Anamnéza v Kokpite (Jerry, 30. 9. 2026)
 
@@ -180,8 +181,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   pravda**, čo v ňom nie je, sa nekonalo (Jerry, 29. 9.). 38 sporných uzavretých
   ako „neprišiel"; 5 z Jerryho kalendára (jan.–jún) sa nezapisuje.
 - [x] Dan Kouřil 9. 7. (7 790 Kč) — zmazaný, platil len členstvo od 2. 7.
-- [ ] **SMS od „ProSapiens"** — Jerry chce. Objednať odosielateľa v SmsManageri
-  (500 Kč + 500 Kč/mes.), po schválení zapísať „ProSapiens" v Údaje → SMS.
+- [x] ~~**SMS od „ProSapiens"**~~ — Jerry 6. 10. 2026: nebude to robiť. Zrušené.
 - [x] Import služieb nahrádza obdobie súboru (6. 10. 2026) — rovnaké poistky
   ako tréningy (`nahradenieObdobia`): len dni a tréneri zo súboru, uzamknutý
   mesiac nie, pri veľkom mazaní nič. Nanečisto na exporte z 3. 10.: 0 zmien.
@@ -191,8 +191,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   secret GCAL_SA_KLUC; stôl klienta → všetko → „+ Nahodiť tréning do kalendára").
   Overené naostro: AATest 30. 9. 10:00 je v Google aj v kal_udalosti.
 - [x] **Terezkin kalendár je zdieľaný** — presun tréningu Terezke funguje (5. 10. 2026).
-- [ ] Jerry: zmazať súbor kľúča ~/Downloads/evident-catcher-510117-k6-c9f048e10703.json
-  (v appke už je ako secret, na disku ho netreba).
+- [x] Súbor kľúča evident-catcher-…json — 6. 10. 2026 už na disku nie je
+  (ani v koši); secret GCAL_SA_KLUC vo workeri je.
 - [x] Zrušenie tréningu z Kokpitu — tlačidlo „Vymazať" s potvrdením je v okne udalosti v Kalendári.
 
 ## 1 · Čaká na Jerryho slovo

@@ -3,6 +3,7 @@ import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 
 import { jeBeta } from "../../lib/psb/beta";
 import { osCasuKlienta, treningovVBalicku, type Udalost } from "../../lib/psb/klientOsCasu";
+import { terazPraha } from "../../lib/psb/cas";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -39,7 +40,7 @@ export function KlientOsCasu({ meno, data, kalUdalosti }: {
       nezaplateneKokpit: data.nezaplateneKokpit || [],
       bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit,
       kalUdalosti,
-    }),
+    }, terazPraha()),
     [meno, data.sessions, data.payments, data.packages, data.historiaBalickov, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, kalUdalosti],
   );
 

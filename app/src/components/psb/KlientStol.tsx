@@ -250,7 +250,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // na osi nezmenilo nič a odpočet by ostal stáť na vyčerpanom členstve.
       balicky: balicky as never,
       kalUdalosti,
-    }) : []),
+      // Po TERAZ, nie po celý deň — karta ráta len tréningy, ktoré už začali,
+      // a os s ňou musí sedieť aj ráno pred večerným tréningom (6. 10. 2026).
+    }, terazPraha()) : []),
     [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti, data.anomalyAck, data.historiaBalickov, data.doplneniaHodiny],
   );
 

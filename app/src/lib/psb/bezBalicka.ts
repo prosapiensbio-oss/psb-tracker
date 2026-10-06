@@ -25,7 +25,7 @@ import { jeAktivny, odtrenovane, type Balicek } from "./balickyEvidencia";
 import { osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
 import { normName } from "./format";
-import { dnesPraha } from "./cas";
+import { dnesPraha, terazPraha } from "./cas";
 
 /** Len to, čo z karty klienta naozaj potrebujeme. */
 export type KlientPreKartu = {
@@ -134,7 +134,9 @@ export function vMinuseKlienta(
   zostatokTeraz: number | null,
   dnes: string = dnesPraha(),
 ): number {
-  const os = osCasuKlienta(meno, zdroj, dnes);
+  // Dnes len tréningy, ktoré už začali — ako karta. Ráno by inak večerný
+  // tréning svietil ako −1, kým karta hovorí 0 (6. 10. 2026).
+  const os = osCasuKlienta(meno, zdroj, dnes === dnesPraha() ? terazPraha() : dnes);
   const { stavy } = priebehBalickov(os, zostatokTeraz, dnes);
   for (const u of os) {
     if (u.druh !== "trening") continue;
