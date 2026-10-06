@@ -1088,6 +1088,12 @@ export function buildAiContext(
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     kalendar: kalendarBlok,
     subeznyChod: subeznyChodBlok,
+    // Odkiaľ sú tržby (`spojPlatby`): bez toho by Jarvis rozdiel medzi
+    // mesiacmi vysvetľoval biznisom, hoci sa zmenil zdroj.
+    zdrojPenazi: {
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Tržby, grafy aj príjem v P&L berú platby pred mesiacom „od“ z exportu PTmindera, od neho z vlastnej evidencie Kokpitu (banka z Fio, hotovosť zo zošita, bitcoin ručne). Keď je „od“ prázdne, všetko je ešte z PTmindera. Rozdiel medzi mesiacmi na hranici môže byť zdrojom, nie biznisom.",
+      od: data.peniazeOd || null,
+    },
     uzavierka: uzavierka
       ? {
           poznamka: "Kroky mesačnej uzávierky pre posledný plný mesiac — to, čo appka od Jerryho ešte chce, aby sa mesiac dal ZAMKNÚŤ. „prekazky“ je hotový zoznam viet; keď je prázdny, mesiac sa dá zamknúť. Neodvodzuj to z registra ani z dát, appka to má spočítané. Obrazovka: Workspace → Uzávierka mesiaca.",

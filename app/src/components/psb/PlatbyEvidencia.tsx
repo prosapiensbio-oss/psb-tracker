@@ -55,14 +55,17 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   const [pracujem, setPracujem] = useState("");
   const [chyba, setChyba] = useState("");
   const [pisem, setPisem] = useState(false);
-  const [f, setF] = useState({ klient: "", datum: dnesPraha(), suma: "", poznamka: "" });
+  const [f, setF] = useState({ klient: "", datum: dnesPraha(), suma: "", poznamka: "", sposob: "hotovost" });
+  const [peniazeOd, setPeniazeOd] = useState("");
+  const [prepnutie, setPrepnutie] = useState<{ od: string; ok: boolean; dovody: string[] } | null>(null);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/platby", { credentials: "same-origin" });
-    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string; odMesiaca?: string; celkomNepriradenych?: number };
+    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string; odMesiaca?: string; celkomNepriradenych?: number; peniazeOd?: string; prepnutie?: { od: string; ok: boolean; dovody: string[] } };
     if (j.ok) {
       setPlatby(j.platby || []); setNepriradene(j.nepriradene || []); setP(j.porovnanie || null);
       setPoExport(j.poExport || ""); setOdMesiaca(j.odMesiaca || ""); setCelkom(j.celkomNepriradenych ?? (j.nepriradene || []).length);
+      setPeniazeOd(j.peniazeOd || ""); setPrepnutie(j.prepnutie || null);
     }
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -89,6 +92,38 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
           label={`Platby — vlastná evidencia${celkom ? ` (${celkom} čaká)` : ""}`}
         />
       </H3>
+
+      {/* ODKIAĽ BERÚ PENIAZE GRAFY (peniazeZKokpitu.ts). Tlačidlo sa ukáže,
+          až keď mesiac sedí — a aj tak rozhoduje server. Dovtedy karta
+          povie, čo chýba, číslom; „nesedí" bez čísla sa nedá opraviť. */}
+      <div style={{ fontSize: 12.5, lineHeight: 1.55, margin: "2px 0 12px", padding: "8px 10px", borderRadius: 8, background: mix(peniazeOd ? C.green : C.border, 14) }}>
+        {peniazeOd ? (
+          <>
+            <b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b>{" "}
+            Staršie mesiace z PTmindera; ten zostáva vedľa ako kontrola.{" "}
+            <button disabled={!!pracujem} onClick={() => void akcia({ akcia: "peniaze-od", mesiac: "" }, "peniaze")}
+              style={{ marginLeft: 6, fontSize: 11.5, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 8px", color: C.textMuted, cursor: "pointer" }}>
+              vrátiť na PTminder
+            </button>
+          </>
+        ) : prepnutie?.ok ? (
+          <>
+            <b>{mesiacKratko(prepnutie.od)} sedí s PTminderom.</b> Tržby a grafy môžu odteraz brať platby z Kokpitu.{" "}
+            <button disabled={!!pracujem} onClick={() => void akcia({ akcia: "peniaze-od", mesiac: prepnutie.od }, "peniaze")}
+              style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, background: C.green, color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+              {pracujem === "peniaze" ? "…" : `Prepnúť peniaze na Kokpit od ${mesiacKratko(prepnutie.od)}`}
+            </button>
+          </>
+        ) : (
+          <>
+            <b>Tržby a grafy berú zatiaľ platby z PTmindera.</b> Na Kokpit sa prepnú od {prepnutie ? mesiacKratko(prepnutie.od) : "zvoleného mesiaca"}, keď bude sedieť:
+            {(prepnutie?.dovody || []).map((d) => <div key={d} style={{ color: C.textMuted, marginLeft: 10 }}>• {d}</div>)}
+            <div style={{ color: C.textDim, marginTop: 4 }}>
+              Čo chýba býva hotovosť zo zošita (formulár nižšie), bitcoin (zapíš ako platbu so spôsobom „bitcoin") a príjmy z banky na priradenie.
+            </div>
+          </>
+        )}
+      </div>
 
       {p && p.mesiace.length > 0 && (
         <>
@@ -240,7 +275,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
           onClick={() => setPisem(!pisem)}
           style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accentLight, 45)}`, background: "transparent", color: C.accentLight }}
         >
-          {pisem ? "Zavrieť" : "Zapísať hotovosť zo zošita"}
+          {pisem ? "Zavrieť" : "Zapísať platbu mimo banky (zošit, bitcoin)"}
         </button>
       </div>
       {pisem && (
@@ -261,6 +296,18 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
               />
             </label>
           ))}
+          {/* Spôsob: od prepnutia peňazí na Kokpit je to jediná cesta, ako sa
+              do tržieb dostane bitcoin a platba z cudzieho účtu (Revolut). */}
+          <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: C.textDim }}>
+            spôsob
+            <select value={f.sposob} onChange={(e) => setF({ ...f, sposob: e.target.value })}
+              style={{ padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}>
+              <option value="hotovost">hotovosť</option>
+              <option value="bitcoin">bitcoin</option>
+              <option value="prevod">prevod z iného účtu</option>
+              <option value="ine">iné</option>
+            </select>
+          </label>
           <button
             onClick={async () => { if (await akcia({ akcia: "hotovost", ...f }, "hotovost")) { setF({ ...f, klient: "", suma: "", poznamka: "" }); } }}
             disabled={pracujem === "hotovost"}

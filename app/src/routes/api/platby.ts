@@ -12,6 +12,7 @@ import {
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
+import { mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -171,6 +172,117 @@ async function zapisDiely(
 /** Ručné spôsoby platby. Fio si svoje riadky značí samo cez fio_id. */
 const SPOSOBY = ["hotovost", "prevod", "bitcoin", "ine"];
 
+/** Stav vlastnej evidencie platieb — to isté pre GET aj pre bránu prepnutia peňazí. */
+async function stavPlatieb(DB: D1Database) {
+  const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty, polozky, ceny] = await DB.batch([
+    DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at, vopred, created_at FROM platby ORDER BY datum DESC"),
+    DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
+    DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
+    DB.prepare("SELECT fio_id FROM platba_nie_klient"),
+    DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')"),
+    DB.prepare("SELECT client_name, date, amount_czk, payment_method FROM payments"),
+    DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
+    // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
+    // Číslo faktúry chodí ako variabilný symbol; firma je fakturačný
+    // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
+    DB.prepare("SELECT id, cislo, klient, ks, cena_czk FROM vydane_faktury WHERE storno_at IS NULL"),
+    DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
+    // Faktúry vystavené v iDoklade. Číslo dokladu stojí v texte prevodu
+    // („20260037 MGR. FILIP STRANAVSKY") a je to variabilný symbol —
+    // najtvrdší dôkaz, aký v tom texte býva. Meno na faktúre je ale
+    // firma, takže sa prekladá cez spárované fakturačné kontakty.
+    DB.prepare("SELECT cislo, nazov FROM idoklad_faktury"),
+    DB.prepare("SELECT firma, klient FROM fakturacne_kontakty WHERE klient IS NOT NULL AND klient <> ''"),
+    // Faktúra za viacerých klientov — podľa položiek sa platba rozdelí.
+    DB.prepare("SELECT faktura_id, klient, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie"),
+    // Ceny balíčkov — spoločný prevod, keď PTminder už nepíše.
+    // + história členstiev z PTmindera: balíčky v Kokpite začínajú
+    // až jeseňou 2026, staršie ceny sú len tam.
+    DB.prepare(`SELECT klient, platnost_od od, cena_czk cena FROM balicky WHERE zrusene_at IS NULL AND cena_czk > 0
+                UNION ALL SELECT klient, od, platba cena FROM ptminder_historia WHERE platba > 0`),
+  ]);
+
+  const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
+  const mapovanie: Record<string, string> = {};
+  for (const m of ((mapa.results || []) as unknown as { vzor: string; klient: string }[])) mapovanie[m.vzor] = m.klient;
+  const poExport = String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || dnesPraha());
+
+  /**
+   * Odkedy sa porovnáva — a prečo to nie je „odjakživa".
+   *
+   * Bankové platby sa dajú doplniť spätne z výpisu, HOTOVOSŤ nie:
+   * tá je v zošite a nikto ju rok dozadu prepisovať nebude. V starších
+   * mesiacoch by teda rozdiel ukazoval chýbajúcu hotovosť, nie chybu —
+   * a cieľ „rozdiel nula" by bol nedosiahnuteľný. Súbežný chod preto
+   * začína mesiacom, ktorý si Jerry zvolí (`platby_od`); staršie
+   * bankové platby v evidencii zostávajú, len sa nesúdia.
+   */
+  const odMesiaca = String(
+    (await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>())?.value || "",
+  ).replace(/"/g, "") || dnesPraha().slice(0, 7);
+
+  const ptPlatby = ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
+    .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method }));
+  /**
+   * Faktúra z iDokladu → klient. Meno na doklade býva firma
+   * („FSH Devices s.r.o."), preto cez spárované kontakty; keď je
+   * vystavená priamo na človeka, hľadá sa medzi klientmi.
+   */
+  const menaKlientov = ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name);
+  const podlaFirmy = new Map<string, string>();
+  for (const k of ((kontakty.results || []) as unknown as { firma: string; klient: string }[])) {
+    podlaFirmy.set(normName(k.firma), k.klient);
+  }
+  const zIdokladu = ((idoklad.results || []) as unknown as { cislo: string; nazov: string }[])
+    .map((f) => ({
+      cislo: f.cislo,
+      klient: podlaFirmy.get(normName(f.nazov))
+        || menaKlientov.find((m) => normName(m) === normName(f.nazov))
+        || "",
+    }))
+    .filter((f) => f.klient);
+
+  const vsetkyNepriradene = nepriradene(
+    (fio.results || []) as unknown as FioRiadok[],
+    platby.map(naPlatbu),
+    mapovanie,
+    new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
+    menaKlientov,
+    ptPlatby,
+    [...fakturyKokpitu(
+      (faktury.results || []) as unknown as FakturaRiadok[],
+      (polozky.results || []) as unknown as PolozkaRiadok[],
+    ), ...zIdokladu],
+    ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
+    (ceny.results || []) as unknown as CenaBalicka[],
+  );
+  const celkomNepriradenych = vsetkyNepriradene.length;
+
+  const porovnanie = porovnajPlatby(
+    platby.map(naPlatbu),
+    ptPlatby,
+    poExport,
+    odMesiaca,
+  );
+  return {
+    ok: true as const,
+    platby,
+    nepriradene: vsetkyNepriradene.slice(0, 120),
+    porovnanie,
+    /**
+     * Peniaze z Kokpitu (`peniazeZKokpitu.ts`): od ktorého mesiaca už
+     * platia a či sa smú prepnúť od začiatku súbežného chodu. Brána
+     * počíta len príjmy, ktoré vyzerajú na platbu klienta — vrátka
+     * z obchodu prepnutiu nebráni.
+     */
+    peniazeOd: String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, ""),
+    prepnutie: { od: odMesiaca, ...mozePrepnut(odMesiaca, porovnanie.mesiace, vsetkyNepriradene.filter((x) => x.klientsky)) },
+    poExport,
+    odMesiaca,
+    celkomNepriradenych,
+  };
+}
+
 export const Route = createFileRoute("/api/platby")({
   server: {
     handlers: {
@@ -195,104 +307,7 @@ export const Route = createFileRoute("/api/platby")({
           return Response.json({ ok: true, platby: r.results || [] });
         }
 
-        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty, polozky, ceny] = await DB.batch([
-          DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at, vopred, created_at FROM platby ORDER BY datum DESC"),
-          DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
-          DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
-          DB.prepare("SELECT fio_id FROM platba_nie_klient"),
-          DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')"),
-          DB.prepare("SELECT client_name, date, amount_czk, payment_method FROM payments"),
-          DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
-          // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
-          // Číslo faktúry chodí ako variabilný symbol; firma je fakturačný
-          // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
-          DB.prepare("SELECT id, cislo, klient, ks, cena_czk FROM vydane_faktury WHERE storno_at IS NULL"),
-          DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
-          // Faktúry vystavené v iDoklade. Číslo dokladu stojí v texte prevodu
-          // („20260037 MGR. FILIP STRANAVSKY") a je to variabilný symbol —
-          // najtvrdší dôkaz, aký v tom texte býva. Meno na faktúre je ale
-          // firma, takže sa prekladá cez spárované fakturačné kontakty.
-          DB.prepare("SELECT cislo, nazov FROM idoklad_faktury"),
-          DB.prepare("SELECT firma, klient FROM fakturacne_kontakty WHERE klient IS NOT NULL AND klient <> ''"),
-          // Faktúra za viacerých klientov — podľa položiek sa platba rozdelí.
-          DB.prepare("SELECT faktura_id, klient, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie"),
-          // Ceny balíčkov — spoločný prevod, keď PTminder už nepíše.
-          // + história členstiev z PTmindera: balíčky v Kokpite začínajú
-          // až jeseňou 2026, staršie ceny sú len tam.
-          DB.prepare(`SELECT klient, platnost_od od, cena_czk cena FROM balicky WHERE zrusene_at IS NULL AND cena_czk > 0
-                      UNION ALL SELECT klient, od, platba cena FROM ptminder_historia WHERE platba > 0`),
-        ]);
-
-        const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
-        const mapovanie: Record<string, string> = {};
-        for (const m of ((mapa.results || []) as unknown as { vzor: string; klient: string }[])) mapovanie[m.vzor] = m.klient;
-        const poExport = String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || dnesPraha());
-
-        /**
-         * Odkedy sa porovnáva — a prečo to nie je „odjakživa".
-         *
-         * Bankové platby sa dajú doplniť spätne z výpisu, HOTOVOSŤ nie:
-         * tá je v zošite a nikto ju rok dozadu prepisovať nebude. V starších
-         * mesiacoch by teda rozdiel ukazoval chýbajúcu hotovosť, nie chybu —
-         * a cieľ „rozdiel nula" by bol nedosiahnuteľný. Súbežný chod preto
-         * začína mesiacom, ktorý si Jerry zvolí (`platby_od`); staršie
-         * bankové platby v evidencii zostávajú, len sa nesúdia.
-         */
-        const odMesiaca = String(
-          (await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>())?.value || "",
-        ).replace(/"/g, "") || dnesPraha().slice(0, 7);
-
-        const ptPlatby = ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
-          .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method }));
-        /**
-         * Faktúra z iDokladu → klient. Meno na doklade býva firma
-         * („FSH Devices s.r.o."), preto cez spárované kontakty; keď je
-         * vystavená priamo na človeka, hľadá sa medzi klientmi.
-         */
-        const menaKlientov = ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name);
-        const podlaFirmy = new Map<string, string>();
-        for (const k of ((kontakty.results || []) as unknown as { firma: string; klient: string }[])) {
-          podlaFirmy.set(normName(k.firma), k.klient);
-        }
-        const zIdokladu = ((idoklad.results || []) as unknown as { cislo: string; nazov: string }[])
-          .map((f) => ({
-            cislo: f.cislo,
-            klient: podlaFirmy.get(normName(f.nazov))
-              || menaKlientov.find((m) => normName(m) === normName(f.nazov))
-              || "",
-          }))
-          .filter((f) => f.klient);
-
-        const vsetkyNepriradene = nepriradene(
-          (fio.results || []) as unknown as FioRiadok[],
-          platby.map(naPlatbu),
-          mapovanie,
-          new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
-          menaKlientov,
-          ptPlatby,
-          [...fakturyKokpitu(
-            (faktury.results || []) as unknown as FakturaRiadok[],
-            (polozky.results || []) as unknown as PolozkaRiadok[],
-          ), ...zIdokladu],
-          ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
-          (ceny.results || []) as unknown as CenaBalicka[],
-        );
-        const celkomNepriradenych = vsetkyNepriradene.length;
-
-        return Response.json({
-          ok: true,
-          platby,
-          nepriradene: vsetkyNepriradene.slice(0, 120),
-          porovnanie: porovnajPlatby(
-            platby.map(naPlatbu),
-            ptPlatby,
-            poExport,
-            odMesiaca,
-          ),
-          poExport,
-          odMesiaca,
-          celkomNepriradenych,
-        });
+        return Response.json(await stavPlatieb(DB));
       },
 
       POST: async ({ request }) => {
@@ -503,6 +518,29 @@ export const Route = createFileRoute("/api/platby")({
           if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });
           await DB.prepare("UPDATE platby SET zrusene_at = ? WHERE id = ?").bind(akcia === "zrus" ? teraz() : null, id).run();
           await audit(DB, { action: akcia === "zrus" ? "platba-zrusena" : "platba-vratena", predmet: id, actor: kto });
+          return Response.json({ ok: true });
+        }
+
+        /**
+         * PENIAZE Z KOKPITU OD MESIACA — alebo späť na PTminder (prázdny mesiac).
+         *
+         * Prepnúť sa dá len od mesiaca, od ktorého sa súbežný chod súdi, a len
+         * keď brána (`mozePrepnut`) pustí: rozhoduje server, nie tlačidlo —
+         * obrazovka mohla byť načítaná pred hodinou. Späť sa dá vždy.
+         */
+        if (akcia === "peniaze-od") {
+          const m = String(b.mesiac || "").slice(0, 7);
+          if (!m) {
+            await DB.prepare("DELETE FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).run();
+            await audit(DB, { action: "peniaze-z-ptmindera", predmet: "", actor: kto });
+            return Response.json({ ok: true });
+          }
+          const stav = await stavPlatieb(DB);
+          if (m !== stav.prepnutie.od) return Response.json({ ok: false, error: `Prepnúť sa dá od ${stav.prepnutie.od} — od toho mesiaca sa súbežný chod porovnáva.` }, { status: 400 });
+          if (!stav.prepnutie.ok) return Response.json({ ok: false, error: `Ešte nesedí: ${stav.prepnutie.dovody.join(" · ")}` }, { status: 409 });
+          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(PENIAZE_KLUC, JSON.stringify(m)).run();
+          await audit(DB, { action: "peniaze-z-kokpitu", predmet: m, actor: kto });
           return Response.json({ ok: true });
         }
 

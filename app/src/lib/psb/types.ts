@@ -225,6 +225,14 @@ export type PSBData = {
    */
   sessionsPtminder?: SessionRow[];
   /**
+   * Platby z exportu PTmindera, CELÉ — len na kontrolu (bitcoin proti PTminderu,
+   * porovnanie v Prechode). Pre tržby platí `payments`, ktoré sú od
+   * `peniazeOd` z vlastnej evidencie (`spojPlatby`).
+   */
+  paymentsPtminder?: PaymentRow[];
+  /** Mesiac RRRR-MM, od ktorého sú peniaze z Kokpitu. Prázdne = všetko z PTmindera. */
+  peniazeOd?: string;
+  /**
    * Balíčky zapísané v Kokpite (vrátane naliatych z PTmindera). Od 1. 10.
    * 2026 sa z nich počíta zostatok na karte klienta (`zostatokKokpitu`).
    */

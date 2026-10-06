@@ -26,6 +26,7 @@ import type { ClientOverride, PSBData, SessionRow } from "./types";
 import { EMPTY_DATA } from "./types";
 import { oblastiZJson } from "./pocitovka";
 import { dnesPraha } from "./cas";
+import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
 const uid = () => crypto.randomUUID();
 
@@ -331,6 +332,23 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         .filter((r) => !r.zrusene_at)
         .map((r) => ({ klient: String(r.klient), datum: String(r.datum || "").slice(0, 10), suma: Number(r.suma_czk) || 0, sposob: String(r.sposob || "") }));
       data.dlhy = polozky;
+      /**
+       * PENIAZE: PRED ZVOLENÝM MESIACOM PTMINDER, OD NEHO KOKPIT.
+       *
+       * Ten istý vzor ako dochádzka (`spojDochadzku`). Tržby, grafy aj príjem
+       * v P&L čítajú `data.payments`; export PTmindera ostáva celý
+       * v `paymentsPtminder` na kontrolu. Mesiac sa volí v Prechode až keď
+       * sedí (`mozePrepnut`) — bez neho sa nemení nič.
+       */
+      const peniazeOd = String(
+        (await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>().catch(() => null))?.value || "",
+      ).replace(/"/g, "");
+      data.peniazeOd = /^\d{4}-\d{2}$/.test(peniazeOd) ? peniazeOd : "";
+      data.paymentsPtminder = data.payments;
+      data.payments = spojPlatby(data.payments, (vlastnePlatby.results as any[]).map((r) => ({
+        klient: String(r.klient || ""), datum: String(r.datum || ""), suma: Number(r.suma_czk) || 0,
+        sposob: String(r.sposob || ""), zruseneAt: r.zrusene_at || null,
+      })), data.peniazeOd);
       // Dni balíčkov, ktoré hodiny nedávajú: nezaplatené predaje a dvojča
       // predaja z Kokpitu v PTminderi (viď `dvojcata`).
       data.bezHodin = [...polozky.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata];

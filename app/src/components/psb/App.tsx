@@ -380,6 +380,10 @@ export function PSBApp() {
   /** Krok Workspace, na ktorý sa má skočiť (odkaz z upozornenia alebo inej záložky). */
   const [workspaceKrok, setWorkspaceKrok] = useState<string | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
+  // Mesiac, od ktorého sú peniaze z Kokpitu — číta ho výpočet ručného príjmu
+  // v efekte banky, ktorý na `data` nezávisí (viď `zaradCiast`).
+  const peniazeOdRef = useRef("");
+  peniazeOdRef.current = data.peniazeOd || "";
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [trackerSection, setTrackerSection] = useState("treningy");
@@ -1411,7 +1415,13 @@ function skupinaFaktur(
         // Vďaka tomu vrátenie (kladná časť na nákladový cieľ) ten náklad odčíta.
         const zaradCiast = (mk: string, ciel: string, ciastka: number, meta: { datum: string; popis: string }) => {
           if (!ciel || ciel === "mimo") return;                 // osobné mimo P&L
-          if (ciel.startsWith(PRIJEM)) { rucnePrijmy[mk] = (rucnePrijmy[mk] || 0) + ciastka; return; }
+          if (ciel.startsWith(PRIJEM)) {
+            // Od mesiaca, keď sú peniaze z Kokpitu (`data.peniazeOd`), je
+            // úvodný v hotovosti PLATBA klienta vo vlastnej evidencii — ako
+            // ručný príjem by sa v P&L započítal druhýkrát.
+            if (!(peniazeOdRef.current && mk >= peniazeOdRef.current)) rucnePrijmy[mk] = (rucnePrijmy[mk] || 0) + ciastka;
+            return;
+          }
           if (ciel.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
             const suma = -ciastka;                              // výdavok → +, vrátenie → −
