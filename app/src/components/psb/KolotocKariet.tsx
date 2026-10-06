@@ -68,9 +68,9 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
         const vpredu = (Math.cos(th) + 1) / 2; // 1 vpredu, 0 vzadu
         const x = R * Math.sin(th);
         const z = R * Math.cos(th) - R;
-        const y = -(uzke ? 18 : 26) * (1 - vpredu);
+        const y = -(uzke ? 26 : 44) * (1 - vpredu);
         b.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, ${z}px) scale(${0.55 + 0.6 * vpredu ** 2})`;
-        b.style.opacity = String(0.12 + 0.88 * vpredu ** 2.2);
+        b.style.opacity = String(0.18 + 0.82 * vpredu ** 2);
         b.style.filter = vpredu > 0.97 ? "none" : `blur(${(1 - vpredu) * 2.2}px)`;
         b.style.zIndex = String(Math.round(vpredu * 100));
         b.style.pointerEvents = vpredu > 0.2 ? "auto" : "none";
@@ -111,7 +111,7 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
       role="tablist"
       aria-label="Karty Workspace"
       style={{
-        position: "relative", flex: "1 1 320px", minWidth: 0, height: uzke ? 66 : 78,
+        position: "relative", flex: "1 1 320px", minWidth: 0, height: uzke ? 78 : 100,
         perspective: 900, perspectiveOrigin: "50% 40%", overflow: "hidden",
         maskImage: "linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent)",
         WebkitMaskImage: "linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent)",
@@ -128,7 +128,7 @@ export function KolotocKariet({ polozky, aktivna, onVyber }: {
             aria-current={akt ? "true" : undefined}
             onClick={() => { if (!akt) onVyber(j, posunKolesa(aktivna, j, n) < 0 ? -1 : 1); }}
             style={{
-              position: "absolute", left: "50%", top: "58%", whiteSpace: "nowrap", fontFamily: "inherit",
+              position: "absolute", left: "50%", top: "64%", whiteSpace: "nowrap", fontFamily: "inherit",
               cursor: akt ? "default" : "pointer", willChange: "transform, opacity, filter",
               fontSize: uzke ? 13.5 : 15, fontWeight: akt ? 800 : 600, padding: "6px 15px", borderRadius: 999,
               border: `1px solid ${akt ? C.accent : "transparent"}`,
