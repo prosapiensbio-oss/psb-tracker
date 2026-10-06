@@ -84,7 +84,8 @@ export function EditorKarta() {
         {nacitane.map((d) => (
           <iframe
             key={d}
-            src={`/editor/${d}.html`}
+            // Bez .html — Cloudflare assets by ho presmerovali (307) na túto adresu.
+            src={`/editor/${d}`}
             title={d === "foto" ? "Editor fotiek" : "Editor videa"}
             style={{
               position: "absolute", inset: 0, width: "100%", height: "100%", border: 0,
