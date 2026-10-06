@@ -199,9 +199,6 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 | Vec | Odkedy | Otázka |
 |---|---|---|
-| 17 potvrdení mien z kalendára (Terezka) | 25. 9. | zlúčiť do jedného riadku registra, alebo nechať po jednom? |
-| 9 falošných zrušení („zmizol tréning", ktorý sa nezmizol) | 25. 9. | označiť ako vysvetlené, alebo prejde sám? |
-| Dovolenka Anny Kadličkovej a Jakuba Kaňovského zapísaná k 7. 10. | 25. 9. | patrí k 30. 9.; tlačidlo „Vrátiť späť" už existuje |
 | PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
 
 ## 2 · Prijaté, nezačaté
@@ -341,10 +338,11 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
 - [x] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
   5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
-- [ ] **Pre Jerryho:** Gerich (hodina 28. 9. po konci viazanosti 2. 9.;
-  15 580 Kč 30. 9. = dva balíčky, v `balicky` jeden), Čechová (DB 5 h pri
-  názve „6h"), Gažo (všetky platby len v PTminder `payments`, v `platby` nič),
-  Kalva/Martinek/Vaško (6h balíček s 8/8/7 h z `na_obdobie`).
+- [x] **Jerry 6. 10. 2026 vysvetlil:** Kalva/Martinek/Vaško 8/8/7 h = presun
+  nevychodených hodín do ďalšieho mesiaca (PTminder má pravdu); Čechová 5 h =
+  odpočítaný nevychodený tréning po letnej pauze (správne); Gerich = nový
+  balík začína nové členstvo, má predplatené dva balíčky; Gažo platí len
+  v PTminderi (bez zásahu).
 
 ## 3 · Blokované niečím mimo Kokpitu
 
@@ -416,6 +414,16 @@ Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **Potvrdenia mien z kalendára** (6. 10. 2026) — 17 z 25. 9. už vybavených;
+  nové celé mená, ktoré sedia na jediného klienta, sa odvtedy priradia samy
+  (`klientPodlaCelehoMena`, Jerry: istá zhoda smie ísť sama). Karta „Nové
+  názvy" z 18 na 7 — ostali prezývky, preklepy a ne-tréningy.
+- **Staré hlásenia zrušení** (6. 10. 2026) — 6 otvorených z 9 (Markéta 31. 8.,
+  Ivi 2. 9., Natália 3. 9., Janka 6. 9. a 30. 9., Lucka 25. 9.) označených ako
+  vysvetlené; PTminder tréning v ten deň nemá — boli to presuny alebo
+  zrušenia, ktoré appka vtedy nespárovala, nie falošné hlásenia.
+- **Dovolenka Kadličkovej/Kaňovského k 7. 10.** — Jerry: nie je dôležité, nechať.
 
 - **Kotva `#cenik` na webe** — opravené 6. 10. 2026. Na menšom telefóne
   (390×664) sa kapitola Ceník delí a jej prvá obrazovka je „Co je součástí

@@ -1,3 +1,4 @@
+import { normName } from "./format";
 /**
  * Mená z kalendára a klienti — ktoré je ktoré.
  *
@@ -65,4 +66,21 @@ export function nejednoznacneMena(
     if (kandidati.length > 1) von.push({ nazov, kandidati });
   }
   return von;
+}
+
+/**
+ * ISTÁ ZHODA: názov udalosti je CELÉ MENO práve jedného klienta (6. 10. 2026).
+ *
+ * Terezka odkedy píše do kalendára celé mená („Jarek Heinrich", „Naďa
+ * Khamaziuk") a každé nové sa aj tak muselo potvrdzovať jedným klikom —
+ * 18 kliknutí týždenne na to, čo appka vedela s istotou. Jerryho zásada:
+ * istá zhoda smie ísť sama, slabá je len návrh. Celé meno (aspoň dve slová,
+ * bez ohľadu na diakritiku a veľké písmená) na jediného klienta je istá;
+ * krstné meno, prezývka („Barborka") alebo preklep ostávajú na potvrdenie.
+ */
+export function klientPodlaCelehoMena(nazov: string, menaKlientov: string[]): string | null {
+  const n = normName(nazov);
+  if (n.split(" ").length < 2) return null;
+  const zhody = [...new Set(menaKlientov.filter((m) => normName(m) === n))];
+  return zhody.length === 1 ? zhody[0] : null;
 }

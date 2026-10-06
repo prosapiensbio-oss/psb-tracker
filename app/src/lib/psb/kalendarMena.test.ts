@@ -39,3 +39,21 @@ describe("mená, ktoré sedia na viacerých", () => {
     expect(nejednoznacneMena(["Janka"], klienti)).toEqual([]);
   });
 });
+
+import { klientPodlaCelehoMena } from "./kalendarMena";
+
+describe("istá zhoda celého mena (6. 10. 2026)", () => {
+  const klienti = ["Jarek Heinrich", "Naďa Khamaziuk", "Barbora Vankova", "Marketa Lozias", "Marketa Resnerová", "Jan Novák", "Jan  Novák"];
+  it("celé meno bez ohľadu na diakritiku a veľkosť", () => {
+    expect(klientPodlaCelehoMena("Jarek Heinrich", klienti)).toBe("Jarek Heinrich");
+    expect(klientPodlaCelehoMena("nada khamaziuk", klienti)).toBe("Naďa Khamaziuk");
+  });
+  it("krstné meno, prezývka ani preklep nie", () => {
+    expect(klientPodlaCelehoMena("Marketa", klienti)).toBeNull();
+    expect(klientPodlaCelehoMena("Barborka Vankova", klienti)).toBeNull();
+    expect(klientPodlaCelehoMena("Jarek Heinrichh", klienti)).toBeNull();
+  });
+  it("dvaja klienti s tým istým menom = nikto", () => {
+    expect(klientPodlaCelehoMena("Jan Novak", ["Jan Novák", "Jan Novak"])).toBeNull();
+  });
+});

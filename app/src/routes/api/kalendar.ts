@@ -6,7 +6,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
-import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
+import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
 import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
@@ -108,6 +108,10 @@ async function snimka(DB: D1Database, z: Zdroj) {
   // Naučené mapovanie mien — čo už raz človek potvrdil, sa druhýkrát nepýta.
   const mapovanie = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
     .bind(z.trener).all()).results || []) as unknown as Mapa[];
+  // Známi klienti — pre ISTÚ zhodu celého mena (`klientPodlaCelehoMena`).
+  const menaKlientov = (((await DB.prepare(
+    "SELECT DISTINCT client_name m FROM sessions UNION SELECT DISTINCT klient FROM balicky UNION SELECT DISTINCT klient FROM kal_mapovanie WHERE klient IS NOT NULL",
+  ).all().catch(() => ({ results: [] }))).results || []) as { m: string }[]).map((x) => String(x.m || "")).filter(Boolean);
 
   const prikazy: D1PreparedStatement[] = [];
   // Zmeny sa najprv nazbierajú a až potom zapíšu — treba ich vidieť naraz, aby
@@ -126,12 +130,15 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // „Marketa 14:00" a jedno meno na dvoch ľudí je v PSB bežné (18 krstných
     // mien má viac než jedného klienta).
     const m = vyberMapu(mapovanie, u.nazov, z.trener, casUdalosti(u.zaciatok));
-    const klient = m?.klient ?? null;
+    // Bez naučeného mapovania: celé meno práve jedného klienta je istá zhoda
+    // a nepýta sa (Jerry 6. 10. 2026: „istá zhoda smie ísť sama“).
+    const presne = m ? null : klientPodlaCelehoMena(u.nazov, menaKlientov);
+    const klient = m?.klient ?? presne;
     // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
     // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie
     // človeka je horšie než žiadne, sedenie by sa pripísalo cudziemu.
-    const typ = m?.typ ?? typZNazvu(u.nazov);
+    const typ = m?.typ ?? typZNazvu(u.nazov) ?? (presne ? "trening" : null);
     const s = podlaUid.get(u.uid);
 
     if (!s) {
@@ -376,7 +383,9 @@ export const Route = createFileRoute("/api/kalendar")({
         for (const u of (udalosti.results || []) as unknown as Ulozena[]) {
           const k = `${u.nazov}|${u.trener}`;
           const chybaKlient = !u.klient && (u.typ === "trening" || u.typ === "uvodny");
-          if (zname.has(k) && !chybaKlient) continue;
+          // Udalosť, ktorá klienta aj typ už má (istá zhoda celého mena pri
+          // sťahovaní, 6. 10. 2026), je známa aj bez riadku v mapovaní.
+          if ((zname.has(k) || (u.klient && u.typ)) && !chybaKlient) continue;
           const e = (nezname[k] ||= { nazov: u.nazov, trener: u.trener, pocet: 0, najblizsi: u.zaciatok });
           e.pocet++;
           if (u.zaciatok < e.najblizsi) e.najblizsi = u.zaciatok;
