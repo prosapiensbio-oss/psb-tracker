@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { bezDiakritiky } from "../../lib/psb/sms";
@@ -81,7 +82,9 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
 
   const akcia = async (telo: Record<string, unknown>, znacka: string) => {
     setPracujem(znacka); setChyba(""); setHlaska("");
-    const j = await posli(telo).catch(() => ({ ok: false, error: "spojenie" } as Awaited<ReturnType<typeof posli>>));
+    let j = await posli(telo).catch(() => ({ ok: false, error: "spojenie" } as Awaited<ReturnType<typeof posli>>));
+    // Druhý balíček k tomu istému — server sa pýta, človek rozhodne.
+    if (!j.ok && potvrdDruhyBalicek(j)) j = await posli({ ...telo, ajTak: true }).catch(() => ({ ok: false, error: "spojenie" } as Awaited<ReturnType<typeof posli>>));
     setPracujem("");
     if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return null; }
     if (typeof j.pridanych === "number") {

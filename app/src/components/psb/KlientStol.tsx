@@ -1,4 +1,5 @@
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -716,10 +717,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
   const pridaj = async () => {
     setPracujem(true); setChyba("");
-    const r = await fetch("/api/balicky", {
+    const zapis = (ajTak = false) => fetch("/api/balicky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "pridaj", klient: meno, ...f, ...cenaPoZlave(f) }),
+      body: JSON.stringify({ akcia: "pridaj", klient: meno, ...f, ...cenaPoZlave(f), ajTak }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    let r = await zapis();
+    // Druhý balíček k tomu istému — server sa pýta, človek rozhodne.
+    if (!r.ok && potvrdDruhyBalicek(r)) r = await zapis(true);
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setPonukniFakturu({ nazov: f.nazov, cena: Number(cenaPoZlave(f).cenaCzk) || 0, id: typeof r.id === "string" ? r.id : undefined });

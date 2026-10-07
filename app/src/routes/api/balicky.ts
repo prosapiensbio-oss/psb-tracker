@@ -8,6 +8,7 @@ import { bindings } from "../../lib/bindings.server";
 import { porovnajBalicky, type Balicek, type PtBalicek } from "../../lib/psb/balickyEvidencia";
 import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac } from "../../lib/psb/format";
+import { jePlatenyBalicek, podobnyBalicek, type ExistujuciBalicek } from "../../lib/psb/duplicitaBalicka";
 import { dnesPraha } from "../../lib/psb/cas";
 
 /**
@@ -271,6 +272,21 @@ export const Route = createFileRoute("/api/balicky")({
             ).bind(klient, nazov, hodiny, od, doDna, cena, poznamka, id).run();
             await audit(DB, { action: "balicek-uprava", predmet: `${klient} — ${nazov}`, neu: `${hodiny ?? "paušál"} h, ${od}–${doDna || "bez konca"}`, actor: kto });
             return Response.json({ ok: true, id });
+          }
+          // Druhý zaplatený balíček do 14 dní od iného = skoro vždy omyl
+          // (Papiež, 7. 10. 2026). Pýta sa; `ajTak` znamená, že človek potvrdil.
+          if (!b.ajTak && jePlatenyBalicek(nazov, cena)) {
+            const jeho = ((await DB.prepare(
+              "SELECT nazov, platnost_od, cena_czk, zrusene_at FROM balicky WHERE klient = ?1 AND zrusene_at IS NULL",
+            ).bind(klient).all().catch(() => ({ results: [] }))).results || []) as unknown as ExistujuciBalicek[];
+            const podobny = podobnyBalicek(jeho, od);
+            if (podobny) {
+              const d = podobny.platnost_od.slice(0, 10).split("-");
+              return Response.json({
+                ok: false, duplicita: { nazov: podobny.nazov, od: podobny.platnost_od },
+                error: `${klient} už má balíček „${podobny.nazov}" od ${Number(d[2])}. ${Number(d[1])}. ${d[0]}. Druhý by znamenal dvakrát hodiny aj peniaze.`,
+              }, { status: 409 });
+            }
           }
           const { id, prenesene } = await zapisBalicek(DB, { klient, nazov, hodiny, od, doDna, cena, poznamka }, kto);
           /**

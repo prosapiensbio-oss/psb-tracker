@@ -1,4 +1,5 @@
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -1686,11 +1687,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 <div style={{ display: "flex", gap: 8, marginTop: 9, flexWrap: "wrap", alignItems: "center" }}>
                   <button
                     onClick={() => void (async () => {
-                      const j = await posli("/api/balicky", {
+                      const telo = {
                         akcia: "pridaj", klient: ponukaBalicka.klient, nazov: ponukaBalicka.nazov,
                         hodiny: ponukaBalicka.hodiny ?? "", platnostOd: ponukaBalicka.platnostOd,
                         platnostDo: ponukaBalicka.platnostDo || "", cenaCzk: ponukaBalicka.cena,
-                      }).catch(() => ({ ok: false, error: "spojenie" }));
+                      };
+                      let j = await posli("/api/balicky", telo).catch(() => ({ ok: false, error: "spojenie" }));
+                      if (!j.ok && potvrdDruhyBalicek(j)) j = await posli("/api/balicky", { ...telo, ajTak: true }).catch(() => ({ ok: false, error: "spojenie" }));
                       if (!j.ok) { setChyba(j.error || "Balíček sa nepodarilo zapísať."); return; }
                       setHlaska(`Zapísané: ${ponukaBalicka.nazov} pre ${ponukaBalicka.klient}.`);
                       setPonukaBalicka(null);
