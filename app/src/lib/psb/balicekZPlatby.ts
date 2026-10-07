@@ -1,5 +1,4 @@
 import { CENNIK, platnostDo } from "./cennik";
-import { nazovProduktu } from "./nazvyProduktov";
 
 /**
  * KTORÝ BALÍČEK PRIŠLA TÁ PLATBA ZAPLATIŤ.
@@ -15,9 +14,9 @@ import { nazovProduktu } from "./nazvyProduktov";
  *
  * AKO SA HÁDA (a čo sa nehádа)
  *
- *  1. Sedí suma s cenou JEHO POSLEDNÉHO balíčka? → ten istý balíček.
- *     Je to najsilnejší signál: ľudia si kupujú to isté dokola.
- *  2. Inak sedí suma s niektorou položkou cenníka? → tá.
+ *  1. Klient už nejaký balíček má? → nič; ďalší vznikne prvým tréningom
+ *     (od 4. 10. 2026) a platba ho len zaplatí.
+ *  2. Nový klient a suma sedí s niektorou položkou cenníka? → tá.
  *  3. Inak sa NEHÁDA nič. Návrh, ktorý si vymyslí hodiny, je horší než
  *     prázdno — balíček sa zapíše ručne.
  *
@@ -42,23 +41,16 @@ export function balicekZPlatby(v: {
   const suma = Math.round(v.suma);
   if (suma <= 0) return null;
 
-  const posledny = v.balicky
-    .filter((b) => !b.zrusene_at && (b.cena_czk || 0) > 0)
-    .sort((a, b) => b.platnost_od.localeCompare(a.platnost_od))[0];
-
-  // 1 · to isté, čo si kupoval naposledy
-  if (posledny && Math.round(posledny.cena_czk || 0) === suma) {
-    const nazov = nazovProduktu(posledny.nazov);
-    const zCennika = CENNIK.find((s) => s.nazov === nazov);
-    return {
-      nazov,
-      hodiny: zCennika?.hodiny ?? null,
-      cena: suma,
-      platnostOd: v.den,
-      platnostDo: (zCennika && platnostDo(v.den, zCennika.tyzdnov, zCennika.mesiacov)) || null,
-      preco: "to isté, čo si kúpil naposledy",
-    };
-  }
+  /**
+   * KLIENT, KTORÝ UŽ BALÍČKY MÁ, DOSTANE ĎALŠÍ SÁM PRVÝM TRÉNINGOM.
+   *
+   * Od 4. 10. 2026 („balíčky vznikajú automaticky začatím prvej hodiny")
+   * platba balíček nezakladá — len ho zaplatí. Návrh tu ostal z 2. 10.
+   * a pri Papiežovi (7. 10.) ponúkol druhý balíček k tomu, ktorý už od
+   * 29. 9. mal. Navrhuje sa už len novému klientovi bez akéhokoľvek
+   * balíčka: tomu prvý tréning nemá podľa čoho veľkosť skopírovať.
+   */
+  if (v.balicky.some((b) => !b.zrusene_at)) return null;
 
   // 2 · sedí s cenníkom
   const zCennika = CENNIK.filter((s) => s.cena != null && Math.round(s.cena) === suma);

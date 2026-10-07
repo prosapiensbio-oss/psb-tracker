@@ -5,26 +5,20 @@ import { balicekZPlatby } from "./balicekZPlatby";
 const bal = (nazov: string, cena: number, od: string) => ({ nazov, cena_czk: cena, platnost_od: od });
 
 describe("balicekZPlatby", () => {
-  it("suma sediaca s posledným balíčkom navrhne ten istý", () => {
-    // Lukáš Hanus platí 6 990 Kč každý mesiac za to isté predplatné.
+  it("klient s balíčkom nedostane návrh — ďalší vznikne prvým tréningom (Papiež, 7. 10. 2026)", () => {
     const n = balicekZPlatby({
-      suma: 6990, den: "2026-10-09",
-      balicky: [bal("OFF - 6h S viazanostou", 6990, "2026-09-09"), bal("OFF - 6h S viazanostou", 6990, "2026-08-10")],
+      suma: 6990, den: "2026-09-29",
+      balicky: [bal("OFF - 6h S viazanostou", 6990, "2026-08-27"), bal("Předplatné 6 h", 6990, "2026-09-29")],
     });
-    expect(n).toMatchObject({ nazov: "6h Předplatné", hodiny: 6, cena: 6990, platnostOd: "2026-10-09" });
-    expect(n?.preco).toBe("to isté, čo si kúpil naposledy");
-    // Platnosť sa dopočíta z cenníka, nie z hlavy. Předplatné je MESIAC
-    // ako v PTminderi (9. 10. → 8. 11.), nie štyri týždne.
-    expect(n?.platnostDo).toBe("2026-11-08");
+    expect(n).toBeNull();
   });
 
-  it("keď posledný balíček nesedí sumou, hľadá sa v cenníku", () => {
-    const n = balicekZPlatby({
-      suma: 9400, den: "2026-10-09",
-      balicky: [bal("OFF - 6h S viazanostou", 6990, "2026-09-09")],
-    });
+  it("nový klient: suma sediaca s cenníkom navrhne položku a platnosť z cenníka", () => {
+    const n = balicekZPlatby({ suma: 9400, den: "2026-10-09", balicky: [] });
     expect(n).toMatchObject({ nazov: "8h Balíček", hodiny: 8, cena: 9400 });
     expect(n?.preco).toBe("suma sedí s cenníkom");
+    // Předplatné je MESIAC ako v PTminderi (9. 10. → 8. 11.), nie štyri týždne.
+    expect(balicekZPlatby({ suma: 6990, den: "2026-10-09", balicky: [] })?.platnostDo).toBe("2026-11-08");
   });
 
   it("klient bez histórie a suma mimo cenníka — NEHÁDA SA", () => {
@@ -32,12 +26,12 @@ describe("balicekZPlatby", () => {
     expect(balicekZPlatby({ suma: 3333, den: "2026-10-09", balicky: [] })).toBeNull();
   });
 
-  it("zrušený balíček sa neberie ako posledný", () => {
+  it("zrušený balíček sa neráta", () => {
     const n = balicekZPlatby({
       suma: 6990, den: "2026-10-09",
       balicky: [{ ...bal("OFF - 6h S viazanostou", 6990, "2026-09-09"), zrusene_at: "2026-09-10" }],
     });
-    // Spadne na cenník — 6 990 je tam 6h Předplatné.
+    // Zrušený balíček nie je história — ako nový klient, spadne na cenník.
     expect(n?.preco).toBe("suma sedí s cenníkom");
   });
 
