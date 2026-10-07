@@ -129,7 +129,8 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean };
+        let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[];
+          stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -346,6 +347,52 @@ export const Route = createFileRoute("/api/fio")({
           return Response.json({ ok: true, potvrdene: ok.length, preskocene: kluce.length - ok.length });
         }
 
+        /**
+         * KROK SPÄŤ (Jerry, 7. 10. 2026: „cmd+z alebo krok späť, keby som
+         * niečo zaradil zbrklo"). Obrazovka si pred každou akciou odloží
+         * pôvodný stav riadkov a tu ho vráti: kategóriu aj potvrdenie.
+         * Pravidlo, ktoré sa medzitým naučilo, sa prepíše späť na pôvodnú
+         * kategóriu; keď pôvodná bola prázdna, naučené pravidlo z úpravy
+         * sa zmaže — zbrklý klik sa nemá zavliecť do ďalšieho mesiaca.
+         */
+        if (b.akcia === "obnov") {
+          const stav = (Array.isArray(b.stav) ? b.stav : []).slice(0, 2000)
+            .map((x) => ({ kluc: String(x.kluc || ""), kategoria: String(x.kategoria || ""), potvrdene: !!x.potvrdene }))
+            .filter((x) => x.kluc);
+          if (!stav.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
+          const zamky = await zamknuteMesiace(DB);
+          const kto = (await currentUser(request)) || "jerry";
+          const kedy = new Date().toISOString();
+          const otazniky = stav.map((_, i) => `?${i + 1}`).join(",");
+          const rs = ((await DB.prepare(
+            `SELECT dedup_key, date, category, counterparty FROM fio_transactions WHERE dedup_key IN (${otazniky})`,
+          ).bind(...stav.map((x) => x.kluc)).all()).results || []) as { dedup_key: string; date: string; category: string | null; counterparty: string | null }[];
+          const podla = new Map(rs.map((x) => [x.dedup_key, x]));
+          const prikazy = [];
+          let vratene = 0, zamknute = 0;
+          for (const x of stav) {
+            const riadok = podla.get(x.kluc);
+            if (!riadok) continue;
+            if (jeZamknuty(zamky, String(riadok.date))) { zamknute++; continue; }
+            prikazy.push(DB.prepare("UPDATE fio_transactions SET category = ?2, potvrdene_at = ?3, potvrdil = ?4 WHERE dedup_key = ?1")
+              .bind(x.kluc, x.kategoria, x.potvrdene ? kedy : null, x.potvrdene ? kto : null));
+            vratene++;
+            const vzor = String(riadok.counterparty || "").trim().toLowerCase();
+            if ((riadok.category || "") !== x.kategoria && vzor.length >= MIN_VZOR) {
+              prikazy.push(DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'uprava'").bind(vzor));
+              if (x.kategoria) {
+                prikazy.push(DB.prepare(
+                  `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
+                   VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'uprava', ?4)`,
+                ).bind(uid(), vzor, x.kategoria, kedy));
+              }
+            }
+          }
+          if (prikazy.length) await DB.batch(prikazy);
+          await audit(DB, { action: "banka-krok-spat", predmet: `${vratene} pohybov`, neu: `vrátené ${vratene}${zamknute ? `, ${zamknute} v uzavretom mesiaci` : ""}`, actor: kto });
+          return Response.json({ ok: true, vratene, zamknute });
+        }
+
         if (b.akcia === "kategoria") {
           const zmeny = Array.isArray(b.zmeny) ? b.zmeny.slice(0, 2000) : [];
           if (!zmeny.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
@@ -362,15 +409,16 @@ export const Route = createFileRoute("/api/fio")({
             if (!kluc) continue;
             if (z.datum && jeZamknuty(zamky, String(z.datum))) { zamknute++; continue; }
             const kat = String(z.kategoria || "");
-            // Prázdna kategória sa nepotvrdzuje — nie je čo.
-            const pt = kat ? potvrdeneAt : null, pk = kat ? potvrdil : null;
-            // Poznámka je voliteľná — keď nepríde, kategória sa mení sama.
+            const poznamka = z.poznamka === undefined ? null : String(z.poznamka || "").slice(0, 400);
+            // `potvrd: false` (Jarvis, dopísaná poznámka) potvrdenie nemení
+            // vôbec. Inak ručné zaradenie potvrdzuje; prázdna kategória ho
+            // zruší — nie je čo potvrdiť.
             stmts.push(
-              z.poznamka === undefined
-                ? DB.prepare("UPDATE fio_transactions SET category = ?2, potvrdene_at = ?3, potvrdil = ?4 WHERE dedup_key = ?1")
-                    .bind(kluc, kat, pt, pk)
-                : DB.prepare("UPDATE fio_transactions SET category = ?2, note = ?3, potvrdene_at = ?4, potvrdil = ?5 WHERE dedup_key = ?1")
-                    .bind(kluc, kat, String(z.poznamka || "").slice(0, 400), pt, pk),
+              b.potvrd === false
+                ? DB.prepare("UPDATE fio_transactions SET category = ?2, note = COALESCE(?3, note) WHERE dedup_key = ?1")
+                    .bind(kluc, kat, poznamka)
+                : DB.prepare("UPDATE fio_transactions SET category = ?2, note = COALESCE(?3, note), potvrdene_at = ?4, potvrdil = ?5 WHERE dedup_key = ?1")
+                    .bind(kluc, kat, poznamka, kat ? potvrdeneAt : null, kat ? potvrdil : null),
             );
             zmenene++;
           }
@@ -401,7 +449,7 @@ export const Route = createFileRoute("/api/fio")({
               const vzor = (podlaKluca.get(String(z.kluc || "")) || "").trim();
               // Prázdna kategória pravidlo neruší, len sa neučí — vyprázdnenie
               // je „neviem", nie „patrí nikam".
-              if (kat && vzor.length >= 3) naucene.set(vzor.toLowerCase(), kat);
+              if (kat && vzor.length >= MIN_VZOR) naucene.set(vzor.toLowerCase(), kat);
             }
             const kedy = new Date().toISOString();
             for (const [vzor, kategoria] of naucene) {

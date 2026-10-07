@@ -8,7 +8,7 @@
  * 67 bez kategórie a všetko to boli platby klientov.
  */
 
-export type FilterPohybov = "nezaradene" | "potvrdit" | "naklady" | "vyplaty" | "sukromne" | "prijmy" | "vsetko";
+export type FilterPohybov = "nezaradene" | "potvrdit" | "potvrdene" | "naklady" | "vyplaty" | "sukromne" | "prijmy" | "vsetko";
 
 export type PohybNaFilter = { suma: number; kategoria: string; typ?: string; klienti?: string; nieKlient?: boolean; potvrdene?: boolean };
 
@@ -18,6 +18,7 @@ export function patriDoFiltra(p: PohybNaFilter, f: FilterPohybov, maSplit = fals
   switch (f) {
     case "nezaradene": return vydaj && !kat && !maSplit;
     case "potvrdit": return cakaNaPotvrdenie(p, maSplit);
+    case "potvrdene": return jePotvrdeny(p, maSplit);
     // Náklady = všetko, čo odišlo, okrem výplat a súkromného — aj nezaradené,
     // lebo aj to je náklad, len ešte bez škatuľky.
     case "naklady": return vydaj && (maSplit || (!kat.startsWith("vyplaty") && kat !== "mimo"));
@@ -47,4 +48,13 @@ export function stavPrijmu(p: PohybNaFilter, maSplit = false): StavPrijmu {
 export function cakaNaPotvrdenie(p: PohybNaFilter, maSplit = false): boolean {
   if (p.suma >= 0 || p.potvrdene || maSplit || p.typ === "hotovosť") return false;
   return !!p.kategoria;
+}
+
+/**
+ * Hotový výdavok — v uzávierke zmizne z plochy (Jerry, 7. 10. 2026: „keď
+ * to zafajknem, tak to zmizne ako potvrdený náklad a takto si vyťukám
+ * všetky"). Vidieť ho je pod filtrom Potvrdené.
+ */
+export function jePotvrdeny(p: PohybNaFilter, maSplit = false): boolean {
+  return p.suma < 0 && !cakaNaPotvrdenie(p, maSplit) && !!(p.kategoria || maSplit);
 }

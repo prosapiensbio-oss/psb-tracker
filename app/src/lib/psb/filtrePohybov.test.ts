@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cakaNaPotvrdenie, patriDoFiltra, stavPrijmu } from "./filtrePohybov";
+import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu } from "./filtrePohybov";
 
 describe("filtre zapísaných pohybov", () => {
   const gerich = { suma: 15580, kategoria: "fixne.apps.ai", klienti: "Gerich Jakub" };
@@ -47,5 +47,16 @@ describe("oranžová fajka", () => {
     expect(cakaNaPotvrdenie({ suma: -605, kategoria: "" })).toBe(false);
     expect(cakaNaPotvrdenie({ suma: 6990, kategoria: "" })).toBe(false);
     expect(patriDoFiltra({ suma: -605, kategoria: "fixne.apps.ai" }, "potvrdit")).toBe(true);
+  });
+});
+
+describe("potvrdené zmiznú z plochy", () => {
+  it("potvrdený, rozdelený a hotovosť sú hotové; návrh a nezaradený nie", () => {
+    expect(jePotvrdeny({ suma: -1500, kategoria: "vyplaty.terezka", potvrdene: true })).toBe(true);
+    expect(jePotvrdeny({ suma: -8999, kategoria: "" }, true)).toBe(true);
+    expect(jePotvrdeny({ suma: -200, kategoria: "spolocne.Potraviny", typ: "hotovosť" })).toBe(true);
+    expect(jePotvrdeny({ suma: -605, kategoria: "fixne.apps.ai" })).toBe(false);
+    expect(jePotvrdeny({ suma: -605, kategoria: "" })).toBe(false);
+    expect(jePotvrdeny({ suma: 6990, kategoria: "", potvrdene: true })).toBe(false);
   });
 });
