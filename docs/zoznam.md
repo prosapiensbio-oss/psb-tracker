@@ -215,7 +215,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   2. **Ponuka termínov** — poslať si ponuku na vlastné číslo, vybrať termín na stránke /t/: vznikne udalosť v Google kalendári a príde push? (zápis do Google z /t/ nebol naostro skúšaný). Potom udalosť zmazať.
   3. **Gestá v Kalendári** — švih prstom (telefón/iPad) a dva prsty na touchpade medzi týždňami; overené len simuláciou.
 - **September: v Kokpite chýba 10 výdavkov z banky, spolu −17 641 Kč (zistené 7. 10. 2026).** 5. 10. sa zapísali len príjmy 29. 9.–4. 10.; výdavky od 28. 9. ostali v rozrobenom náhľade. Oprava: Workspace → Uzávierka → „Stiahnuť mesiac z Fio" za 2026-09 (náhľad API potvrdil presne týchto 10 nových, 0 príjmov), potom to isté za 2026-10. Krok Fio sa pritom tváril „hotovo · všetky zaradené" — `hotovo` je len „za mesiac je aspoň niečo"; zvážiť kontrolu, že výpis siaha po koniec mesiaca.
-- **Pravidlo „2325740014 → Služby · Iné výdaje" (Terezkin účet, naučené úpravou 20. 3.)** zaradilo jej výplatu 1 500 z 29. 9. ako službu; 28 ostatných je výplata Terezka. Čaká na Jerryho: prehodiť a pravidlo zmazať? Podobne „SmsManager → Apps AI".
+- ~~Pravidlo Terezkinho účtu → Služby~~ — HOTOVÉ 7. 10. 2026: výplata 29. 9. prehodená na Výplata Terezka, pravidlo účtu teraz → výplata Terezka; SmsManager ostáva Apps AI (Jerry).
 - ~~5 príjmov s kategóriou „AI aplikácie" + pravidlo „pro"~~ — HOTOVÉ 7. 10. 2026 s Jerryho súhlasom: nálepky vymazané, pravidlo zmazané.
 - **Kratšie odkazy v SMS pre /t/ a /k/ — čaká na súhlas (zmena živého webu):** WP snippet „Krátky odkaz pre SMS" (id 26) presmerúva len /u/ a /v/; pridať /t/ a /k/ + rozšíriť regex vo `verejnyOdkaz.ts`. Dnes idú cez workers.dev → SMS na 2 diely.
 
