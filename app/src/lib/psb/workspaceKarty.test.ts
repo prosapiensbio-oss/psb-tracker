@@ -143,7 +143,7 @@ describe("karta klienta je stôl, nie fronta", () => {
     const k = postavKarty({ zmeny: [], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
     expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "terminy"]);
     // „krok" je karta bety (4. 10. 2026) — prázdna povie „Všetko vybavené".
-    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy", "editor", "terminy", "terminy", "krok"]);
+    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy", "editor", "terminy", "krok"]);
   });
 
   it("nemá položky, takže sa nedá „vybaviť“", () => {

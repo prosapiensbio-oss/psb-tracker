@@ -26,6 +26,9 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  ponuky_terminov: {
+    zrusene_at: "mäkké zrušenie — nová ponuka zrušená nevzniká",
+  },
   jarvis_dokumenty: {
     zmazane_at: "mäkké mazanie — pri vzniku dokument zmazaný nie je",
   },
