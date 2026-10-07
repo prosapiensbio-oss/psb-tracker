@@ -210,6 +210,12 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"):**
+  1. **Kalendár v mobile** — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
+  2. **Ponuka termínov** — poslať si ponuku na vlastné číslo, vybrať termín na stránke /t/: vznikne udalosť v Google kalendári a príde push? (zápis do Google z /t/ nebol naostro skúšaný). Potom udalosť zmazať.
+  3. **Gestá v Kalendári** — švih prstom (telefón/iPad) a dva prsty na touchpade medzi týždňami; overené len simuláciou.
+- **Kratšie odkazy v SMS pre /t/ a /k/ — čaká na súhlas (zmena živého webu):** WP snippet „Krátky odkaz pre SMS" (id 26) presmerúva len /u/ a /v/; pridať /t/ a /k/ + rozšíriť regex vo `verejnyOdkaz.ts`. Dnes idú cez workers.dev → SMS na 2 diely.
+
 - **Editor fotiek + editor videa (6. 10. 2026)** — Jerry: fotky ako v appke Layout (štvorec na polovicu, výrez, mriežka, prekrytie, čiary a uhly), z 5 rozložení vybral **1 · panel vpravo**; potom „editor videa musí byť samostatný". Náčrty: `navrhy-kokpitu/editor-fotiek.html` a `navrhy-kokpitu/editor-videa.html` (video: krok o snímku, rýchlosť bodkou 0,07–2×, strih bodkami na osi + I/O, čiary viazané na snímku, 📷 snímka, stiahnutie videa so strihom a spomalením — MP4 v Chrome). Snímky idú do spoločného zásobníka (`skladacka-sklad.js`, IndexedDB) a editor fotiek ich ponúka v „Snímky z videa". Spoločné časti vkladá `python3 zostav-skladacku.py`. **V Kokpite od 6. 10. 2026: Workspace → karta Editor → Foto / Video** (zdroj `app/editor/`, `python3 editor/zostav.py`). **Napojené na kartotéku klienta 6. 10. 2026** (porovnanie, video, snímky; klient sa vyberá nad editorom). Otvorené: zásobník = kartotéka klienta (šifrovane v R2), veľké videá nahrávať po kusoch (limit veľkosti požiadavky Workera), HEVC z iPhonu. Pozor: súhlas v anamnéze hovorí „nikde se nezveřejňují" — export na sociálne siete chce samostatný súhlas.
 
 | Vec | Odkedy | Otázka |
