@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fioKluc, ocislujDuplicity, parseFio, type FioRiadok } from "./fio";
+import { fioKluc, ocislujDuplicity, odhadniKategoriu, parseFio, type FioRiadok } from "./fio";
 
 // Presný tvar exportu „Pohyby na všech účtech" (13. 9. 2026) — bez ID operace.
 const POHYBY = [
@@ -76,5 +76,15 @@ describe("ocislujDuplicity", () => {
       "2026-06-10|-1000|Jerry vyplata#2",
       "2026-06-10|-1000|Jerry vyplata#3",
     ]);
+  });
+});
+
+describe("naučené pravidlá", () => {
+  test("príliš krátky vzor nehlasuje — „pro“ z Perplexity nesmie chytiť ProSapiens", () => {
+    const pravidla = [{ vzor: "pro", kategoria: "fixne.apps.ai" }, { vzor: "bolt", kategoria: "vyplaty.jerry" }];
+    expect(odhadniKategoriu("Gerich, Jakub Prosapiens 12 lekcií", pravidla)).toBe("");
+    expect(odhadniKategoriu("BOLT.EU Nákup", pravidla)).toBe("vyplaty.jerry");
+    // Perplexity s obchodníkom „PRO" chytí zabudované pravidlo podľa domény.
+    expect(odhadniKategoriu("PRO Nákup: PRO, WWW.PERPLEXIT, US", pravidla)).toBe("fixne.apps.ai");
   });
 });

@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { fioKluc, parseFio, type FioRiadok } from "../../lib/psb/fio";
+import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
 import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
 
 // Import bankového výpisu — dvojkrokovo.
@@ -270,7 +270,7 @@ export const Route = createFileRoute("/api/fio")({
           const naucene = new Map<string, string>();
           for (const r of riadky) {
             const vzor = (r.protistrana || "").trim();
-            if (vzor.length >= 3 && r.kategoria) naucene.set(vzor.toLowerCase(), r.kategoria);
+            if (vzor.length >= MIN_VZOR && r.kategoria) naucene.set(vzor.toLowerCase(), r.kategoria);
           }
           // Zlyhaný zápis pravidla sa NESMIE prehltnúť: DELETE+INSERT s tichým
           // catch znamenal, že keď DELETE prešiel a INSERT padol, naučené

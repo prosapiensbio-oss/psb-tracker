@@ -19,6 +19,15 @@ const pohyb = {
 };
 
 describe("pohyby z Fio API", () => {
+  it("príjem sa nezaraďuje ani naučeným pravidlom (Gerich ako AI, 7. 10. 2026)", () => {
+    const pravidla = [{ vzor: "prosapiens", kategoria: "fixne.apps.ai" }];
+    const prijem = { ...pohyb, column16: st("Prosapiens 12 lekcií predplatné - Jakub Gerich") };
+    const vydaj = { ...prijem, column22: st(1), column1: st(-534.49) };
+    const [p, v] = pohybyZOdpovede({ accountStatement: { transactionList: { transaction: [prijem, vydaj] } } }, pravidla);
+    expect(p.kategoria).toBe("");
+    expect(v.kategoria).toBe("fixne.apps.ai");
+  });
+
   it("prečíta ID, deň, sumu, protistranu aj správu", () => {
     const r = pohybyZOdpovede({ accountStatement: { transactionList: { transaction: [pohyb] } } })[0];
     expect(r.id).toBe("1148734530");

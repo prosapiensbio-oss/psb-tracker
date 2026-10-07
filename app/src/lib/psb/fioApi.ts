@@ -118,16 +118,20 @@ export function pohybyZOdpovede(
     const protistrana = protistranaPohybu(p);
     const poznamka = poznamkaPohybu(p);
     const typ = text(p.column8);
+    const suma = cislo(p.column1);
     out.push({
       // ID pohybu je povinné pole API — bez neho by sa kľúč počítal z dátumu
       // a sumy a dve rovnaké výplaty v jeden deň by splynuli.
       id: text(p.column22),
       datum,
-      suma: cislo(p.column1),
+      suma,
       protistrana,
       poznamka,
       typ,
-      kategoria: odhadniKategoriu(`${protistrana} ${poznamka} ${typ}`, pravidla),
+      // Príjem sa nezaraďuje — to robí Jerry sám (platba klienta, vrátenie…).
+      // Rovnako ako import zo súboru; bez tejto podmienky dostal Gerich
+      // kategóriu „AI aplikácie" z pravidla naučeného na Perplexity.
+      kategoria: suma < 0 ? odhadniKategoriu(`${protistrana} ${poznamka} ${typ}`, pravidla) : "",
     });
   }
   // Od najstaršieho — ten istý poriadok, v akom chodia riadky z výpisu.

@@ -268,10 +268,18 @@ const SEED: [RegExp, string][] = [
   [/tisk|tlač|tlac|vizitk/i, "variabilne.sluzby.tlac"],
 ];
 
+/**
+ * Najkratší naučený vzor, ktorý ešte smie hlasovať. Perplexity raz prišla
+ * na kartu ako obchodník „PRO" → appka sa naučila „pro" = AI aplikácie a
+ * ten kúsok potom sedel v každom „ProSapiens" v poznámke klientskej platby
+ * (Gerich, Mátlová, Papiež… 7. 10. 2026). „bolt"/„wolt" majú 4 a sú v poriadku.
+ */
+export const MIN_VZOR = 4;
+
 export function odhadniKategoriu(text: string, pravidla: { vzor: string; kategoria: string }[] = []): string {
   // Naučené pravidlá majú prednosť pred zabudovanými — Jerry vie lepšie.
   for (const p of pravidla) {
-    if (p.vzor && text.toLowerCase().includes(p.vzor.toLowerCase())) return p.kategoria;
+    if (p.vzor && p.vzor.trim().length >= MIN_VZOR && text.toLowerCase().includes(p.vzor.toLowerCase())) return p.kategoria;
   }
   for (const [re, kat] of SEED) if (re.test(text)) return kat;
   return "";
