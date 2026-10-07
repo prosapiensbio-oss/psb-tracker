@@ -1421,12 +1421,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             return {
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
               metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`, "metricool"),
-              // Pohyby z banky patria sem: rozrobený náhľad výpisu aj zapísané
-              // pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026).
+              // Pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026). Sťahuje sa
+              // zeleným tlačidlom v riadku kroku; druhý import s dátumami bol
+              // to isté ešte raz, tak je schovaný za odkazom (7. 10. 2026).
               fio: (
                 <>
-                  <BankovyImport vstup="" onHotovo={() => void actions?.refresh()} />
-                  <BankaUlozene focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+                  <BankaUlozene
+                    uzavierka focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
+                    onPlatby={() => {
+                      const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "platby");
+                      if (idx >= 0) setI(idx);
+                    }}
+                  />
+                  <IneObdobieFio onHotovo={() => void actions?.refresh()} />
                 </>
               ),
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
@@ -1812,3 +1819,22 @@ const tlacidloKarty = {
   padding: "5px 11px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
   border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
 } as const;
+
+/**
+ * Import s vlastnými dátumami alebo zo súboru — len na požiadanie. Bežný
+ * mesiac stiahne zelené tlačidlo kroku. Rozrobený náhľad sa ale schovať
+ * nesmie: kto zaraďoval a odišiel, musí ho po návrate nájsť otvorený.
+ */
+function IneObdobieFio({ onHotovo }: { onHotovo: () => void }) {
+  const [ukaz, setUkaz] = useState(() => {
+    try { return !!localStorage.getItem("psb-banka-nahlad"); } catch { return false; }
+  });
+  if (!ukaz) {
+    return (
+      <button onClick={() => setUkaz(true)} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", textDecoration: "underline" }}>
+        stiahnuť iné obdobie alebo nahrať súbor z Fio
+      </button>
+    );
+  }
+  return <div style={{ marginTop: 10 }}><BankovyImport vstup="" onHotovo={onHotovo} /></div>;
+}

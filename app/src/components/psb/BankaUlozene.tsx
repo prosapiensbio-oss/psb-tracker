@@ -5,6 +5,7 @@ import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
+import { patriDoFiltra, stavPrijmu, type FilterPohybov } from "../../lib/psb/filtrePohybov";
 import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
@@ -20,23 +21,31 @@ import { Card, Empty, H3, Info, TableWrap } from "./ui";
 // tichým opakovaním zavlečie do každého ďalšieho mesiaca — preto musí byť
 // vidieť a musí sa dať zmazať.
 
-type Pohyb = { datum: string; suma: number; protistrana: string; poznamka: string; typ: string; kategoria: string; kluc: string };
+type Pohyb = {
+  datum: string; suma: number; protistrana: string; poznamka: string; typ: string; kategoria: string; kluc: string;
+  /** Pri príjme: komu ho krok Platby a balíčky priradil / že nie je klient. */
+  klienti?: string; nieKlient?: boolean;
+};
 type Pravidlo = { vzor: string; kategoria: string };
 
-export function BankaUlozene({ focus, pohybSplits, onSplit }: {
+export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby }: {
   focus?: { month?: string; kategoria?: string; nonce?: number } | null;
   /** Rozdelenia/priradenia pohybov z App (split telefónu, príjem, vrátenie). */
   pohybSplits?: PohybSplits;
   /** Uloží rozdelenie jedného pohybu; prázdny zoznam ho zruší. Bez tejto
    *  funkcie sa rozdeľovanie neponúkne (napr. keď komponent nemá kam zapísať). */
   onSplit?: (kluc: string, casti: SplitCiast[]) => void;
+  /** V uzávierke mesiaca: začína na nákladoch, mesiac je daný krokom. */
+  uzavierka?: boolean;
+  /** Preklik na krok Platby a balíčky — tam sa príjmy priraďujú klientom. */
+  onPlatby?: () => void;
 } = {}) {
   const [pohyby, setPohyby] = useState<Pohyb[]>([]);
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
   const [nacitane, setNacitane] = useState(false);
   const [otvorene, setOtvorene] = useState(false);
   const [oznacene, setOznacene] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<"vsetko" | "nezaradene" | "vyplaty">("vsetko");
+  const [filter, setFilter] = useState<FilterPohybov>(uzavierka ? "naklady" : "vsetko");
   const [hladat, setHladat] = useState("");
   // Filter mesiaca. Pri sedemsto pohyboch je "ukáž mi júl" najčastejšia otázka
   // vôbec — bez neho sa musí scrollovať cez pol roka.
@@ -70,11 +79,16 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
   useEffect(nacitaj, []);
 
   const mesiace = [...new Set(pohyby.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
+  const maSplit = (p: Pohyb) => platnySplit(pohybSplits?.[p.kluc]);
+  // Počty na tlačidlách platia pre zvolený mesiac — „Všetko (912)" pri
+  // septembri, z ktorého je vidieť 122, mátlo.
+  const zMesiaca = mesiac ? pohyby.filter((p) => String(p.datum).slice(0, 7) === mesiac) : pohyby;
+  const pocet = (f: FilterPohybov) => zMesiaca.filter((p) => patriDoFiltra(p, f, maSplit(p))).length;
+  const cakaPrijmov = zMesiaca.filter((p) => p.suma > 0 && stavPrijmu(p, maSplit(p)) === "caka").length;
   const viditelne = pohyby.filter((p) => {
     if (mesiac && String(p.datum).slice(0, 7) !== mesiac) return false;
     if (ibaKat && p.kategoria !== ibaKat) return false;
-    if (filter === "nezaradene" && (p.kategoria || platnySplit(pohybSplits?.[p.kluc]))) return false;
-    if (filter === "vyplaty" && !p.kategoria.startsWith("vyplaty")) return false;
+    if (!patriDoFiltra(p, filter, maSplit(p))) return false;
     if (hladat.trim()) {
       const h = hladat.trim().toLowerCase();
       if (!`${p.protistrana} ${p.poznamka}`.toLowerCase().includes(h)) return false;
@@ -125,25 +139,28 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
     setOtvorene(true);
     if (focus.month) setMesiac(focus.month);
     setIbaKat(focus.kategoria || "");
+    // Preklik na konkrétnu kategóriu nesmie zostať schovaný za filtrom.
+    if (focus.kategoria) setFilter("vsetko");
   }, [focus?.month, focus?.kategoria, focus?.nonce]);
 
   // Pohyb s platným rozdelením (split) je zaradený, aj keď jeho surové pole
   // `category` je prázdne — split ho v P&L kryje. Bez tohto svietil telefón
   // −8999 ako „bez kategórie", hoci má 50/50 split (Jerry, 6. 9. 2026).
-  const nezaradenych = pohyby.filter((p) => !p.kategoria && !platnySplit(pohybSplits?.[p.kluc])).length;
+  // Len výdavky: príjem kategóriu nepotrebuje (viď filtrePohybov.ts).
+  const nezaradenych = pohyby.filter((p) => patriDoFiltra(p, "nezaradene", maSplit(p))).length;
   if (!nacitane || !pohyby.length) return null;
 
   return (
     <Card>
-      <div onClick={() => setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexWrap: "wrap" }}>
-        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>
-        <H3><Info label={`Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
-        {nezaradenych > 0 && (
-          <span style={{ fontSize: 11.5, color: C.orange }}>{nezaradenych} bez kategórie</span>
+      <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
+        {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
+        <H3><Info label={uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
+        {(uzavierka ? pocet("nezaradene") : nezaradenych) > 0 && (
+          <span style={{ fontSize: 11.5, color: C.orange }}>{uzavierka ? pocet("nezaradene") : nezaradenych} výdavkov bez kategórie</span>
         )}
       </div>
 
-      {otvorene && (
+      {(otvorene || uzavierka) && (
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
             {ibaKat && (
@@ -152,18 +169,31 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
                 len {nazovKategorie(ibaKat)} ✕
               </button>
             )}
-            {([["vsetko", `Všetko (${pohyby.length})`], ["nezaradene", `Bez kategórie (${nezaradenych})`], ["vyplaty", `Výplaty (${pohyby.filter((p) => p.kategoria.startsWith("vyplaty")).length})`]] as const).map(([id, lbl]) => (
-              <button key={id} onClick={() => setFilter(id)}
-                style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                  border: `1px solid ${filter === id ? C.accent : C.border}`,
-                  background: filter === id ? mix(C.accent, 12) : "transparent",
-                  color: filter === id ? C.accentLight : C.textMuted }}>{lbl}</button>
-            ))}
-            <select value={mesiac} onChange={(e) => setMesiac(e.target.value)}
+            {([
+              ["naklady", "Náklady", "Všetko, čo odišlo z účtu okrem výplat a súkromného — aj to, čo ešte nemá kategóriu."],
+              ["nezaradene", "Nezaradené", "Výdavky bez kategórie. Bez nej sa nedostanú do P&L."],
+              ["vyplaty", "Výplaty", "Peniaze vyplatené Jerrymu a Terezke."],
+              ["sukromne", "Súkromné", "Výdavky zaradené mimo firmu — kontrola, že tam nespadlo nič firemné."],
+              ["prijmy", "Príjmy", "Čo prišlo na účet. Klientom sa priraďujú v kroku Platby a balíčky; tu je len stav."],
+              ["vsetko", "Všetko", ""],
+            ] as const).map(([id, lbl, tip]) => {
+              const n = pocet(id);
+              const pozor = (id === "nezaradene" && n > 0) || (id === "prijmy" && cakaPrijmov > 0);
+              return (
+                <button key={id} onClick={() => setFilter(id)} title={tip || undefined}
+                  style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+                    border: `1px solid ${filter === id ? C.accent : C.border}`,
+                    background: filter === id ? mix(C.accent, 12) : "transparent",
+                    color: filter === id ? C.accentLight : pozor ? C.orange : C.textMuted }}>
+                  {lbl} ({n}){id === "prijmy" && cakaPrijmov > 0 ? ` · ${cakaPrijmov} čaká` : ""}
+                </button>
+              );
+            })}
+            {!uzavierka && <select value={mesiac} onChange={(e) => setMesiac(e.target.value)}
               style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${mesiac ? C.accent : C.border}`, background: C.bg, color: mesiac ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
               <option value="">Všetky mesiace</option>
               {mesiace.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            </select>}
             <input value={hladat} onChange={(e) => setHladat(e.target.value)} placeholder="Hľadať v protistrane…"
               style={{ flex: "1 1 180px", minWidth: 0, padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           </div>
@@ -253,6 +283,23 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
                               ))}
                               {onSplit && (
                                 <button onClick={() => otvorDelenie(p.kluc)} style={{ background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 11, padding: "2px 0" }}>upraviť rozdelenie</button>
+                              )}
+                            </div>
+                          );
+                        }
+                        // Príjem: namiesto kategórie stav z kroku Platby a balíčky.
+                        if (p.suma > 0) {
+                          const st = stavPrijmu(p);
+                          return (
+                            <div style={{ fontSize: 11.5 }}>
+                              {st === "klient" && <span style={{ color: C.green }}>✓ {p.klienti}</span>}
+                              {st === "nieKlient" && <span style={{ color: C.textMuted }}>nie je klient</span>}
+                              {st === "caka" && (onPlatby
+                                ? <button onClick={onPlatby} style={{ background: "none", border: "none", padding: 0, color: C.orange, cursor: "pointer", fontSize: 11.5, textAlign: "left" }}>čaká na priradenie → Platby a balíčky</button>
+                                : <span style={{ color: C.orange }}>čaká na priradenie klientovi</span>)}
+                              {/* Vrátenie od Alzy, vlastný vklad… — to sa rieši tu, nie v Platbách. */}
+                              {onSplit && st !== "klient" && (
+                                <button onClick={() => otvorDelenie(p.kluc)} title="Vrátenie nákladu alebo ručný príjem" style={{ display: "block", background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 11, padding: "2px 0" }}>⑂ vrátenie / príjem</button>
                               )}
                             </div>
                           );

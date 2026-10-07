@@ -1002,6 +1002,9 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
       : `Za ${nazovMesiaca(mesiac)} je z Fio všetko v Kokpite.`);
     oznam("peniaze");
     onZmena();
+    // Po stiahnutí sa ukáže, čo prišlo (Jerry, 7. 10. 2026: tabuľka sa má
+    // zobraziť po kliknutí na zelené tlačidlo, inak nesvieti).
+    setOtvoreny("fio");
   };
 
   const zamkni = async () => {

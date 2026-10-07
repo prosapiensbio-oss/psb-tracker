@@ -95,7 +95,19 @@ export const Route = createFileRoute("/api/fio")({
         }
         try {
           const [t, p] = await Promise.all([
-            DB.prepare("SELECT date, amount_czk, counterparty, note, typ, category, dedup_key FROM fio_transactions ORDER BY date DESC LIMIT 2000").all(),
+            // Pri príjme aj to, čo s ním urobil krok Platby a balíčky — komu
+            // je priradený, alebo že „nie je klient". Príjem sa nezaraďuje
+            // kategóriou (P&L ju na kladnom riadku nečíta), ale v uzávierke
+            // treba vidieť, či ho niekto vybavil (Jerry, 7. 10. 2026).
+            DB.prepare(
+              `SELECT f.date, f.amount_czk, f.counterparty, f.note, f.typ, f.category, f.dedup_key,
+                      p.klienti, CASE WHEN n.fio_id IS NULL THEN 0 ELSE 1 END nie_klient
+                 FROM fio_transactions f
+                 LEFT JOIN (SELECT fio_id, group_concat(klient, ', ') klienti FROM platby
+                             WHERE fio_id IS NOT NULL AND zrusene_at IS NULL GROUP BY fio_id) p ON p.fio_id = f.id
+                 LEFT JOIN platba_nie_klient n ON n.fio_id = f.id
+                ORDER BY f.date DESC LIMIT 2000`,
+            ).all(),
             DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all(),
           ]);
           return Response.json({
@@ -103,6 +115,7 @@ export const Route = createFileRoute("/api/fio")({
             pohyby: (t.results as Record<string, unknown>[]).map((r) => ({
               datum: r.date, suma: r.amount_czk, protistrana: r.counterparty,
               poznamka: r.note, typ: r.typ, kategoria: r.category, kluc: r.dedup_key,
+              klienti: r.klienti || "", nieKlient: !!r.nie_klient,
             })),
             pravidla: (p.results as Record<string, unknown>[]).map((r) => ({ vzor: r.text_pattern, kategoria: r.category })),
           });
