@@ -242,6 +242,14 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
   return (
     <div ref={koren}>
     <Card>
+      {/* V uzávierke lišta (nadpis, filtre, výber, krok späť) stojí navrchu
+          a zoznam roluje pod ňou — Jerry, 7. 10. 2026: „aby keď si poznačujem
+          viac vecí, nemusel skrolovať zase hore, aby som to potvrdil". */}
+      <div style={uzavierka ? {
+        position: "sticky", top: 0, zIndex: 3, background: C.surface,
+        margin: "-16px -16px 0", padding: "16px 16px 2px",
+        borderBottom: `1px solid ${mix(C.border, 60)}`, borderRadius: "12px 12px 0 0",
+      } : undefined}>
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
         <H3><Info label={uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
@@ -335,6 +343,12 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
           </div>
 
 
+        </div>
+      )}
+      </div>
+
+      {(otvorene || uzavierka) && (
+        <div>
           <TableWrap>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
               <thead>
