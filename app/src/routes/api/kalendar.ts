@@ -50,7 +50,7 @@ type ZdrojStav = {
   id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null;
   snimka_kedy: string | null; snimka_ok: number | null; snimka_chyba: string | null;
 };
-type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; zmizla_at: string | null; prvy_raz: string | null };
+type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; typ_rucne: number | null; zmizla_at: string | null; prvy_raz: string | null };
 
 function okno() {
   // Hranice v PRAŽSKOM čase — `kal_udalosti.zaciatok` nesie miestny čas bez
@@ -101,7 +101,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   }
 
   const stare = ((await DB.prepare(
-    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, zmizla_at, prvy_raz FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
+    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, zmizla_at, prvy_raz FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
   ).bind(z.trener, od, do_).all()).results || []) as unknown as Ulozena[];
   const prveStiahnutie = stare.length === 0;
   const podlaUid = new Map(stare.map((s) => [s.uid, s]));
@@ -139,8 +139,16 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
     // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie
     // človeka je horšie než žiadne, sedenie by sa pripísalo cudziemu.
-    const typ = m?.typ ?? typZNazvu(u.nazov) ?? (presne ? "trening" : null);
+    const typZPravidiel = m?.typ ?? typZNazvu(u.nazov) ?? (presne ? "trening" : null);
     const s = podlaUid.get(u.uid);
+    /**
+     * ČO URČIL ČLOVEK, STIAHNUTIE NEPREPÍŠE.
+     *
+     * Druh sa inak odvodzuje z názvu a z naučeného mapovania — a to by pri
+     * každom ďalšom stiahnutí zmazalo ručnú opravu. Jerry, 7. 10. 2026: chce
+     * vedieť z karty klienta prepnúť tréning na úvodný a mať pokoj.
+     */
+    const typ = s?.typ_rucne ? (s.typ ?? typZPravidiel) : typZPravidiel;
 
     if (!s) {
       prikazy.push(DB.prepare(
@@ -570,6 +578,38 @@ export const Route = createFileRoute("/api/kalendar")({
          * z Googlu): zmaže udalosť v Google a u nás ju označí ako zmiznutú —
          * presne to, čo by o nej povedala aj najbližšia snímka.
          */
+        /**
+         * DRUH JEDNEJ UDALOSTI — tréning ↔ úvodný.
+         *
+         * Jerry, 7. 10. 2026 nad Petrom Baťom: „nedá sa prerobiť tréning na
+         * úvodný tréning, chýba mi možnosť kliknúť na to a upraviť kategóriu."
+         * Druh rozhoduje o tom, či sa hodina strhne z balíčka (tréning) alebo
+         * nie (úvodný sa platí sám za seba), takže to nie je kozmetika.
+         *
+         * Do Googlu sa nič nezapisuje — druh je Kokpitova vec, v kalendári
+         * nijako nevyzerá. Značka `typ_rucne` drží rozhodnutie proti ďalšiemu
+         * stiahnutiu.
+         */
+        if (akcia === "trening-druh") {
+          const uid = String(b.uid || "");
+          const trener = String(b.trener || "");
+          const typ = String(b.typ || "") === "uvodny" ? "uvodny" : "trening";
+          if (!uid || !trener) return Response.json({ ok: false, error: "Chýba udalosť." }, { status: 400 });
+          const r = await DB.prepare("SELECT nazov, klient, typ FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
+            .bind(uid, trener).first<{ nazov: string; klient: string | null; typ: string | null }>();
+          if (!r) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
+          await DB.prepare("UPDATE kal_udalosti SET typ = ?1, typ_rucne = 1, naposledy = ?2 WHERE uid = ?3 AND trener = ?4")
+            .bind(typ, teraz(), uid, trener).run();
+          await audit(DB, {
+            action: "kalendar-druh",
+            predmet: r.klient || r.nazov,
+            old: r.typ || "",
+            neu: typ,
+            actor: (await currentUser(request)) || undefined,
+          });
+          return Response.json({ ok: true, typ });
+        }
+
         if (akcia === "trening-zrus") {
           const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
           if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });

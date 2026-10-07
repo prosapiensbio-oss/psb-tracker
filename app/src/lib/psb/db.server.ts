@@ -67,7 +67,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // Dochádzka z kalendára od KOKPIT_OD (viď sedeniaZKalendara.ts). Zmiznutá
     // udalosť sa berie len vtedy, keď o nej Jerry povedal „bol tam".
     DB.prepare(
-      `SELECT u.klient, u.trener, u.zaciatok, u.koniec, u.nazov, u.typ
+      `SELECT u.uid, u.klient, u.trener, u.zaciatok, u.koniec, u.nazov, u.typ
          FROM kal_udalosti u
          LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
         WHERE u.klient IS NOT NULL AND u.typ IN ('trening','uvodny')

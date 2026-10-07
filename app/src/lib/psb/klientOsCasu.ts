@@ -27,7 +27,24 @@ import { dnesPraha, terazPraha } from "./cas";
 
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string; zKokpitu?: boolean }
-  | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number; zdarma?: string }
+  | {
+      druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean;
+      minut?: number; zdarma?: string;
+      /**
+       * `uid` udalosti v kalendári — len pri tréningoch, čo z neho prišli.
+       *
+       * Bez neho sa z karty klienta nedá povedať, KTORÚ udalosť má appka
+       * prepnúť na úvodný (Jerry, 7. 10. 2026). Z exportu PTmindera ho nemáme
+       * a tam sa druh ani meniť nedá — tie riadky zostávajú bez neho.
+       */
+      uid?: string;
+      /**
+       * Úvodný tréning. Platí sa sám za seba (1 100 Kč), takže na osi nemá
+       * vyzerať ako ktorýkoľvek iný tréning — Jerry, 7. 10. 2026: „nedá sa
+       * prerobiť tréning na úvodný, chýba mi možnosť upraviť kategóriu."
+       */
+      uvodny?: boolean;
+    }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean; prepadlo?: number };
 
@@ -117,7 +134,7 @@ type Platba = { client: string; date: string; amount: number; method: string; no
 type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string; added?: string; naObdobie?: number };
 type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
-type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null; trener?: string | null };
+type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null; trener?: string | null; uid?: string | null };
 type Zdarma = { klient: string; den: string; dovod: string };
 /** Riadok z vlastnej evidencie balíčkov (tabuľka `balicky`). */
 type BalicekKokpitu = {
@@ -259,7 +276,11 @@ export function osCasuKlienta(
   const out: Udalost[] = [];
 
   for (const s of moje(zdroj.sessions)) {
-    out.push({ druh: "trening", den: den(s.date), cas: s.time, trener: s.sessionTrainer, nazov: s.sessionName, minut: s.duration });
+    out.push({
+      druh: "trening", den: den(s.date), cas: s.time, trener: s.sessionTrainer, nazov: s.sessionName, minut: s.duration,
+      // Z exportu sa úvodný pozná len podľa názvu sedenia („Uvodny trenink").
+      uvodny: /uvodn/i.test(s.sessionName || "") || undefined,
+    });
   }
 
   // Tréningy, ktoré sú v kalendári a v exporte ešte nie. Porovnáva sa po
@@ -289,7 +310,7 @@ export function osCasuKlienta(
      * kalendár patrí konkrétnemu trénerovi a appka ho pozná. Dva riadky
      * o tom istom teda vyzerali ako dva rôzne druhy záznamu.
      */
-    out.push({ druh: "trening", den: d, cas: u.zaciatok.slice(11, 16), trener: u.trener || undefined, zKalendara: true });
+    out.push({ druh: "trening", den: d, cas: u.zaciatok.slice(11, 16), trener: u.trener || undefined, zKalendara: true, uid: u.uid || undefined, uvodny: u.typ === "uvodny" || undefined });
   }
 
   for (const x of zlucPlatby(

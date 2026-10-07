@@ -220,3 +220,29 @@ describe("skutočné hodiny minulého členstva sú v histórii z PTmindera, nie
     expect(b).toMatchObject({ hodin: 0, doplnenie: true });
   });
 });
+
+describe("úvodný tréning na osi", () => {
+  it("z kalendára si nesie druh aj uid, aby sa dal prepnúť", () => {
+    // Jerry, 7. 10. 2026: Petr Baťa mal 5. 10. úvodný, ale na karte stálo
+    // len „tréning 17:00 · Terezka" a nedalo sa to opraviť.
+    const os = osCasuKlienta("Petr Baťa", {
+      sessions: [], payments: [], packages: [],
+      kalUdalosti: [
+        { uid: "abc@google.com|2026-10-05T17:00", klient: "Petr Baťa", zaciatok: "2026-10-05T17:00", typ: "uvodny", trener: "Terezka" },
+        { uid: "def@google.com|2026-10-12T17:00", klient: "Petr Baťa", zaciatok: "2026-10-12T17:00", typ: "trening", trener: "Terezka" },
+      ],
+    } as never, "2026-10-13");
+    const t = os.filter((x) => x.druh === "trening") as { den: string; uvodny?: boolean; uid?: string }[];
+    expect(t.find((x) => x.den === "2026-10-05")?.uvodny).toBe(true);
+    expect(t.find((x) => x.den === "2026-10-05")?.uid).toBe("abc@google.com|2026-10-05T17:00");
+    expect(t.find((x) => x.den === "2026-10-12")?.uvodny).toBeUndefined();
+  });
+
+  it("z exportu sa úvodný pozná podľa názvu sedenia", () => {
+    const os = osCasuKlienta("Kto Vie", {
+      sessions: [{ client: "Kto Vie", date: "2026-09-01", sessionName: "Uvodny trenink OFFLINE", duration: 60 }],
+      payments: [], packages: [],
+    } as never, "2026-10-01");
+    expect((os[0] as { uvodny?: boolean }).uvodny).toBe(true);
+  });
+});

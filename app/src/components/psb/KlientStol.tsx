@@ -14,6 +14,7 @@ import { adresyMailu } from "../../lib/psb/mime";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
+import { UVODNY } from "../../lib/psb/uvodnaStranka";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
@@ -72,7 +73,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
-  kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[];
+  kalUdalosti?: { uid?: string; trener?: string; zaciatok: string; klient: string | null; typ: string | null }[];
   /** Koľko satoshi klient celkovo zaplatil (z appky PSB Bitcoin). */
   btcSats?: Record<string, number>;
   /** Jednotlivé bitcoinové platby a aktuálny kurz — na záložku ₿. */
@@ -795,6 +796,28 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     oznam("klienti");
   };
 
+  /**
+   * KATEGÓRIA TRÉNINGU — bežný alebo úvodný.
+   *
+   * Jerry, 7. 10. 2026: „chýba mi možnosť kliknúť na to a upraviť tú
+   * udalosť, teda jeho kategóriu." Druh rozhoduje, či sa hodina strhne
+   * z balíčka a za čo sa fakturuje, takže to nie je názov, ale rozhodnutie.
+   * Appka si ho poznačí ako ručný a ďalšie sťahovanie kalendára ho neprepíše.
+   */
+  const zmenDruh = async (uid: string, trener: string, uvodny: boolean) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/kalendar", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "trening-druh", uid, trener, typ: uvodny ? "uvodny" : "trening" }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa zmeniť"); return; }
+    // Dochádzka aj zostatok hodín visia na druhu — bez signálu by karta
+    // ďalej tvrdila staré číslo a kalendár starý druh.
+    oznam("klienti");
+    oznam("kalendar");
+  };
+
   /** Príjem z výpisu patrí tomuto klientovi — jedným klikom, aj s naučením. */
   const priradPrijem = async (fioId: string) => {
     setPracujem(true); setChyba("");
@@ -1513,6 +1536,30 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   </span>
                 </div>
               )}
+              {/* FAKTÚRA NA ČOKOĽVEK, NIELEN NA NAHODENÝ BALÍČEK.
+                  Jerry, 7. 10. 2026 nad Petrom Baťom: „nedá sa vystaviť
+                  faktúra na úvodný tréning, niekde v profile a ešte nevieme
+                  kde by mala byť tá možnosť." Patrí sem, k peniazom klienta:
+                  tu sa nahadzujú balíčky aj vidí dlh. Úvodný má vlastné
+                  tlačidlo, lebo je to najčastejší prípad; druhé otvorí
+                  prázdny formulár na čokoľvek iné. */}
+              {onFaktura && (
+                <div style={{ margin: "0 0 10px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11.5, color: C.textDim }}>Vystaviť faktúru:</span>
+                  <button
+                    onClick={() => onFaktura({ klient: meno, popis: "Úvodní trénink", cena: UVODNY.cenaCzk })}
+                    style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${C.border}`, background: "none", color: C.text, fontFamily: "inherit" }}
+                  >
+                    úvodný tréning · {fmtCZK(UVODNY.cenaCzk)}
+                  </button>
+                  <button
+                    onClick={() => onFaktura({ klient: meno, popis: "", cena: 0 })}
+                    style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "none", color: C.textMuted, fontFamily: "inherit" }}
+                  >
+                    iné…
+                  </button>
+                </div>
+              )}
               {ponukniFakturu && onFaktura && (
                 <div style={{ margin: "0 0 10px", padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12.5, color: C.text }}>
@@ -1754,6 +1801,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 pracujem={pracujem}
                 onZdarma={(zrus) => (zrus || zdarmaDen === x.den ? void oznacZdarma(x.den, zrus) : (setZdarmaDen(x.den), setZdarmaDovod("")))}
                 onZrusZapis={() => { setZdarmaDen(""); setZdarmaDovod(""); }}
+                onDruh={x.druh === "trening" && x.uid && x.trener ? (uvodny) => void zmenDruh(x.uid!, x.trener!, uvodny) : undefined}
               />
             ))}
 
@@ -2019,7 +2067,7 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
   );
 }
 
-function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod, setDovod, pracujem, onZdarma, onZrusZapis }: {
+function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod, setDovod, pracujem, onZdarma, onZrusZapis, onDruh }: {
   u: ReturnType<typeof osCasuKlienta>[number];
   stav?: StavRiadku;
   /** Tréningy, ktoré sa vybrali na tento balíček — rozbaľujú sa klikom. */
@@ -2032,6 +2080,11 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
   pracujem?: boolean;
   onZdarma?: (zrus: boolean) => void;
   onZrusZapis?: () => void;
+  /**
+   * Prepnúť tréning na úvodný a späť. Je to kategória, nie kozmetika:
+   * úvodný sa platí sám za seba a fakturuje sa inak než hodina z balíčka.
+   */
+  onDruh?: (uvodny: boolean) => void;
 }) {
   if (u.druh === "balicekOd") {
     const pocet = treningy?.length || 0;
@@ -2103,7 +2156,7 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
     <div style={{ ...riadok, flexWrap: "wrap" }}>
       <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>
-        tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}
+        {u.uvodny ? <b style={{ color: C.text }}>úvodný tréning</b> : "tréning"}{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}
         {zdarma && (
           <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: C.green }}>
             zdarma{u.zdarma ? ` · ${u.zdarma}` : ""}
@@ -2111,6 +2164,21 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
         )}
       </span>
       {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
+      {/* KATEGÓRIU TRÉNINGU PREPÍNA ČLOVEK (Jerry, 7. 10. 2026).
+          Druh sa inak určuje z názvu udalosti a z naučeného mapovania; keď
+          sa Jerry v kalendári preklikne alebo udalosť pomenuje inak, nemal
+          odkiaľ to opraviť. Len pri udalostiach z kalendára — sedenie
+          z PTmindera appka prepísať nevie. */}
+      {onDruh && u.uid && (
+        <button
+          onClick={() => onDruh(!u.uvodny)}
+          disabled={pracujem}
+          title={u.uvodny ? "Je to bežný tréning, nie úvodný" : "Je to úvodný tréning — platí sa sám za seba"}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10.5, color: C.textMuted, padding: "2px 4px" }}
+        >
+          {u.uvodny ? "je to bežný tréning" : "označiť ako úvodný"}
+        </button>
+      )}
       {onZdarma && (
         <button
           onClick={() => onZdarma(zdarma)}
