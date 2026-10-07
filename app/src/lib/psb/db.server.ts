@@ -31,7 +31,7 @@ import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK, merania] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK, merania, webKontroly] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -85,6 +85,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      */
     DB.prepare("SELECT klient, datum, oblasti_json, posun, poznamka, zdroj FROM klient_merania ORDER BY datum")
       .all().catch(() => ({ results: [] })),
+    // Posledný beh nočnej kontroly webu (migrácia 0102). Len POSLEDNÝ: história
+    // je na obrazovke, do registra patrí dnešný stav.
+    DB.prepare(
+      `SELECT kluc, nazov, stav, detail, beh FROM web_kontroly
+        WHERE beh = (SELECT MAX(beh) FROM web_kontroly) ORDER BY kluc`,
+    ).all().catch(() => ({ results: [] })),
   ]);
 
   const sessionsPtminder: SessionRow[] = (sessions.results as any[]).map((r) => ({
@@ -169,6 +175,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     doplneniaHodiny: Object.fromEntries(
       (doplneniaH.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, Number(r.hodiny) || 0]),
     ),
+    webKontroly: (webKontroly.results as any[]).map((r) => ({
+      kluc: String(r.kluc), nazov: String(r.nazov), stav: String(r.stav) as "ok" | "varovanie" | "chyba",
+      detail: String(r.detail || ""), beh: String(r.beh),
+    })),
     treningyZdarma: (zdarma.results as any[]).map((r) => ({
       id: r.id, klient: r.client_name, den: String(r.den).slice(0, 10), dovod: r.dovod || "", kto: r.kto || "",
     })),
@@ -189,7 +199,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * inak by sa musel doplniť filter do pätnástich výpočtov a na šestnásty
      * by sa zabudlo. Magnety sa nestrácajú, sú vedľa v `magnety`.
      */
-    leads: (leads.results as any[]).filter((r) => (r.druh || "dopyt") !== "magnet").map((r) => ({
+    leads: (leads.results as any[]).filter((r) => {
+      const d = r.druh || "dopyt";
+      // `kontrola` je syntetický riadok nočnej kontroly webu. Nikdy sa nesmie
+      // dostať do Dopytov — inak by ráno vyzeral ako človek, ktorý napísal.
+      return d !== "magnet" && d !== "kontrola";
+    }).map((r) => ({
       id: r.id,
       date: r.date,
       name: r.name || "",

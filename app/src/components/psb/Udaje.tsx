@@ -107,6 +107,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
           />
         </H3>
         <NapojenieWebu />
+        <KontrolaWebu />
         <NapojenieMailu />
         <NapojenieSms />
         <NapojenieMeta />
@@ -1022,6 +1023,88 @@ function NapojenieSms() {
           ? ` ${chybaOdosielatela(odosielatel, brana)}`
           : ""}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Kontrola webu — či sa dá dopyt z webu vôbec odoslať (od 7. 10. 2026).
+ *
+ * Beží sama o 3:50 a padnutý riadok ide do registra. Tlačidlo je tu na to,
+ * aby sa dala pustiť hneď po zásahu do webu — nie aby sa na ňu chodilo pozerať.
+ * Pozor: z obrazovky sa kontroluje len to, čo sa dá prečítať zo stránky.
+ * Syntetický dopyt posiela plánovač, lebo appka sa sama volať nemôže.
+ */
+function KontrolaWebu() {
+  type Riadok = { kluc: string; nazov: string; stav: "ok" | "varovanie" | "chyba"; detail: string };
+  const [riadky, setRiadky] = useState<Riadok[]>([]);
+  const [beh, setBeh] = useState("");
+  const [padlo, setPadlo] = useState<{ kluc: string; od: string; do: string; kolko: number }[]>([]);
+  const [bezi, setBezi] = useState(false);
+
+  const nacitaj = async () => {
+    const r = await fetch("/api/web-kontrola", { credentials: "same-origin" })
+      .then((x) => x.json() as Promise<{ ok: boolean; beh: string; riadky: Riadok[]; padlo: typeof padlo }>)
+      .catch(() => null);
+    if (!r?.ok) return;
+    setRiadky(r.riadky || []);
+    setBeh(r.beh || "");
+    setPadlo(r.padlo || []);
+  };
+  useEffect(() => { void nacitaj(); }, []);
+
+  const skontroluj = async () => {
+    setBezi(true);
+    await fetch("/api/web-kontrola", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: "{}" })
+      .catch(() => null);
+    await nacitaj();
+    setBezi(false);
+  };
+
+  const farba = (st: string) => (st === "ok" ? C.green : st === "varovanie" ? C.orange : C.red);
+  const zle = riadky.filter((r) => r.stav !== "ok");
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          <Info
+            label="Kontrola webu"
+            text="Každú noc o 3:50 porovná, čo formulár na obrazovke posiela, s tým, čo plugin žiada, a overí, že dopyt z webu naozaj zapíše riadok v Kokpite. Vzniklo to preto, že test postury bol od 23. 9. do 7. 10. 2026 rozbitý a prišlo sa na to až ručným pokusom. Tlačidlo spustí kontrolu stránok hneď; syntetický dopyt posiela plánovač v noci."
+          />
+        </div>
+        <button onClick={() => void skontroluj()} disabled={bezi} style={{ ...btn("ghost"), opacity: bezi ? 0.5 : 1 }}>
+          {bezi ? "kontrolujem…" : "Skontrolovať teraz"}
+        </button>
+      </div>
+      {!riadky.length ? (
+        <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>Kontrola zatiaľ nebežala.</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11.5, color: C.textMuted, margin: "6px 0 8px" }}>
+            {beh ? `posledný beh ${fmtDMY(beh.slice(0, 10))}` : ""}
+            {zle.length ? ` · ${zle.length} z ${riadky.length} nie je v poriadku` : ` · všetkých ${riadky.length} v poriadku`}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {riadky.map((r) => (
+              <div key={r.kluc} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                <span style={{ ...badge(r.stav === "ok" ? "green" : r.stav === "varovanie" ? "orange" : "red"), flexShrink: 0 }}>
+                  {r.stav === "ok" ? "ide" : r.stav === "varovanie" ? "pozor" : "stojí"}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{r.nazov}</div>
+                  <div style={{ fontSize: 11.5, color: r.stav === "ok" ? C.textDim : farba(r.stav) }}>{r.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {padlo.length > 0 && (
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
+              Za posledných 30 dní padlo: {padlo.map((p) => `${p.kluc} (${p.kolko}×, od ${fmtDMY(p.od.slice(0, 10))})`).join(" · ")}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

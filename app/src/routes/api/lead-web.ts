@@ -78,7 +78,18 @@ export const Route = createFileRoute("/api/lead-web")({
         const ulozene = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'web_lead_secret'")
           .first<{ value: string }>();
         const ocakavane = ulozene?.value ? String(JSON.parse(ulozene.value)) : "";
-        if (!ocakavane || dane !== ocakavane) {
+        /**
+         * Druhý kľúč: plánovač.
+         *
+         * Nočná kontrola posiela syntetický dopyt z workera `kokpit-cron`, ktorý
+         * tajomstvo webu nemá (a nemal by ho mať — to patrí do WordPressu).
+         * Preukazuje sa teda tokenom plánovača, tým istým ako kalendár a pošta,
+         * a smie poslať VÝHRADNE kontrolný riadok.
+         */
+        const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
+        const danyCron = request.headers.get("x-cron-token") || "";
+        const odPlanovaca = !!cronToken && cronToken.length === danyCron.length && cronToken === danyCron;
+        if (!odPlanovaca && (!ocakavane || dane !== ocakavane)) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
 
@@ -133,6 +144,21 @@ export const Route = createFileRoute("/api/lead-web")({
         const jeMagnet = /lead magnet/i.test(poznamka) || /protokol-o-myofascialnim/i.test(stranka);
 
         /**
+         * Syntetický dopyt z nočnej kontroly (7. 10. 2026).
+         *
+         * Kontrola potrebuje vedieť, že cesta web → Kokpit NAOZAJ zapisuje —
+         * a to sa nedá overiť odpoveďou endpointu, len riadkom v databáze.
+         * Ide teda tou istou cestou ako skutočný dopyt, ale s príznakom:
+         * `druh = 'kontrola'` ho drží mimo Dopytov aj mimo magnetov a Mete sa
+         * nehlási (konverzia, ktorú nikto neurobil, by kazila optimalizáciu).
+         * Kontrola si ho vzápätí zmaže sama.
+         *
+         * Tajomstvo je overené vyššie, takže stačí príznak — kto sa dostal sem,
+         * už dokázal, že je to web alebo plánovač.
+         */
+        const jeKontrola = odPlanovaca || b.kontrola === true || kus(b.kontrola, 10) === "1";
+
+        /**
          * Robot sa Mete nehlási.
          *
          * 26.–29. 9. 2026 prešlo formulárom päť strojových odoslaní (náhodné
@@ -167,7 +193,7 @@ export const Route = createFileRoute("/api/lead-web")({
             poznamka,
             new Date().toISOString(),
             email, telefon, utmCampaign, utm, stranka,
-            jeMagnet ? "magnet" : "dopyt",
+            jeKontrola ? "kontrola" : jeMagnet ? "magnet" : "dopyt",
           )
           .run();
 
@@ -188,7 +214,9 @@ export const Route = createFileRoute("/api/lead-web")({
         for (const r of (nast.results as { key: string; value: string }[]) || []) {
           try { m[r.key] = String(JSON.parse(r.value)); } catch { m[r.key] = r.value; }
         }
-        if (jeRobot) {
+        if (jeKontrola) {
+          capi = " · nočná kontrola — Mete sa nehlási";
+        } else if (jeRobot) {
           capi = " · Mete sa nehlásilo: vyzerá to na robota";
         } else if (m.meta_capi_token && m.meta_pixel_id) {
           const v = await posliLead(m.meta_pixel_id, m.meta_capi_token, {
@@ -214,7 +242,7 @@ export const Route = createFileRoute("/api/lead-web")({
         }
 
         await audit(DB, {
-          action: "dopyt-z-webu",
+          action: jeKontrola ? "kontrola-dopytu" : "dopyt-z-webu",
           predmet: kluc,
           neu: ([meno, email, utmCampaign].filter(Boolean).join(" · ") + capi).slice(0, 300),
           actor: "web",

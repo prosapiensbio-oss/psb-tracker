@@ -94,7 +94,12 @@ export type Lead = {
    * magnet. Do počtu dopytov, ceny za dopyt a lievika ide LEN `dopyt`
    * (Jerry, 24. 9. 2026). Magnet je e-mail do zoznamu, nie otázka na tréning.
    */
-  druh: "dopyt" | "magnet";
+  /**
+   * `kontrola` je syntetický riadok nočnej kontroly webu — do Dopytov ani do
+   * magnetov sa nedostane (filtruje sa v `db.server.ts`) a kontrola si ho
+   * po overení maže.
+   */
+  druh: "dopyt" | "magnet" | "kontrola";
 };
 
 export type ClientOverride = {
@@ -211,6 +216,12 @@ export type PSBData = {
    * nesmú, mailing z nich žije.
    */
   magnety: LeadMagnet[];
+  /**
+   * Posledný beh nočnej kontroly webu (`web_kontroly`). Register z nej robí
+   * položku, keď niečo padlo — bez toho by kontrola bežala do prázdna a
+   * o rozbitom formulári by sa Jerry dozvedel znova až ručným pokusom.
+   */
+  webKontroly: { kluc: string; nazov: string; stav: "ok" | "varovanie" | "chyba"; detail: string; beh: string }[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
   zavery: ZaverRow[];
   /** Nezaplatené poplatky z PTminderu — čo je v exporte, je otvorené. */
@@ -329,6 +340,7 @@ export const EMPTY_DATA: PSBData = {
   leads: [],
   objednaneUvodne: [],
   magnety: [],
+  webKontroly: [],
 };
 
 export type CSVType = "sessions" | "services" | "payments" | "packages" | "transakcie" | "cennik" | "idoklad" | "klienti" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";

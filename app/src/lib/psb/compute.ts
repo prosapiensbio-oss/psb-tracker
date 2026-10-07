@@ -2026,6 +2026,26 @@ export function deriveAnomalies(
   const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"]) =>
     out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie });
 
+  // ── Kontrola webu ────────────────────────────────────────────────────────
+  //
+  // Nočná kontrola (migrácia 0102) overuje, či sa dá dopyt z webu vôbec
+  // odoslať. Keby sa jej nález nedostal do registra, bežala by do prázdna —
+  // a presne to bol problém testu postury: rozbil sa 23. 9. 2026 a prišlo sa
+  // na to 7. 10. ručným pokusom. Jedna položka za celý beh, nie päť.
+  {
+    const zle = (data.webKontroly || []).filter((k) => k.stav !== "ok");
+    if (zle.length) {
+      const chyby = zle.filter((k) => k.stav === "chyba");
+      const beh = (data.webKontroly[0]?.beh || "").slice(0, 10);
+      push(
+        `web-kontrola|${beh}`,
+        chyby.length ? "red" : "orange",
+        chyby.length ? "Web nefunguje" : "Web — upozornenie",
+        `${(chyby.length ? chyby : zle).map((k) => `${k.nazov}: ${k.detail}`).join(" · ")}`,
+      );
+    }
+  }
+
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
   const dnesISO = dnesPraha(now);

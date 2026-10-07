@@ -131,6 +131,62 @@ const push = (env: Env) =>
     }),
   );
 
+/**
+ * Nočná kontrola webu (7. 10. 2026).
+ *
+ * Dva kroky, a práve v tomto poradí: najprv sa pošle SYNTETICKÝ DOPYT na
+ * `/api/lead-web` — tou istou cestou, akou chodí skutočný dopyt z WordPressu —
+ * a až potom sa jeho kľúč odovzdá kontrole, ktorá overí, že riadok v databáze
+ * naozaj vznikol, a zmaže ho.
+ *
+ * Prečo to posiela plánovač a nie sama appka: worker, ktorý volá sám seba cez
+ * verejnú adresu, je zbytočná slučka a na workers.dev končí 404. Plánovač má
+ * službové prepojenie, tak to spraví on. Tajomstvo webu pritom nepotrebuje —
+ * `/api/lead-web` prijme aj token plánovača, ale vtedy smie zapísať výhradne
+ * kontrolný riadok.
+ */
+const kontrolaWebu = async (env: Env) => {
+  const zac = Date.now();
+  let dopyt: { ok: boolean; id?: string; detail: string; trvanie: number } = {
+    ok: false, detail: "syntetický dopyt sa neodoslal", trvanie: 0,
+  };
+  try {
+    const r = await env.KOKPIT.fetch(
+      new Request("https://kokpit.prosapiensbio.workers.dev/api/lead-web", {
+        method: "POST",
+        headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+        body: JSON.stringify({
+          kontrola: true,
+          name: "Nočná kontrola Kokpitu",
+          email: "kontrola@prosapiens.cz",
+          phone: "000000000",
+          message: "Syntetický dopyt nočnej kontroly. Ak toto vidíš v Dopytoch, mazanie zlyhalo.",
+          page: "https://www.prosapiens.cz/uvodni-trenink/",
+        }),
+      }),
+    );
+    const t = await r.text();
+    let j: { ok?: boolean; id?: string } = {};
+    try { j = JSON.parse(t) as typeof j; } catch { /* telo sa nedá rozobrať — ukáže sa nižšie */ }
+    dopyt = {
+      ok: r.ok && !!j.ok && !!j.id,
+      id: j.id,
+      // Nikdy nehlás len stavový kód: nerozobrané telo je stále stopa.
+      detail: r.ok && j.ok ? "" : `HTTP ${r.status}: ${t.slice(0, 200)}`,
+      trvanie: Date.now() - zac,
+    };
+  } catch (e) {
+    dopyt = { ok: false, detail: `spojenie zlyhalo: ${String(e).slice(0, 200)}`, trvanie: Date.now() - zac };
+  }
+  return env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/web-kontrola?cron=1", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ dopyt }),
+    }),
+  );
+};
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     // Ranná dávka notifikácií na telefón. 5:10 UTC = 7:10 u nás v lete,
@@ -161,6 +217,18 @@ export default {
           }
         }
       })());
+      return;
+    }
+    // Kontrola webu beží o 3:50 UTC, teda PRED nočným sťahovaním textu webu
+    // aj pred rannou dávkou push. Keď sa formulár cez deň pokazí, Jerry sa to
+    // dozvie ráno — nie o dva týždne, ako pri teste postury (23. 9. – 7. 10.).
+    if (event.cron === "50 3 * * *") {
+      ctx.waitUntil(
+        kontrolaWebu(env).then(
+          async (r) => console.log(`kontrola webu: HTTP ${r.status} ${(await r.text()).slice(0, 400)}`),
+          (e) => console.error("kontrola webu zlyhala:", e),
+        ),
+      );
       return;
     }
     if (event.cron === "30 3 * * *") {
@@ -210,6 +278,11 @@ export default {
   // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
   async fetch(req: Request, env: Env) {
     const q = new URL(req.url).searchParams;
+    // `?kontrola=1` spustí nočnú kontrolu webu hneď.
+    if (q.get("kontrola") === "1") {
+      const r = await kontrolaWebu(env);
+      return new Response(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
+    }
     // `?web=1` skúša načítanie textu webu bez čakania na 3:30 ráno.
     // `?push=1` pošle rannú dávku hneď — inak by sa overovalo až zajtra ráno.
     // `?meta=1` spustí sťahovanie reklám hneď — na overenie bez čakania na ráno.
