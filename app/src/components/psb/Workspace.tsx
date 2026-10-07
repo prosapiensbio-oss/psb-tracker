@@ -1822,17 +1822,19 @@ const tlacidloKarty = {
 
 /**
  * Import s vlastnými dátumami alebo zo súboru — len na požiadanie. Bežný
- * mesiac stiahne zelené tlačidlo kroku. Rozrobený náhľad sa ale schovať
- * nesmie: kto zaraďoval a odišiel, musí ho po návrate nájsť otvorený.
+ * mesiac stiahne zelené tlačidlo kroku. Rozrobený náhľad sa sám neotvára
+ * (Jerrymu v ňom od 5. 10. visel starý výpis a panel kvôli nemu svietil
+ * stále), ale odkaz povie, že tam je.
  */
 function IneObdobieFio({ onHotovo }: { onHotovo: () => void }) {
-  const [ukaz, setUkaz] = useState(() => {
+  const [ukaz, setUkaz] = useState(false);
+  const rozrobene = (() => {
     try { return !!localStorage.getItem("psb-banka-nahlad"); } catch { return false; }
-  });
+  })();
   if (!ukaz) {
     return (
       <button onClick={() => setUkaz(true)} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", textDecoration: "underline" }}>
-        stiahnuť iné obdobie alebo nahrať súbor z Fio
+        stiahnuť iné obdobie alebo nahrať súbor z Fio{rozrobene ? " · máš tam rozrobený náhľad" : ""}
       </button>
     );
   }
