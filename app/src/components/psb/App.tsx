@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
@@ -909,6 +910,8 @@ export function PSBApp() {
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
   const [, setFioTik] = useState(0);
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
+  /** Výdavky na potvrdenie alebo bez kategórie, po mesiacoch (krok Fio). */
+  const [bankaNaPotvrdenie, setBankaNaPotvrdenie] = useState<Record<string, number>>({});
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
   /** Nákupy z BTC po mesiacoch — pre rozpis bunky aj pre kontrolu dvojitého zápisu. */
   const [btcNakupy, setBtcNakupy] = useState<Record<string, BtcNakup[]>>({});
@@ -1360,7 +1363,7 @@ function skupinaFaktur(
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string; potvrdene?: boolean }[] }) => {
         // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
@@ -1666,6 +1669,18 @@ function skupinaFaktur(
         // Sumy si drží aj React — register z nich robí kontrolu „čo nedorazilo"
         // a „čo nesedí s Excelom". Bez toho by o nich vedel len model.
         setBankaSumy(sumy);
+        // Oranžové fajky po mesiacoch — krok Fio v uzávierke je hotový, až
+        // keď ich v mesiaci niet (Jerry, 7. 10. 2026). Nezaradené sa rátajú
+        // tiež: bez kategórie výdavok v P&L nie je vôbec.
+        const naPotvrdenie: Record<string, number> = {};
+        for (const p of j.pohyby || []) {
+          const maSplit = !!(p.kluc && platnySplit(pohybSplits[p.kluc]));
+          if (cakaNaPotvrdenie(p, maSplit) || patriDoFiltra(p, "nezaradene", maSplit)) {
+            const mk = String(p.datum).slice(0, 7);
+            naPotvrdenie[mk] = (naPotvrdenie[mk] || 0) + 1;
+          }
+        }
+        setBankaNaPotvrdenie(naPotvrdenie);
         setBankaPohyby(pohybyPodla);
         setBankaPrijmy(prijmyBanka);
         // Rozpis má odteraz vlastnú verziu (nastavRozpis vyššie), takže sa
@@ -2171,8 +2186,10 @@ function skupinaFaktur(
       {
         id: "fio",
         label: "Výpis z Fio",
-        hotovo: !!bankaSumy[mk],
-        detail: bankaSumy[mk] ? (pohybovMes ? `${pohybovMes} pohybov, všetky zaradené` : "nahratý") : "chýba výpis",
+        hotovo: !!bankaSumy[mk] && !bankaNaPotvrdenie[mk],
+        detail: !bankaSumy[mk] ? "chýba výpis"
+          : bankaNaPotvrdenie[mk] ? `${bankaNaPotvrdenie[mk]} výdavkov čaká na potvrdenie alebo kategóriu`
+          : pohybovMes ? `${pohybovMes} pohybov, všetky potvrdené` : "nahratý",
         tab: "workspace",
         sub: "uzavierka",
       },
@@ -2249,7 +2266,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.

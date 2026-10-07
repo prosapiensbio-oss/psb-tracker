@@ -663,7 +663,8 @@ export function useAssistantChat(
         void fetch("/api/fio", {
           method: "POST", credentials: "same-origin",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ akcia: "kategoria", zmeny }),
+          // Jarvisovo zaradenie je návrh — oranžová fajka v uzávierke ostáva.
+          body: JSON.stringify({ akcia: "kategoria", zmeny, potvrd: false }),
         })
           .then((r) => r.json())
           .then((j: { ok?: boolean; zmenene?: number; zamknute?: number }) => {

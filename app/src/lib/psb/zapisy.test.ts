@@ -26,6 +26,10 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  fio_transactions: {
+    potvrdene_at: "potvrdenie výdavku v uzávierke — pri importe je kategória len návrh",
+    potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at",
+  },
   ponuky_terminov: {
     zrusene_at: "mäkké zrušenie — nová ponuka zrušená nevzniká",
   },

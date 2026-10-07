@@ -101,7 +101,7 @@ export const Route = createFileRoute("/api/fio")({
             // treba vidieť, či ho niekto vybavil (Jerry, 7. 10. 2026).
             DB.prepare(
               `SELECT f.date, f.amount_czk, f.counterparty, f.note, f.typ, f.category, f.dedup_key,
-                      p.klienti, CASE WHEN n.fio_id IS NULL THEN 0 ELSE 1 END nie_klient
+                      p.klienti, CASE WHEN n.fio_id IS NULL THEN 0 ELSE 1 END nie_klient, f.potvrdene_at
                  FROM fio_transactions f
                  LEFT JOIN (SELECT fio_id, group_concat(klient, ', ') klienti FROM platby
                              WHERE fio_id IS NOT NULL AND zrusene_at IS NULL GROUP BY fio_id) p ON p.fio_id = f.id
@@ -116,6 +116,7 @@ export const Route = createFileRoute("/api/fio")({
               datum: r.date, suma: r.amount_czk, protistrana: r.counterparty,
               poznamka: r.note, typ: r.typ, kategoria: r.category, kluc: r.dedup_key,
               klienti: r.klienti || "", nieKlient: !!r.nie_klient,
+              potvrdene: !!r.potvrdene_at,
             })),
             pravidla: (p.results as Record<string, unknown>[]).map((r) => ({ vzor: r.text_pattern, kategoria: r.category })),
           });
@@ -128,7 +129,7 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[] };
+        let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -316,23 +317,60 @@ export const Route = createFileRoute("/api/fio")({
         // Úprava kategórie po zápise. Náhľad bol dôkladný, ale po zápise sa už
         // nedalo nič zmeniť — jeden nesprávny klik bol trvalý a človek sa potom
         // právom bojí zapísať čokoľvek, čo si nie je istý.
+        /**
+         * POTVRDENIE VÝDAVKOV — „videl som, sedí" (Jerry, 7. 10. 2026).
+         * Len to, čo kategóriu má, alebo je rozdelené (split žije mimo
+         * tabuľky, preto ho posiela obrazovka v `rozdelene`). Uzavretý
+         * mesiac sa nemení.
+         */
+        if (b.akcia === "potvrd") {
+          const kluce = (Array.isArray(b.kluce) ? b.kluce : []).map(String).filter(Boolean).slice(0, 2000);
+          const rozdelene = new Set((Array.isArray(b.rozdelene) ? b.rozdelene : []).map(String));
+          if (!kluce.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
+          const zamky = await zamknuteMesiace(DB);
+          const kto = (await currentUser(request)) || "jerry";
+          const kedy = new Date().toISOString();
+          const otazniky = kluce.map((_, i) => `?${i + 1}`).join(",");
+          const rs = ((await DB.prepare(
+            `SELECT dedup_key, date, category FROM fio_transactions WHERE dedup_key IN (${otazniky}) AND amount_czk < 0`,
+          ).bind(...kluce).all()).results || []) as { dedup_key: string; date: string; category: string | null }[];
+          // `zrus` = klik na zelenú fajku omylom; vráti riadok medzi návrhy.
+          const zrus = b.zrus === true;
+          const ok = rs.filter((r) => !jeZamknuty(zamky, String(r.date)) && (zrus || r.category || rozdelene.has(r.dedup_key)));
+          if (ok.length) {
+            await DB.batch(ok.map((r) => DB.prepare(
+              "UPDATE fio_transactions SET potvrdene_at = ?2, potvrdil = ?3 WHERE dedup_key = ?1",
+            ).bind(r.dedup_key, zrus ? null : kedy, zrus ? null : kto)));
+          }
+          await audit(DB, { action: zrus ? "banka-potvrdenie-zrusene" : "banka-potvrdene", predmet: `${ok.length} výdavkov`, neu: `${zrus ? "zrušené potvrdenie" : "potvrdené"} ${ok.length} z ${kluce.length}`, actor: kto });
+          return Response.json({ ok: true, potvrdene: ok.length, preskocene: kluce.length - ok.length });
+        }
+
         if (b.akcia === "kategoria") {
           const zmeny = Array.isArray(b.zmeny) ? b.zmeny.slice(0, 2000) : [];
           if (!zmeny.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
           const zamky = await zamknuteMesiace(DB);
           const stmts = [];
           let zmenene = 0, zamknute = 0;
+          // Ručné zaradenie je zároveň potvrdenie — človek sa na riadok
+          // pozrel. Jarvisov blok posiela `potvrd: false`: jeho kategória je
+          // návrh a ostáva s oranžovou fajkou, kým ju Jerry neodklikne.
+          const potvrdil = b.potvrd === false ? null : (await currentUser(request)) || "jerry";
+          const potvrdeneAt = potvrdil ? new Date().toISOString() : null;
           for (const z of zmeny) {
             const kluc = String(z.kluc || "");
             if (!kluc) continue;
             if (z.datum && jeZamknuty(zamky, String(z.datum))) { zamknute++; continue; }
+            const kat = String(z.kategoria || "");
+            // Prázdna kategória sa nepotvrdzuje — nie je čo.
+            const pt = kat ? potvrdeneAt : null, pk = kat ? potvrdil : null;
             // Poznámka je voliteľná — keď nepríde, kategória sa mení sama.
             stmts.push(
               z.poznamka === undefined
-                ? DB.prepare("UPDATE fio_transactions SET category = ?2 WHERE dedup_key = ?1")
-                    .bind(kluc, String(z.kategoria || ""))
-                : DB.prepare("UPDATE fio_transactions SET category = ?2, note = ?3 WHERE dedup_key = ?1")
-                    .bind(kluc, String(z.kategoria || ""), String(z.poznamka || "").slice(0, 400)),
+                ? DB.prepare("UPDATE fio_transactions SET category = ?2, potvrdene_at = ?3, potvrdil = ?4 WHERE dedup_key = ?1")
+                    .bind(kluc, kat, pt, pk)
+                : DB.prepare("UPDATE fio_transactions SET category = ?2, note = ?3, potvrdene_at = ?4, potvrdil = ?5 WHERE dedup_key = ?1")
+                    .bind(kluc, kat, String(z.poznamka || "").slice(0, 400), pt, pk),
             );
             zmenene++;
           }

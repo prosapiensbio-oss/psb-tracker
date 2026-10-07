@@ -5,7 +5,7 @@ import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
-import { patriDoFiltra, stavPrijmu, type FilterPohybov } from "../../lib/psb/filtrePohybov";
+import { cakaNaPotvrdenie, patriDoFiltra, stavPrijmu, type FilterPohybov } from "../../lib/psb/filtrePohybov";
 import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
@@ -25,6 +25,8 @@ type Pohyb = {
   datum: string; suma: number; protistrana: string; poznamka: string; typ: string; kategoria: string; kluc: string;
   /** Pri príjme: komu ho krok Platby a balíčky priradil / že nie je klient. */
   klienti?: string; nieKlient?: boolean;
+  /** Výdavok: Jerry potvrdil kategóriu (inak je to len návrh Kokpitu). */
+  potvrdene?: boolean;
 };
 type Pravidlo = { vzor: string; kategoria: string };
 
@@ -96,6 +98,10 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
     return true;
   });
 
+  // Oranžové fajky v tom, čo je práve vidieť — to potvrdí „Potvrdiť všetko".
+  const naPotvrdenie = viditelne.filter((p) => cakaNaPotvrdenie(p, maSplit(p)));
+  const cakaPotvrdenieMes = zMesiaca.filter((p) => cakaNaPotvrdenie(p, maSplit(p))).length;
+
   /** Bez `kluce` sa mení celý označený výber; s nimi len tie riadky. */
   const zmen = async (kategoria: string, kluce?: string[], poznamka?: string) => {
     const vyber = kluce ? new Set(kluce) : oznacene;
@@ -115,6 +121,24 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
       oznam("peniaze");
       setTimeout(() => setSprava(""), 5000);
     } else setSprava("Zmena sa nepodarila.");
+  };
+
+  /** Potvrdí (alebo so `zrus` vráti medzi návrhy) dané výdavky. */
+  const potvrd = async (kluce: string[], zrus = false) => {
+    if (!kluce.length) return;
+    setBusy(true);
+    const r = await fetch("/api/fio", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "potvrd", kluce, zrus, rozdelene: kluce.filter((k) => platnySplit(pohybSplits?.[k])) }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (r.ok) {
+      if (kluce.length > 1) setSprava(`Potvrdené: ${r.potvrdene}${r.preskocene ? ` · ${r.preskocene} preskočených (bez kategórie alebo uzavretý mesiac)` : ""}.`);
+      setOznacene(new Set());
+      nacitaj();
+      oznam("peniaze");
+      if (kluce.length > 1) setTimeout(() => setSprava(""), 5000);
+    } else setSprava("Potvrdenie sa nepodarilo.");
   };
 
   const oznacRovnake = (protistrana: string) => {
@@ -155,6 +179,9 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
         <H3><Info label={uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
+        {uzavierka && cakaPotvrdenieMes > 0 && (
+          <span style={{ fontSize: 11.5, color: C.orange }}>{cakaPotvrdenieMes} čaká na potvrdenie</span>
+        )}
         {(uzavierka ? pocet("nezaradene") : nezaradenych) > 0 && (
           <span style={{ fontSize: 11.5, color: C.orange }}>{uzavierka ? pocet("nezaradene") : nezaradenych} výdavkov bez kategórie</span>
         )}
@@ -172,13 +199,14 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
             {([
               ["naklady", "Náklady", "Všetko, čo odišlo z účtu okrem výplat a súkromného — aj to, čo ešte nemá kategóriu."],
               ["nezaradene", "Nezaradené", "Výdavky bez kategórie. Bez nej sa nedostanú do P&L."],
+              ["potvrdit", "Na potvrdenie", "Kategóriu dal Kokpit sám (pravidlo, Jarvis) — pozri a potvrď."],
               ["vyplaty", "Výplaty", "Peniaze vyplatené Jerrymu a Terezke."],
               ["sukromne", "Súkromné", "Výdavky zaradené mimo firmu — kontrola, že tam nespadlo nič firemné."],
               ["prijmy", "Príjmy", "Čo prišlo na účet. Klientom sa priraďujú v kroku Platby a balíčky; tu je len stav."],
               ["vsetko", "Všetko", ""],
             ] as const).map(([id, lbl, tip]) => {
               const n = pocet(id);
-              const pozor = (id === "nezaradene" && n > 0) || (id === "prijmy" && cakaPrijmov > 0);
+              const pozor = ((id === "nezaradene" || id === "potvrdit") && n > 0) || (id === "prijmy" && cakaPrijmov > 0);
               return (
                 <button key={id} onClick={() => setFilter(id)} title={tip || undefined}
                   style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",
@@ -212,7 +240,26 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
                   </optgroup>
                 ))}
               </select>
+              {pohyby.some((p) => oznacene.has(p.kluc) && cakaNaPotvrdenie(p, maSplit(p))) && (
+                <button disabled={busy} onClick={() => void potvrd(pohyby.filter((p) => oznacene.has(p.kluc) && cakaNaPotvrdenie(p, maSplit(p))).map((p) => p.kluc))}
+                  style={{ padding: "5px 11px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 12), color: C.green, fontFamily: "inherit" }}>
+                  ✓ potvrdiť označené
+                </button>
+              )}
               <button onClick={() => setOznacene(new Set())} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zrušiť výber</button>
+            </div>
+          )}
+
+          {naPotvrdenie.length > 0 && (
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.orange, 9), border: `1px solid ${mix(C.orange, 30)}` }}>
+              <span style={{ fontSize: 12.5, color: C.text }}>
+                <b style={{ color: C.orange }}>✓ {naPotvrdenie.length}</b> {naPotvrdenie.length === 1 ? "výdavok zaradil" : "výdavkov zaradil"} Kokpit sám — oprav, čo nesedí, a zvyšok potvrď.
+              </span>
+              <span style={{ marginLeft: "auto" }} />
+              <button disabled={busy} onClick={() => void potvrd(naPotvrdenie.map((p) => p.kluc))}
+                style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 16), color: C.green, fontFamily: "inherit" }}>
+                {busy ? "…" : `Potvrdiť všetko (${naPotvrdenie.length})`}
+              </button>
             </div>
           )}
 
@@ -270,6 +317,26 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
                       />
                     </td>
                     <td style={{ ...S.td, padding: "3px 6px" }}>
+                      <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+                      {/* Fajka: oranžová = návrh Kokpitu (klik potvrdí),
+                          zelená = potvrdené (klik vráti medzi návrhy). */}
+                      {p.suma < 0 && p.typ !== "hotovosť" && (p.kategoria || maSplit(p)) && (() => {
+                        const caka = cakaNaPotvrdenie(p, maSplit(p));
+                        const pevne = maSplit(p) && !p.potvrdene; // rozdelené je ručná práca
+                        return (
+                          <button
+                            disabled={busy || pevne}
+                            onClick={() => void potvrd([p.kluc], !caka)}
+                            title={caka ? "Kategóriu dal Kokpit sám — klik potvrdí, že sedí" : pevne ? "Rozdelené ručne — potvrdené" : "Potvrdené — klik vráti medzi návrhy"}
+                            aria-label={caka ? `Potvrdiť ${p.protistrana}` : `Zrušiť potvrdenie ${p.protistrana}`}
+                            style={{ flex: "0 0 auto", width: 22, height: 22, marginTop: 3, borderRadius: 11, padding: 0, fontSize: 12, fontWeight: 800, lineHeight: "20px", cursor: busy || pevne ? "default" : "pointer", fontFamily: "inherit",
+                              border: `1.5px solid ${caka ? C.orange : mix(C.green, 60)}`,
+                              background: caka ? "transparent" : mix(C.green, 18),
+                              color: caka ? C.orange : C.green }}
+                          >✓</button>
+                        );
+                      })()}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                       {(() => {
                         const split = pohybSplits?.[p.kluc];
                         if (platnySplit(split)) {
@@ -317,6 +384,8 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
                           </div>
                         );
                       })()}
+                      </div>
+                      </div>
                     </td>
                   </tr>
                   {onSplit && delenyKluc === p.kluc && (

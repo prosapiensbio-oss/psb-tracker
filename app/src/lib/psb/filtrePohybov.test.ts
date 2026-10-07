@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { patriDoFiltra, stavPrijmu } from "./filtrePohybov";
+import { cakaNaPotvrdenie, patriDoFiltra, stavPrijmu } from "./filtrePohybov";
 
 describe("filtre zapísaných pohybov", () => {
   const gerich = { suma: 15580, kategoria: "fixne.apps.ai", klienti: "Gerich Jakub" };
@@ -33,5 +33,19 @@ describe("filtre zapísaných pohybov", () => {
     expect(stavPrijmu({ suma: 500, kategoria: "", nieKlient: true })).toBe("nieKlient");
     expect(stavPrijmu({ suma: 500, kategoria: "", nieKlient: true }, true)).toBe("rozdelene");
     expect(stavPrijmu({ suma: 6990, kategoria: "" })).toBe("caka");
+  });
+});
+
+describe("oranžová fajka", () => {
+  it("návrh Kokpitu čaká, ručné a rozdelené nie", () => {
+    expect(cakaNaPotvrdenie({ suma: -1500, kategoria: "variabilne.sluzby.ine" })).toBe(true);
+    expect(cakaNaPotvrdenie({ suma: -1500, kategoria: "vyplaty.terezka", potvrdene: true })).toBe(false);
+    expect(cakaNaPotvrdenie({ suma: -8999, kategoria: "" }, true)).toBe(false);
+    expect(cakaNaPotvrdenie({ suma: -200, kategoria: "spolocne.Potraviny", typ: "hotovosť" })).toBe(false);
+  });
+  it("nezaradený výdavok ani príjem sa nepotvrdzujú", () => {
+    expect(cakaNaPotvrdenie({ suma: -605, kategoria: "" })).toBe(false);
+    expect(cakaNaPotvrdenie({ suma: 6990, kategoria: "" })).toBe(false);
+    expect(patriDoFiltra({ suma: -605, kategoria: "fixne.apps.ai" }, "potvrdit")).toBe(true);
   });
 });

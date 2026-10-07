@@ -22,6 +22,7 @@ import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
 import { Route as ApiWebObsahRouteImport } from './routes/api/web-obsah'
+import { Route as ApiWebKontrolaRouteImport } from './routes/api/web-kontrola'
 import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
@@ -152,6 +153,11 @@ const ApiWishlistRoute = ApiWishlistRouteImport.update({
 const ApiWebObsahRoute = ApiWebObsahRouteImport.update({
   id: '/api/web-obsah',
   path: '/api/web-obsah',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebKontrolaRoute = ApiWebKontrolaRouteImport.update({
+  id: '/api/web-kontrola',
+  path: '/api/web-kontrola',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVzasWeeksRoute = ApiVzasWeeksRouteImport.update({
@@ -556,6 +562,7 @@ export interface FileRoutesByFullPath {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
@@ -637,6 +644,7 @@ export interface FileRoutesByTo {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
@@ -719,6 +727,7 @@ export interface FileRoutesById {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
@@ -802,6 +811,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
@@ -883,6 +893,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
@@ -964,6 +975,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
@@ -1046,6 +1058,7 @@ export interface RootRouteChildren {
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
   ApiVzasWeeksRoute: typeof ApiVzasWeeksRoute
+  ApiWebKontrolaRoute: typeof ApiWebKontrolaRoute
   ApiWebObsahRoute: typeof ApiWebObsahRoute
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
@@ -1147,6 +1160,13 @@ declare module '@tanstack/react-router' {
       path: '/api/web-obsah'
       fullPath: '/api/web-obsah'
       preLoaderRoute: typeof ApiWebObsahRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/web-kontrola': {
+      id: '/api/web-kontrola'
+      path: '/api/web-kontrola'
+      fullPath: '/api/web-kontrola'
+      preLoaderRoute: typeof ApiWebKontrolaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vzas-weeks': {
@@ -1696,6 +1716,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,
   ApiVzasWeeksRoute: ApiVzasWeeksRoute,
+  ApiWebKontrolaRoute: ApiWebKontrolaRoute,
   ApiWebObsahRoute: ApiWebObsahRoute,
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
