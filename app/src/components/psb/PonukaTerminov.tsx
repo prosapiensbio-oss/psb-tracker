@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
 import { TRENERI } from "../../lib/psb/mailFaktury";
@@ -7,7 +7,6 @@ import { textSmsPonuky } from "../../lib/psb/ponukaTerminov";
 import type { Lead } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
-import { Card } from "./ui";
 import { useUzke } from "./useUzke";
 import { VyberMena } from "./VyberMena";
 
@@ -95,13 +94,63 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   useEffect(() => { if (dopyt?.telefon) setTelefon(dopyt.telefon); }, [dopyt?.telefon]);
   const ponukaMena = useMemo(() => [...new Set([...mena, ...dopyty.map((l) => l.name)])], [mena, dopyty]);
 
-  const obsadene = (den: string, tr: string, od: number, doMin: number, okrem?: Navrh) =>
+  const obsadeneV = (xs: Navrh[], den: string, tr: string, od: number, doMin: number, okrem?: number) =>
     (udalosti || []).some((u) => u.trener === tr && u.zaciatok.slice(0, 10) === den
       && od < (u.koniec ? minuty(u.koniec) : minuty(u.zaciatok) + 60) && doMin > minuty(u.zaciatok))
-    || navrhy.some((n) => n !== okrem && n.den === den && n.trener === tr && od < n.od + n.minut && doMin > n.od);
+    || xs.some((n) => n.id !== okrem && n.den === den && n.trener === tr && od < n.od + n.minut && doMin > n.od);
+  const obsadene = (den: string, tr: string, od: number, doMin: number) => obsadeneV(navrhy, den, tr, od, doMin);
   const vMinulosti = (den: string, od: number) => `${den}T${hhmm(od)}` <= terazPraha();
 
+  /**
+   * ŤAHANIE PONUKY (Jerry, 7. 10. 2026: „keď kliknem na 8:15 a chcem to
+   * posunúť na 8:00, nechcem znovu klikať, ale chytiť to a posunúť").
+   * Blok sa chytí kdekoľvek okrem ×, ide po 15 minútach, aj do iného dňa
+   * alebo do pruhu druhého trénera. Do obsadeného času ani do minulosti
+   * nevojde — zostane na poslednom voľnom mieste.
+   */
+  const [tahany, setTahany] = useState<number | null>(null);
+  const tahNavrhu = useRef<{ id: number; offsetMin: number; x: number; y: number; posunuty: boolean } | null>(null);
+  const ignorujKlikDo = useRef(0);
+  const zacniTah = (e: React.PointerEvent<HTMLDivElement>, n: Navrh) => {
+    if ((e.target as HTMLElement).closest("button") || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    tahNavrhu.current = { id: n.id, offsetMin: ((e.clientY - r.top) / PX) * 60, x: e.clientX, y: e.clientY, posunuty: false };
+    const pohyb = (ev: PointerEvent) => {
+      const t = tahNavrhu.current;
+      if (!t) return;
+      if (!t.posunuty && Math.hypot(ev.clientX - t.x, ev.clientY - t.y) < 4) return;
+      if (!t.posunuty) { t.posunuty = true; setTahany(t.id); }
+      const pod = document.elementsFromPoint(ev.clientX, ev.clientY).find((el) => (el as HTMLElement).dataset?.pol) as HTMLElement | undefined;
+      if (!pod?.dataset.pol) return;
+      const [den, tr] = pod.dataset.pol.split("|");
+      const rr = pod.getBoundingClientRect();
+      setNavrhy((xs) => {
+        const x = xs.find((q) => q.id === t.id);
+        if (!x) return xs;
+        const od = Math.max(OD_H * 60, Math.min(DO_H * 60 - x.minut, OD_H * 60 + Math.round((((ev.clientY - rr.top) / PX) * 60 - t.offsetMin) / 15) * 15));
+        if (x.den === den && x.trener === tr && x.od === od) return xs;
+        if (obsadeneV(xs, den, tr, od, od + x.minut, x.id) || vMinulosti(den, od)) return xs;
+        return xs.map((q) => (q.id === t.id ? { ...q, den, trener: tr, od } : q));
+      });
+    };
+    const koniec = () => {
+      window.removeEventListener("pointermove", pohyb);
+      window.removeEventListener("pointerup", koniec);
+      window.removeEventListener("pointercancel", koniec);
+      // Klik po pustení nesmie do stĺpca pridať nový termín.
+      if (tahNavrhu.current?.posunuty) ignorujKlikDo.current = Date.now() + 300;
+      tahNavrhu.current = null;
+      setTahany(null);
+    };
+    window.addEventListener("pointermove", pohyb);
+    window.addEventListener("pointerup", koniec);
+    window.addEventListener("pointercancel", koniec);
+  };
+
   const pridaj = (den: string, tr: string, od: number) => {
+    if (Date.now() < ignorujKlikDo.current) return;
     const k = `${den}|${tr}`;
     if (od + 60 > DO_H * 60 || obsadene(den, tr, od, od + 60) || vMinulosti(den, od)) { setBlik(k); setTimeout(() => setBlik(""), 450); return; }
     setNavrhy((xs) => [...xs, { id: dalsieId, trener: tr, den, od, minut: 60 }]);
@@ -168,6 +217,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                 {treneri.map((tr, ti) => (
                   <div
                     key={tr}
+                    data-pol={`${den}|${tr}`}
                     onClick={(e) => {
                       const r = e.currentTarget.getBoundingClientRect();
                       pridaj(den, tr, OD_H * 60 + Math.floor(((e.clientY - r.top) / PX) * 4) * 15);
@@ -189,10 +239,12 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                       );
                     })}
                     {navrhy.filter((n) => n.den === den && n.trener === tr).map((n) => (
-                      <div key={n.id} onClick={(e) => e.stopPropagation()} style={{
+                      <div key={n.id} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => zacniTah(e, n)} title="Chyť a posuň · × zmaže" style={{
                         position: "absolute", left: 1, right: 1, top: (n.od - OD_H * 60) / 60 * PX, height: n.minut / 60 * PX - 2, zIndex: 2,
                         borderRadius: 6, border: `2px dashed ${farba(tr)}`, background: mix(farba(tr), 12), color: tr === "Terezka" ? C.blue : C.accentLight,
-                        fontSize: 10.5, fontWeight: 700, padding: "2px 3px", display: "flex", flexDirection: "column", justifyContent: "space-between", cursor: "default",
+                        fontSize: 10.5, fontWeight: 700, padding: "2px 3px", display: "flex", flexDirection: "column", justifyContent: "space-between",
+                        cursor: tahany === n.id ? "grabbing" : "grab", touchAction: "none", pointerEvents: tahany === n.id ? "none" : undefined,
+                        boxShadow: tahany === n.id ? "0 6px 18px rgba(0,0,0,.45)" : undefined,
                       }}>
                         <span style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
                           <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
@@ -220,7 +272,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           </div>
         )}
         <div style={{ ...stitok, marginTop: 4 }}>Ponúkané termíny {zoradene.length ? `(${zoradene.length})` : ""}</div>
-        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Krížikom na bloku ho zmažeš.</div>}
+        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Blok chytíš a posunieš, krížikom ho zmažeš.</div>}
         {zoradene.map((n) => (
           <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${mix(C.border, 100)}`, fontSize: 12.5 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: farba(n.trener) }} />
@@ -278,27 +330,3 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
 const tl = { padding: "5px 11px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 14, cursor: "pointer" } as const;
 const stitok = { fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase" as const, color: C.textDim, fontWeight: 600 };
 
-/**
- * Karta v Kalendári. Zbalená, kým ju človek neotvorí — týždeň je nad ňou
- * a druhá mriežka by ho zbytočne zdvojila. Keď čakajú poslané ponuky,
- * povie to už v nadpise.
- */
-export function PonukaTerminovKarta(props: { mena: string[]; leads: Lead[]; trener: string | null }) {
-  const [otvorena, setOtvorena] = useState(false);
-  const [cakaju, setCakaju] = useState(0);
-  useEffect(() => {
-    void fetch("/api/ponuky", { credentials: "same-origin", cache: "no-store" }).then((r) => r.json())
-      .then((j) => { if (j?.ok) setCakaju((j.ponuky || []).filter((p: Ponuka) => p.stav === "caka").length); }).catch(() => null);
-  }, [otvorena]);
-  return (
-    <Card>
-      <button type="button" onClick={() => setOtvorena((x) => !x)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 0, border: 0, background: "none", color: C.text, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
-        <span style={{ fontSize: 15, fontWeight: 700 }}>Ponuka termínov</span>
-        <span style={{ fontSize: 12, color: C.textDim }}>naťukaj voľné časy a pošli klientovi odkaz — vyberie si sám</span>
-        {cakaju > 0 && <span style={{ fontSize: 11.5, color: C.accentLight }}>· {cakaju} {cakaju === 1 ? "čaká" : "čakajú"} na výber</span>}
-        <span style={{ marginLeft: "auto", fontSize: 12.5, color: C.accentLight, whiteSpace: "nowrap" }}>{otvorena ? "zavrieť" : "ponúknuť termíny ▸"}</span>
-      </button>
-      {otvorena && <div style={{ marginTop: 14 }}><PonukaTerminov {...props} /></div>}
-    </Card>
-  );
-}

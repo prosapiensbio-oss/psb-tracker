@@ -14,8 +14,9 @@ import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
+import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { VyberMena } from "./VyberMena";
-import { PonukaTerminovKarta } from "./PonukaTerminov";
+import { PonukaTerminov } from "./PonukaTerminov";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 
 /**
@@ -140,11 +141,24 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
   // Kam zrolovať: „nezname" na kartu Nové názvy, inak na Zmeny. Preklik z
   // dvoch rôznych notifikácií viedol dovtedy na tú istú kartu (Jerry, 3. 9.).
   const [rolovatNa, setRolovatNa] = useState<string | null>(null);
+  /**
+   * DVE ZÁLOŽKY NAVRCHU (Jerry, 7. 10. 2026: „úplne navrch Kalendár a Termíny,
+   * prioritne je otvorený kalendár"). Obe ostávajú načítané — prepnutie
+   * nesmie zahodiť rozťukanú ponuku (pravidlo „Workspace drží prácu").
+   */
+  const [zalozka, setZalozka] = useState<"kalendar" | "terminy">(() => {
+    try { return sessionStorage.getItem("psb-kalendar-zalozka") === "terminy" ? "terminy" : "kalendar"; } catch { return "kalendar"; }
+  });
+  const prepniZalozku = (z: "kalendar" | "terminy") => {
+    setZalozka(z);
+    try { sessionStorage.setItem("psb-kalendar-zalozka", z); } catch { /* len pohodlie */ }
+  };
   useEffect(() => {
     if (!focus?.nonce) return;
     // Preklik bez trénera nechá platiť to, čo je práve zvolené — nesmie
     // prepnúť na „Obaja".
     if (focus.trainer) setTrener(focus.trainer);
+    setZalozka("kalendar");
     setRolovatNa(focus.sekcia === "nezname" ? "kal-nezname" : "kal-zmeny");
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   // Roluje sa až keď obsah existuje — pri prvom otvorení sa kalendár ešte
@@ -215,8 +229,30 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
     .sort((a, b) => String(b.odpovedane_at).localeCompare(String(a.odpovedane_at)))
     .slice(0, 15);
 
+  const zalozky = (
+    <div style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 11, border: `1px solid ${mix(C.border, 120)}`, background: C.surface, marginBottom: 14 }}>
+      {([["kalendar", "Kalendár"], ["terminy", "Termíny"]] as const).map(([z, l]) => (
+        <button key={z} type="button" onClick={() => prepniZalozku(z)} style={{
+          padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14,
+          background: zalozka === z ? mix(C.accent, 22) : "transparent",
+          color: zalozka === z ? C.accentLight : C.textMuted, fontWeight: zalozka === z ? 700 : 500,
+        }}>{l}</button>
+      ))}
+    </div>
+  );
+
   return (
     <>
+      {zalozky}
+      {/* TERMÍNY — ponuka termínov klientovi (7. 10. 2026). Načítaná ostáva
+          aj na záložke Kalendár, len skrytá. */}
+      <div style={{ display: zalozka === "terminy" ? "block" : "none" }}>
+        <Card>
+          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>Naťukaj voľné časy a pošli klientovi odkaz — vyberie si sám a termín sa mu zapíše do kalendára.</div>
+          <PonukaTerminov mena={menaKlientov} leads={data.leads || []} trener={KALENDAR_TRENERA[trener] ? trener : null} />
+        </Card>
+      </div>
+      <div style={{ display: zalozka === "kalendar" ? "block" : "none" }}>
       {/* Poradie kariet nesie prioritu: hore je to, na čo sa človek pozerá
           každý deň (týždeň), potom to, čo si pýta odpoveď (zmeny, nové mená),
           a celkom dole obsluha (sťahovanie, pripojenie). Kým kalendár
@@ -235,10 +271,6 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
           onObnov={async () => { await nacitaj(); oznam("kalendar"); }}
         />
       )}
-
-      {/* PONUKA TERMÍNOV (Jerry, 7. 10. 2026: „postav mi to v záložke Kalendár,
-          nie vo Workspace") — hneď pod týždňom, z ktorého sa ponúka. */}
-      {pripojene && <PonukaTerminovKarta mena={menaKlientov} leads={data.leads || []} trener={KALENDAR_TRENERA[trener] ? trener : null} />}
 
       {/* Zmeny a nové názvy sa od 5. 10. 2026 VYBAVUJÚ vo Workspace (krok 1)
           — Jerry: „aby to nebolo na dvoch miestach". Tu ostáva odkaz, ručný
@@ -288,6 +320,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
       )}
 
       {pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
+      </div>
     </>
   );
 }
@@ -1368,6 +1401,64 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   /** Klik, ktorý príde hneď po ťahu, patrí ťahu — stĺpec ho nesmie čítať ako „nová udalosť". */
   const ignorujKlikDo = useRef(0);
 
+  /**
+   * POSUN TÝŽDŇA PRSTOM A DVOMA PRSTAMI NA TOUCHPADE (Jerry, 7. 10. 2026:
+   * „medzi týždňami ako v Google Calendari môžem prepínať posunom palca
+   * alebo dvomi prstami na touchpade doľava doprava").
+   *
+   * Rozhodovanie je to isté, odskúšané, ako pri kartách Workspace
+   * (`gestoKariet.ts`): touchpad cez `wheel` (jedno gesto = jeden krok,
+   * dozvuk sa nepočíta), prst cez ťah počas pohybu. Krok je presne ten, čo
+   * robia šípky — o toľko, koľko je vidno, a nie za hranicu stiahnutého
+   * kalendára. Kým sa ťahá udalosť, gesto sa nečíta.
+   */
+  const krokGestom = useRef<(s: 1 | -1) => void>(() => {});
+  krokGestom.current = (sm: 1 | -1) => {
+    if ((sm < 0 && naZaciatok) || (sm > 0 && naKonci)) return;
+    krok(sm);
+  };
+  const gesto = useRef(novyStavGesta());
+  const svih = useRef(novyStavSvihu());
+  const [mriezkaEl, setMriezkaEl] = useState<HTMLDivElement | null>(null);
+  const nastavMriezku = useCallback((el: HTMLDivElement | null) => { mriezkaRef.current = el; setMriezkaEl(el); }, []);
+  useEffect(() => {
+    const el = mriezkaEl;
+    if (!el) return;
+    const naKoleso = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      // Bez toho Safari zo šmyku urobí „krok späť v histórii".
+      e.preventDefault();
+      const sm = krokGesta(gesto.current, { deltaX: e.deltaX, deltaY: e.deltaY, cas: e.timeStamp });
+      if (sm) krokGestom.current(sm);
+    };
+    const zac = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (t && e.touches.length === 1 && !tah.current) zacniSvih(svih.current, t.clientX, t.clientY, e.timeStamp);
+    };
+    const pohyb = (e: TouchEvent) => {
+      if (tah.current) { svih.current.aktivny = false; return; }
+      const t = e.touches[0] || e.changedTouches[0];
+      if (!t) return;
+      const sm = krokSvihu(svih.current, t.clientX, t.clientY, window.innerWidth || 375);
+      // Klik, ktorý by prišiel po švihnutí, nesmie otvoriť „nový tréning".
+      if (sm) { ignorujKlikDo.current = Date.now() + 400; krokGestom.current(sm); }
+    };
+    const zrus = () => { svih.current.aktivny = false; };
+    el.addEventListener("wheel", naKoleso, { passive: false });
+    el.addEventListener("touchstart", zac, { passive: true });
+    el.addEventListener("touchmove", pohyb, { passive: true });
+    el.addEventListener("touchend", pohyb, { passive: true });
+    el.addEventListener("touchcancel", zrus, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", naKoleso);
+      el.removeEventListener("touchstart", zac);
+      el.removeEventListener("touchmove", pohyb);
+      el.removeEventListener("touchend", pohyb);
+      el.removeEventListener("touchcancel", zrus);
+    };
+  }, [mriezkaEl]);
+
+
   const casZBodu = (clientX: number, clientY: number, minut: number, offsetMin: number) => {
     const el = mriezkaRef.current;
     if (!el) return null;
@@ -1424,7 +1515,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            text="Týždeň tak, ako ho vidíš v Google Kalendári. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Označený blok sa dá ťahať myšou; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
+            text="Týždeň tak, ako ho vidíš v Google Kalendári. Medzi týždňami sa dá prepínať posunom prsta alebo dvoma prstami na touchpade doľava a doprava. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Označený blok sa dá ťahať myšou; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
             label="Týždeň"
           />
         </H3>
@@ -1523,7 +1614,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           </div>
 
           {/* Mriežka — position: relative kvôli oknu, ktoré sa lepí k stĺpcu. */}
-          <div ref={mriezkaRef} style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, position: "relative" }}>
+          <div ref={nastavMriezku} style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, position: "relative", touchAction: "pan-y" }}>
             <div style={{ position: "relative", height: hodin * VYSKA }}>
               {Array.from({ length: hodin }, (_, i) => (
                 <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: uzke ? 2 : 4, fontSize: uzke ? 9.5 : 10.5, color: C.textDim }}>

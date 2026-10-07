@@ -2817,9 +2817,13 @@ strih bodkami na osi, uhly na snímke, 📷 snímka, stiahnutie MP4).
 
 Jerry: „ponúknem mu dva a nemôže ani jeden… vytukal by som si všetky
 termíny, poslal by som mu odkaz, klikol by na ten, ktorý chce, a mne by sa
-objavila udalosť v kalendári." **Záložka Kalendár → karta Ponuka termínov**
-pod týždňom (`PonukaTerminovKarta` v `PonukaTerminov.tsx`, zbalená, kým sa
-neotvorí). Najprv bola vo Workspace — Jerry v ten istý deň: „postav mi to
+objavila udalosť v kalendári." **Záložka Kalendár → navrchu dve záložky
+„Kalendár" (predvolená) a „Termíny"** (`PonukaTerminov.tsx`; obe ostávajú
+načítané, skrytá má `display: none`, voľba v sessionStorage
+`psb-kalendar-zalozka`). Ponuka sa chytí a ťahá po 15 min aj do iného dňa
+či pruhu trénera (`data-pol` na stĺpci + `elementsFromPoint`); týždeň
+v Kalendári sa prepína švihnutím prsta aj dvoma prstami na touchpade
+(`gestoKariet.ts`, krok ako šípky, nie za hranicu stiahnutého kalendára). Najprv bola vo Workspace — Jerry v ten istý deň: „postav mi to
 v záložke Kalendár, nie vo Workspace" (výnimka z pravidla „Workspace je
 jediné miesto, kde sa robí" — jeho rozhodnutie) a „tie +/- 15 preč"
 (termín má pevných 60 min, × ho zmaže). Stránka **`/t/<token>`**
