@@ -2812,3 +2812,33 @@ strih bodkami na osi, uhly na snímke, 📷 snímka, stiahnutie MP4).
 - Rámiky ostávajú načítané aj po prepnutí Foto/Video a karty (pravidlo
   „Workspace drží prácu"). Statické súbory idú cez assets bez workera —
   CSP Kokpitu na ne nepadá; rámik povoľuje `frame-src 'self'`.
+
+## Ponuka termínov — klient si vyberie sám (7. 10. 2026)
+
+Jerry: „ponúknem mu dva a nemôže ani jeden… vytukal by som si všetky
+termíny, poslal by som mu odkaz, klikol by na ten, ktorý chce, a mne by sa
+objavila udalosť v kalendári." Workspace → karta **Ponuka termínov**
+(`PonukaTerminov.tsx`, BEZ_FRONTY) a stránka **`/t/<token>`**
+(`routes/t.$token.tsx`, HTML z `ponukaStranka.ts`, variant B1, čeština, bez JS).
+
+- **Tabuľky** `ponuky_terminov` + `ponuky_terminov_casy` (migrácia 0100).
+  Pravidlá (voľné časy, platí do nedele posledného termínu, stav, .ics) sú
+  čisté v `ponukaTerminov.ts` s testami; DB a push v `ponukaTerminov.server.ts`.
+- **Voľné = bez živej udalosti TOHO ISTÉHO trénera a bez termínu vybraného
+  z inej ponuky**, nie v minulosti. Server to overí aj pri vytvorení (ponuka
+  do obsadeného času nevznikne) aj pri výbere.
+- **Výber je zamknutý podmieneným UPDATE** (`vybrany_id IS NULL`) PRED
+  zápisom do Google — dve klepnutia nevyrobia dve udalosti. Keď Google
+  odmietne, zámok sa uvoľní a klient dostane vetu, nie chybovú stránku.
+- **Zápis do kalendára je JEDNO miesto: `zapisTrening`**
+  (`nahodTrening.server.ts`) — volá ho aj „nahodiť tréning" v Kokpite.
+  Udalosť nesie meno klienta; nový človek z dopytu dostane typ `uvodny`.
+- Po výbere ide push trénerovi („X si vybral(a) …"); SMS s odkazom posiela
+  tréner sám cez `SmsKlientovi` s `ponuka` → audit `sms-ponuka` (nie
+  `sms-odoslana`, inak by klient zmizol zo zoznamu kroku 2 · SMS).
+- **Odkaz ide cez workers.dev**, nie prosapiens.cz: WordPress snippet (id 26)
+  presmerúva len `/u/` a `/v/`. Kratší odkaz = pridať `/t/` do snippetu
+  a do `verejnyOdkaz` (zmena verejného webu — s Jerryho súhlasom).
+- Overené naostro na vymyslenom „AATest Ponuka" (vytvorenie, odmietnutie
+  obsadeného času, stránka, zrušenie) a zmazané. **Výber do kalendára nebol
+  skúšaný** — zapísal by skutočnú udalosť; prvý ostrý výber treba sledovať.
