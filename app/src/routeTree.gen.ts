@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as TTokenRouteImport } from './routes/t.$token'
+import { Route as KTokenRouteImport } from './routes/k.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -64,6 +65,7 @@ import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLeadWebRouteImport } from './routes/api/lead-web'
+import { Route as ApiKalendarMobilRouteImport } from './routes/api/kalendar-mobil'
 import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiJarvisDokumentRouteImport } from './routes/api/jarvis-dokument'
@@ -85,6 +87,7 @@ import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
 import { Route as ApiAnamnezaRouteImport } from './routes/api/anamneza'
 import { Route as ApiAlgoRouteImport } from './routes/api/algo'
 import { Route as ATokenRouteImport } from './routes/a.$token'
+import { Route as KTokenKalendarDoticsRouteImport } from './routes/k.$token.kalendar[.]ics'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -124,6 +127,11 @@ const UTokenRoute = UTokenRouteImport.update({
 const TTokenRoute = TTokenRouteImport.update({
   id: '/t/$token',
   path: '/t/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KTokenRoute = KTokenRouteImport.update({
+  id: '/k/$token',
+  path: '/k/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssetsSplatRoute = AssetsSplatRouteImport.update({
@@ -361,6 +369,11 @@ const ApiLeadWebRoute = ApiLeadWebRouteImport.update({
   path: '/api/lead-web',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKalendarMobilRoute = ApiKalendarMobilRouteImport.update({
+  id: '/api/kalendar-mobil',
+  path: '/api/kalendar-mobil',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiKalendarRoute = ApiKalendarRouteImport.update({
   id: '/api/kalendar',
   path: '/api/kalendar',
@@ -466,6 +479,11 @@ const ATokenRoute = ATokenRouteImport.update({
   path: '/a/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KTokenKalendarDoticsRoute = KTokenKalendarDoticsRouteImport.update({
+  id: '/kalendar.ics',
+  path: '/kalendar.ics',
+  getParentRoute: () => KTokenRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -494,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
+  '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -541,9 +560,11 @@ export interface FileRoutesByFullPath {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -572,6 +593,7 @@ export interface FileRoutesByTo {
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
+  '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -619,9 +641,11 @@ export interface FileRoutesByTo {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -651,6 +675,7 @@ export interface FileRoutesById {
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
+  '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -698,9 +723,11 @@ export interface FileRoutesById {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -731,6 +758,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
+    | '/api/kalendar-mobil'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -778,9 +806,11 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/k/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/k/$token/kalendar.ics'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -809,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
+    | '/api/kalendar-mobil'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -856,9 +887,11 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/k/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/k/$token/kalendar.ics'
   id:
     | '__root__'
     | '/'
@@ -887,6 +920,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
+    | '/api/kalendar-mobil'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -934,9 +968,11 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/k/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/k/$token/kalendar.ics'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -966,6 +1002,7 @@ export interface RootRouteChildren {
   ApiJarvisDokumentRoute: typeof ApiJarvisDokumentRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiKalendarRoute: typeof ApiKalendarRoute
+  ApiKalendarMobilRoute: typeof ApiKalendarMobilRoute
   ApiLeadWebRoute: typeof ApiLeadWebRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
@@ -1013,6 +1050,7 @@ export interface RootRouteChildren {
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
+  KTokenRoute: typeof KTokenRouteWithChildren
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
@@ -1074,6 +1112,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$token'
       fullPath: '/t/$token'
       preLoaderRoute: typeof TTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/k/$token': {
+      id: '/k/$token'
+      path: '/k/$token'
+      fullPath: '/k/$token'
+      preLoaderRoute: typeof KTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assets/$': {
@@ -1405,6 +1450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLeadWebRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/kalendar-mobil': {
+      id: '/api/kalendar-mobil'
+      path: '/api/kalendar-mobil'
+      fullPath: '/api/kalendar-mobil'
+      preLoaderRoute: typeof ApiKalendarMobilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/kalendar': {
       id: '/api/kalendar'
       path: '/api/kalendar'
@@ -1552,8 +1604,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ATokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/k/$token/kalendar.ics': {
+      id: '/k/$token/kalendar.ics'
+      path: '/kalendar.ics'
+      fullPath: '/k/$token/kalendar.ics'
+      preLoaderRoute: typeof KTokenKalendarDoticsRouteImport
+      parentRoute: typeof KTokenRoute
+    }
   }
 }
+
+interface KTokenRouteChildren {
+  KTokenKalendarDoticsRoute: typeof KTokenKalendarDoticsRoute
+}
+
+const KTokenRouteChildren: KTokenRouteChildren = {
+  KTokenKalendarDoticsRoute: KTokenKalendarDoticsRoute,
+}
+
+const KTokenRouteWithChildren =
+  KTokenRoute._addFileChildren(KTokenRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -1582,6 +1652,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJarvisDokumentRoute: ApiJarvisDokumentRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiKalendarRoute: ApiKalendarRoute,
+  ApiKalendarMobilRoute: ApiKalendarMobilRoute,
   ApiLeadWebRoute: ApiLeadWebRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
@@ -1629,6 +1700,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
+  KTokenRoute: KTokenRouteWithChildren,
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,

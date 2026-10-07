@@ -17,7 +17,8 @@ import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
  *   POST { akcia: "nastav" }   → uloží bránu, kľúč a odosielateľa
  *   POST { klient, telefon, text } → pošle jednu správu
  *   POST { …, hromadna: true }     → to isté, ale v audite ako `sms-hromadna`
- *   POST { …, ponuka: true }       → to isté, v audite ako `sms-ponuka` (ponuka termínov)
+ *   POST { …, druh: "ponuka" | "kalendar" } → v audite `sms-ponuka` / `sms-kalendar`
+ *                                    (ponuka termínov, kalendár do mobilu — nie správa o hodinách)
  *                                    (oznam pre všetkých nemení zoznam v kroku SMS)
  *
  * ODOSIELA SA NA KLIK, NIKDY SAMO. Naše číslo hodín je pri časti klientov
@@ -202,7 +203,7 @@ export const Route = createFileRoute("/api/sms")({
         await audit(DB, {
           // Hromadná správa a ponuka termínov nie sú správa o hodinách —
           // `sms-odoslana` by klienta vyčistil zo zoznamu kroku 2 · SMS.
-          action: b.hromadna === true ? "sms-hromadna" : b.ponuka === true ? "sms-ponuka" : "sms-odoslana",
+          action: b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : "sms-odoslana",
           predmet: `${klient} · ${cislo}`,
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,

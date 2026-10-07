@@ -2850,3 +2850,28 @@ jediné miesto, kde sa robí" — jeho rozhodnutie) a „tie +/- 15 preč"
 - Overené naostro na vymyslenom „AATest Ponuka" (vytvorenie, odmietnutie
   obsadeného času, stránka, zrušenie) a zmazané. **Výber do kalendára nebol
   skúšaný** — zapísal by skutočnú udalosť; prvý ostrý výber treba sledovať.
+
+## Kalendár v mobile — klient odoberá LEN svoje tréningy (7. 10. 2026)
+
+Jerry: „ak dám klientovi zdieľať môj kalendár, uvidí všetky moje udalosti?"
+Nie — trénerov Google kalendár sa NEZDIEĽA. Kokpit klientovi poskladá
+vlastný kalendár (`/k/<token>/kalendar.ics`, `feedKlienta`
+v `lib/psb/kalendarMobil.ts`) len z `kal_udalosti` s jeho menom
+(živé, typ trening/uvodny, −60 až +200 dní). Náčrt A1 + B1:
+
+- **Profil klienta → dlaždica „📅 Kalendár v mobile"** (`KalendarVMobile.tsx`,
+  pod kontaktom): „Poslať odkaz SMS" (audit `sms-kalendar`, nie
+  `sms-odoslana`), kopírovať, nový odkaz (starý zneplatní — telefón potom
+  dostane PRÁZDNY kalendár, nie chybu, aby staré tréningy zmizli).
+- **Stav vie telefón sám**: každé stiahnutie zapíše `posledne_stiahnutie`,
+  `pocet`, `platforma` (z User-Agent). „Odoberá" = stiahnutie za 3 dni.
+- **Stránka `/k/<token>`** (B1, čeština, bez JS): iPhone dostane
+  `webcal://`, Android odkaz do Google Kalendára (`?cid=webcal…`), druhá
+  cesta pod tlačidlom; rada „vypněte Odstranit upozornění" pre iPhone.
+- V udalosti: „Trénink ProSapiens", s kým, ako sa ozvať, pripomienky
+  −1 deň a −2 h. Žiadne hodiny, peniaze ani iné mená. Riadky .ics sa lámu
+  na 75 bajtov (`zalom`), časy idú v UTC (`prahaNaUtcIcs`).
+- Migrácia 0101 (`klient_kalendar`). Odkaz ide cez workers.dev — `/k/`
+  nie je vo WP snippete (id 26).
+- **Neoverené na skutočnom telefóne**: či iPhone pri odbere nevypne
+  upozornenia a ako rýchlo Google Kalendár obnovuje.

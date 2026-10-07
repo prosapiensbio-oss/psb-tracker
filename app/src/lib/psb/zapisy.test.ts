@@ -29,6 +29,9 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   ponuky_terminov: {
     zrusene_at: "mäkké zrušenie — nová ponuka zrušená nevzniká",
   },
+  klient_kalendar: {
+    zrusene_at: "zneplatnenie odkazu — nový odkaz zneplatnený nevzniká",
+  },
   jarvis_dokumenty: {
     zmazane_at: "mäkké mazanie — pri vzniku dokument zmazaný nie je",
   },

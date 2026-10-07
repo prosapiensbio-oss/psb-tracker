@@ -290,7 +290,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           <div style={{ padding: 10, borderRadius: 10, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 8), display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 12.5, color: C.green }}>Odkaz je hotový — <a href={hotovo.url} target="_blank" rel="noreferrer" style={{ color: C.green }}>pozrieť, čo uvidí</a>.</div>
             <SmsKlientovi
-              meno={hotovo.klient} trener={hotovo.trener} vlozene ponuka
+              meno={hotovo.klient} trener={hotovo.trener} vlozene druhAuditu="ponuka"
               cisloNovehoCloveka={hotovo.telefon || undefined}
               predvolenyText={textSmsPonuky(krstne(hotovo.klient), hotovo.url, PODPIS[hotovo.trener] || "")}
               onOdoslane={() => { oznam("kalendar"); void nacitajPonuky(); }}

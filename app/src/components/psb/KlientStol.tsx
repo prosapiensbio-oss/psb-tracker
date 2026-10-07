@@ -25,6 +25,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
+import { KalendarVMobile } from "./KalendarVMobile";
 import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
@@ -1265,6 +1266,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             nepozrie. Mail je pritom to, na čo odchádza faktúra aj výpis
             hodín; keď je zlý, klient nedostane nič a appka o tom nevie. */}
         <KontaktKlienta meno={meno} />
+
+        {/* Kalendár v mobile (7. 10. 2026) — klient odoberá LEN svoje tréningy. */}
+        <KalendarVMobile meno={meno} trener={c?.primaryTrainer || ""} />
 
         <button onClick={() => setDetaily(!detaily)} style={{ ...navrhTlacidlo, textAlign: "left" }}>
           {detaily ? "Skryť detaily ▴" : `Ďalších ${dalsichUdajov} údajov ▾`}
