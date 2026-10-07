@@ -2817,8 +2817,12 @@ strih bodkami na osi, uhly na snímke, 📷 snímka, stiahnutie MP4).
 
 Jerry: „ponúknem mu dva a nemôže ani jeden… vytukal by som si všetky
 termíny, poslal by som mu odkaz, klikol by na ten, ktorý chce, a mne by sa
-objavila udalosť v kalendári." Workspace → karta **Ponuka termínov**
-(`PonukaTerminov.tsx`, BEZ_FRONTY) a stránka **`/t/<token>`**
+objavila udalosť v kalendári." **Záložka Kalendár → karta Ponuka termínov**
+pod týždňom (`PonukaTerminovKarta` v `PonukaTerminov.tsx`, zbalená, kým sa
+neotvorí). Najprv bola vo Workspace — Jerry v ten istý deň: „postav mi to
+v záložke Kalendár, nie vo Workspace" (výnimka z pravidla „Workspace je
+jediné miesto, kde sa robí" — jeho rozhodnutie) a „tie +/- 15 preč"
+(termín má pevných 60 min, × ho zmaže). Stránka **`/t/<token>`**
 (`routes/t.$token.tsx`, HTML z `ponukaStranka.ts`, variant B1, čeština, bez JS).
 
 - **Tabuľky** `ponuky_terminov` + `ponuky_terminov_casy` (migrácia 0100).

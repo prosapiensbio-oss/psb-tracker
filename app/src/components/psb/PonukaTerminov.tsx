@@ -7,11 +7,14 @@ import { textSmsPonuky } from "../../lib/psb/ponukaTerminov";
 import type { Lead } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { Card } from "./ui";
 import { useUzke } from "./useUzke";
 import { VyberMena } from "./VyberMena";
 
 /**
- * PONUKA TERMÍNOV — Workspace (Jerry, 7. 10. 2026: „A1 a B1").
+ * PONUKA TERMÍNOV — záložka Kalendár (Jerry, 7. 10. 2026: „A1 a B1";
+ * najprv bola vo Workspace, v ten istý deň „postav mi to v záložke
+ * Kalendár, nie vo Workspace" a „tie +/- 15 preč").
  *
  * „Objaví sa klient, ktorý chce termín, ponúknem mu dva a nemôže ani jeden…
  * vytukal by som si všetky termíny, ktoré ponúkam, rovnako ako si vytukávam
@@ -19,9 +22,9 @@ import { VyberMena } from "./VyberMena";
  * a poslal by som mu to SMS."
  *
  * Týždeň z kalendára trénerov; klik do voľného miesta = ponuka na 60 min
- * (po 15 min), −15/+15 a ×. Do obsadeného času ponuka nejde (kontroluje aj
- * server). Filter je ten istý ako vo Workspace: pri „všetko" má deň dva
- * pruhy, Jerry vľavo, Terezka vpravo. Klient vyberá na `/t/<token>`.
+ * (začiatok po 15 min), × ju zmaže. Do obsadeného času ponuka nejde
+ * (kontroluje aj server). Filter je ten istý ako v Kalendári: pri „Obaja"
+ * má deň dva pruhy, Jerry vľavo, Terezka vpravo. Klient vyberá na `/t/<token>`.
  */
 type Udalost = { uid: string; trener: string; zaciatok: string; koniec: string | null; nazov: string | null; klient: string | null; zmizla_at: string | null };
 type Navrh = { id: number; trener: string; den: string; od: number; minut: number };
@@ -104,11 +107,6 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
     setNavrhy((xs) => [...xs, { id: dalsieId, trener: tr, den, od, minut: 60 }]);
     setDalsieId((x) => x + 1);
     setHotovo(null);
-  };
-  const zmenDlzku = (n: Navrh, o: number) => {
-    const m = n.minut + o;
-    if (m < 30 || m > 180 || n.od + m > DO_H * 60 || (o > 0 && obsadene(n.den, n.trener, n.od, n.od + m, n))) return;
-    setNavrhy((xs) => xs.map((x) => (x.id === n.id ? { ...x, minut: m } : x)));
   };
 
   const vytvor = async () => {
@@ -196,11 +194,9 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                         borderRadius: 6, border: `2px dashed ${farba(tr)}`, background: mix(farba(tr), 12), color: tr === "Terezka" ? C.blue : C.accentLight,
                         fontSize: 10.5, fontWeight: 700, padding: "2px 3px", display: "flex", flexDirection: "column", justifyContent: "space-between", cursor: "default",
                       }}>
-                        <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
-                        <span style={{ display: "flex", gap: 2 }}>
-                          {[["−15", () => zmenDlzku(n, -15)], ["+15", () => zmenDlzku(n, 15)], ["×", () => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))]].map(([t, f]) => (
-                            <button key={t as string} type="button" onClick={f as () => void} style={{ flex: 1, padding: 0, border: 0, borderRadius: 3, background: "rgba(0,0,0,.35)", color: "inherit", font: "inherit", fontSize: 9.5, cursor: "pointer" }}>{t as string}</button>
-                          ))}
+                        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+                          <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
+                          <button type="button" title="Zmazať termín" onClick={() => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))} style={{ padding: "0 4px", border: 0, borderRadius: 3, background: "rgba(0,0,0,.35)", color: "inherit", font: "inherit", fontSize: 10, cursor: "pointer", lineHeight: 1.4 }}>×</button>
                         </span>
                       </div>
                     ))}
@@ -224,7 +220,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           </div>
         )}
         <div style={{ ...stitok, marginTop: 4 }}>Ponúkané termíny {zoradene.length ? `(${zoradene.length})` : ""}</div>
-        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Na bloku −15 / +15 a ×.</div>}
+        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Krížikom na bloku ho zmažeš.</div>}
         {zoradene.map((n) => (
           <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${mix(C.border, 100)}`, fontSize: 12.5 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: farba(n.trener) }} />
@@ -281,3 +277,28 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
 
 const tl = { padding: "5px 11px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 14, cursor: "pointer" } as const;
 const stitok = { fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase" as const, color: C.textDim, fontWeight: 600 };
+
+/**
+ * Karta v Kalendári. Zbalená, kým ju človek neotvorí — týždeň je nad ňou
+ * a druhá mriežka by ho zbytočne zdvojila. Keď čakajú poslané ponuky,
+ * povie to už v nadpise.
+ */
+export function PonukaTerminovKarta(props: { mena: string[]; leads: Lead[]; trener: string | null }) {
+  const [otvorena, setOtvorena] = useState(false);
+  const [cakaju, setCakaju] = useState(0);
+  useEffect(() => {
+    void fetch("/api/ponuky", { credentials: "same-origin", cache: "no-store" }).then((r) => r.json())
+      .then((j) => { if (j?.ok) setCakaju((j.ponuky || []).filter((p: Ponuka) => p.stav === "caka").length); }).catch(() => null);
+  }, [otvorena]);
+  return (
+    <Card>
+      <button type="button" onClick={() => setOtvorena((x) => !x)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 0, border: 0, background: "none", color: C.text, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
+        <span style={{ fontSize: 15, fontWeight: 700 }}>Ponuka termínov</span>
+        <span style={{ fontSize: 12, color: C.textDim }}>naťukaj voľné časy a pošli klientovi odkaz — vyberie si sám</span>
+        {cakaju > 0 && <span style={{ fontSize: 11.5, color: C.accentLight }}>· {cakaju} {cakaju === 1 ? "čaká" : "čakajú"} na výber</span>}
+        <span style={{ marginLeft: "auto", fontSize: 12.5, color: C.accentLight, whiteSpace: "nowrap" }}>{otvorena ? "zavrieť" : "ponúknuť termíny ▸"}</span>
+      </button>
+      {otvorena && <div style={{ marginTop: 14 }}><PonukaTerminov {...props} /></div>}
+    </Card>
+  );
+}

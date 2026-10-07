@@ -15,6 +15,7 @@ import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { VyberMena } from "./VyberMena";
+import { PonukaTerminovKarta } from "./PonukaTerminov";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 
 /**
@@ -234,6 +235,10 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
           onObnov={async () => { await nacitaj(); oznam("kalendar"); }}
         />
       )}
+
+      {/* PONUKA TERMÍNOV (Jerry, 7. 10. 2026: „postav mi to v záložke Kalendár,
+          nie vo Workspace") — hneď pod týždňom, z ktorého sa ponúka. */}
+      {pripojene && <PonukaTerminovKarta mena={menaKlientov} leads={data.leads || []} trener={KALENDAR_TRENERA[trener] ? trener : null} />}
 
       {/* Zmeny a nové názvy sa od 5. 10. 2026 VYBAVUJÚ vo Workspace (krok 1)
           — Jerry: „aby to nebolo na dvoch miestach". Tu ostáva odkaz, ručný
