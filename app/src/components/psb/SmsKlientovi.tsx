@@ -48,7 +48,7 @@ const kontakty = () =>
     .then((j) => (j?.udaje || []) as Kontakt[])
     .catch(() => [] as Kontakt[]);
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane, cisloNovehoCloveka, ponuka = false }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -88,6 +88,13 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   vlozene?: boolean;
   /** Správa odišla — zoznam klienta schová, kým sa mu nezmení stav. */
   onOdoslane?: () => void;
+  /**
+   * Číslo človeka, ktorý ešte nie je klient (ponuka termínov z dopytu).
+   * Okno začne na „Jiné" s týmto číslom — v kontaktoch klientov nie je.
+   */
+  cisloNovehoCloveka?: string;
+  /** Ponuka termínov — v audite `sms-ponuka`, nie správa o hodinách. */
+  ponuka?: boolean;
 }) {
   const [otvorene, setOtvorene] = useState(vlozene);
   const [telefon, setTelefon] = useState<string | null>(null);
@@ -151,7 +158,9 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     setTelefon(null);
     void kontakty().then((u) => {
       setVsetkyKontakty(u);
-      setTelefon(String(u.find((x) => x.klient === meno)?.telefon || ""));
+      const svoje = String(u.find((x) => x.klient === meno)?.telefon || "");
+      if (!svoje && cisloNovehoCloveka) { setKomu(JINE_PRIJEMCA); setTelefon(cisloNovehoCloveka); return; }
+      setTelefon(svoje);
     });
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
     // keď dorazí — preto je v druhom effecte nižšie.
@@ -166,7 +175,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         if (typeof j?.balickov === "number") setBalickov(j.balickov);
       }).catch(() => null);
     }
-  }, [otvorene, meno, predvolenyText]);
+  }, [otvorene, meno, predvolenyText, cisloNovehoCloveka]);
 
   /**
    * Predvolený text sa skladá znova pri zmene rodu aj po príchode odkazu.
@@ -286,7 +295,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     setBezi(true); setHlaska("");
     const r = await fetch("/api/sms", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu) }),
+      body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu), ...(ponuka ? { ponuka: true } : {}) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setBezi(false);
     if (r?.ok) { setHotovo(true); setHlaska("odoslané"); onOdoslane?.(); return; }

@@ -7,6 +7,7 @@ import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorKarta } from "./EditorKarta";
+import { PonukaTerminov } from "./PonukaTerminov";
 import { NekonecnyRad } from "./NekonecnyRad";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
@@ -693,6 +694,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     <>
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
               {k.druh === "editor" && <EditorKarta mena={mena} />}
+              {/* PONUKA TERMÍNOV — klient si vyberie z naťukaných časov (7. 10. 2026). */}
+              {k.druh === "terminy" && <PonukaTerminov mena={mena} leads={data.leads || []} trener={trenerKroku} />}
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}

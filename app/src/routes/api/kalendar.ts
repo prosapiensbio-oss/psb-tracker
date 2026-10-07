@@ -9,6 +9,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
 import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
+import { zapisTrening } from "../../lib/psb/nahodTrening.server";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
@@ -504,46 +505,16 @@ export const Route = createFileRoute("/api/kalendar")({
          */
         if (akcia === "trening-nahod") {
           const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
-          if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });
-          const v = pripravTrening({
+          const kto = (await currentUser(request)) || "";
+          // Jedno miesto zápisu (aj pre výber termínu klientom z ponuky).
+          const r = await zapisTrening(DB, kluc, {
             klient: String(b.klient || ""), den: String(b.den || ""), cas: String(b.cas || ""),
             minut: b.minut == null ? undefined : Number(b.minut), trener: String(b.trener || ""),
-          });
-          if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400 });
-          // Druh si vyberá okno v mriežke — úvodný tréning je tiež termín s menom.
-          const typNovej = String(b.typ || "trening") === "uvodny" ? "uvodny" : "trening";
-
-          let idUdalosti = "";
-          try {
-            idUdalosti = await vlozUdalost(kluc, v.t);
-          } catch (e) {
-            const sprava = String(e instanceof Error ? e.message : e);
-            // Terezkin kalendár ešte nemusí byť zdieľaný — povedz to rovno.
-            const rada = /not.*found|forbidden|403|404/i.test(sprava)
-              ? ` Skontroluj, či je kalendár ${v.t.kalendar} zdieľaný účtu kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com s právom robiť zmeny.`
-              : "";
-            return Response.json({ ok: false, error: `Google kalendár zápis odmietol: ${sprava}.${rada}` }, { status: 502 });
-          }
-
-          // Kľúč v tvare snímky: `<ics uid>|<začiatok>`. Holé ics uid by najbližšia
-          // snímka nespoznala — založila by druhý riadok a tento ohlásila ako
-          // „zrušený tréning“, hoci sa nič nezrušilo.
-          const uid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
-          const kedy = teraz();
-          await DB.batch([
-            DB.prepare(
-              `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?7, ?7, NULL)`,
-            ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, String(b.klient || "").trim(), kedy, typNovej),
-            // Mapovanie: plné meno klienta ako názov → klient. Bez času,
-            // platí pre všetky jeho budúce udalosti s týmto názvom.
-            DB.prepare(
-              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, ?3, 1)`,
-            ).bind(String(b.klient || "").trim(), v.t.trener, typNovej),
-          ]);
-          const kto = (await currentUser(request)) || "";
-          await audit(DB, { action: "trening-nahodeny", predmet: `${v.t.nazov} · ${v.t.zaciatok} · ${v.t.trener}`, neu: uid, actor: kto });
-          return Response.json({ ok: true, uid, zaciatok: v.t.zaciatok });
+            // Druh si vyberá okno v mriežke — úvodný tréning je tiež termín s menom.
+            typ: String(b.typ || "trening"),
+          }, kto);
+          if (!r.ok) return Response.json({ ok: false, error: r.chyba }, { status: r.status });
+          return Response.json({ ok: true, uid: r.uid, zaciatok: r.zaciatok });
         }
 
         /**

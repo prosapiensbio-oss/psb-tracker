@@ -16,6 +16,7 @@ import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
+import { Route as TTokenRouteImport } from './routes/t.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -43,6 +44,7 @@ import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
 import { Route as ApiPushBehRouteImport } from './routes/api/push-beh'
 import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
+import { Route as ApiPonukyRouteImport } from './routes/api/ponuky'
 import { Route as ApiPlatbyRouteImport } from './routes/api/platby'
 import { Route as ApiPlanyRouteImport } from './routes/api/plany'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
@@ -117,6 +119,11 @@ const VTokenRoute = VTokenRouteImport.update({
 const UTokenRoute = UTokenRouteImport.update({
   id: '/u/$token',
   path: '/u/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTokenRoute = TTokenRouteImport.update({
+  id: '/t/$token',
+  path: '/t/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssetsSplatRoute = AssetsSplatRouteImport.update({
@@ -252,6 +259,11 @@ const ApiPushRoute = ApiPushRouteImport.update({
 const ApiPremenujRoute = ApiPremenujRouteImport.update({
   id: '/api/premenuj',
   path: '/api/premenuj',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPonukyRoute = ApiPonukyRouteImport.update({
+  id: '/api/ponuky',
+  path: '/api/ponuky',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPlatbyRoute = ApiPlatbyRouteImport.update({
@@ -501,6 +513,7 @@ export interface FileRoutesByFullPath {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/platby': typeof ApiPlatbyRoute
+  '/api/ponuky': typeof ApiPonukyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -528,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
@@ -577,6 +591,7 @@ export interface FileRoutesByTo {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/platby': typeof ApiPlatbyRoute
+  '/api/ponuky': typeof ApiPonukyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -604,6 +619,7 @@ export interface FileRoutesByTo {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
@@ -654,6 +670,7 @@ export interface FileRoutesById {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/platby': typeof ApiPlatbyRoute
+  '/api/ponuky': typeof ApiPonukyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -681,6 +698,7 @@ export interface FileRoutesById {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
@@ -732,6 +750,7 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/platby'
+    | '/api/ponuky'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -759,6 +778,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/t/$token'
     | '/u/$token'
     | '/v/$token'
   fileRoutesByTo: FileRoutesByTo
@@ -808,6 +828,7 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/platby'
+    | '/api/ponuky'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -835,6 +856,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/t/$token'
     | '/u/$token'
     | '/v/$token'
   id:
@@ -884,6 +906,7 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/platby'
+    | '/api/ponuky'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -911,6 +934,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/t/$token'
     | '/u/$token'
     | '/v/$token'
   fileRoutesById: FileRoutesById
@@ -961,6 +985,7 @@ export interface RootRouteChildren {
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiPlanyRoute: typeof ApiPlanyRoute
   ApiPlatbyRoute: typeof ApiPlatbyRoute
+  ApiPonukyRoute: typeof ApiPonukyRoute
   ApiPremenujRoute: typeof ApiPremenujRoute
   ApiPushRoute: typeof ApiPushRoute
   ApiPushBehRoute: typeof ApiPushBehRoute
@@ -988,6 +1013,7 @@ export interface RootRouteChildren {
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
+  TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
 }
@@ -1041,6 +1067,13 @@ declare module '@tanstack/react-router' {
       path: '/u/$token'
       fullPath: '/u/$token'
       preLoaderRoute: typeof UTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$token': {
+      id: '/t/$token'
+      path: '/t/$token'
+      fullPath: '/t/$token'
+      preLoaderRoute: typeof TTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assets/$': {
@@ -1230,6 +1263,13 @@ declare module '@tanstack/react-router' {
       path: '/api/premenuj'
       fullPath: '/api/premenuj'
       preLoaderRoute: typeof ApiPremenujRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ponuky': {
+      id: '/api/ponuky'
+      path: '/api/ponuky'
+      fullPath: '/api/ponuky'
+      preLoaderRoute: typeof ApiPonukyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/platby': {
@@ -1561,6 +1601,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiPlanyRoute: ApiPlanyRoute,
   ApiPlatbyRoute: ApiPlatbyRoute,
+  ApiPonukyRoute: ApiPonukyRoute,
   ApiPremenujRoute: ApiPremenujRoute,
   ApiPushRoute: ApiPushRoute,
   ApiPushBehRoute: ApiPushBehRoute,
@@ -1588,6 +1629,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
+  TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
 }
