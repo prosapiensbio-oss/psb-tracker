@@ -19,6 +19,8 @@
  * mám na starosti ja, nech Terezku nerozptyľujú").
  */
 
+import { denVTyzdni } from "./format";
+
 import type { BezBalicka } from "./bezBalicka";
 import type { Dlznik } from "./dlznici";
 import type { ZostavaPoPlatnosti } from "./platnostZostatok";
@@ -207,6 +209,16 @@ export const trenerZPrihlasenia = (ktoSom: string | null): "Jerry" | "Terezka" |
 const denSK = (iso: string) => {
   const d = (iso || "").slice(0, 10);
   return d ? `${Number(d.slice(8))}. ${Number(d.slice(5, 7))}.` : "";
+};
+
+/**
+ * Termín tak, ako ho človek povie: „st 22. 9. o 16:00". Používa to návrh
+ * presunu — samotný deň by pri presune v rámci dňa nepovedal nič.
+ */
+export const terminSK = (iso: string): string => {
+  const d = (iso || "").slice(0, 10), h = (iso || "").slice(11, 16);
+  if (!d) return "";
+  return `${denVTyzdni(d)} ${denSK(d)}${h ? ` o ${h}` : ""}`;
 };
 
 export const popisZmeny = (x: Zmena): string =>

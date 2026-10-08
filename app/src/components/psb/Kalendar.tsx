@@ -34,7 +34,7 @@ import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 type Zdroj = { id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null };
 export type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null; vysvetlene?: number; odpovedane_at?: string | null };
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
-export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
+export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; prvy_raz?: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
 /** Meno z kalendára, ktoré sedí na viacerých klientov (napr. dve Markety). */
 type Nejednoznacne = { nazov: string; kandidati: string[]; casy: string[] };

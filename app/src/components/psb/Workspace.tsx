@@ -13,7 +13,7 @@ import { NekonecnyRad } from "./NekonecnyRad";
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
 import { REPORTS, UploadCard } from "./Udaje";
 import { BankaUlozene } from "./BankaUlozene";
@@ -163,7 +163,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const [platbyRozbalene, setPlatbyRozbalene] = useState(true);
   const [pocetSms, setPocetSms] = useState<number | null>(null);
-  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
+  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; presuny: Record<string, { zaciatok: string; kandidatov: number }>; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
   /**
@@ -241,7 +241,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
-    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) });
+    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], presuny: k?.presuny || {}, nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) });
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
   }, []);
@@ -906,12 +906,42 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   })()}
                 </div>
               ))}
-              {k.druh === "zmeny" && k.polozky.map((z) => {
+              {k.druh === "zmeny" && (() => {
+                /**
+                 * NAJPRV TIE, ČO ZMIZLI, NAKONIEC POSUNY (Jerry, 8. 10. 2026:
+                 * „nech najprv riešim tie, čo zmizli, a nakoniec posuny").
+                 * Je to to isté pravidlo ako pri celej kope — jeden druh
+                 * práce naraz. Zmiznutá hodina je voľné okno a nezarobené
+                 * peniaze; posun je len zápis, ktorý sa má zrovnať.
+                 */
+                const presuny = zdroje?.presuny || {};
+                const poradie = (z: Zmena) => {
+                  const p = presuny[z.id];
+                  if (z.druh === "zrusene" && !p) return 0;   // naozaj zmizlo
+                  if (z.druh === "zrusene") return 1;         // vyzerá to na presun
+                  if (z.druh === "posunute") return 2;
+                  return 3;                                    // pridané, premenované
+                };
+                const NADPISY = ["Zmizli", "Vyzerá to na presun", "Posuny", "Ostatné zmeny"];
+                const zoradene = [...k.polozky].sort((a, b) => poradie(a) - poradie(b)
+                  || String(b.pred || b.po || "").localeCompare(String(a.pred || a.po || "")));
+                let predosleP = -1;
+                return zoradene.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
                 const t = text(kluc);
+                const presun = presuny[z.id] || null;
+                const skupina = poradie(z);
+                const nadpis = skupina !== predosleP ? NADPISY[skupina] : null;
+                predosleP = skupina;
                 return (
-                  <div key={kluc} style={riadok}>
+                  <div key={kluc}>
+                  {nadpis && (
+                    <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textMuted, margin: "12px 0 5px" }}>
+                      {nadpis}
+                    </div>
+                  )}
+                  <div style={riadok}>
                     <div style={{ minWidth: 150, flex: "1 1 190px" }}>
                       {poKrokoch ? (
                         <button onClick={() => setDenOtvoreny(denOtvoreny === kluc ? "" : kluc)} title="Ukázať týždeň v kalendári"
@@ -922,6 +952,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         <div style={{ fontSize: 12.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
                       )}
                       <div style={{ fontSize: 11, color: C.textDim }}>{popisZmeny(z)} · {z.trener}</div>
+                      {/* Čo appka našla, má byť vidieť BEZ kliknutia — inak
+                          je návrh len skryté tlačidlo. Pri viacerých
+                          kandidátoch sa to povie: je to otázka, nie dôkaz. */}
+                      {presun && (
+                        <div style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
+                          v kalendári pribudol termín {terminSK(presun.zaciatok)}
+                          {presun.kandidatov > 1 ? ` (a ešte ${presun.kandidatov - 1} ďalší) — over, či je to ten` : ""}
+                        </div>
+                      )}
                     </div>
                     {/* Týždeň pod riadkom (order: 99 ho dá na koniec riadku,
                         pod tlačidlá) — Jerry, 4. 10. 2026. */}
@@ -941,8 +980,26 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                      {["klient zrušil", "presunuli sme", "chyba v zápise"].map((d) => (
-                        <button key={d} onClick={() => nastavText(kluc, d)} style={stitok(t === d)}>{d}</button>
+                      {/* Klik na kategóriu rovno UZAVRIE (Jerry, 8. 10. 2026:
+                          „keď klikám na nejakú kategóriu, malo by sa to
+                          automaticky odoslať"). Dovtedy štítok len vyplnil
+                          políčko a čakalo sa na druhý klik na Vybavené —
+                          dva kliky na jednu odpoveď. Kto chce napísať niečo
+                          vlastné, má pod tým políčko a to sa posiela
+                          tlačidlom. */}
+                      {(presun
+                        ? [`presunuli sme na ${terminSK(presun.zaciatok)}`, "klient zrušil", "chyba v zápise"]
+                        : ["klient zrušil", "presunuli sme", "chyba v zápise"]
+                      ).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: d })}
+                          disabled={pracujem === kluc}
+                          title="Uzavrieť s týmto dôvodom"
+                          style={stitok(t === d)}
+                        >
+                          {pracujem === kluc ? "…" : d}
+                        </button>
                       ))}
                     </div>
                     <input value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="alebo vlastnými slovami…" style={vstup(false)} />
@@ -980,8 +1037,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       Súkromné
                     </button>
                   </div>
+                  </div>
                 );
-              })}
+                });
+              })()}
 
               {k.druh === "mena" && k.polozky.map((n) => {
                 const kluc = klucPolozky("mena", n);

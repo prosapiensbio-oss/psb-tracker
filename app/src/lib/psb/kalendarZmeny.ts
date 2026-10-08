@@ -128,3 +128,59 @@ export function sparujZmeny(surove: SurovaZmena[]): SurovaZmena[] {
   surove.forEach((x, i) => { if (!pouzite.has(i)) von.push(x); });
   return von;
 }
+
+/**
+ * ZMIZNUTÁ HODINA, KTORÁ SA INDE OBJAVILA — to nie je zrušenie, to je presun.
+ *
+ * Jerry, 8. 10. 2026: „prečo sú klienti, ktorí sa presunuli, ako zrušenie?
+ * Veď ak sme presunuli, musíš mať záznam o tom, že je na nejakom inom čase
+ * v kalendári — tým pádom sa ma môže tak max spýtať na presun."
+ *
+ * `sparujZmeny` vyššie spojí zrušenie s pridaním, ale len v TEN ISTÝ DEŇ
+ * a len keď obe prídu z jednej synchronizácie. Presun na budúci týždeň ani
+ * presun, ktorého nový termín appka videla už skôr, tým neprejde — a zostane
+ * z neho „zrušené". Zmerané 8. 10. 2026 na ostrých dátach: z 46 nevysvetlených
+ * zrušení ich takto vyzerá 19.
+ *
+ * Dôkaz je v tom, KEDY sa nová udalosť prvý raz objavila. Klient, ktorý chodí
+ * každý týždeň, má v kalendári ďalší tréning vždy — to samo o sebe nehovorí
+ * nič. Ale udalosť, ktorá pribudla v tej istej chvíli, keď iná zmizla, je tá
+ * istá hodina na novom čase.
+ *
+ * Nie je to dôkaz, je to NÁVRH. Pri viacerých kandidátoch sa vyberie ten
+ * najbližší v čase objavenia a appka sa pýta — nerozhoduje.
+ */
+export type MoznyPresun = { zaciatok: string; uid: string; kandidatov: number };
+
+export function najdiPresun(
+  zmena: { druh: string; klient: string | null; nazov: string | null; pred: string | null; kedy: string },
+  udalosti: { uid: string; klient: string | null; nazov: string; zaciatok: string; prvyRaz?: string | null }[],
+  /** Koľko dní okolo pôvodného termínu hľadať nový. */
+  dni = 14,
+  /** Koľko hodín od zmeny sa nová udalosť smie objaviť. */
+  hodin = 36,
+): MoznyPresun | null {
+  if (zmena.druh !== "zrusene" || !zmena.pred) return null;
+  const kto = zmena.klient || zmena.nazov || "";
+  if (!kto) return null;
+  const kedy = Date.parse(zmena.kedy);
+  const pred = Date.parse(`${zmena.pred.slice(0, 16)}:00Z`);
+  if (!Number.isFinite(kedy) || !Number.isFinite(pred)) return null;
+
+  const kandidati: { odstup: number; u: (typeof udalosti)[number] }[] = [];
+  for (const u of udalosti) {
+    if (!u.prvyRaz) continue;
+    if (u.zaciatok.slice(0, 16) === zmena.pred.slice(0, 16)) continue;
+    if (!tenIstyClovek(u.klient || u.nazov, kto)) continue;
+    const zac = Date.parse(`${u.zaciatok.slice(0, 16)}:00Z`);
+    const prvy = Date.parse(u.prvyRaz);
+    if (!Number.isFinite(zac) || !Number.isFinite(prvy)) continue;
+    if (Math.abs(zac - pred) > dni * 86400000) continue;
+    const odstup = Math.abs(prvy - kedy);
+    if (odstup > hodin * 3600000) continue;
+    kandidati.push({ odstup, u });
+  }
+  if (!kandidati.length) return null;
+  kandidati.sort((a, b) => a.odstup - b.odstup || a.u.zaciatok.localeCompare(b.u.zaciatok));
+  return { zaciatok: kandidati[0].u.zaciatok, uid: kandidati[0].u.uid, kandidatov: kandidati.length };
+}

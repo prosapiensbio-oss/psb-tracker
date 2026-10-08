@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ohlasitZmenu, sparujZmeny, tenIstyClovek, type SurovaZmena } from "./kalendarZmeny";
+import { ohlasitZmenu, sparujZmeny, tenIstyClovek, type SurovaZmena, najdiPresun } from "./kalendarZmeny";
 
 /**
  * Michal Knapčok, 11. 8.: „mal tréning v stredu o 15, zrušil, program to
@@ -143,5 +143,46 @@ describe("zrušené + pridané v ten istý deň je posun", () => {
     ]);
     expect(v.filter((x) => x.druh === "posunute")).toHaveLength(1);
     expect(v.filter((x) => x.druh === "pridane")).toHaveLength(1);
+  });
+});
+
+describe("zmiznutá hodina, ktorá sa inde objavila", () => {
+  const zmena = { druh: "zrusene", klient: "Tomaš Krčmar", nazov: null, pred: "2026-09-15T16:00", kedy: "2026-09-14T09:00:00.000Z" };
+  const u = (zaciatok: string, prvyRaz: string | null, klient = "Tomaš Krčmar") =>
+    ({ uid: `u-${zaciatok}`, klient, nazov: klient, zaciatok, prvyRaz });
+
+  test("udalosť, ktorá pribudla v tej istej chvíli, je presun", () => {
+    const p = najdiPresun(zmena, [u("2026-09-22T16:00", "2026-09-14T09:00:00.000Z")]);
+    expect(p?.zaciatok).toBe("2026-09-22T16:00");
+    expect(p?.kandidatov).toBe(1);
+  });
+
+  test("bežný ďalší tréning presun nie je — objavil sa dávno predtým", () => {
+    expect(najdiPresun(zmena, [u("2026-09-22T16:00", "2026-08-01T09:00:00.000Z")])).toBe(null);
+  });
+
+  test("udalosť ďaleko od pôvodného termínu sa neberie", () => {
+    expect(najdiPresun(zmena, [u("2026-11-20T16:00", "2026-09-14T09:00:00.000Z")])).toBe(null);
+  });
+
+  test("iný človek nie je presun", () => {
+    expect(najdiPresun(zmena, [u("2026-09-22T16:00", "2026-09-14T09:00:00.000Z", "Jan Kral")])).toBe(null);
+  });
+
+  test("z viacerých kandidátov vyberie najbližší v čase objavenia a povie, že ich je viac", () => {
+    const p = najdiPresun(zmena, [
+      u("2026-09-20T16:00", "2026-09-14T20:00:00.000Z"),
+      u("2026-09-22T16:00", "2026-09-14T09:30:00.000Z"),
+    ]);
+    expect(p?.zaciatok).toBe("2026-09-22T16:00");
+    expect(p?.kandidatov).toBe(2);
+  });
+
+  test("posunuté ani pridané sa už nerieši", () => {
+    expect(najdiPresun({ ...zmena, druh: "posunute" }, [u("2026-09-22T16:00", "2026-09-14T09:00:00.000Z")])).toBe(null);
+  });
+
+  test("udalosť bez známeho prvého videnia sa neberie — nie je z čoho súdiť", () => {
+    expect(najdiPresun(zmena, [u("2026-09-22T16:00", null)])).toBe(null);
   });
 });

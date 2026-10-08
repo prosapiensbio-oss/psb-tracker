@@ -14,7 +14,7 @@ import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
 import { citajIcal } from "../../lib/psb/ical";
-import { ohlasitZmenu, sparujZmeny } from "../../lib/psb/kalendarZmeny";
+import { ohlasitZmenu, sparujZmeny, najdiPresun } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
@@ -292,7 +292,10 @@ export const Route = createFileRoute("/api/kalendar")({
            * klientovi pridať hodinu.
            */
           DB.prepare(
-            `SELECT u.uid, u.trener, u.zaciatok, u.koniec, u.nazov, u.klient, u.typ
+            // `prvy_raz` nesie, kedy appka udalosť prvý raz videla — z toho
+            // sa pozná presun (`najdiPresun`): hodina, ktorá pribudla v tej
+            // istej chvíli, keď iná zmizla, je tá istá hodina na novom čase.
+            `SELECT u.uid, u.trener, u.zaciatok, u.koniec, u.nazov, u.klient, u.typ, u.prvy_raz
                FROM kal_udalosti u
                LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
               WHERE (u.zmizla_at IS NULL OR k.konal = 1)
@@ -428,9 +431,34 @@ export const Route = createFileRoute("/api/kalendar")({
             .map((u) => `${u.trener}|${casUdalosti(u.zaciatok)}`))].sort(),
         }));
 
+        /**
+         * NÁVRH PRESUNU K ZMIZNUTEJ HODINE (Jerry, 8. 10. 2026).
+         *
+         * Počíta sa TU, nie v prehliadači: okno udalostí má 21 dní dozadu
+         * a zmena spred mesiaca by svojho náprotivka nemala kde nájsť.
+         * Dopyt je ohraničený dňami zmien, ktoré čakajú na odpoveď.
+         */
+        const zmenyRiadky = (zmeny.results || []) as unknown as { id: string; kedy: string; klient: string | null; nazov: string | null; druh: string; pred: string | null }[];
+        const dniZmien = zmenyRiadky.filter((z) => z.druh === "zrusene" && z.pred).map((z) => String(z.pred).slice(0, 10)).sort();
+        let presuny: Record<string, { zaciatok: string; kandidatov: number }> = {};
+        if (dniZmien.length) {
+          const odP = dnesPraha(new Date(Date.parse(`${dniZmien[0]}T00:00:00Z`) - 14 * 86400000));
+          const doP = dnesPraha(new Date(Date.parse(`${dniZmien[dniZmien.length - 1]}T00:00:00Z`) + 14 * 86400000));
+          const kandidati = ((await DB.prepare(
+            "SELECT uid, klient, nazov, zaciatok, prvy_raz FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ?1 AND zaciatok <= ?2",
+          ).bind(`${odP}T00:00`, `${doP}T23:59`).all().catch(() => ({ results: [] }))).results || []) as unknown as { uid: string; klient: string | null; nazov: string; zaciatok: string; prvy_raz: string | null }[];
+          const vTvare = kandidati.map((u) => ({ uid: u.uid, klient: u.klient, nazov: u.nazov, zaciatok: u.zaciatok, prvyRaz: u.prvy_raz }));
+          presuny = Object.fromEntries(zmenyRiadky.flatMap((z) => {
+            const p = najdiPresun(z, vTvare);
+            return p ? [[z.id, { zaciatok: p.zaciatok, kandidatov: p.kandidatov }]] : [];
+          }));
+        }
+
         return Response.json({
           ok: true,
           nejednoznacne,
+          /** Ku ktorej zmiznutej hodine appka našla nový termín (`najdiPresun`). */
+          presuny,
           // Beh, ktorý zomrel bez zápisu chyby, sa ukáže ako chyba — nie ako
           // zelené „pripojený" (kalendarZdroje.chybaZdroja).
           zdroje: ((zdroje.results || []) as unknown as ZdrojStav[]).map(({ snimka_kedy, snimka_ok, snimka_chyba, ...z }) => ({
