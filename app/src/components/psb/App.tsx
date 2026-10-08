@@ -2388,7 +2388,7 @@ function skupinaFaktur(
    * zdrojov, ktoré ukazujú obrazovky: P&L z `pnlCalc`, hodiny a klienti zo
    * sedení, Instagram z `kanaly_mesiace`, reklama z Mety (`spendAds`).
    */
-  const vstupReportu = useCallback((mk: string): { mesiace: MesiacReportu[]; extra: ExtraReportu } => {
+  const vstupReportu = useCallback((mk: string, druh: "mesiac" | "kvartal" = "mesiac"): { mesiace: MesiacReportu[]; extra: ExtraReportu } => {
     const p = pnlCalc();
     const mesiace: MesiacReportu[] = [];
     const [y, m] = mk.split("-").map(Number);
@@ -2413,14 +2413,20 @@ function skupinaFaktur(
         reklama: mkt?.spendAds,
       });
     }
-    const trenovali = new Set(data.sessions.filter((x) => x.date.slice(0, 7) === mk).map((x) => x.client));
+    // Obdobie extra údajov: mesiac, alebo celý štvrťrok pri kvartálnom reporte.
+    const obdobie = druh === "kvartal"
+      ? [0, 1, 2].map((k) => new Date(Date.UTC(y, m - 1 - k, 1)).toISOString().slice(0, 7))
+      : [mk];
+    const trenovali = new Set(data.sessions.filter((x) => obdobie.includes(x.date.slice(0, 7))).map((x) => x.client));
     const odmlcani = Object.values(clients).filter((c) => c.status === "Aktívny" && !trenovali.has(c.name)).length;
-    const vydaje = Object.entries(bankaSumy[mk] || {}).filter(([k]) => !k.startsWith("vyplaty")).sort((a, b) => b[1] - a[1]);
+    const spolu: Record<string, number> = {};
+    for (const o of obdobie) for (const [k, v] of Object.entries(bankaSumy[o] || {})) spolu[k] = (spolu[k] || 0) + v;
+    const vydaje = Object.entries(spolu).filter(([k]) => !k.startsWith("vyplaty")).sort((a, b) => b[1] - a[1]);
     return {
       mesiace,
       extra: {
         odmlcani,
-        zositChyba: !hotovostMesiace.has(mk),
+        zositChyba: obdobie.some((o) => !hotovostMesiace.has(o)),
         topVydaj: vydaje[0] ? { nazov: nazovKategorie(vydaje[0][0]), suma: vydaje[0][1] } : undefined,
       },
     };

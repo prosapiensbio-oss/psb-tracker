@@ -102,7 +102,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Podklady mesiaca pre mesačnú správu — zoznam všetkých mesiacov a zámkov. */
   podkladyUzavierky?: (mesiac: string) => string;
   /** Vstup mesačného/kvartálneho reportu (App → mesacnyReport.ts). */
-  reportUzavierky?: (mesiac: string) => { mesiace: MesiacReportu[]; extra: ExtraReportu };
+  reportUzavierky?: (mesiac: string, druh?: "mesiac" | "kvartal") => { mesiace: MesiacReportu[]; extra: ExtraReportu };
   /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
   /**

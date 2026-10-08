@@ -57,6 +57,8 @@ export const kvartalMesiaca = (m: string) => Math.ceil(Number(m.slice(5, 7)) / 3
 /** Je to posledný mesiac štvrťroka (marec, jún, september, december)? */
 export const koniecKvartalu = (m: string) => Number(m.slice(5, 7)) % 3 === 0;
 
+/** 1 nový klient · 2–4 noví klienti · 5 nových klientov. */
+export const noviKlienti = (n: number) => `${n} ${n === 1 ? "nový klient" : n >= 2 && n <= 4 ? "noví klienti" : "nových klientov"}`;
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ")}`;
 const sucet = (xs: (number | undefined)[]) => xs.reduce<number>((a, x) => a + (x || 0), 0);
 const priemer = (xs: number[]) => (xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : 0);
@@ -182,7 +184,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
   const bezReklamy = (akt.reklama || 0) < 100;
   const novi: OtazkaReportu = {
     id: "novi", otazka: "Prichádzajú noví ľudia?", semafor: sNovi,
-    odpoved: `${kc(akt.dopyty)} dopytov, ${kc(akt.novi)} ${akt.novi === 1 ? "nový klient" : "noví klienti"}`
+    odpoved: `${kc(akt.dopyty)} dopytov, ${noviKlienti(akt.novi)}`
       + (akt.prirastokIg !== undefined ? `; Instagram ${akt.prirastokIg >= 0 ? "+" : ""}${kc(akt.prirastokIg)} sledovateľov${bezReklamy ? " bez reklamy" : ` pri reklame ${kc(akt.reklama || 0)} Kč`}` : "") + ".",
     hlavne: { hodnota: akt.dopyty, jednotka: "dopytov", ...zmena(akt.dopyty, pred?.dopyty, nazovPred, dativPred), seria: seriaMes.map((x) => x.dopyty), popisSerie },
     cisla: [
@@ -195,7 +197,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       : bezReklamy && (akt.prirastokIg ?? 0) <= 0
         ? "Bez reklamy sledovatelia neprirastajú — rozhodni, či v ďalšom mesiaci pustiť reklamu."
         : akt.dopyty > 0
-          ? `Odpovedaj na dopyty do 24 hodín — z ${kc(akt.dopyty)} dopytov ${akt.novi === 1 ? "je 1 nový klient" : `je ${kc(akt.novi)} nových klientov`}.`
+          ? `Odpovedaj na dopyty do 24 hodín — z ${kc(akt.dopyty)} dopytov ${akt.novi >= 2 && akt.novi <= 4 ? "sú" : "je"} ${noviKlienti(akt.novi)}.`
           : "Žiadny dopyt — skontroluj, či formuláre na webe fungujú (nočná kontrola) a či beží reklama.",
   };
 

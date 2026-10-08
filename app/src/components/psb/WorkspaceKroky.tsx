@@ -928,7 +928,7 @@ const nazovMesiaca = (mk: string) => {
 export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [], reportVstup }: {
   mesiac: string;
   /** Mesačný a kvartálny report pod zámkom (Jerry, 8. 10. 2026). */
-  reportVstup?: (mesiac: string) => { mesiace: MesiacReportu[]; extra: ExtraReportu };
+  reportVstup?: (mesiac: string, druh?: "mesiac" | "kvartal") => { mesiace: MesiacReportu[]; extra: ExtraReportu };
   /** Kedy sa čo naposledy nahralo — dátum stojí pri každom kroku (Jerry, 5. 10. 2026). */
   uploadLog?: { date: string; type: string }[];
   /**
@@ -1144,7 +1144,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
         </div>
       )}
       {report && reportVstup && (() => {
-        const v = reportVstup(mesiac);
+        const v = reportVstup(mesiac, report);
         return <ReportMesiaca report={postavReport(v.mesiace, mesiac, report, v.extra)} nahlad={!zamknuty} onZavri={() => setReport(null)} />;
       })()}
     </>
