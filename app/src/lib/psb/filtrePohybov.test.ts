@@ -33,6 +33,8 @@ describe("filtre zapísaných pohybov", () => {
     expect(stavPrijmu({ suma: 500, kategoria: "", nieKlient: true })).toBe("nieKlient");
     expect(stavPrijmu({ suma: 500, kategoria: "", nieKlient: true }, true)).toBe("rozdelene");
     expect(stavPrijmu({ suma: 6990, kategoria: "" })).toBe("caka");
+    // Loptička za 200 Kč nečaká na priradenie klientovi (Jerry, 8. 10. 2026).
+    expect(stavPrijmu({ suma: 200, kategoria: "prijem.produkt" })).toBe("zaradeny");
   });
 });
 

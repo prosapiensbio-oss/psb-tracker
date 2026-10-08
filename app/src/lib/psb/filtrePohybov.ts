@@ -8,6 +8,8 @@
  * 67 bez kategórie a všetko to boli platby klientov.
  */
 
+import { jeKategoriaPrijmu } from "./kategoriePrijmov";
+
 export type FilterPohybov = "nezaradene" | "potvrdit" | "potvrdene" | "naklady" | "vyplaty" | "sukromne" | "prijmy" | "vsetko";
 
 export type PohybNaFilter = { suma: number; kategoria: string; typ?: string; klienti?: string; nieKlient?: boolean; potvrdene?: boolean };
@@ -30,11 +32,13 @@ export function patriDoFiltra(p: PohybNaFilter, f: FilterPohybov, maSplit = fals
 }
 
 /** Čo sa s príjmom stalo — ukazuje sa namiesto kategórie. */
-export type StavPrijmu = "klient" | "nieKlient" | "rozdelene" | "caka";
+export type StavPrijmu = "klient" | "zaradeny" | "nieKlient" | "rozdelene" | "caka";
 
 export function stavPrijmu(p: PohybNaFilter, maSplit = false): StavPrijmu {
   if (maSplit) return "rozdelene";
   if (p.klienti) return "klient";
+  // Predaj produktu / iný príjem — nie je to platba klienta, nečaká na nikoho.
+  if (jeKategoriaPrijmu(p.kategoria)) return "zaradeny";
   if (p.nieKlient) return "nieKlient";
   return "caka";
 }

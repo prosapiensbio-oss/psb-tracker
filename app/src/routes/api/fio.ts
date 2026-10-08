@@ -4,6 +4,7 @@ import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
+import { jeKategoriaPrijmu } from "../../lib/psb/kategoriePrijmov";
 import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
 
 // Import bankového výpisu — dvojkrokovo.
@@ -285,7 +286,8 @@ export const Route = createFileRoute("/api/fio")({
           const naucene = new Map<string, string>();
           for (const r of riadky) {
             const vzor = (r.protistrana || "").trim();
-            if (vzor.length >= MIN_VZOR && r.kategoria) naucene.set(vzor.toLowerCase(), r.kategoria);
+            // Z príjmu sa pravidlo neučí — pravidlá zaraďujú len výdavky.
+            if (vzor.length >= MIN_VZOR && r.kategoria && r.suma < 0) naucene.set(vzor.toLowerCase(), r.kategoria);
           }
           // Zlyhaný zápis pravidla sa NESMIE prehltnúť: DELETE+INSERT s tichým
           // catch znamenal, že keď DELETE prešiel a INSERT padol, naučené
@@ -449,7 +451,8 @@ export const Route = createFileRoute("/api/fio")({
               const vzor = (podlaKluca.get(String(z.kluc || "")) || "").trim();
               // Prázdna kategória pravidlo neruší, len sa neučí — vyprázdnenie
               // je „neviem", nie „patrí nikam".
-              if (kat && vzor.length >= MIN_VZOR) naucene.set(vzor.toLowerCase(), kat);
+              // Kategória príjmu (loptička…) sa neučí — pravidlá sú pre výdavky.
+              if (kat && !jeKategoriaPrijmu(kat) && vzor.length >= MIN_VZOR) naucene.set(vzor.toLowerCase(), kat);
             }
             const kedy = new Date().toISOString();
             for (const [vzor, kategoria] of naucene) {

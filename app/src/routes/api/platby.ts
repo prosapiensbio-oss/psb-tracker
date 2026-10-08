@@ -177,7 +177,8 @@ const SPOSOBY = ["hotovost", "prevod", "bitcoin", "ine"];
 async function stavPlatieb(DB: D1Database) {
   const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty, polozky, ceny] = await DB.batch([
     DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at, vopred, created_at FROM platby ORDER BY datum DESC"),
-    DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
+    // Predaj produktu a iný príjem nie sú platby klienta — do frontu nepatria.
+    DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 AND COALESCE(category, '') NOT IN ('prijem.produkt', 'prijem.ine') ORDER BY date DESC"),
     DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
     DB.prepare("SELECT fio_id FROM platba_nie_klient"),
     DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')"),

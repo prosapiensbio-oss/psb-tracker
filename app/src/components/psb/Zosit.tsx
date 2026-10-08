@@ -2,7 +2,8 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { useEffect, useRef, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
-import { nazovKategorie } from "../../lib/psb/vzas";
+import { KATEGORIE_PRIJMU, jeKategoriaPrijmu, nazovPrijmu } from "../../lib/psb/kategoriePrijmov";
+import { kategorieZoznam } from "./Banka";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { VyberKategorie } from "./VyberKategorie";
@@ -101,6 +102,9 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
   /** Rozpísaný text v poli dátumu — kým sa nedá prečítať, ISO sa nemení. */
   const [denMesiac, setDenMesiac] = useState<Record<number, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  // Čitateľný názov kategórie („Výplata — Terezka", nie „vyplaty.terezka").
+  const [KAT] = useState(kategorieZoznam);
+  const nazov = (k: string) => (jeKategoriaPrijmu(k) ? nazovPrijmu(k) : KAT.find((x) => x.value === k)?.label || k);
 
   const nacitaj = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -252,6 +256,26 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
               sú podfarbené. Skontroluj ich proti papieru skôr, než zapíšeš.
             </div>
           )}
+          {/* Lišta so zápisom stojí navrchu a riadky rolujú pod ňou (Jerry,
+              8. 10. 2026) — pri dlhej strane sa netreba vracať dolu ani hore. */}
+          <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.surface, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "0 -16px 8px", padding: "10px 16px", borderBottom: `1px solid ${mix(C.border, 60)}` }}>
+            <button
+              onClick={() => void zapis()}
+              disabled={busy}
+              style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 8, padding: "7px 16px", color: C.accentLight, fontSize: 12.5, cursor: busy ? "default" : "pointer" }}
+            >
+              Zapísať {riadky.filter((r) => !r.vypnuty).length} riadkov
+            </button>
+            <button
+              onClick={() => { setRiadky(null); setDenMesiac({}); setStav(""); }}
+              style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}
+            >
+              Zahodiť
+            </button>
+            <span style={{ fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
+              Súčet na zápis: <b style={{ color: spolu < 0 ? C.red : C.green }}>{fmtCZK(spolu)}</b>
+            </span>
+          </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
               <thead>
@@ -324,10 +348,18 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                     <td style={{ padding: "5px 8px" }}>
                       {r.uzMame ? (
                         <span style={{ fontSize: 11.5, color: C.green }} title="Tento riadok je už zapísaný — zaškrtni ho, len ak je to naozaj iná platba.">
-                          ✓ už v Kokpite · {r.kategoriaVDb ? nazovKategorie(r.kategoriaVDb) || r.kategoriaVDb : "bez kategórie"}
+                          ✓ už v Kokpite · {r.kategoriaVDb ? nazov(r.kategoriaVDb) : r.suma > 0 ? "platba klienta" : "bez kategórie"}
                         </span>
                       ) : r.zamknuty ? (
                         <span style={{ fontSize: 11.5, color: C.textMuted }}>uzavretý mesiac — nezapíše sa</span>
+                      ) : r.suma > 0 ? (
+                        // Príjem: platba klienta (priradí sa v kroku 3), predaj
+                        // produktu (loptička 200 Kč) alebo iný príjem.
+                        <select value={jeKategoriaPrijmu(r.kategoria) ? r.kategoria : ""} onChange={(e) => uprav(i, { kategoria: e.target.value })}
+                          aria-label={`Druh príjmu ${r.popis}`}
+                          style={{ width: 190, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, padding: "5px 7px", cursor: "pointer", fontFamily: "inherit" }}>
+                          {KATEGORIE_PRIJMU.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                        </select>
                       ) : (
                         <VyberKategorie hodnota={r.kategoria || ""} onZmena={(k) => uprav(i, { kategoria: k })} sirka={190} />
                       )}
@@ -338,24 +370,6 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
             </table>
           </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 11 }}>
-            <button
-              onClick={() => void zapis()}
-              disabled={busy}
-              style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 8, padding: "7px 16px", color: C.accentLight, fontSize: 12.5, cursor: busy ? "default" : "pointer" }}
-            >
-              Zapísať {riadky.filter((r) => !r.vypnuty).length} riadkov
-            </button>
-            <button
-              onClick={() => { setRiadky(null); setDenMesiac({}); setStav(""); }}
-              style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}
-            >
-              Zahodiť
-            </button>
-            <span style={{ fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
-              Súčet na zápis: <b style={{ color: spolu < 0 ? C.red : C.green }}>{fmtCZK(spolu)}</b>
-            </span>
-          </div>
         </>
       )}
 

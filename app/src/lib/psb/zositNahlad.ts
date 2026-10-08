@@ -1,4 +1,5 @@
 import { odhadniKategoriu } from "./fio";
+import { CENA_LOPTICKY, PRIJEM_PRODUKT } from "./kategoriePrijmov";
 
 /**
  * NÁHĽAD ZOŠITA PROTI TOMU, ČO UŽ V KOKPITE JE (Jerry, 8. 10. 2026:
@@ -44,7 +45,10 @@ export function oznacZosit(
       z.pouzite = true;
       return { ...r, uzMame: true, kategoriaVDb: z.category || "", kategoria: z.category || "" };
     }
-    const navrh = r.suma < 0 ? odhadniKategoriu(`${r.popis} ${r.poznamka || ""}`, pravidla) : "";
+    // Príjem presne za cenu loptičky sa navrhne ako predaj produktu — len
+    // návrh v rolete, človek ho vidí a prepne.
+    const navrh = r.suma < 0 ? odhadniKategoriu(`${r.popis} ${r.poznamka || ""}`, pravidla)
+      : Math.round(r.suma) === CENA_LOPTICKY ? PRIJEM_PRODUKT : "";
     return { ...r, uzMame: false, kategoriaVDb: "", kategoria: navrh };
   });
 }

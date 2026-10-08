@@ -6,6 +6,7 @@ import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
+import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
@@ -1589,6 +1590,9 @@ function skupinaFaktur(
             // dieru 181 962 Kč, ktorá neexistuje.
             const mkP = String(p.datum).slice(0, 7);
             prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
+            // Predaj produktu / iný príjem (nie platba klienta) → Iné príjmy,
+            // ale až od mesiaca tržieb z Kokpitu; predtým je v PTminderi.
+            if (prijemDoPnl(p.kategoria, mkP, peniazeOdRef.current)) rucnePrijmy[mkP] = (rucnePrijmy[mkP] || 0) + p.suma;
             continue;
           }
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;

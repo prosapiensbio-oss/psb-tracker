@@ -34,4 +34,9 @@ describe("náhľad zošita proti Kokpitu", () => {
     expect(o[0]).toMatchObject({ uzMame: false, kategoria: "spolocne.Potraviny" });
     expect(o[1].kategoria).toBe("");
   });
+
+  it("príjem 200 Kč sa navrhne ako predaj loptičky", () => {
+    expect(oznacZosit([{ datum: "2026-09-01", popis: "Janka Malinová", suma: 200 }], [])[0].kategoria).toBe("prijem.produkt");
+    expect(oznacZosit([{ datum: "2026-09-02", popis: "Naďa", suma: 9400 }], [])[0].kategoria).toBe("");
+  });
 });
