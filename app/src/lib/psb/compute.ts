@@ -2033,9 +2033,17 @@ export function deriveAnomalies(
   // a presne to bol problém testu postury: rozbil sa 23. 9. 2026 a prišlo sa
   // na to 7. 10. ručným pokusom. Jedna položka za celý beh, nie päť.
   {
-    const zle = (data.webKontroly || []).filter((k) => k.stav !== "ok");
+    /**
+     * DO REGISTRA IDE LEN „CHYBA".
+     *
+     * Varovanie je vec, ktorú treba vedieť, nie spraviť — dozvuk opravenej
+     * chyby, nezaregistrovaný rozmer v GA4, reklama bez odkazu. Na obrazovke
+     * v Údajoch zostáva; v registri by svietila dni a brala pozornosť tomu,
+     * čo naozaj stojí (CLAUDE.md: register nesmie svietiť celý).
+     */
+    const zle = (data.webKontroly || []).filter((k) => k.stav === "chyba");
     if (zle.length) {
-      const chyby = zle.filter((k) => k.stav === "chyba");
+      const chyby = zle;
       /**
        * Kľúč nesie, ČO padlo — nie KEDY.
        *

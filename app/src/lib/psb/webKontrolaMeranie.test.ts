@@ -41,6 +41,21 @@ const ZDRAVY = data({
 });
 
 describe("zlyhania za okno", () => {
+  it("staré zlyhanie bez úspešného odoslania odvtedy ZOSTÁVA chybou", () => {
+    // Toto je prípad, pre ktorý je okno sedemdňové: cron vie beh vynechať
+    // a porucha spred dvoch dní môže stále bežať. Kým sa nič neodoslalo,
+    // nevieme, že je opravená — a vtedy sa nesmie stíšiť.
+    const n = zlyhania(data({
+      udalosti: [
+        u({ udalost: "cta_formular", den: VCERA, stranka: "/uvodni-trenink/", pocet: 3 }),
+        u({ udalost: "formular_zlyhal", den: "2026-10-04", stranka: "/test-postury/", pocet: 6 }),
+      ],
+      navstevy: [{ den: VCERA, pocet: 100 }],
+    }));
+    expect(n.stav).toBe("chyba");
+    expect(n.detail).not.toContain("stopa po oprave");
+  });
+
   it("jedno zlyhanie je chyba a v detaile je počet, stránka, dôvod aj pole", () => {
     const n = zlyhania(data({
       udalosti: [
@@ -72,7 +87,7 @@ describe("zlyhania za okno", () => {
     expect(n.detail.indexOf("/test-postury/")).toBeLessThan(n.detail.indexOf("/kontakt/"));
   });
 
-  it("zlyhanie z predvčera je chyba, aj keď včera nepadlo nič", () => {
+  it("zlyhanie z predvčera, po ktorom sa UŽ ODOSLALO, je stopa po oprave", () => {
     // Pôvodne bolo toto „ok“: riadok sa súdil len za včera a osemdesiat
     // stratených dopytov stálo ako číslo vo vete zeleného riadku. Cron vie
     // beh vynechať, takže o tých dňoch by neohlásil nikto nič.
@@ -84,7 +99,12 @@ describe("zlyhania za okno", () => {
       ],
       navstevy: ZDRAVY.navstevy,
     }));
-    expect(n.stav).toBe("chyba");
+    // ZDRAVY nesie dve úspešné odoslania z VCERA, teda PO tých zlyhaniach:
+    // cesta zase funguje a červený poplach nad opravenou chybou by svietil
+    // ďalších päť dní nad vecou, s ktorou sa nedá nič robiť. Riadok zostáva
+    // aj s číslami, len ako varovanie.
+    expect(n.stav).toBe("varovanie");
+    expect(n.detail).toContain("Odvtedy sa 2× podarilo odoslať");
     expect(n.detail).toContain("80×");
     // Deň po dni, najnovší prvý — inak sa nedá povedať, či porucha ešte žije.
     expect(n.detail).toContain("Naposledy 2026-10-04");

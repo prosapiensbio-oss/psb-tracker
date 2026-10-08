@@ -373,7 +373,37 @@ export function skontrolujMeranie(d: MeranieData, dnes: string = dnesPraha()): N
     const vceraTicho = vceraP.zlyhal === 0
       ? ` Včera (${vcera}) nepadlo ani jedno; riadok sa preto súdi za celé okno — keby kontrola v tie noci nebežala, o tých zlyhaniach by sa nedozvedel nikto.`
       : "";
-    nalezy.push(zlyhaniaNalez("chyba",
+    /**
+     * ČERSTVÉ ZLYHANIE JE POPLACH, STARÉ UŽ LEN STOPA.
+     *
+     * Okno je sedemdňové zámerne — keby kontrola jednu noc nebežala, nález
+     * sa nesmie stratiť. Lenže červený riadok nad chybou, ktorá sa už dva dni
+     * neopakuje a je opravená, svieti ďalších päť dní nad vecou, s ktorou sa
+     * nedá nič urobiť; to je presne to, po čom register prestane fungovať
+     * (CLAUDE.md: otázka, s ktorou sa už nedá nič robiť, doň nepatrí).
+     *
+     * Hranica je deň: zlyhanie zo včera alebo z dneška = porucha, ktorá beží
+     * TERAZ. Staršie zostáva na obrazovke ako varovanie s vetou, dokedy ho
+     * bude vidieť — a keď sa vráti, vráti sa aj červená.
+     */
+    const poslednyPad = dni[0]?.den || "";
+    /*
+     * Rozhoduje DÔKAZ, NIE DÁTUM.
+     *
+     * Prvá verzia merala čerstvosť kalendárom („zlyhanie zo včera") — lenže
+     * cron vie beh vynechať a živá porucha spred dvoch dní by sa tým stíšila
+     * na varovanie. Preto sa pýtame inak: odoslal sa od posledného zlyhania
+     * formulár ÚSPEŠNE? Keď áno, cesta zase funguje a riadok je stopa po
+     * oprave. Keď od vtedy nikto neodoslal nič, nevieme nič a svieti červená.
+     */
+    const odoslaneOdVtedy = udalostiTyzden
+      .filter((r) => r.udalost === "formular_odoslany" && r.den > poslednyPad)
+      .reduce((a, r) => a + r.pocet, 0);
+    const cerstve = odoslaneOdVtedy === 0;
+    const dozvuk = cerstve
+      ? ""
+      : ` Odvtedy sa ${odoslaneOdVtedy}× podarilo odoslať, takže cesta zase funguje a toto je stopa po oprave — riadok zhasne sám, keď ${poslednyPad} vypadne zo sedemdňového okna.`;
+    nalezy.push(zlyhaniaNalez(cerstve ? "chyba" : "varovanie",
       // `dni[0]` tu z definície existuje (zlyhanie v okne má deň, inak by ho
       // `vOkne` nepustilo), ale cez `?.`: táto funkcia beží v nočnej kontrole,
       // v ktorej sú aj body 1 a 3, a výnimka by zhodila zápis všetkých troch.
@@ -387,7 +417,7 @@ export function skontrolujMeranie(d: MeranieData, dnes: string = dnesPraha()): N
        * presne to číslo, kvôli ktorému sa na ňu Jerry pozerá. Preto sa vedľa
        * pokusov hovorí, koľko ľudí sa vôbec pustilo do písania.
        */
-      `za posledných 7 dní (${od} až ${vcera}) sa ${tyzden.zlyhal}× nepodarilo odoslať formulár${tyzden.start > 0 ? ` (do písania sa pustilo ${tyzden.start}× — jeden človek po chybe skúša znova, takže ľudí je menej než pokusov)` : ""} — a aj jeden stratený dopyt je človek, ktorý videl chybu a odišiel. Naposledy ${dni[0]?.den || vcera}, po dňoch: ${dni.map((x) => `${x.den} ${x.pocet}×`).join(" · ")}. Kde: ${kde.join(" · ")}.${vceraTicho}${chybaju}`));
+      `za posledných 7 dní (${od} až ${vcera}) sa ${tyzden.zlyhal}× nepodarilo odoslať formulár${tyzden.start > 0 ? ` (do písania sa pustilo ${tyzden.start}× — jeden človek po chybe skúša znova, takže ľudí je menej než pokusov)` : ""} — a aj jeden stratený dopyt je človek, ktorý videl chybu a odišiel. Naposledy ${dni[0]?.den || vcera}, po dňoch: ${dni.map((x) => `${x.den} ${x.pocet}×`).join(" · ")}. Kde: ${kde.join(" · ")}.${vceraTicho}${dozvuk}${chybaju}`));
   } else if (tyzden.spolu === 0) {
     // Nula zlyhaní z nuly udalostí nie je zistenie. Či je ticho na webe alebo
     // v meraní, patrí druhému riadku a tu by sa to len zdvojilo.
