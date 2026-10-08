@@ -210,7 +210,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
-- **Mesačný a kvartálny report po zamknutí mesiaca (Jerry, 8. 10. 2026)** — CTA „📄 Report za <mesiac>" pod zámkom v Uzávierke a po zamknutí marca/júna/septembra/decembra aj „📊 Kvartálny report". Oblasti: hodiny a klienti, peniaze, marketing. Náčrty: `navrhy-kokpitu/mesacny-report.html` (A karty ako v Kokpite, B list na papieri/PDF, C tri otázky + akcia). Čaká na výber; zisk brať z P&L (nie z banky), stavať na existujúcom `report.ts`/`reportHtml.ts`.
+- **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Otvorené: tlač/PDF, štvrtá otázka v kvartálnom („splnili sme, čo report navrhol?") — vyžaduje ukladať akcie.
 
 - ~~Odpočet hodín — tri návrhy~~ — **Jerry 8. 10. 2026 vybral A** (rad pod sebou, teda to, čo beží). Návrhy B (pás hodín) a C (dve kôpky) zostávajú v `navrhy-kokpitu/odpocet-hodin.html`, keby sa k tomu raz vrátil.
 - ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Klientovi ešte neodišla — pošli ju z karty Faktúry. Príčina (klik na popis prepisoval sumu) je opravená.
