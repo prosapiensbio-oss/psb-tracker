@@ -70,7 +70,7 @@ function Otazka({ o, kvartal }: { o: OtazkaReportu; kvartal: boolean }) {
       {/* Karta z návrhu A: veľké číslo, zmena, krivka. */}
       <div style={{ background: mix(C.bg, 60), border: `1px solid ${mix(C.border, 70)}`, borderRadius: 14, padding: 14 }}>
         <div style={{ fontSize: 32, fontWeight: 750, letterSpacing: "-.02em", lineHeight: 1, color: C.text, fontVariantNumeric: "tabular-nums" }}>
-          {o.hlavne.jednotka === "Kč" && o.hlavne.zmena === "chýba P&L" ? "—" : kc(o.hlavne.hodnota)}
+          {o.hlavne.chyba ? "—" : kc(o.hlavne.hodnota)}
           <span style={{ fontSize: 13, fontWeight: 500, color: C.textMuted, marginLeft: 6 }}>{o.hlavne.jednotka}</span>
         </div>
         <span style={{ display: "inline-block", marginTop: 7, fontSize: 12, fontWeight: 650, padding: "2px 9px", borderRadius: 10, color: smer, background: mix(smer, 14) }}>{o.hlavne.zmena}</span>

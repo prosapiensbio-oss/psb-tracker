@@ -17,12 +17,14 @@ describe("mesačný report", () => {
     const r = postavReport(mesiace, "2026-09", "mesiac", extra);
     expect(r.nadpis).toBe("September 2026");
     expect(r.porovnanie).toBe("proti priemeru posledných 6 mesiacov");
-    const [praca, peniaze, novi] = r.otazky;
+    const o = (id: string) => r.otazky.find((x) => x.id === id)!;
+    const [praca, peniaze, novi] = [o("praca"), o("peniaze"), o("novi")];
     // priemer apr–aug = (200+200+200+214+183+... ) — september je nad ním
     expect(praca.hlavne.zmena).toMatch(/▲ \d+ % nad priemerom/);
     expect(praca.hlavne.zmena).not.toContain("august");
     expect(praca.detail.find((d) => d.metrika === "Odtrénované hodiny")?.priemer).toBe("200");
     expect(praca.akcia).toContain("3 aktívni klienti netrénovali");
+    expect(r.otazky.map((x) => x.id)).toEqual(["praca", "klienti", "peniaze", "novi", "koncentracia", "osobne"]);
     expect(peniaze.detail.map((d) => d.metrika)).toContain("Tržba na hodinu");
     expect(novi.akcia).toContain("Natoč príbeh klienta");
     expect(novi.zoznamy[0].nadpis).toBe("Odkiaľ prišli dopyty");
@@ -32,10 +34,10 @@ describe("mesačný report", () => {
 
   it("chýbajúci zošit a chýbajúce P&L sa nezamlčia; strata je červená", () => {
     const bezPnl = postavReport([...mesiace.slice(0, 11), m("2026-09", { prijmy: undefined, zisk: undefined, naklady: undefined })], "2026-09", "mesiac", { ...extra, zositChyba: true });
-    expect(bezPnl.otazky[1].semafor).toBe("o");
-    expect(bezPnl.otazky[1].akcia).toContain("zošit");
+    expect(bezPnl.otazky.find((x) => x.id === "peniaze")!.semafor).toBe("o");
+    expect(bezPnl.otazky.find((x) => x.id === "peniaze")!.akcia).toContain("zošit");
     const strata = postavReport([...mesiace.slice(0, 11), m("2026-09", { zisk: -12000, prijmy: 150000, naklady: 162000 })], "2026-09", "mesiac", extra);
-    expect(strata.otazky[1].semafor).toBe("c");
+    expect(strata.otazky.find((x) => x.id === "peniaze")!.semafor).toBe("c");
   });
 
   it("kvartál Q3 proti priemeru troch celých štvrťrokov", () => {
@@ -63,12 +65,28 @@ describe("break-even, aplikácie a osobné financie", () => {
     const ms = mesiace.map((x) => ({ ...x, ...s({}) }));
     ms[ms.length - 1] = { ...ms[ms.length - 1], ...s({ ai: 8723, spolocne: { Nájom: 23000, Potraviny: 25000, Ahsoka: 7300 } }) };
     const r = postavReport(ms, "2026-09", "mesiac", { ...extra, topVydaje: [{ nazov: "Prevádzka · Nájom + energie", suma: 54750 }] });
-    const pen = r.otazky[1];
+    const pen = r.otazky.find((x) => x.id === "peniaze")!;
     expect(pen.detail.map((d) => d.metrika)).toEqual(expect.arrayContaining(["Break-even (tržby, pri ktorých je zisk 0)", "Tržby nad break-even", "Aplikácie spolu", "z toho AI (Claude, ChatGPT, Perplexity…)"]));
-    const osob = r.otazky[3];
+    const osob = r.otazky.find((x) => x.id === "osobne")!;
     expect(osob.otazka).toBe("Koľko si berieme domov?");
     expect(osob.detail.map((d) => d.metrika)).toContain("· Nájom");
     expect(osob.semafor).toBe("o");
     expect(osob.akcia).toContain("Potraviny");
+  });
+});
+
+describe("klienti, strop a koncentrácia", () => {
+  it("strop 120 h, obnova s menami, koncentrácia pod prahom", () => {
+    const ms = mesiace.map((x) => ({ ...x, hodinyJerry: 98, hodinyTerezka: 97, obnovaPct: 80, retenciaPct: 85 }));
+    ms[ms.length - 1] = { ...ms[ms.length - 1], hodinyJerry: 131, hodinyTerezka: 100, obnovaPct: 80, retenciaPct: 83 };
+    const r = postavReport(ms, "2026-09", "mesiac", { ...extra, odmlcani: 0, strop: { jerry: 120, terezka: 120 }, obnova: { skoncilo: 15, obnovene: 12 }, bezObnovy: [{ klient: "Roman Jakubiček", do: "2026-09-28" }], topKlient: { klient: "A", podiel: 6.5 }, top20: 39 });
+    const o = (id: string) => r.otazky.find((x) => x.id === id)!;
+    expect(o("praca").detail.find((d) => d.metrika === "Vyťaženie voči stropu — Jerry")?.rozdiel).toBe("109 %");
+    expect(o("praca").akcia).toContain("Jerry (109 %)");
+    expect(o("klienti").zoznamy[0].polozky).toEqual(["Roman Jakubiček (28. 9.)"]);
+    expect(o("klienti").akcia).toContain("Roman Jakubiček");
+    expect(o("koncentracia").semafor).toBe("z");
+    // Podiel hodín je rozdelenie práce, nie dobré/zlé — bez farby.
+    expect(o("koncentracia").detail.find((d) => d.metrika === "Hodiny odtrénované Jerrym")?.dobre).toBeUndefined();
   });
 });

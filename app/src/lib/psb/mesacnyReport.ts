@@ -48,6 +48,16 @@ export type MesiacReportu = {
   vyplataTerezka?: number;
   /** Spoločné po kategóriách (Nájom, Potraviny, Ahsoka…). */
   spolocne?: Record<string, number>;
+  /** Daň a odvody (Štát Jerry + Štát Terezka — paušálna daň). */
+  dan?: number;
+  /** Klienti (metrikyKlientov.ts), v percentách. */
+  obnovaPct?: number;
+  prezitiePct?: number;
+  retenciaPct?: number;
+  odchodyPct?: number;
+  /** Úvodné tréningy a dopyty z reklamy — pre lievik a cenu dopytu. */
+  uvodne?: number;
+  dopytyReklama?: number;
 };
 
 export type ExtraReportu = {
@@ -61,12 +71,29 @@ export type ExtraReportu = {
   zdroje?: { zdroj: string; pocet: number }[];
   /** Najlepší reels obdobia podľa zhliadnutí. */
   najlepsiReel?: { hook: string; views: number };
+  /** Klienti, ktorým v období skončil balíček a nový neprišiel. */
+  bezObnovy?: { klient: string; do: string }[];
+  obnova?: { skoncilo: number; obnovene: number };
+  prezitie?: { kohorta: string; novi: number; ostali: number };
+  retencia?: { kohorta: number; ostali: number };
+  hodnotaKlienta?: { pocet: number; priemer: number; mesiacov: number };
+  /** Koncentrácia tržieb obdobia. */
+  topKlient?: { klient: string; podiel: number };
+  top20?: number;
+  /** Strop hodín trénera za mesiac (Jerry, 8. 10. 2026: obom 120 h). */
+  strop?: { jerry: number; terezka: number };
+  /** Stav TERAZ (nie za obdobie): rezerva v mesiacoch, dlžné Kč, predplatené hodiny. */
+  rezervaMesiacov?: number | null;
+  dlzne?: number;
+  predplateneHodiny?: number;
+  /** Koľkí rôzni klienti za 12 mesiacov niekoho priviedli. */
+  odporucatelia?: number;
 };
 
 export type Semafor = "z" | "o" | "c";
 export type RiadokDetailu = { metrika: string; hodnota: string; priemer: string; rozdiel: string; smer: "hore" | "dole" | "rovno"; dobre?: boolean };
 export type OtazkaReportu = {
-  id: "praca" | "peniaze" | "novi" | "osobne";
+  id: "praca" | "klienti" | "peniaze" | "novi" | "koncentracia" | "osobne";
   otazka: string;
   semafor: Semafor;
   odpoved: string;
@@ -100,6 +127,13 @@ function protiPriemeru(teraz: number, p: number | undefined): { zmena: string; s
   return { zmena: `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)} % ${pct > 0 ? "nad" : "pod"} priemerom`, smer: pct > 0 ? "hore" : "dole" };
 }
 
+const priemerPola = (ms: MesiacReportu[], k: keyof MesiacReportu) => {
+  const v = ms.map((x) => x[k] as number | undefined).filter((x): x is number => x !== undefined);
+  return v.length ? v.reduce((a, x) => a + x, 0) / v.length : undefined;
+};
+/** Riadok bez porovnania (stav teraz, text). */
+const riadokText = (metrika: string, hodnota: string, priemer = "—", rozdiel = "—"): RiadokDetailu => ({ metrika, hodnota, priemer, rozdiel, smer: "rovno" });
+
 /** Súčty mesiacov za štvrťrok (sledovatelia = stav na konci, dosah = priemer). */
 function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
   const ma = (k: keyof MesiacReportu) => ms.some((x) => x[k] !== undefined);
@@ -124,6 +158,13 @@ function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
     googleTrasy: sum("googleTrasy"),
     googleWeb: sum("googleWeb"),
     breakEven: sum("breakEven"),
+    dan: sum("dan"),
+    uvodne: sum("uvodne"),
+    dopytyReklama: sum("dopytyReklama"),
+    obnovaPct: priemerPola(ms, "obnovaPct"),
+    prezitiePct: priemerPola(ms, "prezitiePct"),
+    retenciaPct: priemerPola(ms, "retenciaPct"),
+    odchodyPct: priemerPola(ms, "odchodyPct"),
     apps: sum("apps"),
     ai: sum("ai"),
     vyplataJerry: sum("vyplataJerry"),
@@ -196,9 +237,22 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
   const marza = (x: MesiacReportu) => (x.prijmy && x.zisk !== undefined ? (x.zisk / x.prijmy) * 100 : undefined);
   const naHodinu = (x: MesiacReportu) => (x.prijmy && x.hodiny ? x.prijmy / x.hodiny : undefined);
   const konverzia = (x: MesiacReportu) => (x.dopyty ? (x.novi / x.dopyty) * 100 : undefined);
+  /** Prevádzkový break-even: náklady bez výplat zakladateľov. */
+  const beBezOdmien = (x: MesiacReportu) => (x.naklady !== undefined && x.vyplaty !== undefined ? x.naklady - x.vyplaty : undefined);
   const nadBe = (x: MesiacReportu) => (x.prijmy !== undefined && x.breakEven !== undefined ? x.prijmy - x.breakEven : undefined);
   /** Koľko hodín treba odtrénovať, aby tržby pokryli break-even (pri tržbe na hodinu obdobia). */
   const hodinNaBe = (x: MesiacReportu) => { const t = naHodinu(x); return t && x.breakEven !== undefined ? x.breakEven / t : undefined; };
+
+  // Strop hodín (EOS Life, Company of One): pri kvartáli trojnásobok.
+  const nasobok = druh === "kvartal" ? 3 : 1;
+  const nadStropom: string[] = [];
+  const stropRiadky: RiadokDetailu[] = [];
+  for (const [kto, hod, strop] of [["Jerry", akt.hodinyJerry, extra.strop?.jerry], ["Terezka", akt.hodinyTerezka, extra.strop?.terezka]] as const) {
+    if (hod === undefined || !strop) continue;
+    const pctStropu = Math.round((hod / (strop * nasobok)) * 100);
+    if (pctStropu > 100) nadStropom.push(`${kto} (${pctStropu} %)`);
+    stropRiadky.push({ metrika: `Vyťaženie voči stropu — ${kto}`, hodnota: `${kc(hod)} / ${kc(strop * nasobok)} h`, priemer: "—", rozdiel: `${pctStropu} %`, smer: pctStropu > 100 ? "hore" : "rovno", dobre: pctStropu > 100 ? false : undefined });
+  }
 
   // 1 · MÁME DOSŤ PRÁCE?
   const pHodin = priem("hodiny");
@@ -214,13 +268,14 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       riadok("Odtrénované hodiny", akt.hodiny, h("hodiny"), cele),
       riadok(druh === "kvartal" ? "Klienti (najviac v mesiaci)" : "Klienti, ktorí trénovali", akt.aktivni, h("aktivni"), cele),
       riadok("Hodín na klienta", naKlienta(akt), historia.map(naKlienta), (n) => n.toFixed(1).replace(".", ",")),
-      riadok("Noví klienti", akt.novi, h("novi"), cele),
-      riadok("Prestali chodiť", akt.prestali, h("prestali"), cele, false),
       riadok("Hodiny — Jerry", akt.hodinyJerry, h("hodinyJerry"), cele),
       riadok("Hodiny — Terezka", akt.hodinyTerezka, h("hodinyTerezka"), cele),
+      ...stropRiadky,
     ]),
     zoznamy: [],
-    akcia: extra.odmlcani > 0
+    akcia: nadStropom.length
+      ? `Nad stropom hodín: ${nadStropom.join(", ")} — nových klientov dávať tomu, kto má voľno, alebo povedať „nie".`
+      : extra.odmlcani > 0
       ? `${extra.odmlcani} ${extra.odmlcani === 1 ? "aktívny klient netrénoval" : extra.odmlcani <= 4 ? "aktívni klienti netrénovali" : "aktívnych klientov netrénovalo"} — ozvi sa im skôr, než vypadnú z rytmu.`
       : (akt.prestali || 0) > (priem("prestali") || 0) + 1
         ? `Prestalo chodiť ${kc(akt.prestali || 0)} klientov (priemer ${kc(priem("prestali") || 0)}) — zisti prečo, kým je to čerstvé.`
@@ -257,11 +312,23 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
         riadok("Tržby nad break-even", nadBe(akt), historia.map(nadBe), kcF),
         riadok("Tržba na hodinu", naHodinu(akt), historia.map(naHodinu), kcF),
         riadok("Hodín na break-even", hodinNaBe(akt), historia.map(hodinNaBe), cele, false),
+        riadok("Break-even bez odmien zakladateľov", beBezOdmien(akt), historia.map(beBezOdmien), kcF, false),
         riadok("Aplikácie spolu", akt.apps, h("apps"), kcF, false),
         riadok("z toho AI (Claude, ChatGPT, Perplexity…)", akt.ai, h("ai"), kcF, false),
         riadok("Výplaty zakladateľov", akt.vyplaty, h("vyplaty"), kcF),
+        extra.rezervaMesiacov != null ? riadokText("Rezerva (teraz)", `${extra.rezervaMesiacov.toFixed(1).replace(".", ",")} mesiaca`, "cieľ ≥ 3", extra.rezervaMesiacov >= 3 ? "✓" : "pod prahom") : null,
+        extra.predplateneHodiny !== undefined ? riadokText("Predplatené neodtrénované hodiny (teraz)", `${kc(extra.predplateneHodiny)} h`) : null,
+        extra.dlzne !== undefined ? riadokText("Dlhy klientov (teraz)", `${kc(extra.dlzne)} Kč`) : null,
       ]),
-      zoznamy: vydajeZoznam.length ? [{ nadpis: "Najväčšie náklady (bez výplat)", polozky: vydajeZoznam }] : [],
+      zoznamy: [
+        ...(vydajeZoznam.length ? [{ nadpis: "Najväčšie náklady (bez výplat)", polozky: vydajeZoznam }] : []),
+        ...(akt.prijmy ? [{ nadpis: "Kam išli tržby (Profit First: 5 / 50 / – / 30)", polozky: [
+          `Zisk — ${Math.round(((akt.zisk || 0) / akt.prijmy) * 100)} %`,
+          `Odmeny zakladateľov — ${Math.round(((akt.vyplaty || 0) / akt.prijmy) * 100)} %`,
+          `Daň a odvody (paušál) — ${Math.round(((akt.dan || 0) / akt.prijmy) * 100)} %`,
+          `Prevádzka — ${Math.round((((akt.naklady || 0) - (akt.vyplaty || 0) - (akt.dan || 0)) / akt.prijmy) * 100)} %`,
+        ] }] : []),
+      ],
       akcia: extra.zositChyba
         ? "Doplň zošit hotovosti — kým chýba, zisk je nadhodnotený o hotovostné výdavky."
         : (akt.naklady || 0) > (priem("naklady") || Infinity) * 1.15 && extra.topVydaje?.[0]
@@ -287,7 +354,10 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     detail: nn([
       riadok("Dopyty", akt.dopyty, h("dopyty"), cele),
       riadok("Noví klienti", akt.novi, h("novi"), cele),
+      riadokText("Lievik: dopyty → úvodné → noví klienti", `${kc(akt.dopyty)} → ${akt.uvodne ?? "?"} → ${kc(akt.novi)}`),
       riadok("Z dopytu klient", konverzia(akt), historia.map(konverzia), pct, true, true),
+      akt.dopytyReklama && akt.reklama ? riadokText("Reklama na 1 dopyt z reklamy", `${kc(akt.reklama / akt.dopytyReklama)} Kč`, "—", `${akt.dopytyReklama} dopytov`) : null,
+      extra.odporucatelia !== undefined ? riadokText("Klienti, ktorí za 12 mes. niekoho priviedli", `${extra.odporucatelia}${akt.aktivni ? ` · ${Math.round((extra.odporucatelia / akt.aktivni) * 100)} %` : ""}`) : null,
       riadok("Prírastok sledovateľov IG", akt.prirastokIg, h("prirastokIg"), (n) => `${n >= 0 ? "+" : ""}${kc(n)}`),
       riadok("Priemerný dosah reels", akt.dosahReels, h("dosahReels"), cele),
       riadok("Reklama (Meta)", akt.reklama, h("reklama"), kcF, false),
@@ -336,7 +406,59 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       : "Bez zmeny — spoločné výdavky sú v priemere.",
   };
 
-  return { druh, nadpis, porovnanie, otazky: [praca, peniaze, novi, osobne] };
+  // 2 · DRŽIA SA KLIENTI? (obnova, prežitie, retencia, odchody)
+  const pct0 = (n: number) => `${Math.round(n)} %`;
+  const obn = akt.obnovaPct;
+  const sKlienti: Semafor = obn === undefined ? "o" : obn >= 75 && (akt.retenciaPct ?? 100) >= 70 ? "z" : obn >= 60 ? "o" : "c";
+  const bezObnovy = extra.bezObnovy || [];
+  const den = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}.`;
+  const klienti: OtazkaReportu = {
+    id: "klienti", otazka: "Držia sa klienti?", semafor: sKlienti,
+    odpoved: [
+      extra.obnova ? `Balíček obnovilo ${extra.obnova.obnovene} z ${extra.obnova.skoncilo}` : "",
+      extra.retencia?.kohorta ? `z klientov spred pol roka trénuje ${extra.retencia.ostali} z ${extra.retencia.kohorta}` : "",
+      extra.prezitie?.novi ? `z nováčikov spred 4 mesiacov po 100 dňoch trénuje ${extra.prezitie.ostali} z ${extra.prezitie.novi}` : "",
+    ].filter(Boolean).join("; ").replace(/^./, (c) => c.toUpperCase()) + ".",
+    hlavne: { hodnota: Math.round(obn ?? 0), jednotka: "% obnovilo balíček", ...protiPriemeru(obn ?? 0, priem("obnovaPct")), seria: seriaMes.map((x) => x.obnovaPct ?? 0), popisSerie, chyba: obn === undefined },
+    detail: nn([
+      riadok("Obnova balíčkov (do 30 dní)", akt.obnovaPct, h("obnovaPct"), pct0, true, true),
+      riadok("Prežitie prvých 100 dní", akt.prezitiePct, h("prezitiePct"), pct0, true, true),
+      riadok("Retencia po 6 mesiacoch (cieľ 80 %)", akt.retenciaPct, h("retenciaPct"), pct0, true, true),
+      riadok("Odchody", akt.odchodyPct, h("odchodyPct"), pct0, false, true),
+      riadok("Prestali chodiť (počet)", akt.prestali, h("prestali"), cele, false),
+      extra.hodnotaKlienta?.pocet ? riadokText("Hodnota klienta za celú spoluprácu", `${kc(extra.hodnotaKlienta.priemer)} Kč`, `${extra.hodnotaKlienta.mesiacov.toFixed(1).replace(".", ",")} mes.`, `${extra.hodnotaKlienta.pocet} klientov`) : null,
+    ]),
+    zoznamy: bezObnovy.length ? [{ nadpis: "Skončil balíček, nový neprišiel", polozky: bezObnovy.map((b) => `${b.klient} (${den(b.do)})`) }] : [],
+    akcia: bezObnovy.length
+      ? `Ozvi sa ${bezObnovy.length === 1 ? "klientovi" : "klientom"} bez obnovy: ${bezObnovy.map((b) => b.klient).join(", ")}.`
+      : extra.prezitie?.novi && extra.prezitie.ostali / extra.prezitie.novi < 0.6
+        ? "Nováčikovia odchádzajú v prvých 100 dňoch — po 3. tréningu sa ich spýtaj, ako sa im darí."
+        : "Držať — obnovy aj návraty sú v poriadku.",
+  };
+
+  // 5 · NESTOJÍME NA PÁR ĽUĎOCH? (Built to Sell, E-Myth)
+  const hodSpolu = (akt.hodinyJerry || 0) + (akt.hodinyTerezka || 0);
+  const podiel = (x: MesiacReportu, kto: "hodinyJerry" | "hodinyTerezka") => { const sp = (x.hodinyJerry || 0) + (x.hodinyTerezka || 0); return sp ? ((x[kto] || 0) / sp) * 100 : undefined; };
+  const top = extra.topKlient;
+  const sKonc: Semafor = top && top.podiel > 15 ? "c" : "z";
+  const neutral = (x: RiadokDetailu | null) => (x ? { ...x, dobre: undefined } : null);
+  const koncentraciaQ: OtazkaReportu = {
+    id: "koncentracia", otazka: "Nestojíme na pár ľuďoch?", semafor: sKonc,
+    odpoved: top ? `Najväčší klient tvorí ${Math.round(top.podiel)} % tržieb (prah 15 %), horných 20 % klientov ${Math.round(extra.top20 || 0)} %.` : "Tržby podľa klientov za obdobie nie sú.",
+    hlavne: { hodnota: Math.round(top?.podiel || 0), jednotka: "% tržieb od najväčšieho klienta", zmena: top && top.podiel > 15 ? "nad prahom 15 %" : "pod prahom 15 %", smer: "rovno", seria: [], popisSerie: [], chyba: !top },
+    detail: nn([
+      top ? riadokText("Najväčší klient z tržieb", pct0(top.podiel), "prah ≤ 15 %", top.podiel > 15 ? "nad" : "✓") : null,
+      extra.top20 !== undefined ? riadokText("Horných 20 % klientov z tržieb", pct0(extra.top20)) : null,
+      hodSpolu ? neutral(riadok("Hodiny odtrénované Jerrym", podiel(akt, "hodinyJerry"), historia.map((x) => podiel(x, "hodinyJerry")), pct0, true, true)) : null,
+      hodSpolu ? neutral(riadok("Hodiny odtrénované Terezkou", podiel(akt, "hodinyTerezka"), historia.map((x) => podiel(x, "hodinyTerezka")), pct0, true, true)) : null,
+    ]),
+    zoznamy: [],
+    akcia: top && top.podiel > 15
+      ? `${top.klient} tvorí ${Math.round(top.podiel)} % tržieb — keby odišiel, chýba to hneď.`
+      : nadStropom.length ? "Nových klientov dávať trénerovi, ktorý je pod stropom." : "Bez zmeny.",
+  };
+
+  return { druh, nadpis, porovnanie, otazky: [praca, klienti, peniaze, novi, koncentraciaQ, osobne] };
 }
 
 /** Report ako markdown pre tlač do PDF (`vytlacReport`), grafy cez značky. */

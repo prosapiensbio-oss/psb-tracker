@@ -7,6 +7,7 @@ import { mzdaZaskoku } from "../../lib/psb/zaskok";
 import { BARTER_KLIENTI, breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
+import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prveTreningy, retencia6 } from "../../lib/psb/metrikyKlientov";
 import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { PRESUN } from "../../lib/psb/fio";
@@ -2414,6 +2415,13 @@ function skupinaFaktur(
     // 12 mesiacov: priemer šiestich pred mesiacom aj troch štvrťrokov pred kvartálom.
     const kluceMes = Array.from({ length: 13 }, (_, k) => new Date(Date.UTC(y, m - 1 - (12 - k), 1)).toISOString().slice(0, 7));
     const klientiMes = (mm: string) => new Set(data.sessions.filter((x) => x.date.slice(0, 7) === mm).map((x) => x.client));
+    // Platby na obnovu balíčkov a koncentráciu: Kokpit aj PTminder (kým beží súbežne).
+    const platbyVsetky = [
+      ...(data.platbyKokpit || []).map((x) => ({ klient: x.klient, datum: x.datum, suma: x.suma })),
+      ...(data.payments || []).map((x) => ({ klient: x.client, datum: x.date.slice(0, 10), suma: x.amount })),
+    ];
+    const prve = prveTreningy(data.sessions);
+    const pctZ = (a: number, b: number) => (b ? (a / b) * 100 : undefined);
     for (const mm of kluceMes.slice(1)) {
       const i = VZAS_MONTHS.indexOf(mm);
       const sed = data.sessions.filter((x) => x.date.slice(0, 7) === mm);
@@ -2442,6 +2450,16 @@ function skupinaFaktur(
           if (v[i]) a[nazov] = (a[nazov] || 0) + v[i];
           return a;
         }, {}) : undefined,
+        dan: i >= 0 ? (pnlHodnota("fixne.prevadzka.statJerry", mm) || 0) + (pnlHodnota("fixne.prevadzka.statTerezka", mm) || 0) : undefined,
+        ...(() => {
+          const o = obnovaBalickov(balickyRiadky, platbyVsetky, mm);
+          const pr = prezitie100(data.sessions, mm, prve);
+          const re = retencia6(data.sessions, mm);
+          const od = odchody(data.sessions, mm);
+          return { obnovaPct: pctZ(o.obnovene, o.skoncilo), prezitiePct: pctZ(pr.ostali, pr.novi), retenciaPct: pctZ(re.ostali, re.kohorta), odchodyPct: pctZ(od.odisli, od.pred) };
+        })(),
+        uvodne: sed.filter((x) => x.sessionType === "UVODNE").length,
+        dopytyReklama: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mm && l.source === "reklama").length,
         googleTrasy: kanal("Google Business", "Directions"),
         googleWeb: kanal("Google Business", "Website clicks"),
         novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mm).length,
@@ -2478,9 +2496,33 @@ function skupinaFaktur(
         topVydaje: vydaje.slice(0, 3).map(([k, v]) => ({ nazov: nazovKategorie(k), suma: v })),
         zdroje: Object.entries(zdroje).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({ zdroj: NAZOV_ZDROJA[z] || z, pocet: n })),
         najlepsiReel: reels[0] ? { hook: reels[0].hook, views: reels[0].views } : undefined,
+        ...(() => {
+          // Obnova za celé obdobie (pri kvartáli tri mesiace), ostatné ku koncu obdobia.
+          const obnovy = obdobie.map((o) => obnovaBalickov(balickyRiadky, platbyVsetky, o));
+          const koniec = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+          // Koncentrácia z tržieb obdobia — tie isté platby, z ktorých má P&L tržby.
+          const k = koncentracia((data.payments || []).map((x) => ({ klient: x.client, datum: x.date.slice(0, 10), suma: x.amount })), obdobie);
+          const odDna = new Date(Date.UTC(y, m - 12, 1)).toISOString().slice(0, 10);
+          const rez = spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem });
+          return {
+            obnova: { skoncilo: obnovy.reduce((a, o) => a + o.skoncilo, 0), obnovene: obnovy.reduce((a, o) => a + o.obnovene, 0) },
+            bezObnovy: obnovy.flatMap((o) => o.bezObnovy),
+            prezitie: prezitie100(data.sessions, mk, prve),
+            retencia: retencia6(data.sessions, mk),
+            hodnotaKlienta: hodnotaKlienta(data.sessions, platbyVsetky, koniec),
+            topKlient: k.topKlient,
+            top20: k.spolu ? k.top20 : undefined,
+            // Jerry, 8. 10. 2026: „strop Jerry 120, Terezka 120".
+            strop: { jerry: 120, terezka: 120 },
+            rezervaMesiacov: rez.mesiace,
+            dlzne: (data.dlhy || []).reduce((a, d) => a + (d.doplatit || 0), 0),
+            predplateneHodiny: Object.values(clients).reduce((a, c) => a + Math.max(0, c.packageRemaining || 0), 0),
+            odporucatelia: new Set((data.leads || []).filter((l) => l.source === "referencia" && (l.referrer || "").trim() && (l.date || "") >= odDna && (l.date || "") <= koniec).map((l) => normName(l.referrer))).size,
+          };
+        })(),
       },
     };
-  }, [data, clients, bankaSumy, hotovostMesiace, mktVerzia]);
+  }, [data, clients, bankaSumy, hotovostMesiace, mktVerzia, balickyRiadky, btcCelkom, ucetStav, hotovostStav]);
 
   const podkladyMesiaca = useCallback((mk: string): string => {
     const r: string[] = [];
