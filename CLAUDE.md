@@ -2875,3 +2875,20 @@ v `lib/psb/kalendarMobil.ts`) len z `kal_udalosti` s jeho menom
   nie je vo WP snippete (id 26).
 - **Neoverené na skutočnom telefóne**: či iPhone pri odbere nevypne
   upozornenia a ako rýchlo Google Kalendár obnovuje.
+
+## Metricool cez MCP — jedno ťuknutie v uzávierke (8. 10. 2026)
+
+API Metricoolu je len v pláne Advanced; MCP server `ai.metricool.com/mcp` je na
+každom pláne. Kokpit je preto **MCP klient**: OAuth s dynamickou registráciou
+(`app.metricool.com/oauth/register`), PKCE S256, rozsah `mcp:read`, tokeny vo
+`vzas_settings` (`metricool_klient`, `metricool_token`) — von sa nevracajú.
+Kód: `lib/psb/metricool.ts` (čisté mapovanie, testy), `metricool.server.ts`
+(OAuth + JSON-RPC, odpoveď môže byť JSON aj SSE), `routes/api/metricool.ts`
+(`?akcia=pripoj`, POST `stav`/`stiahni`/`odpoj`), `routes/api/metricool-spat.ts`
+(návrat z povolenia). Uzávierka → krok Metricool: „Pripojiť Metricool" raz,
+potom „Stiahnuť mesiac z Metricoolu".
+- Zapisuje to isté ako export: `mkt_prispevky` (ID príspevku/reelsu =
+  `<media>_<účet>` ako v CSV, story = adresa) a `kanaly_mesiace` Instagram
+  s názvami metrík PDF zostavy; `upload_log` typ `metricool`.
+- Jednotky: čas pozerania MCP v sekundách → ×1000 (CSV je v ms); view rate v %.
+- Brand ProSapiens = 2101108 (`BRAND_PSB`). Ostatné siete zatiaľ nie.
