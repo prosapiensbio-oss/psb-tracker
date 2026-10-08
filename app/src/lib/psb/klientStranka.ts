@@ -43,7 +43,12 @@ export const SADZBA = {
   ramik: "#3a4630",
   zelena: "#d9e0c8",
   plocha: "#2c3524",
-  minus: "#e2a07f",
+  /**
+   * ČERVENÁ, NIE JEMNÁ ORANŽOVÁ (Jerry, 8. 10. 2026: „odpočítavanie hodín
+   * mi daj červené"). Na zelenom podklade má kontrast 5,2 : 1, takže je to
+   * červená, ktorá sa aj prečíta.
+   */
+  minus: "#ff6b5a",
 };
 
 const kc = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/ /g, " ")} Kč`;
@@ -76,11 +81,18 @@ const cesky = (t: string) =>
  * zostatok nad nulou, dochodený balíček a hodiny nad rámec nie sú to isté
  * a klient si to vie prerátať.
  */
-function hlavnyStav(v: VypisKlienta): { velke: string; pod: string } {
+function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: boolean } {
   if (v.zostatok == null) return { velke: "Tvoje tréninky", pod: "Přehled posledního balíčku." };
   if (v.zostatok > 0) return { velke: `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
   if (v.zostatok === 0) return { velke: "Poslední hodina", pod: "balíček máš dochozený" };
-  return { velke: `Nad rámec ${hod(-v.zostatok)}`, pod: "odtrénováno nad zaplacený balíček" };
+  /**
+   * „NEZAPLACENO", NIE „NAD RÁMEC" (Jerry, 8. 10. 2026).
+   *
+   * „Nad rámec" je pohľad zvnútra — hovorí o hranici balíčka. Klient
+   * potrebuje vedieť, čo z toho preňho vyplýva: tieto hodiny ešte nie sú
+   * zaplatené. A preto červeno.
+   */
+  return { velke: `Nezaplaceno ${hod(-v.zostatok)}`, pod: "odtrénováno nad zaplacený balíček", cervene: true };
 }
 
 /**
@@ -336,23 +348,30 @@ function nazovRozsahu(balickov: number | undefined): string {
   return `Posledních ${n} balíčků`;
 }
 
+/**
+ * BEZ VODOROVNÉHO POSUVNÍKA (Jerry, 8. 10. 2026: „posuvník doprava
+ * jednotlivých hodín daj preč a nechaj iba pre klientov odpočítavanie
+ * hodín").
+ *
+ * Os sa dala listovať do strany a klient videl naraz tri body zo šiestich —
+ * na to, čo z odkazu naozaj potrebuje (koľkú hodinu má za sebou a čo ešte
+ * nie je zaplatené), je to prekážka. Odpočet stojí pod sebou, celý naraz,
+ * bez druhého rozbaľovania. `osVodorovna` ostáva v kóde nepoužitá zámerne:
+ * je to jedna z troch podôb v návrhoch a môže sa vrátiť.
+ */
 function blokOsi(v: VypisKlienta, zlozena: boolean): string {
   const s = SADZBA;
   if (!v.os.length) return "";
   const nazov = nazovRozsahu(v.balickov);
-  const rozbal = (v.balickov ?? 1) === 1 ? "Rozbalit celý balíček pod sebou" : "Rozbalit vše pod sebou";
-  const rozpis = `<details style="margin-top:16px;border-top:1px solid ${s.ramik};padding-top:14px">
-<summary style="font-size:13.5px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>${esc(rozbal)}</summary>
-<div style="margin-top:16px">${osZvisla(v.os)}</div></details>`;
   if (zlozena) {
     return `<div style="margin-top:28px">
 <details style="border-top:1px solid ${s.ramik};border-bottom:1px solid ${s.ramik};padding:14px 0">
 <summary style="font-size:14px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>${esc(nazov)} — co se stalo</summary>
-<div style="margin-top:18px">${osVodorovna(v.os)}${rozpis}</div></details></div>`;
+<div style="margin-top:18px">${osZvisla(v.os)}</div></details></div>`;
   }
   return `<div style="margin-top:30px">
 <div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">${esc(nazov)}</div>
-${osVodorovna(v.os)}${rozpis}</div>`;
+${osZvisla(v.os)}</div>`;
 }
 
 /**
@@ -439,7 +458,7 @@ details[open] .psb-sip{transform:rotate(90deg)}
 
 <div style="padding:26px 0 20px">${logo}</div>
 
-<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${s.biela}">${esc(stav.velke)}</h1>
+<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${stav.cervene ? s.minus : s.biela}">${esc(stav.velke)}</h1>
 <div style="margin-top:6px;font-size:15px;color:${s.tlmeny}">${esc(stav.pod)}</div>
 ${dalsi}
 

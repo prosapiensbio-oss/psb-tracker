@@ -106,6 +106,17 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     klient: "", popis: "", ks: "1", cena: "", vystavene: dnes(),
     splatnostDni: String(SPLATNOST_DNI), poznamka: "", balicekId: "",
   });
+  /**
+   * Cena balíčka, z ktorého faktúra vznikla.
+   *
+   * Jerry, 8. 10. 2026: „QR na 6 990 pre Martina Vaška, a keď som mu poslal
+   * faktúru, prišla na 7 790 — pritom má předplatné a Kokpit u neho ukazuje
+   * 6 990." Doklad 20261001 to naozaj hovorí. Stalo sa to tak, že klik na
+   * hotový popis prepísal AJ sumu: ponuka popisov nesie svoju obvyklú cenu
+   * a tá je pri balíčku 7 790. Cena balíčka je tvrdý údaj, popis je text —
+   * text sa odteraz mení sám, suma len keď ju nikto nenastavil.
+   */
+  const [cenaBalicka, setCenaBalicka] = useState<number | null>(null);
   const [u, setU] = useState<Omit<Udaje, "klient">>(PRAZDNE_UDAJE);
   /**
    * Ďalší klienti na tej istej faktúre. Jerry, 4. 10. 2026: „Dan a Monika
@@ -142,6 +153,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       cena: predvolba.cena ? String(Math.round(predvolba.cena)) : "",
       vystavene: dnes(), balicekId: predvolba.balicekId || "",
     }));
+    setCenaBalicka(predvolba.balicekId && predvolba.cena > 0 ? Math.round(predvolba.cena) : null);
     setOtvorenaNova(true);
     onPredvolbaSpracovana?.();
   }, [predvolba, onPredvolbaSpracovana]);
@@ -211,6 +223,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
+    setCenaBalicka(null);
   };
 
   /** Otvorí náhľad mailu — text sa zloží tu a dá sa prepísať. */
@@ -319,8 +332,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setF((s) => ({ ...s, popis: p.text, cena: String(p.cena) }))}
-                title={`${p.text} — ${p.cena} Kč`}
+                onClick={() => setF((s) => ({ ...s, popis: p.text, cena: cenaBalicka != null ? s.cena : String(p.cena) }))}
+                title={cenaBalicka != null
+                  ? `${p.text} — prepíše len text, suma zostane ${cenaBalicka} Kč podľa balíčka`
+                  : `${p.text} — ${p.cena} Kč`}
                 style={{
                   padding: "5px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer",
                   border: `1px solid ${f.popis === p.text ? C.accent : C.border}`,
@@ -348,6 +363,26 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               <b style={{ fontSize: 15, color: C.text }}>{suma((Number(f.ks) || 0) * (Number(f.cena) || 0))} Kč</b>
             </div>
           </div>
+
+          {/* Faktúra, ktorá nesedí s balíčkom, musí byť VIDNO pred vystavením.
+              Martinovi Vaškovi odišla na 7 790 Kč, hoci jeho předplatné stojí
+              6 990 — a nikde to nebolo napísané (Jerry, 8. 10. 2026). */}
+          {cenaBalicka != null && (Number(f.ks) || 0) * (Number(f.cena) || 0) !== cenaBalicka && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10,
+              padding: "8px 11px", borderRadius: 9, border: `1px solid ${mix(C.orange, 55)}`, background: C.orangeBg,
+              fontSize: 12, color: C.orange,
+            }}>
+              <span>Balíček, z ktorého faktúra vznikla, stojí <b>{suma(cenaBalicka)} Kč</b> — faktúra je na {suma((Number(f.ks) || 0) * (Number(f.cena) || 0))} Kč.</span>
+              <button
+                type="button"
+                onClick={() => setF((s) => ({ ...s, ks: "1", cena: String(cenaBalicka) }))}
+                style={{ padding: "4px 10px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.orange, 60)}`, background: mix(C.orange, 16), color: C.orange }}
+              >
+                Dať {suma(cenaBalicka)} Kč
+              </button>
+            </div>
+          )}
 
           {dalsie.map((d, i) => {
             const nastav = (zmena: Partial<DalsiaPolozka>) => setDalsie((s) => s.map((x, j) => (j === i ? { ...x, ...zmena } : x)));

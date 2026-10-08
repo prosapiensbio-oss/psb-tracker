@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { klientStranka } from "./klientStranka";
+import { klientStranka, SADZBA } from "./klientStranka";
 import type { VypisKlienta } from "./mailKlientovi";
 
 const zaklad: VypisKlienta = {
@@ -32,7 +32,12 @@ describe("klientStranka", () => {
     // vždy rovnako."
     expect(klientStranka({ ...zaklad, zostatok: 4 })).toContain("Zbývá ti 4 h");
     expect(klientStranka({ ...zaklad, zostatok: 0 })).toContain("Poslední hodina");
-    expect(klientStranka({ ...zaklad, zostatok: -3 })).toContain("Nad rámec 3 h");
+    // Jerry, 8. 10. 2026: „Nad rámec nahradiť Nezaplatené a dať to červeným."
+    const minus = klientStranka({ ...zaklad, zostatok: -3 });
+    expect(minus).toContain("Nezaplaceno 3 h");
+    expect(minus).not.toContain("Nad rámec");
+    // Nadpis nesie farbu mínusu, nie bielu.
+    expect(minus.slice(minus.indexOf("<h1"), minus.indexOf("Nezaplaceno"))).toContain(SADZBA.minus);
   });
 
   it("QR a suma sa kreslia LEN keď klient dlží", () => {
@@ -93,22 +98,21 @@ describe("klientStranka", () => {
     expect(klientStranka({ ...zaklad, platba: p })).not.toContain("QR platba");
   });
 
-  it("vodorovná os začína tým, čo bolo naposledy", () => {
-    // Jerry, 2. 10. 2026: „chcel by som, aby to začínalo najaktuálnejším dňom
-    // a ako sa posúvaš doprava, tak ideš do minulosti."
+  it("žiadne listovanie do strany — odpočet stojí pod sebou", () => {
+    // Jerry, 8. 10. 2026: „posuvník doprava jednotlivých hodín daj preč
+    // a nechaj iba pre klientov odpočítavanie hodín."
     const h = klientStranka(zaklad);
-    const naposledy = h.indexOf("naposledy");
-    expect(naposledy).toBeGreaterThan(-1);
-    // Za značkou „naposledy" stojí najnovší bod, nie najstarší.
-    const poNej = h.slice(naposledy, naposledy + 400);
-    expect(poNej).toContain("15. 9.");
-    expect(poNej).not.toContain("9. 9.");
+    expect(h).not.toContain("posouvej doprava");
+    expect(h).not.toContain("overflow-x:auto");
+    // A ani druhé rozbaľovanie — rozpis JE tá os.
+    expect(h).not.toContain("Rozbalit celý balíček");
   });
 
-  it("zvislý rozpis ide opačne — najstaršie hore", () => {
+  it("odpočet ide najstaršie hore — ako sa číta príbeh", () => {
     const h = klientStranka(zaklad);
-    const rozpis = h.slice(h.indexOf("Rozbalit celý balíček"));
-    expect(rozpis.indexOf("Balíček 8 h")).toBeLessThan(rozpis.indexOf("trénink"));
+    // Len samotný blok osi: slovo „trénink" je aj v nadpise stránky.
+    const os = h.slice(h.indexOf("Poslední balíček"));
+    expect(os.indexOf("Balíček 8 h")).toBeLessThan(os.indexOf("trénink"));
   });
 
   it("os stojí rozbalená vždy, aj pri dlhu — stránka má jednu podobu", () => {
@@ -246,7 +250,7 @@ describe("nadpis osi hovorí, koľko histórie klient vidí", () => {
     expect(klientStranka({ ...z, balickov: 1 })).toContain("Poslední balíček");
     const dva = klientStranka({ ...z, balickov: 2 });
     expect(dva).toContain("Poslední dva balíčky");
-    expect(dva).toContain("Rozbalit vše pod sebou");
+    expect(dva).not.toContain("Rozbalit vše pod sebou");
   });
 
   it("celá história sa tak aj volá", () => {
