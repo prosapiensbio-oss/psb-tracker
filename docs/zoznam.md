@@ -210,8 +210,11 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, neoverené okom.** Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
+
 - **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
-  **Otvorené — chce to Jerryho slovo:** staršie úvodné tréningy vlastný balíček NEDOSTANÚ, appka do minulosti sama nepíše. Bez záznamu sú: Albert Matl (14. 9.), Janka Malinova (17. 8.) a šesť neaktívnych — Roman Pavlik (5. 8.), Hana Hrdinova (6. 8.), Zuzana Spoligova (6. 8.), Terezie Pehalova (11. 8.), Tomaš Dvořak (10. 9.). Všetci majú platbu 1 100 Kč v PTminderi, takže by nevznikol žiadny dlh — išlo by len o to, aby úvodný mal predaj aj u nás. Doplniť?
+  **Doplnené 8. 10. 2026** (Jerry: „áno doplň tie staršie úvodné"): sedem úvodných z augusta a septembra má vlastný balíček — Pavlik, Hrdinova, Spoligova, Pehalova, Malinova, Dvořak, Matl. Nikomu z nich nevznikol dlh (všetci zaplatili) a nikomu sa nezmenili hodiny okrem troch, ktorí dovtedy nemali žiadny záznam.
+  **Čo sa doplniť NEDÁ:** zvyšných 59 úvodných späť do januára 2025. Nasucho to vymyslelo dlh 1 100 Kč štrnástim ľuďom, ktorí zaplatili (ich platby z 2025 sa k balíčku nespárujú), dvom iným naopak dlh 6 990 Kč zmazalo a piatim stlačilo hodiny do mínusu. Keby to raz malo zmysel, musí sa k tomu prilepiť párovanie starých platieb — nie samotné balíčky.
 - **Nadpis stránky klienta vs. os (Jerry sa k tomu ešte nevyjadril).** Pri Lukášovi Hanusovi riadky končia na 4 h, ale nadpis hlási 5 h — nadpis ide za kartou klienta, os za vlastným prepočtom. Má sa nadpis riadiť osou (stránka bude sama so sebou v zhode), alebo ostať na karte?
 
 - **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"):**
