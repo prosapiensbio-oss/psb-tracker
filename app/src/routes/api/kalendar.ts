@@ -1088,6 +1088,41 @@ export const Route = createFileRoute("/api/kalendar")({
          * Vracia sa CELÝ zápis, nie len text: poznámka bez odklepnutia by
          * v karte svietila ako cudzia veta bez majiteľa.
          */
+        /**
+         * ODMAPOVANIE — druhá polovica kroku späť pri „Súkromné".
+         *
+         * Jerry, 8. 10. 2026: „áno dorob aj to odmapovanie pri súkromné."
+         * Tlačidlo robí dve veci naraz (uzavrie otázku a zapíše názov ako
+         * súkromný), takže vrátenie musí vrátiť obe — inak sa otázka vráti
+         * do zoznamu, ale appka si ďalej myslí, že ten názov nie je tréning,
+         * a pri najbližšej synchronizácii ho znova odloží bokom.
+         *
+         * Udalosti sa vracajú do stavu „nerozpoznané" (typ aj klient NULL),
+         * nie do nejakého predošlého typu — ten appka nikde neukladá a
+         * vymyslieť ho by znamenalo tvrdiť niečo, čo nevie. Nerozpoznaná
+         * udalosť sa pri ďalšom behu posúdi podľa pravidiel nanovo, čo je
+         * presne to, čo „vrátiť späť" znamená.
+         *
+         * Mení sa LEN to, čo zapísalo samotné mapovanie (typ `sukromne`
+         * bez klienta) — udalosť, ktorú medzitým niekto priradil klientovi,
+         * sa nechá na pokoji.
+         */
+        if (akcia === "odmapuj") {
+          const nazov = String(b.nazov || "");
+          const trener = String(b.trener || "");
+          if (!nazov || !trener) return Response.json({ ok: false, error: "chýba názov alebo tréner" }, { status: 400 });
+          const cas = /^\d{2}:\d{2}$/.test(String(b.cas || "")) ? String(b.cas) : "";
+          const typ = String(b.typ || "");
+          const r = await DB.prepare("DELETE FROM kal_mapovanie WHERE nazov = ?1 AND trener = ?2 AND cas = ?3" + (typ ? " AND typ = ?4" : ""))
+            .bind(...(typ ? [nazov, trener, cas, typ] : [nazov, trener, cas])).run();
+          if (typ === "sukromne") {
+            await DB.prepare(
+              "UPDATE kal_udalosti SET typ = NULL, klient = NULL WHERE nazov = ?1 AND trener = ?2 AND typ = 'sukromne' AND klient IS NULL",
+            ).bind(nazov, trener).run().catch(() => undefined);
+          }
+          return Response.json({ ok: true, zmazane: r.meta.changes || 0 });
+        }
+
         if (akcia === "vrat") {
           const id = String(b.id || "");
           if (!id) return Response.json({ ok: false, error: "chýba id" }, { status: 400 });

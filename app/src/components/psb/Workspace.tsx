@@ -605,6 +605,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (!a.ok) { setPracujem(""); setChyba(a.error || "nepodarilo sa uložiť"); return; }
     setPracujem("");
     await vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: "súkromná udalosť — nie je to tréning" });
+    // Krok späť musí vedieť o OBOCH zápisoch, nielen o tom poslednom.
+    if (z.nazov) setKrokSpat((x) => (x && x.kluc === kluc
+      ? { ...x, mapovanie: { nazov: z.nazov as string, trener: z.trener, typ: "sukromne" } }
+      : x));
   };
 
   /**
@@ -647,7 +651,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   };
 
   /** Čo sa dá vrátiť klávesou ⌘Z — vždy len posledné odoslanie. */
-  const [krokSpat, setKrokSpat] = useState<{ kluc: string; id: string; popis: string } | null>(null);
+  const [krokSpat, setKrokSpat] = useState<{ kluc: string; id: string; popis: string; mapovanie?: { nazov: string; trener: string; typ: string } } | null>(null);
   const [vratene, setVratene] = useState("");
 
   const vratKrok = useCallback(async () => {
@@ -656,8 +660,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     setKrokSpat(null);
     const j = await posli("/api/kalendar", { akcia: "vrat", id: k.id }).catch(() => ({ ok: false, error: "spojenie" }));
     if (!j.ok) { setChyba(j.error || "vrátiť sa to nepodarilo"); setKrokSpat(k); return; }
+    // „Súkromné" zapísalo aj pravidlo pre ten názov — bez jeho zmazania by
+    // sa otázka vrátila do zoznamu, ale appka by názov ďalej považovala za
+    // nie-tréning a pri najbližšej synchronizácii ho znova odložila.
+    if (k.mapovanie) {
+      const m = await posli("/api/kalendar", { akcia: "odmapuj", ...k.mapovanie }).catch(() => ({ ok: false, error: "spojenie" }));
+      if (!m.ok) setChyba("Otázka je späť, ale názov zostal zapísaný ako súkromný — zmaž ho v Kalendári.");
+    }
     setHotove((s) => { const n = new Set(s); n.delete(k.kluc); return n; });
-    setVratene("Vrátené — riadok je zase v zozname.");
+    setVratene(k.mapovanie ? "Vrátené — riadok je zase v zozname a názov už nie je súkromný." : "Vrátené — riadok je zase v zozname.");
     setTimeout(() => setVratene(""), 4000);
     oznam("kalendar");
     void nacitaj();
