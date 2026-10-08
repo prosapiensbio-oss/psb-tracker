@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
-import { BARTER_KLIENTI, pnlCalc, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
@@ -2390,6 +2390,8 @@ function skupinaFaktur(
    */
   const vstupReportu = useCallback((mk: string, druh: "mesiac" | "kvartal" = "mesiac"): { mesiace: MesiacReportu[]; extra: ExtraReportu } => {
     const p = pnlCalc();
+    const be = breakEvenRad();
+    const appsKluce = Object.keys(PNL.fixne.subcategories.apps?.items || {}).map((k) => `fixne.apps.${k}`);
     const mesiace: MesiacReportu[] = [];
     const [y, m] = mk.split("-").map(Number);
     // 12 mesiacov: priemer šiestich pred mesiacom aj troch štvrťrokov pred kvartálom.
@@ -2412,6 +2414,17 @@ function skupinaFaktur(
         hodinyJerry: hodinyTrenera("jerry"),
         hodinyTerezka: hodinyTrenera("terez"),
         vyplaty: i >= 0 && p.prijmy[i] ? p.vyplatySpolu[i] : undefined,
+        breakEven: i >= 0 && p.prijmy[i] ? be[i] : undefined,
+        apps: i >= 0 ? appsKluce.reduce((a, k) => a + (pnlHodnota(k, mm) || 0), 0) : undefined,
+        ai: i >= 0 ? pnlHodnota("fixne.apps.ai", mm) : undefined,
+        vyplataJerry: i >= 0 && p.prijmy[i] ? p.poslaneJerry[i] : undefined,
+        vyplataTerezka: i >= 0 && p.prijmy[i] ? p.poslaneTerezka[i] : undefined,
+        // „Nájom" a „Nájom 2" sú pre človeka jedno — spoločný nájom bytu.
+        spolocne: i >= 0 ? Object.entries(SPOLOCNE).reduce<Record<string, number>>((a, [k, v]) => {
+          const nazov = k.replace(/\s+\d+$/, "");
+          if (v[i]) a[nazov] = (a[nazov] || 0) + v[i];
+          return a;
+        }, {}) : undefined,
         googleTrasy: kanal("Google Business", "Directions"),
         googleWeb: kanal("Google Business", "Website clicks"),
         novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mm).length,
@@ -2433,7 +2446,9 @@ function skupinaFaktur(
     const odmlcani = Object.values(clients).filter((c) => c.status === "Aktívny" && !trenovali.has(c.name)).length;
     const spolu: Record<string, number> = {};
     for (const o of obdobie) for (const [k, v] of Object.entries(bankaSumy[o] || {})) spolu[k] = (spolu[k] || 0) + v;
-    const vydaje = Object.entries(spolu).filter(([k]) => !k.startsWith("vyplaty")).sort((a, b) => b[1] - a[1]);
+    // Náklady FIRMY — bez výplat, spoločných výdavkov domácnosti a súkromného
+    // (tie sú v osobných financiách reportu, Jerry 8. 10. 2026).
+    const vydaje = Object.entries(spolu).filter(([k]) => !k.startsWith("vyplaty") && !k.startsWith("spolocne") && k !== "mimo").sort((a, b) => b[1] - a[1]);
     const zdroje: Record<string, number> = {};
     for (const l of data.leads || []) if (obdobie.includes((l.date || "").slice(0, 7))) zdroje[l.source || "ine"] = (zdroje[l.source || "ine"] || 0) + 1;
     const NAZOV_ZDROJA: Record<string, string> = { referencia: "odporúčanie", reklama: "reklama", mail: "mail", web: "web", google: "Google", instagram: "Instagram", instagram_osobny: "Instagram (osobný)", telefon: "telefón", ine: "iné" };

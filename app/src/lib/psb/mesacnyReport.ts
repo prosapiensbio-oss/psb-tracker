@@ -38,6 +38,16 @@ export type MesiacReportu = {
   reklama?: number;
   googleTrasy?: number;
   googleWeb?: number;
+  /** Break-even z P&L (`breakEvenRad`): náklady bez výplat + nárok trénerov. */
+  breakEven?: number;
+  /** Aplikácie spolu (fixne.apps.*) a z toho AI (fixne.apps.ai). */
+  apps?: number;
+  ai?: number;
+  /** Osobné financie zakladateľov — čo si vzali a spoločné výdavky domácnosti. */
+  vyplataJerry?: number;
+  vyplataTerezka?: number;
+  /** Spoločné po kategóriách (Nájom, Potraviny, Ahsoka…). */
+  spolocne?: Record<string, number>;
 };
 
 export type ExtraReportu = {
@@ -56,7 +66,7 @@ export type ExtraReportu = {
 export type Semafor = "z" | "o" | "c";
 export type RiadokDetailu = { metrika: string; hodnota: string; priemer: string; rozdiel: string; smer: "hore" | "dole" | "rovno"; dobre?: boolean };
 export type OtazkaReportu = {
-  id: "praca" | "peniaze" | "novi";
+  id: "praca" | "peniaze" | "novi" | "osobne";
   otazka: string;
   semafor: Semafor;
   odpoved: string;
@@ -113,6 +123,15 @@ function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
     reklama: sum("reklama"),
     googleTrasy: sum("googleTrasy"),
     googleWeb: sum("googleWeb"),
+    breakEven: sum("breakEven"),
+    apps: sum("apps"),
+    ai: sum("ai"),
+    vyplataJerry: sum("vyplataJerry"),
+    vyplataTerezka: sum("vyplataTerezka"),
+    spolocne: ms.some((x) => x.spolocne) ? ms.reduce<Record<string, number>>((a, x) => {
+      for (const [k, v] of Object.entries(x.spolocne || {})) a[k] = (a[k] || 0) + v;
+      return a;
+    }, {}) : undefined,
   };
 }
 
@@ -170,6 +189,9 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
   const marza = (x: MesiacReportu) => (x.prijmy && x.zisk !== undefined ? (x.zisk / x.prijmy) * 100 : undefined);
   const naHodinu = (x: MesiacReportu) => (x.prijmy && x.hodiny ? x.prijmy / x.hodiny : undefined);
   const konverzia = (x: MesiacReportu) => (x.dopyty ? (x.novi / x.dopyty) * 100 : undefined);
+  const nadBe = (x: MesiacReportu) => (x.prijmy !== undefined && x.breakEven !== undefined ? x.prijmy - x.breakEven : undefined);
+  /** Koľko hodín treba odtrénovať, aby tržby pokryli break-even (pri tržbe na hodinu obdobia). */
+  const hodinNaBe = (x: MesiacReportu) => { const t = naHodinu(x); return t && x.breakEven !== undefined ? x.breakEven / t : undefined; };
 
   // 1 · MÁME DOSŤ PRÁCE?
   const pHodin = priem("hodiny");
@@ -224,15 +246,24 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
         riadok("Náklady vrátane výplat", akt.naklady, h("naklady"), kcF, false),
         riadok("Zisk", akt.zisk, h("zisk"), kcF),
         riadok("Marža", marza(akt), historia.map(marza), pct),
-        riadok("Výplaty", akt.vyplaty, h("vyplaty"), kcF),
+        riadok("Break-even (tržby, pri ktorých je zisk 0)", akt.breakEven, h("breakEven"), kcF, false),
+        riadok("Tržby nad break-even", nadBe(akt), historia.map(nadBe), kcF),
         riadok("Tržba na hodinu", naHodinu(akt), historia.map(naHodinu), kcF),
+        riadok("Hodín na break-even", hodinNaBe(akt), historia.map(hodinNaBe), cele, false),
+        riadok("Aplikácie spolu", akt.apps, h("apps"), kcF, false),
+        riadok("z toho AI (Claude, ChatGPT, Perplexity…)", akt.ai, h("ai"), kcF, false),
+        riadok("Výplaty zakladateľov", akt.vyplaty, h("vyplaty"), kcF),
       ]),
       zoznamy: vydajeZoznam.length ? [{ nadpis: "Najväčšie náklady (bez výplat)", polozky: vydajeZoznam }] : [],
       akcia: extra.zositChyba
         ? "Doplň zošit hotovosti — kým chýba, zisk je nadhodnotený o hotovostné výdavky."
         : (akt.naklady || 0) > (priem("naklady") || Infinity) * 1.15 && extra.topVydaje?.[0]
           ? `Náklady sú ${protiPriemeru(akt.naklady || 0, priem("naklady")).zmena}. Najväčší: ${extra.topVydaje[0].nazov} (${kc(extra.topVydaje[0].suma)} Kč) — patrí celý do tohto obdobia?`
-          : sPeniaze === "z" ? "Držať." : "Tržby sú pod priemerom — pozri, komu končí balíček a kto ešte nekúpil ďalší.",
+          : nadBe(akt) !== undefined && (nadBe(akt) as number) < 0
+            ? `Tržby sú ${kc(-(nadBe(akt) as number))} Kč pod break-even — to je ${kc(-(nadBe(akt) as number) / (naHodinu(akt) || 1))} hodín navyše, ktoré chýbali.`
+            : (akt.ai || 0) > (priem("ai") || Infinity) * 1.3
+              ? `AI stálo ${kc(akt.ai || 0)} Kč (priemer ${kc(priem("ai") || 0)}) — over, ktoré predplatné je navyše.`
+              : sPeniaze === "z" ? "Držať." : "Tržby sú pod priemerom — pozri, komu končí balíček a kto ešte nekúpil ďalší.",
     };
   }
 
@@ -270,7 +301,35 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
           : "Žiadny dopyt — skontroluj, či formuláre na webe fungujú (nočná kontrola) a či beží reklama.",
   };
 
-  return { druh, nadpis, porovnanie, otazky: [praca, peniaze, novi] };
+  // 4 · OSOBNÉ FINANCIE — výplaty a spoločné výdavky domácnosti po kategóriách
+  // (Jerry, 8. 10. 2026: „nájom spoločné 23k — prečo to mám vidieť medzi
+  // nákladmi? To patrí do osobných financií, kde sú aj výplaty").
+  const spolocneSpolu = (x: MesiacReportu) => (x.spolocne ? Object.values(x.spolocne).reduce((a, v) => a + v, 0) : undefined);
+  const domov = (x: MesiacReportu) => (x.vyplataJerry !== undefined || x.vyplataTerezka !== undefined ? (x.vyplataJerry || 0) + (x.vyplataTerezka || 0) : undefined);
+  const kategorie = Object.entries(akt.spolocne || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const histSpol = historia.map(spolocneSpolu);
+  const pSpolocne = definovane(histSpol).length ? priemer(definovane(histSpol)) : undefined;
+  const sOsobne: Semafor = spolocneSpolu(akt) !== undefined && pSpolocne && (spolocneSpolu(akt) as number) > pSpolocne * 1.2 ? "o" : "z";
+  const najvacsiaKat = kategorie[0];
+  const osobne: OtazkaReportu = {
+    id: "osobne", otazka: "Koľko si berieme domov?", semafor: sOsobne,
+    odpoved: domov(akt) !== undefined
+      ? `Výplaty spolu ${kc(domov(akt) as number)} Kč${spolocneSpolu(akt) !== undefined ? `; spoločné výdavky domácnosti ${kc(spolocneSpolu(akt) as number)} Kč${pSpolocne ? ` (priemer ${kc(pSpolocne)})` : ""}` : ""}.`
+      : "Výplaty za obdobie ešte nie sú v P&L.",
+    hlavne: { hodnota: Math.round(domov(akt) || 0), jednotka: "Kč výplaty", ...protiPriemeru(domov(akt) || 0, (() => { const v = definovane(historia.map(domov)); return v.length ? priemer(v) : undefined; })()), seria: seriaMes.map((x) => domov(x) || 0), popisSerie, chyba: domov(akt) === undefined },
+    detail: nn([
+      riadok("Výplata — Jerry", akt.vyplataJerry, h("vyplataJerry"), kcF),
+      riadok("Výplata — Terezka", akt.vyplataTerezka, h("vyplataTerezka"), kcF),
+      riadok("Spoločné výdavky spolu", spolocneSpolu(akt), histSpol, kcF, false),
+      ...kategorie.map(([k, v]) => riadok(`· ${k}`, v, historia.map((x) => x.spolocne?.[k] ?? 0), kcF, false)),
+    ]),
+    zoznamy: [],
+    akcia: sOsobne === "o" && najvacsiaKat
+      ? `Spoločné výdavky sú nad priemerom — najviac ${najvacsiaKat[0]} (${kc(najvacsiaKat[1])} Kč).`
+      : "Bez zmeny — spoločné výdavky sú v priemere.",
+  };
+
+  return { druh, nadpis, porovnanie, otazky: [praca, peniaze, novi, osobne] };
 }
 
 /** Report ako markdown pre tlač do PDF (`vytlacReport`), grafy cez značky. */

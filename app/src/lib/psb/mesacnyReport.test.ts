@@ -56,3 +56,19 @@ describe("mesačný report", () => {
     expect(md).toContain("**Urob:**");
   });
 });
+
+describe("break-even, aplikácie a osobné financie", () => {
+  it("break-even v peniazoch, spoločný nájom v osobných financiách", () => {
+    const s = (o: Partial<MesiacReportu>) => ({ breakEven: 180000, apps: 9000, ai: 3000, vyplataJerry: 60000, vyplataTerezka: 15000, spolocne: { Nájom: 23000, Potraviny: 20000 }, ...o });
+    const ms = mesiace.map((x) => ({ ...x, ...s({}) }));
+    ms[ms.length - 1] = { ...ms[ms.length - 1], ...s({ ai: 8723, spolocne: { Nájom: 23000, Potraviny: 25000, Ahsoka: 7300 } }) };
+    const r = postavReport(ms, "2026-09", "mesiac", { ...extra, topVydaje: [{ nazov: "Prevádzka · Nájom + energie", suma: 54750 }] });
+    const pen = r.otazky[1];
+    expect(pen.detail.map((d) => d.metrika)).toEqual(expect.arrayContaining(["Break-even (tržby, pri ktorých je zisk 0)", "Tržby nad break-even", "Aplikácie spolu", "z toho AI (Claude, ChatGPT, Perplexity…)"]));
+    const osob = r.otazky[3];
+    expect(osob.otazka).toBe("Koľko si berieme domov?");
+    expect(osob.detail.map((d) => d.metrika)).toContain("· Nájom");
+    expect(osob.semafor).toBe("o");
+    expect(osob.akcia).toContain("Potraviny");
+  });
+});
