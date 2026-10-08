@@ -1821,6 +1821,16 @@ export function KamOdisliCard() {
   const [tahamUcet, setTahamUcet] = useState(false);
   const [chybaUctu, setChybaUctu] = useState("");
   const [hotTxt, setHotTxt] = useState("");
+  /**
+   * Ku ktorému dňu hotovosť platí (Jerry, 8. 10. 2026: „tu by zas mala byť
+   * možnosť nastaviť dátum, ku ktorému evidujeme tú hotovosť").
+   *
+   * Predvolene dnešok — obálka sa počíta v ten deň, keď sa do nej pozrieš.
+   * Lenže uzávierka sa robí prvý víkend nového mesiaca a vtedy to číslo
+   * patrí ku koncu MINULÉHO mesiaca; bez dátumu by sa september zapísal
+   * ako októbrový stav.
+   */
+  const [hotDatum, setHotDatum] = useState(dnesPraha());
   const [fioTxt, setFioTxt] = useState("");
   const [fioDatum, setFioDatum] = useState("");
 
@@ -1853,7 +1863,7 @@ export function KamOdisliCard() {
     // Stav hotovosti zhasína krok uzávierky aj dlaždicu Rezerva — obe si ho
     // čítali raz pri štarte (kontrola 24. 9. 2026).
     const predtym = stav;
-    const v: StavPenazi = { hotovost: cislo(hotTxt), datum: dnesPraha() };
+    const v: StavPenazi = { hotovost: cislo(hotTxt), datum: hotDatum || dnesPraha() };
     setStav(v);
     setUprava("");
     const ok = await saveVzasSetting("stav_penazi", v);
@@ -1953,9 +1963,14 @@ export function KamOdisliCard() {
         {uprava === "hotovost" ? (
           <>
             <label style={{ fontSize: 11.5, color: C.textMuted }}>
-              Hotovosť dnes (Kč)
+              Hotovosť v obálke (Kč)
               <input value={hotTxt} onChange={(e) => setHotTxt(e.target.value)} inputMode="numeric"
                 style={{ ...S.input, display: "block", marginTop: 4, width: 130 }} />
+            </label>
+            <label style={{ fontSize: 11.5, color: C.textMuted }}>
+              Ku dňu
+              <input type="date" value={hotDatum} onChange={(e) => setHotDatum(e.target.value)} max={dnesPraha()}
+                style={{ ...S.input, display: "block", marginTop: 4, width: 150, colorScheme: "dark" }} />
             </label>
             <button onClick={() => void ulozHotovost()} style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}>
               Uložiť
@@ -1986,8 +2001,8 @@ export function KamOdisliCard() {
               style={{ background: mix(C.accent, 12), border: `1px solid ${mix(C.accent, 50)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: tahamUcet ? "default" : "pointer", fontFamily: "inherit" }}>
               {tahamUcet ? "sťahujem…" : "Stiahnuť z Fia"}
             </button>
-            <button onClick={() => setUprava("hotovost")}
-              title={`Zapíše sa k dnešnému dňu (${fmtDMY(dnesPraha())})`}
+            <button onClick={() => { setHotDatum(dnesPraha()); setUprava("hotovost"); }}
+              title="Číslo z obálky a deň, ku ktorému platí"
               style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
               {stav ? "Prepísať hotovosť" : "Zapísať hotovosť"}
             </button>
@@ -2007,7 +2022,7 @@ export function KamOdisliCard() {
         )}
         {chybaUctu && <span style={{ fontSize: 11.5, color: C.red, flexBasis: "100%" }}>{chybaUctu}</span>}
         <span style={{ fontSize: 11.5, color: C.textDim, flex: 1, minWidth: 200 }}>
-          Účet si appka vypýta od banky; hotovosť sa zapíše k dnešnému dňu ({fmtDMY(dnesPraha())}).
+          Účet si appka vypýta od banky; pri hotovosti si vyberieš deň, ku ktorému platí.
         </span>
       </div>
     </Card>
