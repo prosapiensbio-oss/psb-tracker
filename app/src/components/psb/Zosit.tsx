@@ -30,8 +30,8 @@ type Riadok = {
   vypnuty?: boolean;
   /** Ten istý riadok už v Kokpite stojí (server, `oznacZosit`). */
   uzMame?: boolean;
-  /** Presun na účet, ktorý už má banka — do zošita sa nezapisuje. */
-  zBanky?: boolean;
+  /** Vklad vo výpise, ktorý tomuto presunu zodpovedá (druhá strana tej istej koruny). */
+  parovanie?: { datum: string; popis: string; suma: number };
   kategoriaVDb?: string;
   /** Mesiac je uzavretý — zápis by server aj tak odmietol. */
   zamknuty?: boolean;
@@ -348,11 +348,13 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                       />
                     </td>
                     <td style={{ padding: "5px 8px" }}>
-                      {r.uzMame && r.zBanky ? (
-                        <span style={{ fontSize: 11.5, color: C.green }} title="Presun na účet už stojí vo výpise z banky (vklad hotovosti). Keby sa zapísal aj zo zošita, tie isté peniaze by boli dvakrát.">
-                          ✓ má to banka · vklad na účet
-                        </span>
-                      ) : r.uzMame ? (
+                      {r.parovanie && (
+                        <div style={{ fontSize: 11, color: C.green, marginBottom: 3 }}
+                          title="Tá istá hotovosť z druhej strany: z obálky odišla, na účet prišla. Zapíšu sa obe — dvakrát sa nezapočíta, lebo toto je výdavok z obálky a bankový riadok je príjem na účet.">
+                          ↔ pasuje na {r.parovanie.popis.length > 34 ? `${r.parovanie.popis.slice(0, 32)}…` : r.parovanie.popis} ({naDenMesiac(r.parovanie.datum)})
+                        </div>
+                      )}
+                      {r.uzMame ? (
                         <span style={{ fontSize: 11.5, color: C.green }} title="Tento riadok je už zapísaný — zaškrtni ho, len ak je to naozaj iná platba.">
                           ✓ už v Kokpite · {r.kategoriaVDb ? nazov(r.kategoriaVDb) : r.suma > 0 ? "platba klienta" : "bez kategórie"}
                         </span>

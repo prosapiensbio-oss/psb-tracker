@@ -205,6 +205,17 @@ export function fioDatum(s: string): string | null {
 // zvyšok sa doučí z toho, čo Jerry zaradí ručne (uloží sa ako pravidlo).
 /** Kategórie mimo P&L — riadky, ktoré do nákladov firmy nepatria. */
 export const MIMO_PNL = "mimo";
+/**
+ * PRESUN HOTOVOSTI NA ÚČET — ani náklad, ani príjem.
+ *
+ * Jerry, 8. 10. 2026: „keď budem presúvať peniaze z hotovosti na účet,
+ * potrebujem o tom mať záznam, lebo o tie peniaze neprichádzam — len nie sú
+ * v hotovosti." Je to tá istá koruna na druhom mieste: v zošite odchádza
+ * z obálky, vo výpise pribúda na účte. Do P&L nevstupuje ani raz (kategória
+ * nemá tvar `sekcia.podsekcia.položka`, takže ju agregácia nenájde) a od
+ * „Mimo P&L — súkromné" sa líši zámerne: súkromné je míňanie, toto je presun.
+ */
+export const PRESUN = "presun";
 /** Výplata bez určenia človeka — zostáva kvôli starším zápisom. */
 export const VYPLATY = "vyplaty";
 // Výplata musí vedieť, KOMU patrí, inak sa z nej nedá počítať dlh voči
@@ -235,6 +246,9 @@ const SEED: [RegExp, string][] = [
   [/billa|rohlik|rohlík|lidl|albert|kaufland|tesco|globus|penny|potraviny|drogerie|spajz|spajza/i, MIMO_PNL],
   [/bolt\.|uber|liftago/i, MIMO_PNL],
   [/výběr z bankomatu|vyber z bankomatu/i, MIMO_PNL],
+  // Vklad vlastnej hotovosti na účet. Pred týmto pravidlom zostával bez
+  // kategórie a visel medzi nezaradenými, hoci je to len presun.
+  [/vklad do bankomatu|vklad hotovosti/i, PRESUN],
   // Ahsoka (pes) nie je „súkromné" v zmysle jedného človeka — je to spoločný
   // výdavok domácnosti, ktorý sa delí na polovicu a každému zakladateľovi sa
   // započíta ako čerpaná výplata. Od júla 2026 odchádza z účtu jedným prevodom

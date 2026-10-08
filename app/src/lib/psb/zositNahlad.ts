@@ -1,4 +1,4 @@
-import { odhadniKategoriu } from "./fio";
+import { odhadniKategoriu, PRESUN } from "./fio";
 import { CENA_LOPTICKY, PRIJEM_PRODUKT } from "./kategoriePrijmov";
 
 /**
@@ -20,20 +20,30 @@ import { CENA_LOPTICKY, PRIJEM_PRODUKT } from "./kategoriePrijmov";
  */
 export type RiadokZositu = { datum: string; popis: string; suma: number; poznamka?: string; isty?: boolean };
 export type HotovostVDb = { date: string; amount_czk: number; counterparty: string; category: string | null };
-export type OznacenyRiadok = RiadokZositu & { uzMame: boolean; kategoriaVDb: string; kategoria: string; zBanky?: boolean };
+export type OznacenyRiadok = RiadokZositu & {
+  uzMame: boolean; kategoriaVDb: string; kategoria: string;
+  /** Vklad vo výpise, ktorý tomuto presunu zodpovedá — druhá strana tej istej koruny. */
+  parovanie?: { datum: string; popis: string; suma: number };
+};
 
 /**
- * PRESUN NA ÚČET MÁ BANKA — v zošite sa nezapisuje (Jerry, 8. 10. 2026:
- * „bol tam presun na účet 23 000, dal som ho neoznačiť… prečo sa zapísal?").
+ * PRESUN NA ÚČET JE VLASTNÝ ZÁPIS, NIE VYNECHANÝ RIADOK.
  *
- * Nezapísal sa; appka ho ale ani nespoznala, takže ho musel odškrtnúť sám
- * a potom nemal ako vedieť, že tých 23 000, čo vidí medzi pohybmi, je riadok
- * od BANKY („Vklad do bankomatu", 18. 9.) — tá istá hotovosť z druhej strany.
- * Zapísať aj riadok zo zošita by tie peniaze započítalo dvakrát.
+ * Jerry, 8. 10. 2026: „keď budem presúvať peniaze z hotovosti na účet,
+ * potrebujem o tom mať záznam, lebo o tie peniaze neprichádzam — len nie sú
+ * v hotovosti." Prvá verzia taký riadok odškrtla („má to banka"); to je
+ * odpoveď na inú otázku. Z obálky tá hotovosť naozaj odišla a zošit je
+ * evidencia obálky — riadok tam patrí, len s kategóriou `presun`, ktorá
+ * nevstupuje do P&L.
  *
- * Párovanie je zámerne na SUMU a DEŇ (±3), nie na text: zošit hovorí „presun
- * na účet", banka „Vklad do bankomatu: FIO BANKA, JOŠTOVA 4" a nijaké
- * spoločné slovo tam nie je.
+ * Nájdený vklad vo výpise sa pritom UKÁŽE (`parovanie`): „pasuje na vklad do
+ * bankomatu 18. 9." Je to tá istá koruna z druhej strany a človek má vidieť,
+ * že appka o oboch stranách vie — dvakrát sa nezapočíta, lebo bankový riadok
+ * je príjem na účet a tento výdavok z obálky.
+ *
+ * Párovanie je na SUMU a DEŇ (±3), nie na text: zošit hovorí „presun na
+ * účet", banka „Vklad do bankomatu: FIO BANKA, JOŠTOVA 4" a nijaké spoločné
+ * slovo tam nie je.
  */
 export type VkladVBanke = { date: string; amount_czk: number; counterparty: string };
 
@@ -69,7 +79,10 @@ export function oznacZosit(
     const v = vklad(r);
     if (v) {
       v.pouzite = true;
-      return { ...r, uzMame: true, zBanky: true, kategoriaVDb: "", kategoria: "" };
+      return {
+        ...r, uzMame: false, kategoriaVDb: "", kategoria: PRESUN,
+        parovanie: { datum: v.date.slice(0, 10), popis: v.counterparty, suma: v.amount_czk },
+      };
     }
     // Príjem presne za cenu loptičky sa navrhne ako predaj produktu — len
     // návrh v rolete, človek ho vidí a prepne.

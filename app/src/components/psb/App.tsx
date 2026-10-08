@@ -9,6 +9,7 @@ import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
+import { PRESUN } from "../../lib/psb/fio";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
 
@@ -1513,7 +1514,7 @@ function skupinaFaktur(
          * je pritom výplata v naturáliách a patrí do „poslané".
          */
         const zapocitajPolozku = (mk: string, pol: FaPol, popis: string, doklad: string) => {
-          if (!pol.kategoria || pol.kategoria === "mimo") return;
+          if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria === PRESUN) return;
           if (pol.kategoria.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
             if (pol.kategoria === "vyplaty.jerry") v.jerry += pol.cena;
@@ -1541,7 +1542,7 @@ function skupinaFaktur(
         // `ciastka` je so znamienkom: záporná = výdavok, kladná = príjem/vrátenie.
         // Vďaka tomu vrátenie (kladná časť na nákladový cieľ) ten náklad odčíta.
         const zaradCiast = (mk: string, ciel: string, ciastka: number, meta: { datum: string; popis: string }) => {
-          if (!ciel || ciel === "mimo") return;                 // osobné mimo P&L
+          if (!ciel || ciel === "mimo" || ciel === PRESUN) return;  // osobné mimo P&L a presuny medzi vlastnými peniazmi
           if (ciel.startsWith(PRIJEM)) {
             // Od mesiaca, keď sú peniaze z Kokpitu (`data.peniazeOd`), je
             // úvodný v hotovosti PLATBA klienta vo vlastnej evidencii — ako
@@ -1596,7 +1597,7 @@ function skupinaFaktur(
             if (prijemDoPnl(p.kategoria, mkP, peniazeOdRef.current)) rucnePrijmy[mkP] = (rucnePrijmy[mkP] || 0) + p.suma;
             continue;
           }
-          if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
+          if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo" || p.kategoria === PRESUN) continue;
           const mk = String(p.datum).slice(0, 7);
           if (p.kategoria.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
