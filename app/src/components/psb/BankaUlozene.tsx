@@ -396,7 +396,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
                           if (e.target.value !== (p.poznamka || "")) void zmen(p.kategoria, [p.kluc], e.target.value);
                         }}
                         placeholder="+ poznámka"
-                        style={{ marginTop: 2, width: "100%", maxWidth: 320, background: "transparent", border: "none", borderBottom: `1px dashed ${mix(C.border, 80)}`, color: p.poznamka ? C.textDim : C.accentLight, fontSize: 11, padding: "1px 0" }}
+                        style={{ marginTop: 2, width: "100%", maxWidth: 460, background: "transparent", border: "none", borderBottom: `1px dashed ${mix(C.border, 80)}`, color: p.poznamka ? C.textMuted : C.accentLight, fontSize: 12, padding: "2px 0" }}
                       />
                     </td>
                     <td style={{ ...S.td, padding: "3px 6px" }}>
