@@ -22,6 +22,7 @@ import { fetchWeekEntries, saveWeekEntry } from "../../lib/psb/client";
 import type { ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 import { C, mix } from "../../lib/psb/theme";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
+import { SOURCES } from "./Klienti";
 import type { PSBData } from "../../lib/psb/types";
 import { otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -801,7 +802,7 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
   leads: { id: string; date: string; name: string; source: string; status: string; email: string; telefon: string; odpovedaneAt: string; dovod: string; druh: string; note: string }[];
   clients: Record<string, ClientAgg>;
   /** Úvodní klienti uzatváraného mesiaca bez zdroja (krok uzávierky „Odkiaľ prišli"). */
-  bezZdroja: { mena: string[]; mesiac: string; otvor?: () => void };
+  bezZdroja: { mena: string[]; mesiac: string; otvor?: () => void; onOverride?: (meno: string, pole: string, hodnota: string) => void };
   onNavigate?: (tab: string, sub?: string) => void;
   onZmena: () => void;
   /** Celý zoznam dopytov — komponent z Marketingu, aby sa nekreslil dvakrát inak. */
@@ -875,12 +876,7 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
       {bezZdroja.mena.length > 0 && (
         <>
           <NadpisSekcie pocet={bezZdroja.mena.length}>Odkiaľ prišli — uzávierka {bezZdroja.mesiac}</NadpisSekcie>
-          <div style={{ ...riadok, alignItems: "flex-start" }}>
-            <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 300px", lineHeight: 1.55 }}>
-              Úvodný tréning mali, zdroj nemajú: <b>{bezZdroja.mena.join(", ")}</b>.
-            </span>
-            {bezZdroja.otvor && <button style={hlavne(true)} onClick={bezZdroja.otvor}>Doplniť v Klientoch</button>}
-          </div>
+          <ZdrojeKlientov mena={bezZdroja.mena} onOverride={bezZdroja.onOverride} />
         </>
       )}
       {prazdne && <VsetkoVybavene text="Všetko vybavené — každému dopytu sa niekto ozval." />}
@@ -897,6 +893,65 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
           Lievik a ceny za dopyt sú v <button style={{ ...vedlajsie, padding: "2px 6px" }} onClick={() => onNavigate("marketing", "lievik")}>Marketing → Lievik</button>
         </div>
       )}
+    </>
+  );
+}
+
+/**
+ * ODKIAĽ PRIŠLI — doplní sa rovno tu, nie o dve obrazovky ďalej.
+ *
+ * Jerry, 8. 10. 2026: „Terezka tam má «odkiaľ prišli», keď to otvorí,
+ * otvorí sa Klient a nič tam nie je — chcel by som, aby sa hneď pod tým
+ * rozbalil zoznam neznámych, o ktorých nevieme, odkiaľ prišli."
+ *
+ * Zdroj klienta je jedno pole; preklik na inú záložku kvôli jednej rolete
+ * je presne ten krok navyše, kvôli ktorému sa veci nerobia. Zapisuje sa
+ * cestou appky (`onOverride` → `actions.setOverride`), takže to hneď vidia
+ * aj ostatné obrazovky.
+ */
+export function ZdrojeKlientov({ mena, zdroje, onOverride }: {
+  mena: string[];
+  /** Čo už je zapísané — `client_overrides.zdroj` podľa mena. */
+  zdroje?: Record<string, string>;
+  onOverride?: (meno: string, pole: string, hodnota: string) => void;
+}) {
+  const [hotove, setHotove] = useState<Record<string, string>>({});
+  if (!mena.length) return <VsetkoVybavene text="Každý úvodný tohto mesiaca má zapísaný zdroj." />;
+  return (
+    <>
+      <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 8 }}>
+        Úvodný tréning mali, zdroj nemajú. Vyber, odkiaľ prišiel — zapíše sa hneď.
+      </div>
+      {mena.map((m) => {
+        const hodnota = hotove[m] ?? zdroje?.[m] ?? "";
+        return (
+          <div key={m} style={riadok}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170, flex: "1 1 170px" }}>{m}</span>
+            <select
+              value={hodnota}
+              aria-label={`Odkiaľ prišiel ${m}`}
+              onChange={(e) => {
+                const v = e.target.value;
+                setHotove((p) => ({ ...p, [m]: v }));
+                if (v) onOverride?.(m, "zdroj", v);
+              }}
+              style={{ background: C.bg, color: C.text, border: `1px solid ${hodnota ? mix(C.green, 55) : C.border}`, borderRadius: 7, fontSize: 12.5, padding: "5px 8px", cursor: "pointer", fontFamily: "inherit", minWidth: 200 }}
+            >
+              <option value="">— vyber zdroj —</option>
+              {SOURCES.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
+            </select>
+            {hodnota === "referencia" && (
+              <input
+                defaultValue=""
+                placeholder="kto ho poslal (nepovinné)"
+                onBlur={(e) => e.target.value.trim() && onOverride?.(m, "zdrojKto", e.target.value.trim())}
+                style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12.5, padding: "5px 8px", fontFamily: "inherit", minWidth: 180 }}
+              />
+            )}
+            {hotove[m] && <span style={{ fontSize: 11.5, color: C.green }}>✓ zapísané</span>}
+          </div>
+        );
+      })}
     </>
   );
 }

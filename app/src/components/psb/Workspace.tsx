@@ -29,7 +29,7 @@ import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { ritualy } from "../../lib/psb/rituals";
-import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta } from "./WorkspaceKroky";
+import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
@@ -1551,6 +1551,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           bezZdroja={{
             mena, mesiac: mesiacUzavierky,
             otvor: zdroje?.tab && onNavigate ? () => onNavigate(zdroje.tab as string, zdroje.sub, zdroje.focus as never) : undefined,
+            onOverride,
           }}
           onNavigate={onNavigate}
           onZmena={() => oznam("klienti")}
@@ -1601,6 +1602,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
               otazky: <OtazkyMesiaca mesiac={mk} ja={trenerKroku === "Terezka" ? "terezka" : trenerKroku === "Jerry" ? "jerry" : undefined} />,
               hotovostStav: <KamOdisliCard />,
+              // Zdroj sa doplní tu, nie o dve obrazovky ďalej (Jerry, 8. 10. 2026).
+              zdroje: (
+                <ZdrojeKlientov
+                  mena={((krokyUzavierky?.(mk) || []).find((x) => x.id === "zdroje")?.focus as { skupina?: { mena?: string[] } } | undefined)?.skupina?.mena || []}
+                  zdroje={Object.fromEntries(Object.entries(clients).map(([meno, c]) => [meno, (c as { zdroj?: string }).zdroj || ""]))}
+                  onOverride={onOverride}
+                />
+              ),
               upozornenia: actions && onNavigate ? (
                 upozornenia.length
                   ? <>{upozornenia.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />)}</>

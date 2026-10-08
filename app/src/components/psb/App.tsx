@@ -2244,6 +2244,18 @@ function skupinaFaktur(
   const krokyZamku = useCallback((mk: string): KrokUzavierky[] => {
     const k = kotvaDat(data);
     const z = zapisy.mesiace?.[mk];
+    /**
+     * OTÁZKY MESIACA SÚ ZODPOVEDANÉ, AŽ KEĎ ODPOVEDALI OBAJA.
+     *
+     * Jerry, 8. 10. 2026: „dáva mi to ponuku uzamknutia mesiaca — ako mi to
+     * môže ponúkať, pokiaľ Terezka daný mesiac svojimi slovami nepopísala?"
+     * Krok sa dovtedy odškrtol od PRVEJ odpovede, takže Jerryho štyri vety
+     * zavreli mesiac aj za ňu. Odpovede sú pritom po ľuďoch
+     * (`<otázka>__jerry`, `<otázka>__terezka`) — stačilo ich spočítať zvlášť.
+     */
+    const odpovedalKto = (kto: string) => Object.entries(z?.answers || {})
+      .some(([k2, v]) => k2.endsWith(`__${kto}`) && String(v).trim());
+    const chybaju = (["jerry", "terezka"] as const).filter((kto) => !odpovedalKto(kto));
     const odpovedane = Object.values(z?.answers || {}).filter((v) => String(v).trim()).length;
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
     // bankaPohyby[mesiac] je mapa KATEGÓRIA → pohyby, nie pole. `.length` na
@@ -2331,8 +2343,12 @@ function skupinaFaktur(
       {
         id: "otazky",
         label: "Otázky mesiaca",
-        hotovo: odpovedane > 0,
-        detail: odpovedane > 0 ? `${odpovedane} zodpovedaných` : "žiadna odpoveď",
+        hotovo: chybaju.length === 0,
+        detail: chybaju.length === 0
+          ? `${odpovedane} zodpovedaných — obaja`
+          : odpovedane > 0
+            ? `${odpovedane} zodpovedaných · čaká sa na ${chybaju.map((x) => (x === "jerry" ? "Jerryho" : "Terezku")).join(" a ")}`
+            : "žiadna odpoveď",
         // Otázky mesiaca žijú vo Výsledky → Mesačné, nie v Peniazoch. Prvá
         // verzia mierila na tabuľku tržieb: správna obrazovka na pohľad, ale
         // nie tá, kde sa odpovedá. Focus riadok rozbalí a doskroluje k otázkam.
