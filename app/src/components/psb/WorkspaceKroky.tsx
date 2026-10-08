@@ -8,6 +8,8 @@
  * Pravidlá (kto patrí do zoznamu, aký balíček vznikne, kedy sa pýtať na
  * sumu) sú v `lib/psb/workspaceKroky.ts` a majú testy. Tu je len obrazovka.
  */
+import { koniecKvartalu, kvartalMesiaca, postavReport, type ExtraReportu, type MesiacReportu } from "../../lib/psb/mesacnyReport";
+import { ReportMesiaca } from "./ReportMesiaca";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { useEffect, useMemo, useState } from "react";
 
@@ -923,8 +925,10 @@ const nazovMesiaca = (mk: string) => {
  *    stiahne tu, všetky pohyby (aj výdavky) sa zapíšu a zaradia podľa
  *    naučených pravidiel. Čo pravidlo nemá, zaradí sa v Banke.
  */
-export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [] }: {
+export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [], reportVstup }: {
   mesiac: string;
+  /** Mesačný a kvartálny report pod zámkom (Jerry, 8. 10. 2026). */
+  reportVstup?: (mesiac: string) => { mesiace: MesiacReportu[]; extra: ExtraReportu };
   /** Kedy sa čo naposledy nahralo — dátum stojí pri každom kroku (Jerry, 5. 10. 2026). */
   uploadLog?: { date: string; type: string }[];
   /**
@@ -946,6 +950,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
   const [bezi, setBezi] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
+  const [report, setReport] = useState<"mesiac" | "kvartal" | null>(null);
   useEffect(() => { if (trener === "Terezka") setOtvoreny("otazky"); }, [trener]);
 
   useEffect(() => {
@@ -1124,6 +1129,24 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
           {prekazky.length > 0 && <span style={{ fontSize: 11.5, color: C.textMuted }}>Ešte chýba: {prekazky.join(", ")}.</span>}
         </div>
       )}
+      {/* Report: po zamknutí naostro, predtým ako náhľad (čísla sa ešte môžu
+          zmeniť). Kvartálny len za marec, jún, september a december. */}
+      {(!trener || trener === "Jerry") && reportVstup && (
+        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button style={zamknuty ? hlavne(true) : vedlajsie} onClick={() => setReport("mesiac")}>
+            📄 {zamknuty ? "Report" : "Náhľad reportu"} za {nazovMesiaca(mesiac)}
+          </button>
+          {koniecKvartalu(mesiac) && (
+            <button style={zamknuty ? hlavne(true) : vedlajsie} onClick={() => setReport("kvartal")}>
+              📊 {zamknuty ? "Kvartálny report" : "Náhľad kvartálneho reportu"} Q{kvartalMesiaca(mesiac)} {mesiac.slice(0, 4)}
+            </button>
+          )}
+        </div>
+      )}
+      {report && reportVstup && (() => {
+        const v = reportVstup(mesiac);
+        return <ReportMesiaca report={postavReport(v.mesiace, mesiac, report, v.extra)} nahlad={!zamknuty} onZavri={() => setReport(null)} />;
+      })()}
     </>
   );
 }

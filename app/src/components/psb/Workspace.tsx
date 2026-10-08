@@ -18,6 +18,7 @@ import { Dopyty } from "./Dopyty";
 import { REPORTS, UploadCard } from "./Udaje";
 import { BankaUlozene } from "./BankaUlozene";
 import { BankovyImport } from "./Banka";
+import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { Zosit } from "./Zosit";
 import { Uzavierky } from "./Uzavierky";
 import { HromadnaSprava } from "./HromadnaSprava";
@@ -78,7 +79,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -100,6 +101,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   prekazkyUzavierky?: (mesiac: string) => string[];
   /** Podklady mesiaca pre mesačnú správu — zoznam všetkých mesiacov a zámkov. */
   podkladyUzavierky?: (mesiac: string) => string;
+  /** Vstup mesačného/kvartálneho reportu (App → mesacnyReport.ts). */
+  reportUzavierky?: (mesiac: string) => { mesiace: MesiacReportu[]; extra: ExtraReportu };
   /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
   /**
@@ -1566,6 +1569,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           trener={trenerKroku}
           onZmena={() => oznam("klienti")}
           uploadLog={data.uploadLog}
+          reportVstup={reportUzavierky}
           obsahKroku={(() => {
             const mk = mesiacUzavierky;
             const nahravanie = (co: string, zameranie: "ptminder" | "metricool") => actions ? (

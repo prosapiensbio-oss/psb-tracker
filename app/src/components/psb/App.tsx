@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
-import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, pnlCalc, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
+import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
@@ -95,7 +96,7 @@ import { ZapisButton } from "./Zapis";
 import { mimoWorkspace, ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
-import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
+import { KANALY, MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 import { dnesPraha } from "../../lib/psb/cas";
 import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
 
@@ -2382,6 +2383,49 @@ function skupinaFaktur(
    * opravy v P&L. Presne tie dôvody o rok chýbajú, keď sa človek pozrie na
    * číslo a nevie, prečo je také.
    */
+  /**
+   * Vstup mesačného/kvartálneho reportu (`mesacnyReport.ts`) — z tých istých
+   * zdrojov, ktoré ukazujú obrazovky: P&L z `pnlCalc`, hodiny a klienti zo
+   * sedení, Instagram z `kanaly_mesiace`, reklama z Mety (`spendAds`).
+   */
+  const vstupReportu = useCallback((mk: string): { mesiace: MesiacReportu[]; extra: ExtraReportu } => {
+    const p = pnlCalc();
+    const mesiace: MesiacReportu[] = [];
+    const [y, m] = mk.split("-").map(Number);
+    for (let k = 8; k >= 0; k--) {
+      const mm = new Date(Date.UTC(y, m - 1 - k, 1)).toISOString().slice(0, 7);
+      const i = VZAS_MONTHS.indexOf(mm);
+      const sed = data.sessions.filter((x) => x.date.slice(0, 7) === mm);
+      const ig = (metrika: string) => KANALY.find((r) => r.mesiac === mm && r.kanal === "Instagram" && r.metrika === metrika)?.hodnota;
+      const mkt = MKT_MESACNE.find((r) => r.m === mm);
+      mesiace.push({
+        m: mm,
+        hodiny: sed.reduce((a, x) => a + (x.duration || 60) / 60, 0),
+        aktivni: new Set(sed.map((x) => x.client)).size,
+        novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mm).length,
+        dopyty: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mm).length,
+        prijmy: i >= 0 && p.prijmy[i] ? p.prijmy[i] : undefined,
+        naklady: i >= 0 && p.prijmy[i] ? p.celkoveNaklady[i] : undefined,
+        zisk: i >= 0 && p.prijmy[i] ? p.hrubyZisk[i] : undefined,
+        sledovatelia: ig("Followers"),
+        prirastokIg: ig("Followers balance"),
+        dosahReels: ig("Avg reach per reel"),
+        reklama: mkt?.spendAds,
+      });
+    }
+    const trenovali = new Set(data.sessions.filter((x) => x.date.slice(0, 7) === mk).map((x) => x.client));
+    const odmlcani = Object.values(clients).filter((c) => c.status === "Aktívny" && !trenovali.has(c.name)).length;
+    const vydaje = Object.entries(bankaSumy[mk] || {}).filter(([k]) => !k.startsWith("vyplaty")).sort((a, b) => b[1] - a[1]);
+    return {
+      mesiace,
+      extra: {
+        odmlcani,
+        zositChyba: !hotovostMesiace.has(mk),
+        topVydaj: vydaje[0] ? { nazov: nazovKategorie(vydaje[0][0]), suma: vydaje[0][1] } : undefined,
+      },
+    };
+  }, [data, clients, bankaSumy, hotovostMesiace, mktVerzia]);
+
   const podkladyMesiaca = useCallback((mk: string): string => {
     const r: string[] = [];
     const kc = (n: number | undefined) => (n === undefined ? "—" : `${Math.round(n).toLocaleString("sk-SK")} Kč`);
@@ -2391,9 +2435,14 @@ function skupinaFaktur(
     })();
 
     r.push("== ČÍSLA ==");
-    r.push(`Tržby: ${kc(pnlHodnota("prijmy", mk))} (predchádzajúci mesiac ${kc(pnlHodnota("prijmy", predch))})`);
-    r.push(`Celkové náklady: ${kc(pnlHodnota("celkoveNaklady", mk))}`);
-    r.push(`Hrubý zisk: ${kc(pnlHodnota("hrubyZisk", mk))}`);
+    // pnlHodnota číta položky P&L, nie súčty — „prijmy" v nej nie je
+    // a podklady pre Jarvisa písali pri tržbách aj zisku pomlčku.
+    const pc = pnlCalc();
+    const ix = (k: string) => VZAS_MONTHS.indexOf(k);
+    const zRadu = (rad: number[], k: string) => (ix(k) >= 0 ? rad[ix(k)] : undefined);
+    r.push(`Tržby: ${kc(zRadu(pc.prijmy, mk))} (predchádzajúci mesiac ${kc(zRadu(pc.prijmy, predch))})`);
+    r.push(`Celkové náklady: ${kc(zRadu(pc.celkoveNaklady, mk))}`);
+    r.push(`Hrubý zisk: ${kc(zRadu(pc.hrubyZisk, mk))}`);
 
     const sedeniaMes = data.sessions.filter((x) => x.date.slice(0, 7) === mk);
     const hodinyMes = sedeniaMes.reduce((a, x) => a + x.duration / 60, 0);
@@ -2970,7 +3019,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
 
         {active === "jarvis" && (
           <JarvisOkno
