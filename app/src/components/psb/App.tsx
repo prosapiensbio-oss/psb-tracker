@@ -96,7 +96,7 @@ import { ZapisButton } from "./Zapis";
 import { mimoWorkspace, ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
-import { KANALY, MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
+import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 import { dnesPraha } from "../../lib/psb/cas";
 import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
 
@@ -2392,16 +2392,28 @@ function skupinaFaktur(
     const p = pnlCalc();
     const mesiace: MesiacReportu[] = [];
     const [y, m] = mk.split("-").map(Number);
-    for (let k = 8; k >= 0; k--) {
-      const mm = new Date(Date.UTC(y, m - 1 - k, 1)).toISOString().slice(0, 7);
+    // 12 mesiacov: priemer šiestich pred mesiacom aj troch štvrťrokov pred kvartálom.
+    const kluceMes = Array.from({ length: 13 }, (_, k) => new Date(Date.UTC(y, m - 1 - (12 - k), 1)).toISOString().slice(0, 7));
+    const klientiMes = (mm: string) => new Set(data.sessions.filter((x) => x.date.slice(0, 7) === mm).map((x) => x.client));
+    for (const mm of kluceMes.slice(1)) {
       const i = VZAS_MONTHS.indexOf(mm);
       const sed = data.sessions.filter((x) => x.date.slice(0, 7) === mm);
-      const ig = (metrika: string) => KANALY.find((r) => r.mesiac === mm && r.kanal === "Instagram" && r.metrika === metrika)?.hodnota;
+      const kanal = (k: string, metrika: string) => KANALY.find((r) => r.mesiac === mm && r.kanal === k && r.metrika === metrika)?.hodnota;
+      const ig = (metrika: string) => kanal("Instagram", metrika);
       const mkt = MKT_MESACNE.find((r) => r.m === mm);
+      const predKlienti = klientiMes(kluceMes[kluceMes.indexOf(mm) - 1]);
+      const terazKlienti = klientiMes(mm);
+      const hodinyTrenera = (t: string) => sed.filter((x) => (x.sessionTrainer || "").toLowerCase().startsWith(t)).reduce((a, x) => a + (x.duration || 60) / 60, 0);
       mesiace.push({
         m: mm,
         hodiny: sed.reduce((a, x) => a + (x.duration || 60) / 60, 0),
-        aktivni: new Set(sed.map((x) => x.client)).size,
+        aktivni: terazKlienti.size,
+        prestali: [...predKlienti].filter((c) => !terazKlienti.has(c)).length,
+        hodinyJerry: hodinyTrenera("jerry"),
+        hodinyTerezka: hodinyTrenera("terez"),
+        vyplaty: i >= 0 && p.prijmy[i] ? p.vyplatySpolu[i] : undefined,
+        googleTrasy: kanal("Google Business", "Directions"),
+        googleWeb: kanal("Google Business", "Website clicks"),
         novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mm).length,
         dopyty: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mm).length,
         prijmy: i >= 0 && p.prijmy[i] ? p.prijmy[i] : undefined,
@@ -2422,12 +2434,18 @@ function skupinaFaktur(
     const spolu: Record<string, number> = {};
     for (const o of obdobie) for (const [k, v] of Object.entries(bankaSumy[o] || {})) spolu[k] = (spolu[k] || 0) + v;
     const vydaje = Object.entries(spolu).filter(([k]) => !k.startsWith("vyplaty")).sort((a, b) => b[1] - a[1]);
+    const zdroje: Record<string, number> = {};
+    for (const l of data.leads || []) if (obdobie.includes((l.date || "").slice(0, 7))) zdroje[l.source || "ine"] = (zdroje[l.source || "ine"] || 0) + 1;
+    const NAZOV_ZDROJA: Record<string, string> = { referencia: "odporúčanie", reklama: "reklama", mail: "mail", web: "web", google: "Google", instagram: "Instagram", instagram_osobny: "Instagram (osobný)", telefon: "telefón", ine: "iné" };
+    const reels = MKT_TOP.filter((r) => r.typ === "reel" && obdobie.includes(r.m)).sort((a, b) => b.views - a.views);
     return {
       mesiace,
       extra: {
         odmlcani,
         zositChyba: obdobie.some((o) => !hotovostMesiace.has(o)),
-        topVydaj: vydaje[0] ? { nazov: nazovKategorie(vydaje[0][0]), suma: vydaje[0][1] } : undefined,
+        topVydaje: vydaje.slice(0, 3).map(([k, v]) => ({ nazov: nazovKategorie(k), suma: v })),
+        zdroje: Object.entries(zdroje).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({ zdroj: NAZOV_ZDROJA[z] || z, pocet: n })),
+        najlepsiReel: reels[0] ? { hook: reels[0].hook, views: reels[0].views } : undefined,
       },
     };
   }, [data, clients, bankaSumy, hotovostMesiace, mktVerzia]);

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
-import type { OtazkaReportu, Report } from "../../lib/psb/mesacnyReport";
+import { reportNaMarkdown, type OtazkaReportu, type Report } from "../../lib/psb/mesacnyReport";
+import { stlpcovyGraf, FARBY } from "../../lib/psb/reportGrafy";
+import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -60,16 +62,6 @@ function Otazka({ o, kvartal }: { o: OtazkaReportu; kvartal: boolean }) {
           <h3 style={{ margin: 0, fontSize: 17, color: C.text }}>{o.otazka}</h3>
         </div>
         <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.55, opacity: 0.92 }}>{o.odpoved}</div>
-        {o.cisla.length > 0 && (
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 12 }}>
-            {o.cisla.map((c, i) => (
-              <div key={i}>
-                <div style={{ fontSize: 17, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{c.hodnota}</div>
-                <div style={{ fontSize: 11.5, color: C.textMuted }}>{c.popis}</div>
-              </div>
-            ))}
-          </div>
-        )}
         <div style={{ marginTop: 14, background: mix(C.orange, 12), border: `1px solid ${mix(C.orange, 35)}`, borderRadius: 12, padding: "10px 12px", fontSize: 13, lineHeight: 1.5, color: C.text }}>
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".07em", color: C.orange, fontWeight: 700, marginBottom: 3 }}>Urob</div>
           {o.akcia}
@@ -84,8 +76,56 @@ function Otazka({ o, kvartal }: { o: OtazkaReportu; kvartal: boolean }) {
         <span style={{ display: "inline-block", marginTop: 7, fontSize: 12, fontWeight: 650, padding: "2px 9px", borderRadius: 10, color: smer, background: mix(smer, 14) }}>{o.hlavne.zmena}</span>
         <Krivka seria={o.hlavne.seria} popis={o.hlavne.popisSerie} farba={farba} stlpce={kvartal} />
       </div>
+      {/* Najdôležitejšie čísla oblasti proti priemeru (Jerry, 8. 10. 2026:
+          „meriame veľa vecí, chcem vidieť to najdôležitejšie"). */}
+      {(o.detail.length > 0 || o.zoznamy.length > 0) && (
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: o.zoznamy.length ? "minmax(0, 3fr) minmax(0, 2fr)" : "1fr", gap: 16 }} className="psb-report-otazka">
+          {o.detail.length > 0 && (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ color: C.textDim, fontSize: 11 }}>
+                  <th style={{ textAlign: "left", fontWeight: 600, padding: "4px 6px" }} />
+                  <th style={{ textAlign: "right", fontWeight: 600, padding: "4px 6px" }}>Toto obdobie</th>
+                  <th style={{ textAlign: "right", fontWeight: 600, padding: "4px 6px" }}>Priemer</th>
+                  <th style={{ textAlign: "right", fontWeight: 600, padding: "4px 6px" }}>Rozdiel</th>
+                </tr>
+              </thead>
+              <tbody>
+                {o.detail.map((d) => (
+                  <tr key={d.metrika} style={{ borderTop: `1px solid ${mix(C.border, 60)}` }}>
+                    <td style={{ padding: "5px 6px", color: C.textMuted }}>{d.metrika}</td>
+                    <td style={{ padding: "5px 6px", textAlign: "right", color: C.text, fontWeight: 650, fontVariantNumeric: "tabular-nums" }}>{d.hodnota}</td>
+                    <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{d.priemer}</td>
+                    <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 600, color: d.dobre === undefined ? C.textMuted : d.dobre ? C.green : C.red, whiteSpace: "nowrap" }}>{d.rozdiel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {o.zoznamy.length > 0 && (
+            <div style={{ display: "grid", gap: 10, alignContent: "start" }}>
+              {o.zoznamy.map((z) => (
+                <div key={z.nadpis}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: C.textDim, fontWeight: 650, marginBottom: 4 }}>{z.nadpis}</div>
+                  {z.polozky.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{p}</div>)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Tlač do PDF — ten istý report ako markdown so stĺpcovými grafmi (`vytlacReport`). */
+function tlac(report: Report) {
+  const grafy: Record<string, string> = {};
+  for (const o of report.otazky) {
+    if (o.hlavne.seria.length < 2) continue;
+    grafy[o.id] = stlpcovyGraf({ popisky: o.hlavne.popisSerie, serie: [{ nazov: o.hlavne.jednotka, farba: FARBY.hlavna, hodnoty: o.hlavne.seria.map((v) => Math.round(v)) }], vyska: 170 });
+  }
+  vytlacReport(reportNaMarkdown(report), report.druh === "kvartal" ? `Kvartálny report ${report.nadpis}` : report.nadpis, grafy);
 }
 
 export function ReportMesiaca({ report, nahlad, onZavri }: { report: Report; nahlad: boolean; onZavri: () => void }) {
@@ -105,13 +145,14 @@ export function ReportMesiaca({ report, nahlad, onZavri }: { report: Report; nah
           <span style={{ fontSize: 13, color: C.textMuted }}>{report.porovnanie}</span>
           {nahlad && <span style={{ fontSize: 11.5, color: C.orange, border: `1px solid ${mix(C.orange, 45)}`, borderRadius: 10, padding: "2px 8px" }}>náhľad — mesiac ešte nie je zamknutý</span>}
           <span style={{ marginLeft: "auto" }} />
+          <button onClick={() => tlac(report)} style={{ background: mix(C.green, 14), border: `1px solid ${mix(C.green, 45)}`, color: C.green, borderRadius: 9, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 650 }}>🖨 Tlačiť / PDF</button>
           <button onClick={onZavri} style={{ background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: 9, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Zavrieť</button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           {report.otazky.map((o) => <Otazka key={o.id} o={o} kvartal={report.druh === "kvartal"} />)}
         </div>
         <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 14, lineHeight: 1.5 }}>
-          Zisk je z P&L Kokpitu, hodiny a klienti zo sedení, Instagram z Metricoolu, reklama z Mety. Semafor porovnáva s {report.druh === "kvartal" ? "minulým štvrťrokom" : "priemerom posledných šiestich mesiacov"}.
+          Zisk je z P&L Kokpitu, hodiny a klienti zo sedení, Instagram z Metricoolu, reklama z Mety. Všetky porovnania sú s priemerom ({report.porovnanie.replace("proti priemeru ", "")}), nie s predošlým obdobím.
         </div>
       </div>
     </div>
