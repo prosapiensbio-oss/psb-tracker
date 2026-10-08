@@ -1577,7 +1577,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
             return {
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
-              metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`, "metricool"),
+              // Bežne stačí zelené tlačidlo v riadku kroku (Metricool cez MCP,
+              // 8. 10. 2026); ručný export ostáva ako záloha.
+              metricool: nahravanie(`Záloha, keď tlačidlo „Stiahnuť mesiac z Metricoolu“ nejde: pretiahni sem export za ${mk} (CSV príspevkov alebo mesačný PDF report).`, "metricool"),
               // Pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026). Sťahuje sa
               // zeleným tlačidlom v riadku kroku; druhý import s dátumami bol
               // to isté ešte raz, tak je schovaný za odkazom (7. 10. 2026).

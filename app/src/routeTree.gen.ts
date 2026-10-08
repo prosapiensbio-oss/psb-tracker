@@ -56,6 +56,8 @@ import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiObrazokPromptRouteImport } from './routes/api/obrazok-prompt'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiNapadObrazokRouteImport } from './routes/api/napad-obrazok'
+import { Route as ApiMetricoolSpatRouteImport } from './routes/api/metricool-spat'
+import { Route as ApiMetricoolRouteImport } from './routes/api/metricool'
 import { Route as ApiMetaMediaRouteImport } from './routes/api/meta-media'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
@@ -325,6 +327,16 @@ const ApiNapadObrazokRoute = ApiNapadObrazokRouteImport.update({
   path: '/api/napad-obrazok',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetricoolSpatRoute = ApiMetricoolSpatRouteImport.update({
+  id: '/api/metricool-spat',
+  path: '/api/metricool-spat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetricoolRoute = ApiMetricoolRouteImport.update({
+  id: '/api/metricool',
+  path: '/api/metricool',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetaMediaRoute = ApiMetaMediaRouteImport.update({
   id: '/api/meta-media',
   path: '/api/meta-media',
@@ -529,6 +541,8 @@ export interface FileRoutesByFullPath {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/metricool': typeof ApiMetricoolRoute
+  '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
@@ -611,6 +625,8 @@ export interface FileRoutesByTo {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/metricool': typeof ApiMetricoolRoute
+  '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
@@ -694,6 +710,8 @@ export interface FileRoutesById {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/metricool': typeof ApiMetricoolRoute
+  '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
@@ -778,6 +796,8 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/metricool'
+    | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
@@ -860,6 +880,8 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/metricool'
+    | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
@@ -942,6 +964,8 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/metricool'
+    | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
@@ -1025,6 +1049,8 @@ export interface RootRouteChildren {
   ApiMeraniaRoute: typeof ApiMeraniaRoute
   ApiMetaRoute: typeof ApiMetaRoute
   ApiMetaMediaRoute: typeof ApiMetaMediaRoute
+  ApiMetricoolRoute: typeof ApiMetricoolRoute
+  ApiMetricoolSpatRoute: typeof ApiMetricoolSpatRoute
   ApiNapadObrazokRoute: typeof ApiNapadObrazokRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiObrazokPromptRoute: typeof ApiObrazokPromptRoute
@@ -1400,6 +1426,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNapadObrazokRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/metricool-spat': {
+      id: '/api/metricool-spat'
+      path: '/api/metricool-spat'
+      fullPath: '/api/metricool-spat'
+      preLoaderRoute: typeof ApiMetricoolSpatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/metricool': {
+      id: '/api/metricool'
+      path: '/api/metricool'
+      fullPath: '/api/metricool'
+      preLoaderRoute: typeof ApiMetricoolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/meta-media': {
       id: '/api/meta-media'
       path: '/api/meta-media'
@@ -1683,6 +1723,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeraniaRoute: ApiMeraniaRoute,
   ApiMetaRoute: ApiMetaRoute,
   ApiMetaMediaRoute: ApiMetaMediaRoute,
+  ApiMetricoolRoute: ApiMetricoolRoute,
+  ApiMetricoolSpatRoute: ApiMetricoolSpatRoute,
   ApiNapadObrazokRoute: ApiNapadObrazokRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiObrazokPromptRoute: ApiObrazokPromptRoute,
