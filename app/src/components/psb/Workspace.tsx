@@ -646,12 +646,53 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (idx >= 0) setI(idx);
   };
 
+  /** Čo sa dá vrátiť klávesou ⌘Z — vždy len posledné odoslanie. */
+  const [krokSpat, setKrokSpat] = useState<{ kluc: string; id: string; popis: string } | null>(null);
+  const [vratene, setVratene] = useState("");
+
+  const vratKrok = useCallback(async () => {
+    if (!krokSpat) return;
+    const k = krokSpat;
+    setKrokSpat(null);
+    const j = await posli("/api/kalendar", { akcia: "vrat", id: k.id }).catch(() => ({ ok: false, error: "spojenie" }));
+    if (!j.ok) { setChyba(j.error || "vrátiť sa to nepodarilo"); setKrokSpat(k); return; }
+    setHotove((s) => { const n = new Set(s); n.delete(k.kluc); return n; });
+    setVratene("Vrátené — riadok je zase v zozname.");
+    setTimeout(() => setVratene(""), 4000);
+    oznam("kalendar");
+    void nacitaj();
+  }, [krokSpat, nacitaj, oznam, posli]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      // V rozpísanom texte patrí ⌘Z písaniu, nie appke.
+      if (t && (t.isContentEditable || /^(input|textarea)$/i.test(t.tagName))) return;
+      if (!krokSpat) return;
+      e.preventDefault();
+      void vratKrok();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [krokSpat, vratKrok]);
+
   const vybav = async (kluc: string, url: string, telo: Record<string, unknown>) => {
     setPracujem(kluc); setChyba("");
     const j = await posli(url, telo).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem("");
     if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
     setHotove((s) => new Set([...s, kluc]));
+    /**
+     * KROK SPÄŤ PO ODOSLANÍ (Jerry, 8. 10. 2026: „potrebujem aj cmd+z, keby
+     * som to odoslal príliš unáhlene"). Vracať sa dá to, čo appka vie
+     * naozaj vrátiť — zatiaľ vysvetlená zmena v kalendári (akcia `vrat`,
+     * ktorá existuje od 25. 9.). Pamätá si LEN posledný krok: hlbšia
+     * história by sľubovala vrátenie aj tam, kde ho server nemá.
+     */
+    if (telo.akcia === "vysvetli" && telo.id) {
+      setKrokSpat({ kluc, id: String(telo.id), popis: String(telo.poznamka || "").trim() });
+    }
     // Register na Dnes drží vlastnú kópiu kalendára — bez oznámenia by
     // vybavená zmena svietila ďalej (kontrola 24. 9. 2026).
     oznam(url.includes("platby") ? "peniaze" : "kalendar");
@@ -1002,7 +1043,23 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         </button>
                       ))}
                     </div>
-                    <input value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="alebo vlastnými slovami…" style={vstup(false)} />
+                    {/* Enter odošle — Jerry, 8. 10. 2026: „keď odpíšem, nedá
+                        sa mi enterom potvrdiť to, čo som napísal." Ruka, ktorá
+                        práve dopísala vetu, je na klávesnici, nie na myši. */}
+                    <input
+                      value={t}
+                      onChange={(e) => nastavText(kluc, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" || pracujem === kluc) return;
+                        e.preventDefault();
+                        // Kurzor z políčka von, inak by ⌘Z hneď po odoslaní
+                        // vrátilo napísané písmená, nie odoslanú odpoveď.
+                        e.currentTarget.blur();
+                        void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: t.trim() });
+                      }}
+                      placeholder="alebo vlastnými slovami… (Enter odošle)"
+                      style={vstup(false)}
+                    />
                     {/* „Vybavené" sa dá stlačiť VŽDY, aj bez dôvodu.
                         Jerry, 23. 9. 2026: „nabehnem myšou na Vybavené a
                         ukáže sa prečiarknutý kruh." Ukazoval sa preto, že
@@ -1802,6 +1859,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               </div>
             )}
             {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}
+            {/* Krok späť musí byť VIDNO — klávesová skratka, o ktorej nikto
+                nevie, neexistuje. Zmizne, len čo sa odošle niečo ďalšie. */}
+            {vratene && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{vratene}</div>}
+            {krokSpat && !vratene && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, color: C.textMuted }}>
+                <span>Odoslané{krokSpat.popis ? `: „${krokSpat.popis}"` : ""}.</span>
+                <button
+                  onClick={() => void vratKrok()}
+                  style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "3px 9px", fontFamily: "inherit", fontSize: 12, color: C.accentLight, cursor: "pointer" }}
+                >
+                  Späť (⌘Z)
+                </button>
+              </div>
+            )}
             {hlaska && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{hlaska}</div>}
               </>
             )}
