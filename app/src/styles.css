@@ -131,7 +131,7 @@
   --c-accentBg: #6b8c421f;
   --c-text: #e0dcc8;         /* teplý krémový */
   --c-textMuted: #aaa995;
-  --c-textDim: #7c7e68;
+  --c-textDim: #90927b;
   --c-red: #c25b44;
   --c-redBg: #c25b4422;
   --c-orange: #d4a04a;       /* slnko — teplé varovanie */
@@ -156,8 +156,8 @@
   --c-accentLight: #456127;  /* tmavá zeleň pre čísla/nadpisy na svetlom */
   --c-accentBg: #5e7c381a;
   --c-text: #2c3524;         /* mokrý mach */
-  --c-textMuted: #6b7560;    /* tieň pod stromom */
-  --c-textDim: #8a9280;
+  --c-textMuted: #575f4e;    /* tieň pod stromom */
+  --c-textDim: #646a5b;
   --c-red: #b0503c;
   --c-redBg: #b0503c1a;
   --c-orange: #b9821f;
@@ -182,8 +182,8 @@
   --c-accentLight: #aacb78;
   --c-accentBg: #7ba24c22;
   --c-text: #e8e5d6;
-  --c-textMuted: #b4b79e;
-  --c-textDim: #8a907a;
+  --c-textMuted: #c7c9b6;
+  --c-textDim: #b5b9ab;
   --c-red: #d0715a;
   --c-redBg: #d0715a22;
   --c-orange: #e0b05a;
@@ -228,7 +228,7 @@
   --c-accentBg: #e2914e1f;
   --c-text: #f0eee2;
   --c-textMuted: #c0bda8;
-  --c-textDim: #867f68;
+  --c-textDim: #9b957f;
   --c-red: #e2604a;
   --c-redBg: #e2604a22;
   /* Varovná farba je zámerne SVETLEJŠIA než akcent. Špecifikácia ponúka
@@ -263,8 +263,8 @@
   --c-accentLight: #f7c186;
   --c-accentBg: #f0a55e22;
   --c-text: #faf8ee;
-  --c-textMuted: #ecdec0;
-  --c-textDim: #c2b48f;
+  --c-textMuted: #f5eddc;
+  --c-textDim: #e2dbc9;
   --c-red: #f27a5c;
   --c-redBg: #f27a5c26;
   --c-orange: #f0c26e;
@@ -295,7 +295,7 @@
   --c-accentBg: #b5691f1a;
   --c-text: #242018;
   --c-textMuted: #5c5442;
-  --c-textDim: #8f8770;
+  --c-textDim: #79725f;
   --c-red: #c14328;
   --c-redBg: #c1432814;
   --c-orange: #a5701f;

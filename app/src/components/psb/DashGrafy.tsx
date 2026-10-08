@@ -303,7 +303,7 @@ export function GrafyKniznica({
                         {VYCHODZIE.has(w.id) && <span style={{ fontSize: 10, color: mix(C.accent, 85), fontWeight: 600 }}> · hlavný</span>}
                       </span>
                       <span style={{ display: "block", fontSize: 11.5, color: C.textDim, marginTop: 2, lineHeight: 1.45 }}>
-                        {w.popis}{w.doma && <span style={{ color: mix(C.textDim, 80) }}> · doma v: {w.doma}</span>}
+                        {w.popis}{w.doma && <span style={{ color: C.textDim }}> · doma v: {w.doma}</span>}
                       </span>
                     </span>
                   </button>

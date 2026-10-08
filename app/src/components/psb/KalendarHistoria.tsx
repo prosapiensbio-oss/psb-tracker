@@ -158,7 +158,7 @@ export function KalendarHistoria() {
                     <div key={t.trener} style={{ display: "flex", gap: 10, fontSize: 11.5, padding: "2px 0", fontVariantNumeric: "tabular-nums", color: C.textDim }}>
                       <span style={{ flex: 1 }}>
                         {t.trener}
-                        <span style={{ color: mix(C.textDim, 140) }}> · {t.klientiExport} / {t.klientiVlastne} klientov</span>
+                        <span style={{ color: C.textDim }}> · {t.klientiExport} / {t.klientiVlastne} klientov</span>
                       </span>
                       <span style={{ width: 78, textAlign: "right" }}>{t.treningyExport} · {t.hodinyExport} h</span>
                       <span style={{ width: 78, textAlign: "right" }}>{t.treningyVlastne} · {t.hodinyVlastne} h</span>

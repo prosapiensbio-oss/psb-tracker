@@ -251,7 +251,7 @@ function ZmenyRiadok({ ts, zmeny }: { ts: number; zmeny: Zmena[] }) {
         const dobre = rozdiel > 0 === z.dobreHore;
         return (
           <span key={i} style={{ fontSize: 11.5, color: C.textMuted, whiteSpace: "nowrap" }}>
-            {i > 0 && <span style={{ color: mix(C.textDim, 60), marginRight: 8 }}>·</span>}
+            {i > 0 && <span style={{ color: C.textDim, marginRight: 8 }}>·</span>}
             {z.label}{" "}
             <strong style={{ color: dobre ? C.green : C.orange }}>
               {rozdiel > 0 ? "+" : "−"}{z.fmt(Math.abs(rozdiel))}
@@ -291,7 +291,7 @@ function Pasmo({ titulok, popis, deti }: { titulok: string; popis: string; deti:
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 6px" }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>{titulok}</span>
-        <span style={{ fontSize: 10.5, color: mix(C.textDim, 75) }}>{popis}</span>
+        <span style={{ fontSize: 11, color: C.textDim }}>{popis}</span>
         <div style={{ flex: 1, height: 1, background: mix(C.border, 50) }} />
       </div>
       {deti}
