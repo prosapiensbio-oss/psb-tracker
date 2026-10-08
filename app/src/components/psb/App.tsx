@@ -2438,7 +2438,8 @@ function skupinaFaktur(
         prestali: [...predKlienti].filter((c) => !terazKlienti.has(c)).length,
         hodinyJerry: hodinyTrenera("jerry"),
         hodinyTerezka: hodinyTrenera("terez"),
-        vyplaty: i >= 0 && p.prijmy[i] ? p.vyplatySpolu[i] : undefined,
+        // Len zakladatelia — `vyplatySpolu` nesie aj Matyášovu mzdu (DPP), a tá je náklad prevádzky.
+        vyplaty: i >= 0 && p.prijmy[i] ? (p.poslaneJerry[i] || 0) + (p.poslaneTerezka[i] || 0) : undefined,
         breakEven: i >= 0 && p.prijmy[i] ? be[i] : undefined,
         apps: i >= 0 ? appsKluce.reduce((a, k) => a + (pnlHodnota(k, mm) || 0), 0) : undefined,
         ai: i >= 0 ? pnlHodnota("fixne.apps.ai", mm) : undefined,
