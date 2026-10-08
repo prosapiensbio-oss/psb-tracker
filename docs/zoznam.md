@@ -210,6 +210,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Odpočet hodín na stránke klienta — tri návrhy, čaká sa na A/B/C.** `navrhy-kokpitu/odpocet-hodin.html` (Vaškove skutočné čísla). A = rad pod sebou (beží teraz), B = pás hodín (balíček ako šesť políčok), C = dve kôpky (z balíčka / nad balíček). Hotové nezávisle od voľby: „Nezaplaceno" namiesto „Nad rámec", červená (5,2 : 1 na zelenom), preč s listovaním do strany aj s druhým rozbaľovaním.
+- **Faktúra 20261001 (Martin Vaško, 7 790 Kč) je o 800 Kč vyššia než jeho předplatné.** Doklad už odišiel klientovi. Príčina opravená 8. 10. (klik na popis prepisoval sumu), ale samotná faktúra je vystavená — rozhodni, či sa má stornovať a vystaviť nová na 6 990 Kč, alebo nechať tak. Ostatné faktúry so svojím balíčkom sedia (overené na všetkých nestornovaných).
+
 - **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, overené naostro 8. 10.** (Workspace → Kalendár → Firma, ‹ ‹ › a Alt+← vrátia presne poradie). Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
 
 - **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
