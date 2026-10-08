@@ -47,9 +47,6 @@ hlava = hlava[:hlava.index("let nalezov = 0;")]
 if "navrhNovehoBalicka" not in hlava:
     hlava = hlava.replace('import { deriveClients }',
         'import { navrhNovehoBalicka } from "../src/lib/psb/workspaceKroky";\nimport { deriveClients }', 1)
-if "const druhyTreningov" not in hlava:
-    i = hlava.index("const doplneniaHodiny = Object.fromEntries(")
-    hlava = hlava[:i] + 'const druhyTreningov = Object.fromEntries(\n  nacitaj("druhy").map((r: any) => [`${r.klient}|${den(r.den)}`, String(r.druh || "")]),\n);\n' + hlava[i:]
 telo = open("scripts/nasucho-telo.ts", encoding="utf-8").read()
 # Hlavička žije v scripts/, generovaný súbor inde — cesty k src/ musia sedieť.
 koren = os.path.abspath("src")

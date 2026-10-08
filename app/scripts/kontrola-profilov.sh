@@ -61,5 +61,8 @@ stiahni balicky    "SELECT id,klient,nazov,hodiny,platnost_od,platnost_do,cena_c
 # Tie isté vstupy osi ako v loadData — bez nich kontrolór počíta inak než appka.
 stiahni historia   "SELECT klient,nazov,druh,stav,hodiny,zostatok,od,do,pridane,platba FROM ptminder_historia"
 stiahni doplnenia  "SELECT klient,den,hodiny FROM doplnenia_hodiny"
+# Ručne určený druh tréningu (úvodný ↔ bežný) — bez neho kontrolór počíta
+# inú os než appka: úvodný si nesie vlastnú hodinu.
+stiahni druhy      "SELECT klient,den,druh FROM trening_druh"
 
 bun run scripts/kontrola-profilov.ts

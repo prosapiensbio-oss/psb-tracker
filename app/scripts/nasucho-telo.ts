@@ -11,7 +11,7 @@ const zoznamNavrhov: { name: string; zostatok: number | null }[] = (Object.value
 console.log(`aktívnych klientov: ${zoznamNavrhov.length}\n`);
 let navrhov = 0;
 for (const c of zoznamNavrhov) {
-  const os = osi.get(c.name) || osCasuKlienta(c.name, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny, druhyTreningov } as never, DNES);
+  const os = osi.get(c.name) || [];
   const { stavy } = priebehBalickov(os, c.zostatok, DNES);
   const k = normName(c.name);
   const ceny = [
@@ -33,7 +33,7 @@ console.log(`\nspolu ${navrhov} návrhov`);
  */
 const navrhy: any[] = [];
 for (const c of zoznamNavrhov) {
-  const os = osi.get(c.name) || osCasuKlienta(c.name, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny, druhyTreningov } as never, DNES);
+  const os = osi.get(c.name) || [];
   const { stavy } = priebehBalickov(os, c.zostatok, DNES);
   const k = normName(c.name);
   const ceny = [

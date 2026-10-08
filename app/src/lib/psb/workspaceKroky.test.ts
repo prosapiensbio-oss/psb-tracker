@@ -156,3 +156,27 @@ describe("úvodný tréning je vlastný balíček", () => {
     expect(navrhNovehoBalicka("Kto Vie", os, stavy)).toBe(null);
   });
 });
+
+describe("úvodný v deň, keď začína bežný balíček", () => {
+  // Luky Kríž: prvý tréning 28. 9. a v ten istý deň kúpených 6 h. Keď Jerry
+  // ten tréning prepne na úvodný, hodina nesmie padnúť zo šiestich — úvodný
+  // si nesie svoju vlastnú (Jerry, 8. 10. 2026).
+  const os = [
+    { druh: "trening", den: "2026-09-28", cas: "14:00", uvodny: true },
+    { druh: "balicekOd", den: "2026-09-28", nazov: "OFF - 6h BEZ viazanosti", hodin: 6 },
+  ] as never[];
+
+  it("úvodný balíček vznikne, aj keď je deň krytý", () => {
+    const stavy = new Map([[os[0], { zostatok: 6, dlh: null, usek: "2026-09-28" }]]) as never;
+    const n = navrhNovehoBalicka("Luky Kríž", os, stavy);
+    expect(n?.nazov).toBe("Úvodní trénink");
+    expect(n?.cena).toBe(1100);
+    expect(n?.odDna).toBe("2026-09-28");
+  });
+
+  it("druhý raz už nevznikne — úvodný balíček ten deň má", () => {
+    const sBalickom = [...os, { druh: "balicekOd", den: "2026-09-28", nazov: "Úvodní trénink", hodin: 1 }] as never[];
+    const stavy = new Map([[sBalickom[0], { zostatok: 7, dlh: null, usek: "2026-09-28" }]]) as never;
+    expect(navrhNovehoBalicka("Luky Kríž", sBalickom, stavy)).toBe(null);
+  });
+});

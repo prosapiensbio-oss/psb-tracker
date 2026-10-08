@@ -63,6 +63,9 @@ const historiaBalickov = nacitaj("historia").map((r: any) => ({
   added: r.pridane || "", validFrom: r.od || "", validTo: r.do || "",
   payment: r.platba ?? undefined, kind: r.druh, stav: r.stav || undefined,
 }));
+const druhyTreningov = Object.fromEntries(
+  nacitaj("druhy").map((r: any) => [`${r.klient}|${den(r.den)}`, String(r.druh || "")]),
+);
 const doplneniaHodiny = Object.fromEntries(
   nacitaj("doplnenia").map((r: any) => [`${r.klient}|${den(r.den)}`, Number(r.hodiny) || 0]),
 );
@@ -153,7 +156,7 @@ const kalUdalosti = kal.filter((r: any) => String(r.zaciatok).slice(0, 16) <= te
   .map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
 const osi = new Map<string, Udalost[]>();
 for (const m of mena) {
-  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny } as never, DNES));
+  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny, druhyTreningov } as never, DNES));
 }
 
 let nalezov = 0;

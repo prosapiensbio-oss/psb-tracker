@@ -113,9 +113,6 @@ export function navrhNovehoBalicka(
     // odpočet (`buduca`) siaha len po hodiny posledného balíčka, mínus ďalej.
     return nezaplateneOd.has(st.usek) ? (st.dlh != null && st.buduca == null) : (st.buduca != null || st.dlh != null);
   });
-  if (!nekryte.length) return null;
-  const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
-
   /**
    * ÚVODNÝ TRÉNING JE VLASTNÝ BALÍČEK (Jerry, 8. 10. 2026).
    *
@@ -126,23 +123,34 @@ export function navrhNovehoBalicka(
    * Stojí PRED hľadaním predošlého balíčka: nový klient žiadny nemá, takže
    * dovtedy mu nevzniklo nič a úvodný visel v dochádzke bez peňazí. Jedna
    * hodina za cenu úvodného — tréning ju hneď minie a zostatok sedí na nule.
+   *
+   * A NEPOZERÁ SA, ČI JE TEN DEŇ UŽ KRYTÝ. Luky Kríž kúpil 6 h v ten istý
+   * deň, čo trénoval prvýkrát; keď ten tréning Jerry prepne na úvodný, hodina
+   * nemá padnúť zo šiestich — úvodný si nesie svoju vlastnú. Preto stačí, že
+   * úvodný balíček na ten deň ešte neexistuje. Len v POSLEDNOM období:
+   * staršie úvodné sú minulosť a appka do nej sama nepíše.
    */
-  const uvodnyNekryty = nekryte.find((u) => u.druh === "trening" && u.uvodny);
-  if (uvodnyNekryty) {
+  const maUvodnyBalicek = (d: string) => os.some((u) => u.druh === "balicekOd" && u.den === d && u.nazov === NAZOV_UVODNEHO);
+  const uvodny = os.find((u) => u.druh === "trening" && u.uvodny
+    && stavy.get(u)?.usek === posledneObdobie && !maUvodnyBalicek(u.den));
+  if (uvodny) {
     return {
       klient,
-      odDna: uvodnyNekryty.den,
+      odDna: uvodny.den,
       nekrytych: 1,
       nazov: NAZOV_UVODNEHO,
       hodiny: 1,
       cena: UVODNY.cenaCzk,
-      platnostDo: uvodnyNekryty.den,
+      platnostDo: uvodny.den,
       predosly: null,
       navrat: false,
       pauzaDni: -1,
       cenaPoznamka: undefined,
     };
   }
+
+  if (!nekryte.length) return null;
+  const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
 
   const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> =>
     u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna);
