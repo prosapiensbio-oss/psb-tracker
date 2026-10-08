@@ -139,10 +139,17 @@ function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
  * Riadok tabuľky: hodnota obdobia proti priemeru histórie.
  * `vyssieJeLepsie` určuje farbu (pri nákladoch je viac horšie).
  */
-function riadok(metrika: string, akt: number | undefined, hist: (number | undefined)[], format: (n: number) => string, vyssieJeLepsie = true): RiadokDetailu | null {
+function riadok(metrika: string, akt: number | undefined, hist: (number | undefined)[], format: (n: number) => string, vyssieJeLepsie = true, vBodoch = false): RiadokDetailu | null {
   if (akt === undefined || !Number.isFinite(akt)) return null;
   const h = definovane(hist).filter((x) => Number.isFinite(x));
   const p = h.length ? priemer(h) : undefined;
+  // Percentá (marža, konverzia) sa porovnávajú v percentuálnych bodoch —
+  // „marža 26 % je o 465 % nad priemerom" nič nehovorí.
+  if (vBodoch && p !== undefined) {
+    const b = Math.round(akt - p);
+    const smer = Math.abs(b) < 1 ? "rovno" : b > 0 ? "hore" : "dole";
+    return { metrika, hodnota: format(akt), priemer: format(p), rozdiel: smer === "rovno" ? "≈" : `${b > 0 ? "▲ +" : "▼ "}${b} p. b.`, smer, dobre: smer === "rovno" ? undefined : (smer === "hore") === vyssieJeLepsie };
+  }
   const z = protiPriemeru(akt, p);
   const rozdiel = z.zmena.replace(" priemerom", "").replace("ako priemer", "≈").replace("bez priemeru", "—");
   return { metrika, hodnota: format(akt), priemer: p === undefined ? "—" : format(p), rozdiel, smer: z.smer, dobre: z.smer === "rovno" ? undefined : (z.smer === "hore") === vyssieJeLepsie };
@@ -245,7 +252,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
         riadok("Tržby", akt.prijmy, h("prijmy"), kcF),
         riadok("Náklady vrátane výplat", akt.naklady, h("naklady"), kcF, false),
         riadok("Zisk", akt.zisk, h("zisk"), kcF),
-        riadok("Marža", marza(akt), historia.map(marza), pct),
+        riadok("Marža", marza(akt), historia.map(marza), pct, true, true),
         riadok("Break-even (tržby, pri ktorých je zisk 0)", akt.breakEven, h("breakEven"), kcF, false),
         riadok("Tržby nad break-even", nadBe(akt), historia.map(nadBe), kcF),
         riadok("Tržba na hodinu", naHodinu(akt), historia.map(naHodinu), kcF),
@@ -280,7 +287,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     detail: nn([
       riadok("Dopyty", akt.dopyty, h("dopyty"), cele),
       riadok("Noví klienti", akt.novi, h("novi"), cele),
-      riadok("Z dopytu klient", konverzia(akt), historia.map(konverzia), pct),
+      riadok("Z dopytu klient", konverzia(akt), historia.map(konverzia), pct, true, true),
       riadok("Prírastok sledovateľov IG", akt.prirastokIg, h("prirastokIg"), (n) => `${n >= 0 ? "+" : ""}${kc(n)}`),
       riadok("Priemerný dosah reels", akt.dosahReels, h("dosahReels"), cele),
       riadok("Reklama (Meta)", akt.reklama, h("reklama"), kcF, false),
