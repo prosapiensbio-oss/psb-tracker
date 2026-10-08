@@ -403,3 +403,24 @@ describe("poplatok, ktorý už vysvetľuje platba v Kokpite", () => {
     expect(poplatkyPoOdrataniPlatieb([po("Jan Kral", "2026-01-17", 6990)], [pl("Jan Kral", "2026-09-20", 6990)]).otvorene).toHaveLength(1);
   });
 });
+
+describe("text platby sa nepíše dvakrát", () => {
+  // Fio dá niekedy do správy aj odosielateľa to isté a na obrazovke z toho
+  // bolo „J. Miřejovský · MIŘEJOVSKÝ JIŘÍ J. Miřejovský · MIŘEJOVSKÝ JIŘÍ"
+  // (Jerry, 8. 10. 2026).
+  const r = (counterparty: string | null, note: string | null) =>
+    ({ id: "x", date: "2026-01-07", amount_czk: 752, counterparty, note, typ: null });
+
+  it("rovnaká správa a odosielateľ sa napíšu raz", () => {
+    expect(textPlatby(r("J. Miřejovský · MIŘEJOVSKÝ JIŘÍ", "J. Miřejovský · MIŘEJOVSKÝ JIŘÍ")))
+      .toBe("J. Miřejovský · MIŘEJOVSKÝ JIŘÍ");
+  });
+
+  it("rôzne polia zostávajú obe — na párovaní sa nič nemení", () => {
+    expect(textPlatby(r("Prosapiens 18h", "Natália Pecková"))).toBe("Prosapiens 18h Natália Pecková");
+  });
+
+  it("prázdna správa nenechá medzeru", () => {
+    expect(textPlatby(r("MIŘEJOVSKÝ JIŘÍ", null))).toBe("MIŘEJOVSKÝ JIŘÍ");
+  });
+});

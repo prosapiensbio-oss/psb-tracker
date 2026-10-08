@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -32,6 +32,44 @@ import { najdiKlienta } from "../../lib/psb/compute";
  */
 
 const uid = () => crypto.randomUUID();
+
+/**
+ * PRIRADENIE POHYBU KLIENTOVI — jedno miesto, lebo zrušená platba blokuje.
+ *
+ * Jerry, 8. 10. 2026: „túto platbu som potvrdil už 2× a stále sa vracia,
+ * prečo?" Lebo nad `platby` je unikátna dvojica (fio_id, klient) a NEBERIE
+ * ohľad na zrušenie. Platbu Jiřího Miřejovského (752 Kč, 7. 1.) zrušila
+ * 5. 10. oprava platiteľa „Jarek"; odvtedy ten istý pohyb tomu istému
+ * klientovi priradiť nešlo — `INSERT OR IGNORE` ticho nezapísal NIČ a API
+ * vrátilo `ok: true`. Appka teda po každom kliknutí tvrdila, že je hotovo,
+ * a pohyb sa vracal medzi nepriradené.
+ *
+ * Zrušená platba sa preto OŽIVÍ, nezakladá sa druhá: stráž má pravdu, že
+ * ten istý pohyb nesmie mať pre jedného klienta dva riadky. A výsledok sa
+ * vracia von, aby sa „nestalo sa nič" už nikdy nemohlo tváriť ako úspech
+ * (CLAUDE.md: ticho zlyhávajúci zápis je horší než hlasitá chyba).
+ */
+type StavZapisu = "nova" | "obnovena" | "uz-bola";
+
+async function zapisPriradenie(
+  DB: D1Database,
+  v: { klient: string; datum: string; suma: number; sposob: string; fioId: string; poznamka: string; kto: string | null | undefined; vopred: boolean },
+): Promise<StavZapisu> {
+  const uz = await DB.prepare("SELECT id, zrusene_at FROM platby WHERE fio_id = ?1 AND klient = ?2")
+    .bind(v.fioId, v.klient).first<{ id: string; zrusene_at: string | null }>().catch(() => null);
+  if (uz && !uz.zrusene_at) return "uz-bola";
+  if (uz) {
+    await DB.prepare(
+      `UPDATE platby SET zrusene_at = NULL, datum = ?2, suma_czk = ?3, sposob = ?4, poznamka = ?5, autor = ?6, vopred = ?7
+         WHERE id = ?1`,
+    ).bind(uz.id, v.datum, v.suma, v.sposob, v.poznamka, v.kto || null, v.vopred ? 1 : 0).run();
+    return "obnovena";
+  }
+  await DB.prepare(
+    "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  ).bind(uid(), v.klient, v.datum, v.suma, v.sposob, v.fioId, v.poznamka, teraz(), v.kto || null, v.vopred ? 1 : 0).run();
+  return "nova";
+}
 const teraz = () => new Date().toISOString();
 const denISO = (s: unknown) => {
   const v = String(s ?? "").slice(0, 10);
@@ -146,12 +184,16 @@ async function zapisDiely(
   // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
   const vopred = await Promise.all(kusy.map((d) => jeVopred(DB, d.klient)));
   try {
-    await DB.batch(kusy.map((d, i) =>
-      DB.prepare(
-        "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
-      ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, sposobZRiadku(r), r.id,
-        `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null, vopred[i] ? 1 : 0),
-    ));
+    // Po jednom, nie v dávke: zrušená platba toho istého klienta sa OŽIVÍ
+    // (viď `zapisPriradenie`) — dovtedy na nej rozdelenie padalo hláškou
+    // „už má priradenú platbu", hoci žiadna živá neexistovala.
+    for (let i = 0; i < kusy.length; i++) {
+      const d = kusy[i];
+      await zapisPriradenie(DB, {
+        klient: d.klient, datum: r.date.slice(0, 10), suma: d.suma, sposob: sposobZRiadku(r), fioId: r.id,
+        poznamka: `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, kto, vopred: vopred[i],
+      });
+    }
   } catch (e) {
     const t = String(e instanceof Error ? e.message : e);
     return {
@@ -335,11 +377,11 @@ export const Route = createFileRoute("/api/platby")({
           const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
             .bind(fioId).first<FioRiadok>();
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
-          const prikazy = [
-            DB.prepare(
-              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, sposobZRiadku(r), fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
-          ];
+          const stav = await zapisPriradenie(DB, {
+            klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
+            poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
+          }).catch((e) => { throw e; });
+          const prikazy: D1PreparedStatement[] = [];
           // Pravidlo sa učí LEN vtedy, keď je klient priamo v odosielateľovi.
           // Inak by sa naučilo zo sprostredkovaného prevodu a každý ďalší
           // prevod tej istej osoby by appka ponúkala ako platbu toho klienta.
@@ -349,8 +391,8 @@ export const Route = createFileRoute("/api/platby")({
             prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
               .bind(vzor, klient, teraz()));
           }
-          await DB.batch(prikazy);
-          await audit(DB, { action: "platba-priradena", predmet: klient, neu: `${r.amount_czk} Kč · ${r.date.slice(0, 10)}`, actor: kto });
+          if (prikazy.length) await DB.batch(prikazy);
+          await audit(DB, { action: "platba-priradena", predmet: klient, neu: `${r.amount_czk} Kč · ${r.date.slice(0, 10)}${stav === "obnovena" ? " (obnovená zrušená platba)" : ""}`, actor: kto });
 
           /**
            * BALÍČEK VZNIKÁ Z PENAZÍ, NIE ZO ZÁMERU.
@@ -369,7 +411,7 @@ export const Route = createFileRoute("/api/platby")({
             { nazov: string; cena_czk: number | null; platnost_od: string; zrusene_at: string | null }[];
           const navrh = balicekZPlatby({ suma: r.amount_czk, den: r.date.slice(0, 10), balicky: jehoBalicky });
 
-          return Response.json({ ok: true, zapamatane: naucil, navrh });
+          return Response.json({ ok: true, zapamatane: naucil, navrh, stav });
         }
 
         /**
@@ -418,17 +460,17 @@ export const Route = createFileRoute("/api/platby")({
             if (!r) { chyby.push(`${fioId.slice(0, 8)}: riadok výpisu neexistuje`); continue; }
             const vzor = vzorPlatby(r);
             const naucil = smieSaZapamatat(vzor, klient);
-            const prikazy = [
-              DB.prepare(
-                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
-              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, sposobZRiadku(r), fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
-            ];
+            await zapisPriradenie(DB, {
+              klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
+              poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
+            });
+            const prikazy: D1PreparedStatement[] = [];
             if (naucil) {
               prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
                 .bind(vzor, klient, teraz()));
               naucenych++;
             }
-            await DB.batch(prikazy);
+            if (prikazy.length) await DB.batch(prikazy);
             hotovo++;
           }
           await audit(DB, { action: "platby-davka", predmet: `${hotovo} z ${polozky.length}`, neu: `naučených pravidiel: ${naucenych}`, actor: kto });

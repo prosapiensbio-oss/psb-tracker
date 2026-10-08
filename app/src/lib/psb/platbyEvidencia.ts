@@ -149,8 +149,17 @@ export type FioRiadok = { id: string; date: string; amount_czk: number; counterp
 export type Platba = { id: string; klient: string; datum: string; sumaCzk: number; sposob: string; fioId: string | null; zruseneAt: string | null };
 export type PtPlatba = { klient: string; datum: string; suma: number; metoda: string };
 
-/** Text, podľa ktorého sa platba páruje: správa aj odosielateľ naraz. */
-export const textPlatby = (r: FioRiadok): string => `${r.counterparty || ""} ${r.note || ""}`.trim();
+/**
+ * Text, podľa ktorého sa platba páruje: správa aj odosielateľ naraz.
+ *
+ * Keď Fio dá do oboch polí to isté, nepíše sa to dvakrát — na obrazovke
+ * z toho bolo „J. Miřejovský · MIŘEJOVSKÝ JIŘÍ J. Miřejovský · MIŘEJOVSKÝ
+ * JIŘÍ" (Jerry, 8. 10. 2026). Na párovanie to vplyv nemá, na čitateľnosť áno.
+ */
+export const textPlatby = (r: FioRiadok): string => {
+  const a = (r.counterparty || "").trim(), b = (r.note || "").trim();
+  return (b && b !== a ? `${a} ${b}` : a).trim();
+};
 
 /**
  * Vzor pre naučené priradenie: LEN odosielateľ (za „·"), bez správy.
