@@ -92,7 +92,7 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       podľa trénera, vyťaženosť, navádzač kariet, hromadná SMS — naostro 5. 10.
 - [x] Duplicity mimo Workspace odstránené (Kalendár, Upload, Tréningy,
       + Zápis); duplikovať tréning a presun na iného trénera v kalendári.
-- [ ] **FIO_TOKEN v bete** — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
+- [ ] **FIO_TOKEN v bete** (8. 10.: stále chýba, beta má len PSB_SESSION_SECRET) — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
 - [x] **Banka stiahnutá** (overené 5. 10. 2026: pohyby do 4. 10.). Pravidlo
       „nezaplatený balíček = mínus" stojí na spárovanej banke — sťahovať priebežne.
@@ -124,7 +124,7 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
   tvare 6, takže to nie je plošné. Posúdiť vie len ten, kto balíček predal.
 - [x] 3 minuté doplnenia 1 h (Petra Bambúšková, Tsiolis, Jitka) — ukončené k 29. 9.
 - [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
-- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. (Platby z Kokpitu
+- [x] **Peniaze z banky a zošita** — overené 8. 10. 2026: prepínač je zapnutý, `platby_od` = 2026-10. (Platby z Kokpitu
   na osi času a v maili sú od 5. 10. 2026 — `zlucPlatby`.)
 - [x] **Os času a „dnes"** — 6. 10. 2026: profil, os pri karte aj mínus
   v zozname dlžníkov berú len tréningy, ktoré už začali (`terazPraha`), ako karta.
@@ -183,7 +183,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   a /terezia/ existujú (predtým som ich hľadal pod zlou adresou).
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
 - [ ] **Pocitovka beží od 30. 9. 2026** — o mesiac sa pozrieť, koľkí klienti
-  odpovedali. Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
+  odpovedali. (8. 10.: zatiaľ 0 odpovedí v `klient_merania`.) Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
   že sa nepýtame dosť nahlas; vtedy zvážiť pripomenutie v SMS po treťom
   tréningu.
 
@@ -198,7 +198,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - [x] Import služieb nahrádza obdobie súboru (6. 10. 2026) — rovnaké poistky
   ako tréningy (`nahradenieObdobia`): len dni a tréneri zo súboru, uzamknutý
   mesiac nie, pri veľkom mazaní nič. Nanečisto na exporte z 3. 10.: 0 zmien.
-- [ ] Export Sessions s 28.–29. 9., keď ich Jerry dopíše.
+- [x] Export Sessions s 28.–29. 9. — overené 8. 10. 2026: v sessions je 28. 9. 8 tréningov, 29. 9. 10.
 - [x] **Nahadzovanie tréningov do Google kalendára z Kokpitu** — hotové 29. 9.
   (servisný účet kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com,
   secret GCAL_SA_KLUC; stôl klienta → všetko → „+ Nahodiť tréning do kalendára").
@@ -210,7 +210,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
-- **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, neoverené okom.** Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
+- **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, overené naostro 8. 10.** (Workspace → Kalendár → Firma, ‹ ‹ › a Alt+← vrátia presne poradie). Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
 
 - **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
   **Doplnené 8. 10. 2026** (Jerry: „áno doplň tie staršie úvodné"): sedem úvodných z augusta a septembra má vlastný balíček — Pavlik, Hrdinova, Spoligova, Pehalova, Malinova, Dvořak, Matl. Nikomu z nich nevznikol dlh (všetci zaplatili) a nikomu sa nezmenili hodiny okrem troch, ktorí dovtedy nemali žiadny záznam.
@@ -218,8 +218,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - **Nadpis stránky klienta vs. os (Jerry sa k tomu ešte nevyjadril).** Pri Lukášovi Hanusovi riadky končia na 4 h, ale nadpis hlási 5 h — nadpis ide za kartou klienta, os za vlastným prepočtom. Má sa nadpis riadiť osou (stránka bude sama so sebou v zhode), alebo ostať na karte?
 
 - **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"):**
-  1. **Kalendár v mobile** — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
-  2. **Ponuka termínov** — poslať si ponuku na vlastné číslo, vybrať termín na stránke /t/: vznikne udalosť v Google kalendári a príde push? (zápis do Google z /t/ nebol naostro skúšaný). Potom udalosť zmazať.
+  1. **Kalendár v mobile** (8. 10.: zatiaľ nikto nemá odkaz, `klient_kalendar` je prázdna) — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
+  2. **Ponuka termínov** — zápis z /t/ do Google FUNGUJE (overené 8. 10. v dátach): ponuka pre Mateja Prochadzku vytvorená 7. 10. o 9:47, termín vybraný o 31 s neskôr, udalosť 14. 10. 10:00 je v Google aj v Kokpite. **Otázka na Jerryho: bola to skúška? Ak áno, udalosť 14. 10. treba zmazať, inak sa Matejovi zaráta tréning.** Push trénerovi neoverený.
   3. **Gestá v Kalendári** — švih prstom (telefón/iPad) a dva prsty na touchpade medzi týždňami; overené len simuláciou.
 - ~~September: chýbalo 10 výdavkov z banky (−17 641 Kč)~~ — HOTOVÉ 7. 10. 2026: Jerry stiahol mesiac z Fio (september má 132 pohybov); krok Fio odvtedy hlási hotovo až pri 0 nepotvrdených a 0 nezaradených výdavkoch.
 - ~~Pravidlo Terezkinho účtu → Služby~~ — HOTOVÉ 7. 10. 2026: výplata 29. 9. prehodená na Výplata Terezka, pravidlo účtu teraz → výplata Terezka; SmsManager ostáva Apps AI (Jerry).
