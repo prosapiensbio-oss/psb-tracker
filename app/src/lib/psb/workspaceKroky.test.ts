@@ -134,3 +134,25 @@ describe("platba z banky k dlžníkovi", () => {
     expect(kandidatiPlatby("Nikto", { spolu: 500, polozky: [{ datum: "2026-09-27", suma: 500 }] }, nepr)).toEqual([]);
   });
 });
+
+describe("úvodný tréning je vlastný balíček", () => {
+  it("vznikne aj klientovi, ktorý žiadny balíček nemal", () => {
+    // Jerry, 8. 10. 2026: „Petr Baťa by mal mať po úvodnom automaticky dlh
+    // 1 100 Kč." Dovtedy návrh potreboval predošlý balíček, z ktorého sa
+    // veľkosť odvodzuje — nový klient ho nemá, takže nevzniklo nič.
+    const os = [{ druh: "trening", den: "2026-10-05", cas: "17:00", uvodny: true }] as never[];
+    const stavy = new Map(os.map((u) => [u, { zostatok: null, dlh: 1, usek: "" }])) as never;
+    const n = navrhNovehoBalicka("Petr Baťa", os, stavy);
+    expect(n?.nazov).toBe("Úvodní trénink");
+    expect(n?.hodiny).toBe(1);
+    expect(n?.cena).toBe(1100);
+    expect(n?.odDna).toBe("2026-10-05");
+    expect(n?.predosly).toBe(null);
+  });
+
+  it("bežný prvý tréning bez predošlého balíčka ďalej nevyrába nič", () => {
+    const os = [{ druh: "trening", den: "2026-10-05", cas: "17:00" }] as never[];
+    const stavy = new Map(os.map((u) => [u, { zostatok: null, dlh: 1, usek: "" }])) as never;
+    expect(navrhNovehoBalicka("Kto Vie", os, stavy)).toBe(null);
+  });
+});

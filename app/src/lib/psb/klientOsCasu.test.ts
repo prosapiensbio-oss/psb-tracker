@@ -246,3 +246,22 @@ describe("úvodný tréning na osi", () => {
     expect((os[0] as { uvodny?: boolean }).uvodny).toBe(true);
   });
 });
+
+describe("ručne určený druh tréningu", () => {
+  it("prebije kalendár aj export — oboma smermi", () => {
+    // Jerry, 8. 10. 2026: „vždy by mala byť možnosť zmeniť to z úvodného na
+    // normálny alebo z normálneho na úvodný."
+    const zdroj = {
+      sessions: [{ client: "Luky Križ", date: "2026-09-28", sessionName: "OFFLINE - 60min", duration: 60 }],
+      payments: [], packages: [],
+      kalUdalosti: [{ uid: "x@google.com", klient: "Petr Baťa", zaciatok: "2026-10-05T17:00", typ: "uvodny", trener: "Terezka" }],
+      druhyTreningov: { "Luky Križ|2026-09-28": "uvodny", "Petr Baťa|2026-10-05": "trening" },
+    } as never;
+
+    const syn = osCasuKlienta("Luky Križ", zdroj, "2026-10-08");
+    expect((syn.find((x) => x.den === "2026-09-28") as { uvodny?: boolean }).uvodny).toBe(true);
+
+    const bata = osCasuKlienta("Petr Baťa", zdroj, "2026-10-08");
+    expect((bata.find((x) => x.den === "2026-10-05") as { uvodny?: boolean }).uvodny).toBeUndefined();
+  });
+});

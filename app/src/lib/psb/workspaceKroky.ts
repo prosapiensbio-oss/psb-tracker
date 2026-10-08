@@ -14,6 +14,7 @@
  */
 import type { DlhPolozka } from "./zaplatene";
 import { CENNIK, platnostDo, type Sablona } from "./cennik";
+import { UVODNY } from "./uvodnaStranka";
 import { normName } from "./format";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
@@ -39,7 +40,8 @@ export type NavrhNovehoBalicka = {
   cena: number;
   platnostDo: string;
   /** Posledný balíček, z ktorého sa veľkosť a cena berú. */
-  predosly: { nazov: string; od: string; cena: number | null };
+  /** Predošlý balíček, z ktorého sa veľkosť a cena odvodili; úvodný žiadny nemá. */
+  predosly: { nazov: string; od: string; cena: number | null } | null;
   /**
    * Klient sa vracia po dlhej pauze — balíček vznikne, ale Kokpit sa spýta,
    * či sedí (Jerry: „vznikne automaticky a následne sa Kokpit dopýta").
@@ -67,6 +69,13 @@ export type NavrhNovehoBalicka = {
  * ktorý platí inú cenu stále (posledné dva balíčky za rovnakú necenníkovú
  * sumu), ostane jeho.
  */
+/**
+ * Ako sa úvodný volá v evidencii balíčkov. Jedno miesto — používa to návrh
+ * aj faktúra z karty klienta, aby sa nerozišli (české „trénink", lebo tak sa
+ * to volá aj na faktúre, ktorú vidí klient).
+ */
+export const NAZOV_UVODNEHO = "Úvodní trénink";
+
 export function navrhNovehoBalicka(
   klient: string,
   os: Udalost[],
@@ -106,6 +115,34 @@ export function navrhNovehoBalicka(
   });
   if (!nekryte.length) return null;
   const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
+
+  /**
+   * ÚVODNÝ TRÉNING JE VLASTNÝ BALÍČEK (Jerry, 8. 10. 2026).
+   *
+   * „Úvodný tréning je špecificky samostatný balík a mal by vznikať vždy
+   * prvým tréningom klienta — Petr Baťa by mal mať po úvodnom automaticky
+   * dlh 1 100 Kč a ja by som mal mať možnosť vystaviť mu faktúru."
+   *
+   * Stojí PRED hľadaním predošlého balíčka: nový klient žiadny nemá, takže
+   * dovtedy mu nevzniklo nič a úvodný visel v dochádzke bez peňazí. Jedna
+   * hodina za cenu úvodného — tréning ju hneď minie a zostatok sedí na nule.
+   */
+  const uvodnyNekryty = nekryte.find((u) => u.druh === "trening" && u.uvodny);
+  if (uvodnyNekryty) {
+    return {
+      klient,
+      odDna: uvodnyNekryty.den,
+      nekrytych: 1,
+      nazov: NAZOV_UVODNEHO,
+      hodiny: 1,
+      cena: UVODNY.cenaCzk,
+      platnostDo: uvodnyNekryty.den,
+      predosly: null,
+      navrat: false,
+      pauzaDni: -1,
+      cenaPoznamka: undefined,
+    };
+  }
 
   const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> =>
     u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna);

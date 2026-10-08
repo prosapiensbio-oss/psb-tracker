@@ -41,6 +41,7 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
     bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit,
     treningyZdarma: (data.treningyZdarma || []) as never,
     doplneniaHodiny: data.doplneniaHodiny || {},
+    druhyTreningov: data.druhyTreningov || {},
     historia: (data.historiaBalickov || []) as never,
     balicky: balicky.map((b) => ({
       klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,

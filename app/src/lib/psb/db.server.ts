@@ -31,7 +31,7 @@ import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK, merania, webKontroly] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -64,6 +64,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       .all().catch(() => ({ results: [] })),
     // Koľko hodín pridalo „Doplnenie členstva" — viď migráciu 0085.
     DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all().catch(() => ({ results: [] })),
+    // Ručne určený druh tréningu (úvodný ↔ bežný) — platí na oba zdroje.
+    DB.prepare("SELECT klient, den, druh FROM trening_druh").all().catch(() => ({ results: [] })),
     // Dochádzka z kalendára od KOKPIT_OD (viď sedeniaZKalendara.ts). Zmiznutá
     // udalosť sa berie len vtedy, keď o nej Jerry povedal „bol tam".
     DB.prepare(
@@ -174,6 +176,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      */
     doplneniaHodiny: Object.fromEntries(
       (doplneniaH.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, Number(r.hodiny) || 0]),
+    ),
+    druhyTreningov: Object.fromEntries(
+      (druhy.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, String(r.druh || "")]),
     ),
     webKontroly: (webKontroly.results as any[]).map((r) => ({
       kluc: String(r.kluc), nazov: String(r.nazov), stav: String(r.stav) as "ok" | "varovanie" | "chyba",

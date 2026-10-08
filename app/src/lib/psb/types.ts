@@ -251,6 +251,15 @@ export type PSBData = {
   /** Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`. */
   doplneniaHodiny?: Record<string, number>;
   /**
+   * Druh tréningu, ktorý určil človek — kľúč `klient|deň`, hodnota
+   * „uvodny" alebo „trening".
+   *
+   * Jerry, 8. 10. 2026: „vždy by mala byť možnosť zmeniť to z úvodného na
+   * normálny a naopak." Platí na oba zdroje dochádzky: udalosť z kalendára
+   * aj sedenie z exportu, ktoré žiadnu udalosť nemá.
+   */
+  druhyTreningov?: Record<string, string>;
+  /**
    * Dohodnuté úvodné tréningy, ktoré sa ešte neodohrali.
    *
    * Jerry, 1. 10. 2026: „najdôležitejšie je, aby keď je úvodný tréning,

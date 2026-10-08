@@ -591,22 +591,29 @@ export const Route = createFileRoute("/api/kalendar")({
          * stiahnutiu.
          */
         if (akcia === "trening-druh") {
-          const uid = String(b.uid || "");
-          const trener = String(b.trener || "");
+          const klient = String(b.klient || "").trim();
+          const den = String(b.den || "").slice(0, 10);
           const typ = String(b.typ || "") === "uvodny" ? "uvodny" : "trening";
-          if (!uid || !trener) return Response.json({ ok: false, error: "Chýba udalosť." }, { status: 400 });
-          const r = await DB.prepare("SELECT nazov, klient, typ FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
-            .bind(uid, trener).first<{ nazov: string; klient: string | null; typ: string | null }>();
-          if (!r) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
-          await DB.prepare("UPDATE kal_udalosti SET typ = ?1, typ_rucne = 1, naposledy = ?2 WHERE uid = ?3 AND trener = ?4")
-            .bind(typ, teraz(), uid, trener).run();
-          await audit(DB, {
-            action: "kalendar-druh",
-            predmet: r.klient || r.nazov,
-            old: r.typ || "",
-            neu: typ,
-            actor: (await currentUser(request)) || undefined,
-          });
+          if (!klient || !/^\d{4}-\d{2}-\d{2}$/.test(den)) {
+            return Response.json({ ok: false, error: "Chýba klient alebo deň." }, { status: 400 });
+          }
+          const kto = (await currentUser(request)) || "";
+          const kedy = teraz();
+          /**
+           * Rozhodnutie sa ukladá k DŇU klienta, nie k udalosti: sedenie
+           * z exportu PTmindera žiadnu udalosť nemá (Luky Kríž začal rovno
+           * tréningom) a prepnúť by sa nedalo. Keď udalosť v kalendári je,
+           * prepíše sa aj jej typ — podľa neho sa počíta dochádzka a cena —
+           * a označí sa ako ručná, nech ju ďalšie sťahovanie neprepíše.
+           */
+          await DB.prepare(
+            `INSERT INTO trening_druh (klient, den, druh, kto, kedy) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(klient, den) DO UPDATE SET druh = ?3, kto = ?4, kedy = ?5`,
+          ).bind(klient, den, typ, kto, kedy).run();
+          await DB.prepare(
+            "UPDATE kal_udalosti SET typ = ?1, typ_rucne = 1, naposledy = ?2 WHERE klient = ?3 AND substr(zaciatok, 1, 10) = ?4 AND zmizla_at IS NULL",
+          ).bind(typ, kedy, klient, den).run().catch(() => null);
+          await audit(DB, { action: "trening-druh", predmet: `${klient} · ${den}`, neu: typ, actor: kto || undefined });
           return Response.json({ ok: true, typ });
         }
 

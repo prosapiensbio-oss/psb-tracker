@@ -248,6 +248,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
       doplneniaHodiny: data.doplneniaHodiny || {},
+      // Ručne určený druh tréningu (úvodný ↔ bežný) — Jerry, 8. 10. 2026.
+      druhyTreningov: data.druhyTreningov || {},
       // Odpovede o konci platnosti — prepadnuté hodiny sú na osi značkou.
       acks: data.anomalyAck,
       // Vlastná evidencia balíčkov: bez nej by sa po nahodení nového balíčka
@@ -257,7 +259,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // Po TERAZ, nie po celý deň — karta ráta len tréningy, ktoré už začali,
       // a os s ňou musí sedieť aj ráno pred večerným tréningom (6. 10. 2026).
     }, terazPraha()) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti, data.anomalyAck, data.historiaBalickov, data.doplneniaHodiny],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti, data.anomalyAck, data.historiaBalickov, data.doplneniaHodiny, data.druhyTreningov],
   );
 
   /**
@@ -804,11 +806,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * z balíčka a za čo sa fakturuje, takže to nie je názov, ale rozhodnutie.
    * Appka si ho poznačí ako ručný a ďalšie sťahovanie kalendára ho neprepíše.
    */
-  const zmenDruh = async (uid: string, trener: string, uvodny: boolean) => {
+  const zmenDruh = async (den: string, uvodny: boolean) => {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/kalendar", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "trening-druh", uid, trener, typ: uvodny ? "uvodny" : "trening" }),
+      body: JSON.stringify({ akcia: "trening-druh", klient: meno, den, typ: uvodny ? "uvodny" : "trening" }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa zmeniť"); return; }
@@ -1801,7 +1803,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 pracujem={pracujem}
                 onZdarma={(zrus) => (zrus || zdarmaDen === x.den ? void oznacZdarma(x.den, zrus) : (setZdarmaDen(x.den), setZdarmaDovod("")))}
                 onZrusZapis={() => { setZdarmaDen(""); setZdarmaDovod(""); }}
-                onDruh={x.druh === "trening" && x.uid && x.trener ? (uvodny) => void zmenDruh(x.uid!, x.trener!, uvodny) : undefined}
+                onDruh={x.druh === "trening" ? (uvodny) => void zmenDruh(x.den, uvodny) : undefined}
               />
             ))}
 
@@ -2169,7 +2171,7 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
           sa Jerry v kalendári preklikne alebo udalosť pomenuje inak, nemal
           odkiaľ to opraviť. Len pri udalostiach z kalendára — sedenie
           z PTmindera appka prepísať nevie. */}
-      {onDruh && u.uid && (
+      {onDruh && (
         <button
           onClick={() => onDruh(!u.uvodny)}
           disabled={pracujem}

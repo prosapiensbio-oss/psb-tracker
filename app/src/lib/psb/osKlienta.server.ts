@@ -48,6 +48,7 @@ export async function osKlientaZoServera(
     sessions: data.sessions, payments: data.payments, packages: data.packages,
     services: data.services, poplatky: data.poplatky, nezaplateneKokpit: data.nezaplateneKokpit || [], bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit, treningyZdarma: data.treningyZdarma,
     doplneniaHodiny: data.doplneniaHodiny || {}, kalUdalosti, balicky,
+    druhyTreningov: data.druhyTreningov || {},
     historia: data.historiaBalickov || [], acks: data.anomalyAck,
   }, teraz);
 

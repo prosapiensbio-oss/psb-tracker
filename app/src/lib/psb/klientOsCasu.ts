@@ -261,6 +261,12 @@ export function osCasuKlienta(
      */
     doplneniaHodiny?: Record<string, number>;
     /**
+     * Druh tréningu určený človekom — kľúč `klient|deň`. Prebíja to, čo
+     * hovorí názov udalosti aj export: Jerry, 8. 10. 2026 („Petr Baťa má
+     * teraz normálny tréning a chcel by som to zmeniť na úvodný").
+     */
+    druhyTreningov?: Record<string, string>;
+    /**
      * Odpovede na „platnosť skončila a hodiny zostali" (`anomaly_ack`,
      * kľúč `platnost|meno|deň`). Keď časť prepadla, os to ukáže značkou
      * v deň konca platnosti — bez tréningu (Jerry, 6. 10. 2026: „2 h a 1 h
@@ -528,6 +534,24 @@ export function osCasuKlienta(
   // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
   for (const u of out) {
     if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;
+  }
+
+  /**
+   * RUČNE URČENÝ DRUH PREBÍJA OBA ZDROJE.
+   *
+   * Názov udalosti („Petr Baťa -uvodný tréning") aj názov sedenia z exportu
+   * („Uvodny trenink OFFLINE") sú len odhad. Keď o tom rozhodol človek,
+   * platí jeho slovo — a platí rovnako na tréning z kalendára aj na sedenie,
+   * ktoré v kalendári nikdy nebolo (Luky Kríž začal rovno tréningom).
+   */
+  const rucneDruhy = zdroj.druhyTreningov || {};
+  if (Object.keys(rucneDruhy).length) {
+    for (const u of out) {
+      if (u.druh !== "trening") continue;
+      const d = rucneDruhy[`${meno}|${u.den}`] ?? rucneDruhy[`${k}|${u.den}`];
+      if (d === "uvodny") u.uvodny = true;
+      else if (d === "trening") delete u.uvodny;
+    }
   }
 
   /**
