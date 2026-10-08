@@ -536,3 +536,17 @@ describe("sťahovanie bez siete", () => {
     expect(n[0].detail).toContain("HTTP 404");
   });
 });
+
+describe("veta o obsahu sa číta ako veta", () => {
+  it("kladné zistenie spája značky spojkou „aj“, nie „ani“", () => {
+    // „v tele je „data-form" ani „psb-skryte"" sa číta presne opačne,
+    // než ako to kontrola myslí.
+    const n = skontrolujStrankuZivot(
+      { url: "https://x.cz/a/", konecnaUrl: "https://x.cz/a/", stav: 200, bajtov: 50_000, trvanieMs: 500, telo: "<form data-form></form><div id=\"psb-skryte\"></div>" },
+      { musiObsahovat: ["data-form", "psb-skryte"] },
+    );
+    expect(n.stav).toBe("ok");
+    expect(n.detail).toContain("aj");
+    expect(n.detail).not.toContain("ani „psb-skryte“");
+  });
+});

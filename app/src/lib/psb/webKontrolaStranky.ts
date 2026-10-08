@@ -201,9 +201,14 @@ function znackyPreCestu(cesta: string, medze: MedzeStranok): string[] {
   return zoznam(medze.musiObsahovat);
 }
 
-/** Značky do vety pre človeka. */
-function vymenuj(znacky: string[]): string {
-  return znacky.map((z) => `„${z.slice(0, 80)}“`).join(" ani ");
+/**
+ * Značky do vety pre človeka. Spojka je parameter, lebo tá istá funkcia sa
+ * používa v zápornej vete („nie je v nej X ani Y") aj v kladnej („v tele je
+ * X aj Y") — natvrdo napísané „ani" vyrobilo vetu „v tele je X ani Y", čo sa
+ * číta presne opačne, než ako to kontrola myslí.
+ */
+function vymenuj(znacky: string[], spojka: "ani" | "aj" = "ani"): string {
+  return znacky.map((z) => `„${z.slice(0, 80)}“`).join(` ${spojka} `);
 }
 
 function velkost(bajtov: number): string {
@@ -386,7 +391,7 @@ export function skontrolujStrankuZivot(o: OdpovedStranky, medze: MedzeStranok = 
   }
 
   const oObsahu = znacky.length
-    ? `v tele je ${vymenuj(znacky)}`
+    ? `v tele je ${vymenuj(znacky, "aj")}`
     : "obsah sa nekontroloval — pre túto cestu nie je zadaná povinná značka";
   return zlozNalez(
     kluc,
