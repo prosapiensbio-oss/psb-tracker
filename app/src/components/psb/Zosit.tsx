@@ -30,6 +30,8 @@ type Riadok = {
   vypnuty?: boolean;
   /** Ten istý riadok už v Kokpite stojí (server, `oznacZosit`). */
   uzMame?: boolean;
+  /** Presun na účet, ktorý už má banka — do zošita sa nezapisuje. */
+  zBanky?: boolean;
   kategoriaVDb?: string;
   /** Mesiac je uzavretý — zápis by server aj tak odmietol. */
   zamknuty?: boolean;
@@ -346,7 +348,11 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                       />
                     </td>
                     <td style={{ padding: "5px 8px" }}>
-                      {r.uzMame ? (
+                      {r.uzMame && r.zBanky ? (
+                        <span style={{ fontSize: 11.5, color: C.green }} title="Presun na účet už stojí vo výpise z banky (vklad hotovosti). Keby sa zapísal aj zo zošita, tie isté peniaze by boli dvakrát.">
+                          ✓ má to banka · vklad na účet
+                        </span>
+                      ) : r.uzMame ? (
                         <span style={{ fontSize: 11.5, color: C.green }} title="Tento riadok je už zapísaný — zaškrtni ho, len ak je to naozaj iná platba.">
                           ✓ už v Kokpite · {r.kategoriaVDb ? nazov(r.kategoriaVDb) : r.suma > 0 ? "platba klienta" : "bez kategórie"}
                         </span>

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
-import { oznacZosit, type HotovostVDb } from "../../lib/psb/zositNahlad";
+import { oznacZosit, type HotovostVDb, type VkladVBanke } from "../../lib/psb/zositNahlad";
 import { bindings } from "../../lib/bindings.server";
 
 // Prepis zošita hotovostných platieb z fotky.
@@ -124,15 +124,21 @@ export const Route = createFileRoute("/api/zosit")({
         if (DB && cisté.length) {
           const od = new Date(Date.parse(`${cisté[0].datum}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
           const doDna = new Date(Date.parse(`${cisté[cisté.length - 1].datum}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
-          const [vDb, pr, zamky] = await Promise.all([
+          const [vDb, vklady, pr, zamky] = await Promise.all([
             DB.prepare("SELECT date, amount_czk, counterparty, category FROM fio_transactions WHERE typ = 'hotovosť' AND date BETWEEN ?1 AND ?2")
               .bind(od, doDna).all().then((x) => (x.results || []) as unknown as HotovostVDb[]).catch(() => [] as HotovostVDb[]),
+            // Vklady hotovosti, ktoré už má BANKA. Presun na účet je v zošite
+            // aj vo výpise — zapísať oboje by tie peniaze započítalo dvakrát.
+            DB.prepare(`SELECT date, amount_czk, counterparty FROM fio_transactions
+                         WHERE typ <> 'hotovosť' AND date BETWEEN ?1 AND ?2
+                           AND (lower(counterparty) LIKE '%vklad%' OR lower(note) LIKE '%vklad hotovosti%')`)
+              .bind(od, doDna).all().then((x) => (x.results || []) as unknown as VkladVBanke[]).catch(() => [] as VkladVBanke[]),
             DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
               .then((x) => ((x.results || []) as { text_pattern: string; category: string }[]).map((y) => ({ vzor: String(y.text_pattern || ""), kategoria: String(y.category || "") })))
               .catch(() => []),
             zamknuteMesiace(DB),
           ]);
-          oznacene = oznacZosit(cisté, vDb, pr).map((x) => ({ ...x, poznamka: x.poznamka || "", isty: x.isty !== false, zamknuty: jeZamknuty(zamky, x.datum) }));
+          oznacene = oznacZosit(cisté, vDb, pr, vklady).map((x) => ({ ...x, poznamka: x.poznamka || "", isty: x.isty !== false, zamknuty: jeZamknuty(zamky, x.datum) }));
         }
         return Response.json({ ok: true, riadky: oznacene, zahodenych: riadky.length - cisté.length });
       },

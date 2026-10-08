@@ -20,7 +20,22 @@ import { CENA_LOPTICKY, PRIJEM_PRODUKT } from "./kategoriePrijmov";
  */
 export type RiadokZositu = { datum: string; popis: string; suma: number; poznamka?: string; isty?: boolean };
 export type HotovostVDb = { date: string; amount_czk: number; counterparty: string; category: string | null };
-export type OznacenyRiadok = RiadokZositu & { uzMame: boolean; kategoriaVDb: string; kategoria: string };
+export type OznacenyRiadok = RiadokZositu & { uzMame: boolean; kategoriaVDb: string; kategoria: string; zBanky?: boolean };
+
+/**
+ * PRESUN NA ÚČET MÁ BANKA — v zošite sa nezapisuje (Jerry, 8. 10. 2026:
+ * „bol tam presun na účet 23 000, dal som ho neoznačiť… prečo sa zapísal?").
+ *
+ * Nezapísal sa; appka ho ale ani nespoznala, takže ho musel odškrtnúť sám
+ * a potom nemal ako vedieť, že tých 23 000, čo vidí medzi pohybmi, je riadok
+ * od BANKY („Vklad do bankomatu", 18. 9.) — tá istá hotovosť z druhej strany.
+ * Zapísať aj riadok zo zošita by tie peniaze započítalo dvakrát.
+ *
+ * Párovanie je zámerne na SUMU a DEŇ (±3), nie na text: zošit hovorí „presun
+ * na účet", banka „Vklad do bankomatu: FIO BANKA, JOŠTOVA 4" a nijaké
+ * spoločné slovo tam nie je.
+ */
+export type VkladVBanke = { date: string; amount_czk: number; counterparty: string };
 
 const prveSlovo = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim().split(/[\s,.(]+/)[0] || "";
 const den = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
@@ -29,8 +44,14 @@ export function oznacZosit(
   riadky: RiadokZositu[],
   vDb: HotovostVDb[],
   pravidla: { vzor: string; kategoria: string }[] = [],
+  /** Vklady hotovosti, ktoré už má banka — presun na účet sa nezapisuje. */
+  vklady: VkladVBanke[] = [],
 ): OznacenyRiadok[] {
   const volne = vDb.map((x) => ({ ...x, pouzite: false }));
+  const volneVklady = vklady.map((x) => ({ ...x, pouzite: false }));
+  const vklad = (r: RiadokZositu) => volneVklady.find((x) => !x.pouzite
+    && Math.round(Math.abs(x.amount_czk)) === Math.round(Math.abs(r.suma))
+    && Math.abs(den(x.date) - den(r.datum)) <= 3 * 86400000);
   const najdi = (r: RiadokZositu) => {
     const presne = volne.find((x) => !x.pouzite && x.date.slice(0, 10) === r.datum && Math.round(x.amount_czk) === Math.round(r.suma));
     if (presne) return presne;
@@ -44,6 +65,11 @@ export function oznacZosit(
     if (z) {
       z.pouzite = true;
       return { ...r, uzMame: true, kategoriaVDb: z.category || "", kategoria: z.category || "" };
+    }
+    const v = vklad(r);
+    if (v) {
+      v.pouzite = true;
+      return { ...r, uzMame: true, zBanky: true, kategoriaVDb: "", kategoria: "" };
     }
     // Príjem presne za cenu loptičky sa navrhne ako predaj produktu — len
     // návrh v rolete, človek ho vidí a prepne.

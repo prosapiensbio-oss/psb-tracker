@@ -40,3 +40,31 @@ describe("náhľad zošita proti Kokpitu", () => {
     expect(oznacZosit([{ datum: "2026-09-02", popis: "Naďa", suma: 9400 }], [])[0].kategoria).toBe("");
   });
 });
+
+describe("presun na účet už má banka", () => {
+  const vklady = [{ date: "2026-09-18", amount_czk: 23000, counterparty: "Vklad do bankomatu: FIO BANKA, JOŠTOVA 4" }];
+
+  it("riadok zošita o presune sa označí ako už evidovaný", () => {
+    const [r] = oznacZosit([{ datum: "2026-09-18", popis: "presun na účet", suma: -23000 }], [], [], vklady);
+    expect(r.uzMame).toBe(true);
+    expect(r.zBanky).toBe(true);
+  });
+
+  it("sedí aj o dva dni vedľa a bez ohľadu na znamienko", () => {
+    const [r] = oznacZosit([{ datum: "2026-09-20", popis: "na účet", suma: 23000 }], [], [], vklady);
+    expect(r.uzMame).toBe(true);
+  });
+
+  it("iná suma sa nespáruje — peniaze sa nehádajú", () => {
+    const [r] = oznacZosit([{ datum: "2026-09-18", popis: "presun na účet", suma: -22000 }], [], [], vklady);
+    expect(r.uzMame).toBe(false);
+  });
+
+  it("jeden vklad pokryje jeden riadok, nie dva", () => {
+    const rs = oznacZosit([
+      { datum: "2026-09-18", popis: "presun na účet", suma: -23000 },
+      { datum: "2026-09-19", popis: "presun na účet", suma: -23000 },
+    ], [], [], vklady);
+    expect(rs.map((x) => x.uzMame)).toEqual([true, false]);
+  });
+});
