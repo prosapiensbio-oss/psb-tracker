@@ -148,9 +148,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
 
   // Fakturačné údaje vybraného klienta sa nalejú do formulára údajov.
   const udajeKlienta = useMemo(() => udaje.find((x) => x.klient === f.klient), [udaje, f.klient]);
+  /**
+   * Keď klient fakturačné údaje NEMÁ, formulár sa otvorí sám a karta zožltne.
+   * Jerry, 8. 10. 2026: „vidím, že Petr Baťa môže vystaviť faktúru, ale
+   * súčasne vidím, že nemám fakturačné údaje — to by malo na mňa vyskočiť."
+   * Dovtedy to bol tlmený odkaz „doplniť" na pravom okraji riadku.
+   */
   useEffect(() => {
     setU(udajeKlienta ? { ...PRAZDNE_UDAJE, ...udajeKlienta } : PRAZDNE_UDAJE);
-    setUpravujemUdaje(false);
+    setUpravujemUdaje(!udajeKlienta && !!f.klient);
   }, [udajeKlienta, f.klient]);
 
   const posli = async (telo: Record<string, unknown>, znacka: string) => {
@@ -388,7 +394,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
             Odberateľ: <b style={{ color: C.text }}>{udajeKlienta?.firma || f.klient || "—"}</b>
             {udajeKlienta?.ico ? ` · IČ ${udajeKlienta.ico}` : ""}
             {udajeKlienta?.email ? ` · ${udajeKlienta.email}` : ""}
-            {!udajeKlienta && f.klient ? " — fakturačné údaje ešte nemá, doplň ich nižšie" : ""}
+            {!udajeKlienta && f.klient
+              ? <b style={{ color: C.orange }}> — fakturačné údaje ešte nemá, doplň ich nižšie</b>
+              : null}
           </div>
 
           <button
@@ -408,17 +416,30 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       )}
 
       {f.klient && (
-        <div style={{ padding: 12, borderRadius: 11, border: `1px solid ${C.border}`, marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: upravujemUdaje ? 10 : 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>Fakturačné údaje — {f.klient}</div>
+        <div style={{
+          padding: 12, borderRadius: 11, marginBottom: 14,
+          border: `1px solid ${udajeKlienta ? C.border : mix(C.orange, 55)}`,
+          background: udajeKlienta ? undefined : C.orangeBg,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: upravujemUdaje ? 10 : 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: udajeKlienta ? C.text : C.orange }}>
+              {udajeKlienta ? `Fakturačné údaje — ${f.klient}` : `Chýbajú fakturačné údaje — ${f.klient}`}
+            </div>
             <button
               type="button"
               onClick={() => setUpravujemUdaje((x) => !x)}
-              style={{ background: "none", border: "none", color: C.textDim, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+              style={udajeKlienta
+                ? { background: "none", border: "none", color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }
+                : { padding: "5px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.orange, 60)}`, background: mix(C.orange, 16), color: C.orange }}
             >
-              {upravujemUdaje ? "skryť" : udajeKlienta ? "upraviť" : "doplniť"}
+              {upravujemUdaje ? "skryť" : udajeKlienta ? "upraviť" : "doplniť teraz"}
             </button>
           </div>
+          {!udajeKlienta && (
+            <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: upravujemUdaje ? 10 : 0 }}>
+              Faktúra sa vystaviť dá aj bez nich — na doklade potom bude len meno klienta, bez adresy a bez e-mailu, na ktorý sa dá poslať.
+            </div>
+          )}
           {upravujemUdaje && (
             <>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
