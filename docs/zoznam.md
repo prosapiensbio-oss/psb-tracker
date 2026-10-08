@@ -210,6 +210,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Ďalšie metriky do reportu z výskumu kníh (8. 10. 2026)** — 15 kandidátov v `docs/metriky-z-knih.md` (prežitie 100 dní, retencia 6 mes., obnova balíčkov, rezerva v mesiacoch, predplatené vs. dlžné hodiny, koncentrácia, lievik po krokoch, referral číslo, cena za klienta podľa kanála, Profit First…). Čaká na výber. Break-even, aplikácie/AI a osobné financie sú už v reporte.
+
 - **Heinrich 24. 9.: 2 400 Kč, ktoré si nechala Terezka v hotovosti, zapísať ako TEREZKINU VÝPLATU (Jerry, 8. 10. 2026).** PTminder má 7 790, na účet prišlo 5 390; rozdiel nie je v zošite ani v banke. Zapísať ako hotovostný výdavok/výplatu Terezka za 9/2026 (nie ako tržbu). Pri porovnaní tržieb sept.: PTminder 324 849 vs Kokpit 323 639 (banka+zošit 285 577 + bitcoin 38 062) — rozdiel 1 210 = +2 400 Heinrich − 1 100 druhá platba Dvořáka 16. 9. (v PTminderi chýba) − 90 preklep Papiež. Kalmus (15. 9.) a Kaňovský (1. 7.) platili bitcoinom, PTminder ich má ako banku.
 
 - **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Otvorené: tlač/PDF, štvrtá otázka v kvartálnom („splnili sme, čo report navrhol?") — vyžaduje ukladať akcie.
