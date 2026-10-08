@@ -210,6 +210,10 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
+  **Otvorené — chce to Jerryho slovo:** staršie úvodné tréningy vlastný balíček NEDOSTANÚ, appka do minulosti sama nepíše. Bez záznamu sú: Albert Matl (14. 9.), Janka Malinova (17. 8.) a šesť neaktívnych — Roman Pavlik (5. 8.), Hana Hrdinova (6. 8.), Zuzana Spoligova (6. 8.), Terezie Pehalova (11. 8.), Tomaš Dvořak (10. 9.). Všetci majú platbu 1 100 Kč v PTminderi, takže by nevznikol žiadny dlh — išlo by len o to, aby úvodný mal predaj aj u nás. Doplniť?
+- **Nadpis stránky klienta vs. os (Jerry sa k tomu ešte nevyjadril).** Pri Lukášovi Hanusovi riadky končia na 4 h, ale nadpis hlási 5 h — nadpis ide za kartou klienta, os za vlastným prepočtom. Má sa nadpis riadiť osou (stránka bude sama so sebou v zhode), alebo ostať na karte?
+
 - **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"):**
   1. **Kalendár v mobile** — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
   2. **Ponuka termínov** — poslať si ponuku na vlastné číslo, vybrať termín na stránke /t/: vznikne udalosť v Google kalendári a príde push? (zápis do Google z /t/ nebol naostro skúšaný). Potom udalosť zmazať.
