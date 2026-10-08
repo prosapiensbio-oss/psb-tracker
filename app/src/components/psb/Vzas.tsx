@@ -1817,6 +1817,9 @@ export function KamOdisliCard() {
   const [fio, setFio] = useState<FioZostatok | null>(null);
   const [stav, setStav] = useState<StavPenazi | null>(null);
   const [uprava, setUprava] = useState<"" | "hotovost" | "ucet">("");
+  /** Sťahovanie zostatku z Fia — „pracujem" a prípadná hláška od banky. */
+  const [tahamUcet, setTahamUcet] = useState(false);
+  const [chybaUctu, setChybaUctu] = useState("");
   const [hotTxt, setHotTxt] = useState("");
   const [fioTxt, setFioTxt] = useState("");
   const [fioDatum, setFioDatum] = useState("");
@@ -1875,6 +1878,28 @@ export function KamOdisliCard() {
     if (!ok) { setFio(predtym); setUprava("ucet"); }
   };
 
+  /**
+   * ÚČET SA STIAHNE Z FIA, NEOPISUJE SA (Jerry, 8. 10. 2026: „pri stave
+   * hotovosti by malo «prepísať účet» nahradiť «stiahnuť z Fia»").
+   *
+   * Dovtedy sa číslo opisovalo z internetbankingu a inak čakalo na
+   * najbližší import výpisu — teda na koniec mesiaca. Banka ho vie povedať
+   * kedykoľvek; ručné prepísanie zostáva ako záloha, keď API nejde.
+   */
+  const stiahniUcet = async () => {
+    setTahamUcet(true); setChybaUctu("");
+    const j = await fetch("/api/fio", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "zostatok" }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }));
+    setTahamUcet(false);
+    if (!j?.ok) { setChybaUctu(String(j?.chyba || "Zostatok sa nepodarilo stiahnuť.")); return; }
+    const v: FioZostatok = { suma: Number(j.suma) || 0, datum: String(j.datum), rucne: false };
+    setFio(v); setFioTxt(String(v.suma)); setFioDatum(v.datum);
+    oznam("peniaze");
+  };
+
   const btc = res?.czk ?? 0;
   const naUcte = fio?.suma ?? 0;
   const hotovost = stav?.hotovost ?? 0;
@@ -1904,7 +1929,7 @@ export function KamOdisliCard() {
       <div style={{ marginTop: 4 }}>
         {riadok(
           "Na účte Fio", naUcte, fio ? C.text : C.textDim,
-          "Konečný zostatok z hlavičky výpisu z Fia. Doplní sa sám pri importe — appka ho inak nemá odkiaľ vedieť, výpis obsahuje pohyby, nie stav účtu.",
+          "Konečný zostatok podľa banky. Tlačidlo „Stiahnuť z Fia“ sa jej naň spýta rovno (cez obdobie, takže to neposúva zarážku pre import pohybov); doplní sa aj sám pri importe výpisu.",
           fio ? `k ${fmtDMY(fio.datum)}${fio.rucne ? " · ručne" : " · z výpisu"}` : "zatiaľ nezapísané",
         )}
         {riadok(
@@ -1956,11 +1981,20 @@ export function KamOdisliCard() {
           </>
         ) : (
           <>
-            <button onClick={() => setUprava("ucet")} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
-              {fio ? "Prepísať účet" : "Zapísať účet"}
+            <button onClick={() => void stiahniUcet()} disabled={tahamUcet}
+              title="Spýta sa banky na dnešný zostatok a zapíše ho k dnešnému dňu"
+              style={{ background: mix(C.accent, 12), border: `1px solid ${mix(C.accent, 50)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: tahamUcet ? "default" : "pointer", fontFamily: "inherit" }}>
+              {tahamUcet ? "sťahujem…" : "Stiahnuť z Fia"}
             </button>
-            <button onClick={() => setUprava("hotovost")} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+            <button onClick={() => setUprava("hotovost")}
+              title={`Zapíše sa k dnešnému dňu (${fmtDMY(dnesPraha())})`}
+              style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
               {stav ? "Prepísať hotovosť" : "Zapísať hotovosť"}
+            </button>
+            <button onClick={() => setUprava("ucet")}
+              title="Keď banka nejde — číslo z internetbankingu"
+              style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+              účet ručne
             </button>
           </>
         )}
@@ -1971,8 +2005,9 @@ export function KamOdisliCard() {
         {stav && staraHotovost > 40 && (
           <span style={{ fontSize: 11.5, color: C.orange }}>Hotovosť je zapísaná pred viac než mesiacom.</span>
         )}
+        {chybaUctu && <span style={{ fontSize: 11.5, color: C.red, flexBasis: "100%" }}>{chybaUctu}</span>}
         <span style={{ fontSize: 11.5, color: C.textDim, flex: 1, minWidth: 200 }}>
-          Účet sa doplní sám pri najbližšom importe výpisu z Fia — dovtedy sa dá opísať z internetbankingu.
+          Účet si appka vypýta od banky; hotovosť sa zapíše k dnešnému dňu ({fmtDMY(dnesPraha())}).
         </span>
       </div>
     </Card>

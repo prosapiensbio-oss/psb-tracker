@@ -5,6 +5,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
 import { jeKategoriaPrijmu } from "../../lib/psb/kategoriePrijmov";
+import { dnesPraha } from "../../lib/psb/cas";
 import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
 
 // Import bankového výpisu — dvojkrokovo.
@@ -222,6 +223,49 @@ export const Route = createFileRoute("/api/fio")({
             bezId: riadky.filter((r) => !r.id).length,
             zdroj: od && doDna ? `${od} – ${doDna}` : "od posledného stiahnutia",
           });
+        }
+
+        /**
+         * LEN ZOSTATOK NA ÚČTE — pre krok „Stav hotovosti" v uzávierke.
+         *
+         * Jerry, 8. 10. 2026: „pri stave hotovosti by malo «prepísať účet»
+         * nahradiť «stiahnuť z Fia»." Dovtedy sa číslo opisovalo
+         * z internetbankingu a čakalo na najbližší import výpisu.
+         *
+         * Ide to cez OBDOBIE (`urlObdobie`), nie cez „od posledného
+         * stiahnutia": to druhé posúva zarážku a pohyby, ktoré by si vzal
+         * tento dotaz, by už v najbližšom importe neboli. Krátke okno
+         * (včera–dnes) stačí — zaujíma nás `closingBalance`, teda stav ku
+         * koncu obdobia, nie riadky.
+         */
+        if (b.akcia === "zostatok") {
+          const token = ((bindings() as { FIO_TOKEN?: string }).FIO_TOKEN || "").trim();
+          if (!token) return Response.json({ ok: false, chyba: "Fio token nie je nastavený." }, { status: 400 });
+          const dnes = dnesPraha();
+          const vcera = dnesPraha(new Date(Date.now() - 86400000));
+          let odpoved: Response;
+          try {
+            odpoved = await fetch(urlObdobie(token, vcera, dnes), {
+              headers: { "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)", accept: "application/json" },
+            });
+          } catch { return Response.json({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }, { status: 502 }); }
+          if (!odpoved.ok) {
+            const detail = await odpoved.text().catch(() => "");
+            return Response.json({
+              ok: false,
+              chyba: `${chybaOdpovede(odpoved.status)}${detail.trim() ? ` (banka: ${detail.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)})` : ""}`,
+            }, { status: 502 });
+          }
+          let json: FioOdpoved;
+          try { json = (await odpoved.json()) as FioOdpoved; }
+          catch { return Response.json({ ok: false, chyba: "Banka vrátila odpoveď, ktorej appka nerozumie." }, { status: 502 }); }
+          const suma = zostatokZOdpovede(json);
+          if (suma == null) return Response.json({ ok: false, chyba: "Odpoveď banky zostatok nenesie." }, { status: 502 });
+          const hodnota = { suma: Math.round(suma), datum: dnes, rucne: false };
+          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('fio_zostatok',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(JSON.stringify(hodnota)).run();
+          await audit(DB, { action: "fio-zostatok", predmet: `${hodnota.suma} Kč`, neu: `k ${dnes}`, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, ...hodnota });
         }
 
         if (b.akcia === "nahlad") {
