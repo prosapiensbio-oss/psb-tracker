@@ -2036,9 +2036,17 @@ export function deriveAnomalies(
     const zle = (data.webKontroly || []).filter((k) => k.stav !== "ok");
     if (zle.length) {
       const chyby = zle.filter((k) => k.stav === "chyba");
-      const beh = (data.webKontroly[0]?.beh || "").slice(0, 10);
+      /**
+       * Kľúč nesie, ČO padlo — nie KEDY.
+       *
+       * S dňom v kľúči sa položka vracala každé ráno ako nová a odklepnúť sa
+       * nedala (pravidlo „kľúč sa neodvodzuje z textu karty", 26. 8. 2026).
+       * Pri náleze, ktorý žije sedemdňové okno, to znamená týždeň svietenia
+       * nad vecou, o ktorej Jerry už vie. Takto odklepnutie drží, kým padá to
+       * isté — a len čo padne čokoľvek iné, kľúč sa zmení a položka sa vráti.
+       */
       push(
-        `web-kontrola|${beh}`,
+        `web-kontrola|${zle.map((k) => k.kluc).sort().join(",")}`,
         chyby.length ? "red" : "orange",
         chyby.length ? "Web nefunguje" : "Web — upozornenie",
         `${(chyby.length ? chyby : zle).map((k) => `${k.nazov}: ${k.detail}`).join(" · ")}`,

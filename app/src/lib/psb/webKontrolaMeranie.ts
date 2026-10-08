@@ -377,7 +377,17 @@ export function skontrolujMeranie(d: MeranieData, dnes: string = dnesPraha()): N
       // `dni[0]` tu z definície existuje (zlyhanie v okne má deň, inak by ho
       // `vOkne` nepustilo), ale cez `?.`: táto funkcia beží v nočnej kontrole,
       // v ktorej sú aj body 1 a 3, a výnimka by zhodila zápis všetkých troch.
-      `za posledných 7 dní (${od} až ${vcera}) sa ${tyzden.zlyhal}× nepodarilo odoslať formulár — každé jedno je stratený dopyt, človek videl chybu a odišiel. Naposledy ${dni[0]?.den || vcera}, po dňoch: ${dni.map((x) => `${x.den} ${x.pocet}×`).join(" · ")}. Kde: ${kde.join(" · ")}.${vceraTicho}${chybaju}`));
+      /*
+       * ZLYHANIE JE POKUS, NIE ČLOVEK.
+       *
+       * Prvá verzia hovorila „10× nepodarilo odoslať — každé jedno je stratený
+       * dopyt". 2. 10. 2026 to bolo DESAŤ POKUSOV JEDNÉHO ČLOVEKA: GA4 hlási
+       * v ten deň jediný `formular_start`. Kto dostane chybu, skúša znova —
+       * a kontrola, ktorá z toho spraví desať stratených dopytov, preháňa
+       * presne to číslo, kvôli ktorému sa na ňu Jerry pozerá. Preto sa vedľa
+       * pokusov hovorí, koľko ľudí sa vôbec pustilo do písania.
+       */
+      `za posledných 7 dní (${od} až ${vcera}) sa ${tyzden.zlyhal}× nepodarilo odoslať formulár${tyzden.start > 0 ? ` (do písania sa pustilo ${tyzden.start}× — jeden človek po chybe skúša znova, takže ľudí je menej než pokusov)` : ""} — a aj jeden stratený dopyt je človek, ktorý videl chybu a odišiel. Naposledy ${dni[0]?.den || vcera}, po dňoch: ${dni.map((x) => `${x.den} ${x.pocet}×`).join(" · ")}. Kde: ${kde.join(" · ")}.${vceraTicho}${chybaju}`));
   } else if (tyzden.spolu === 0) {
     // Nula zlyhaní z nuly udalostí nie je zistenie. Či je ticho na webe alebo
     // v meraní, patrí druhému riadku a tu by sa to len zdvojilo.
