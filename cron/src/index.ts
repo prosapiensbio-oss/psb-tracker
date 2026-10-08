@@ -190,8 +190,47 @@ const kontrolaWebu = async (env: Env, cast: "formulare" | "stranky" | "meranie" 
   );
 };
 
+/**
+ * Metricool každú noc (Jerry, 8. 10. 2026: „áno, nastav to každú noc").
+ * Kokpit drží prístup do Metricoolu sám (MCP, bez plánu Advanced), takže
+ * plánovač len povie „stiahni". Bežiaci mesiac každú noc; prvý týždeň mesiaca
+ * aj ten predošlý, aby uzávierka dostala úplné čísla. Každý mesiac je vlastná
+ * požiadavka — jedna je ~10 krátkych dopytov na Metricool.
+ */
+const metricoolMesiac = (env: Env, mesiac: string) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/metricool", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "stiahni", mesiac }),
+    }),
+  );
+
+/** Mesiac v Prahe (RRRR-MM), s posunom o n mesiacov. */
+const mesiacPraha = (n = 0) => {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Prague" }));
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+const denPraha = () => Number(new Date().toLocaleString("en-US", { timeZone: "Europe/Prague", day: "numeric" }));
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    if (event.cron === "40 4 * * *") {  // 06:40 lokál v lete — po kontrole webu a reklamách
+      ctx.waitUntil((async () => {
+        const mesiace = denPraha() <= 7 ? [mesiacPraha(-1), mesiacPraha()] : [mesiacPraha()];
+        for (const m of mesiace) {
+          try {
+            const r = await metricoolMesiac(env, m);
+            console.log(`metricool ${m}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
+          } catch (e) {
+            console.error(`metricool ${m} zlyhal:`, e);
+          }
+        }
+      })());
+      return;
+    }
     // Ranná dávka notifikácií na telefón. 5:10 UTC = 7:10 u nás v lete,
     // 6:10 v zime — teda vtedy, keď človek berie telefón do ruky, nie keď
     // ešte spí. Beží PRED snímkou kalendára z toho istého behu by sa nezmestila

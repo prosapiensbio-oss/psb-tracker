@@ -33,10 +33,17 @@ export const Route = createFileRoute("/api/metricool")({
         }
       },
       POST: async ({ request }) => {
-        if (!(await isAuthed(request))) return unauthorized();
+        // Nočný sťah (Jerry, 8. 10. 2026: „áno, nastav to každú noc") ide
+        // z plánovača kokpit-cron s tokenom — a smie LEN sťahovať.
+        const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
+        const dany = request.headers.get("x-cron-token") || "";
+        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const b = (await request.json().catch(() => ({}))) as { akcia?: string; mesiac?: string };
+        if (odPlanovaca && b.akcia !== "stiahni") return unauthorized();
+        const kto = odPlanovaca ? "kokpit-cron" : (await currentUser(request)) || undefined;
         const hlavicky = { "cache-control": "no-store" };
 
         if (b.akcia === "stav") return Response.json({ ok: true, ...(await stavPripojenia(DB)) }, { headers: hlavicky });
@@ -94,7 +101,7 @@ export const Route = createFileRoute("/api/metricool")({
 
             const siete = [...new Set(kanaly.map((k) => k.kanal))];
             const vysledok = { reels: reels.length, posty: posty.length, stories: stories.length, metrik: kanaly.length, siete, preskocene };
-            await audit(DB, { action: "metricool-stiahnute", predmet: mesiac, neu: `${vysledok.reels} reels, ${vysledok.posty} príspevkov, ${vysledok.stories} stories, ${vysledok.metrik} metrík`, actor: (await currentUser(request)) || undefined });
+            await audit(DB, { action: "metricool-stiahnute", predmet: mesiac, neu: `${vysledok.reels} reels, ${vysledok.posty} príspevkov, ${vysledok.stories} stories, ${vysledok.metrik} metrík`, actor: kto });
             return Response.json({ ok: true, mesiac, ...vysledok }, { headers: hlavicky });
           } catch (e) {
             const sprava = e instanceof Error ? e.message : String(e);
