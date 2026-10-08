@@ -205,12 +205,21 @@ export function spayd(v: {
   splatnost?: string;
   prijemca?: string;
 }): string {
+  /**
+   * PRÁZDNY VARIABILNÝ SYMBOL SA NEPOSIELA.
+   *
+   * Stránka klienta QR vyrába bez čísla faktúry (páruje sa menom v správe)
+   * a do reťazca tak šlo holé `X-VS:` bez hodnoty — pole, ktoré nič
+   * nehovorí a bankovej appke nemá čo predvyplniť. Nájdené pri kontrole
+   * QR 8. 10. 2026; suma bola v poriadku.
+   */
+  const vs = (v.vs || "").replace(/\D/g, "").slice(0, 10);
   const polia = [
     "SPD*1.0",
     `ACC:${(v.iban || DODAVATEL.iban).replace(/\s/g, "")}`,
     `AM:${v.suma.toFixed(2)}`,
     "CC:CZK",
-    `X-VS:${v.vs.replace(/\D/g, "").slice(0, 10)}`,
+    ...(vs ? [`X-VS:${vs}`] : []),
   ];
   if (v.splatnost) polia.push(`DT:${v.splatnost.replace(/-/g, "")}`);
   if (v.prijemca) polia.push(`RN:${ascii(v.prijemca).slice(0, 35).toUpperCase()}`);

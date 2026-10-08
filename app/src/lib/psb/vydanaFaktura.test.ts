@@ -138,3 +138,20 @@ describe("ascii", () => {
     expect(ascii("  dve   medzery ")).toBe("dve medzery");
   });
 });
+
+describe("QR platba — variabilný symbol", () => {
+  it("faktúra nesie číslo ako VS", () => {
+    const q = spayd({ suma: 6990, vs: "20261006", sprava: "Faktura 20261006 PSB", splatnost: "2026-10-22" });
+    expect(q).toContain("AM:6990.00");
+    expect(q).toContain("X-VS:20261006");
+  });
+
+  it("bez čísla faktúry sa pole VS vôbec nepošle", () => {
+    // Stránka klienta páruje platbu menom v správe, nie symbolom; holé
+    // „X-VS:" je pole bez hodnoty (nájdené pri kontrole QR 8. 10. 2026).
+    const q = spayd({ suma: 6990, vs: "", sprava: "Martin Vaško" });
+    expect(q).not.toContain("X-VS");
+    expect(q).toContain("MSG:MARTIN VASKO");
+    expect(q).toContain("AM:6990.00");
+  });
+});
