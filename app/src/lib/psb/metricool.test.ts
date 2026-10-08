@@ -34,3 +34,29 @@ describe("Metricool cez MCP", () => {
     expect(rozsahMesiaca("2026-02").to).toBe("2026-02-28T23:59:59+01:00");
   });
 });
+
+describe("ostatné siete", () => {
+  it("Facebook: stav na konci mesiaca, súčty, nehlásené pole sa nezapíše", async () => {
+    const { SIETE, mesacneSiete, poliaSiete } = await import("./metricool");
+    const fb = SIETE.find((s) => s.kanal === "Facebook")!;
+    const n = poliaSiete(fb).length;
+    const riadok = (den: string, sled: number, visits: number) => {
+      const r: unknown[] = Array(n).fill(null);
+      r[poliaSiete(fb).indexOf("FBEV17")] = String(sled);
+      r[poliaSiete(fb).indexOf("FBEV03")] = String(visits);
+      return [...r, den];
+    };
+    const m = Object.fromEntries(mesacneSiete(fb, [riadok("20260901", 330, 2), riadok("20260930", 334, 3), riadok("20261001", 999, 9)], "2026-09").map((x) => [x.metrika, x.hodnota]));
+    expect(m).toEqual({ Followers: 334, "Page visits": 5 });
+  });
+
+  it("YouTube: prírastok = získaní − stratení; 403 na značku sa spozná", async () => {
+    const { SIETE, mesacneSiete, poliaSiete, jeInaZnacka } = await import("./metricool");
+    const yt = SIETE.find((s) => s.kanal === "YouTube")!;
+    const p = poliaSiete(yt);
+    const r = (g: number, l: number, den: string) => { const x: unknown[] = Array(p.length).fill(null); x[p.indexOf("YTEV05")] = g; x[p.indexOf("YTEV06")] = l; return [...x, den]; };
+    const m = Object.fromEntries(mesacneSiete(yt, [r(3, 1, "20260905"), r(1, 0, "20260920")], "2026-09").map((x) => [x.metrika, x.hodnota]));
+    expect(m["Followers balance"]).toBe(3);
+    expect(jeInaZnacka(`Metricool: 403 Forbidden … "Access denied to blog: '2101108'"`)).toBe(true);
+  });
+});

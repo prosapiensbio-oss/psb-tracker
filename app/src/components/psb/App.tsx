@@ -2311,7 +2311,7 @@ function skupinaFaktur(
         id: "metricool",
         label: "Metricool",
         hotovo: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk),
-        detail: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk) ? "nahratý" : "chýba export",
+        detail: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk) ? "nahratý" : "chýba — stiahni z Metricoolu",
         tab: "workspace",
         sub: "uzavierka",
       },

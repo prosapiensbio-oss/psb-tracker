@@ -23,7 +23,7 @@ import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import type { PSBData } from "../../lib/psb/types";
 import { otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 
 export type BalicekRiadokKroku = {
   id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
@@ -1006,16 +1006,26 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
     } catch { /* bez adresy nič */ }
     return () => { zive = false; };
   }, []);
+  // Sťahuje mesiac uzávierky a k nemu aj bežiaci mesiac — Jerry, 8. 10. 2026:
+  // „môžem aj každý týždeň?" Môže; ťuknutie počas mesiaca obnoví čísla do dneška
+  // a zápis je prepis, nič sa nezdvojí.
   const stiahniMetricool = async () => {
     setBezi("metricool"); setChyba(""); setHlaska("");
-    const j = await posli("/api/metricool", { akcia: "stiahni", mesiac }) as { ok?: boolean; error?: string; nepripojeny?: boolean; reels?: number; posty?: number; stories?: number };
-    setBezi("");
-    if (!j.ok) {
-      if (j.nepripojeny) setMetricool(false);
-      setChyba(String(j.error || "Metricool sa nestiahol."));
-      return;
+    type Odp = { ok?: boolean; error?: string; nepripojeny?: boolean; reels?: number; posty?: number; stories?: number; siete?: string[]; preskocene?: string[] };
+    const mesiace = [...new Set([mesiac, mesiacPraha()])];
+    const vety: string[] = [];
+    for (const m of mesiace) {
+      const j = await posli("/api/metricool", { akcia: "stiahni", mesiac: m }) as Odp;
+      if (!j.ok) {
+        setBezi("");
+        if (j.nepripojeny) setMetricool(false);
+        setChyba(String(j.error || "Metricool sa nestiahol."));
+        return;
+      }
+      vety.push(`${nazovMesiaca(m)}: ${j.reels} reels, ${j.posty} príspevkov, ${j.stories} stories · ${(j.siete || []).join(", ")}${j.preskocene?.length ? ` (bez ${j.preskocene.join(", ")})` : ""}`);
     }
-    setHlaska(`Z Metricoolu za ${nazovMesiaca(mesiac)}: ${j.reels} reels, ${j.posty} príspevkov, ${j.stories} stories a mesačné čísla Instagramu.`);
+    setBezi("");
+    setHlaska(`Stiahnuté z Metricoolu — ${vety.join(" | ")}.`);
     setOtvoreny("");
     onZmena();
   };
@@ -1098,7 +1108,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
                 // Celá stránka ide do Metricoolu na povolenie a vráti sa sem.
                 <a href="/api/metricool?akcia=pripoj" style={{ ...hlavne(true), textDecoration: "none", display: "inline-block" }}>Pripojiť Metricool</a>
               )}
-              {!maObsah && k.tab && onNavigate && (
+              {!maObsah && k.tab && onNavigate && k.id !== "metricool" && (
                 <button style={vedlajsie} onClick={() => onNavigate(k.tab as string, k.sub, k.focus as never)}>otvoriť</button>
               )}
             </div>

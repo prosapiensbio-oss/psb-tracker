@@ -19,6 +19,8 @@
 export const MCP_URL = "https://ai.metricool.com/mcp";
 /** ProSapiens Biomechanic v Metricoole. */
 export const BRAND_PSB = "2101108";
+/** Účet Metricoolu (prosapiens.bio@gmail.com) — patrí do žiadosti o prístup. */
+export const POUZIVATEL_MC = "1737317";
 
 export type PrispevokMc = {
   id: string; druh: "post" | "reel" | "story"; datum: string; mesiac: string; url: string; hook: string;
@@ -139,3 +141,95 @@ export function rozsahMesiaca(mesiac: string): { from: string; to: string } {
   const posun = (mm: number) => (mm >= 4 && mm <= 10 ? "+02:00" : "+01:00");
   return { from: `${mesiac}-01T00:00:00${posun(m)}`, to: `${mesiac}-${String(posledny).padStart(2, "0")}T23:59:59${posun(m)}` };
 }
+
+/**
+ * OSTATNÉ SIETE (Jerry, 8. 10. 2026: „áno, chcem aj ostatné"). Vývoj účtu po
+ * dňoch → jeden mesačný riadok na metriku do `kanaly_mesiace`. Názvy kanálov
+ * a metrík sú tie, ktoré zapisuje PDF zostava a číta Kanaly.tsx.
+ *   posledna — stav ku koncu mesiaca (sledovatelia)
+ *   sucet    — súčet dní
+ *   rozdiel  — prvé pole mínus druhé (získaní − stratení)
+ */
+export type MetrikaSiete = { metrika: string; polia: string[]; ako: "posledna" | "sucet" | "rozdiel" };
+export type Siet = { kanal: string; metriky: MetrikaSiete[] };
+
+export const SIETE: Siet[] = [
+  { kanal: "Facebook", metriky: [
+    { metrika: "Followers", polia: ["FBEV17"], ako: "posledna" },
+    { metrika: "Acquired", polia: ["FBEV47"], ako: "sucet" },
+    { metrika: "Lost", polia: ["FBEV48"], ako: "sucet" },
+    { metrika: "Page visits", polia: ["FBEV03"], ako: "sucet" },
+    { metrika: "Views", polia: ["FBEV49"], ako: "sucet" },
+    { metrika: "Posts", polia: ["FBEV04"], ako: "sucet" },
+    { metrika: "Reels", polia: ["FBEV21"], ako: "sucet" },
+    { metrika: "Video views", polia: ["FBEV22"], ako: "sucet" },
+    { metrika: "Interactions", polia: ["FBEV10"], ako: "sucet" },
+    { metrika: "Shares", polia: ["FBEV15"], ako: "sucet" },
+  ] },
+  { kanal: "TikTok", metriky: [
+    { metrika: "Followers", polia: ["TKEV07"], ako: "posledna" },
+    { metrika: "Followers balance", polia: ["TKEV08"], ako: "sucet" },
+    { metrika: "Videos", polia: ["TKEV01"], ako: "sucet" },
+    { metrika: "Views", polia: ["TKEV02"], ako: "sucet" },
+    { metrika: "Reach", polia: ["TKEV11"], ako: "sucet" },
+    { metrika: "Profile views", polia: ["TKEV09"], ako: "sucet" },
+    { metrika: "Interactions", polia: ["TKEV06"], ako: "sucet" },
+    { metrika: "Shares", polia: ["TKEV05"], ako: "sucet" },
+  ] },
+  { kanal: "YouTube", metriky: [
+    { metrika: "Followers", polia: ["YTEV01"], ako: "posledna" },
+    { metrika: "Followers balance", polia: ["YTEV05", "YTEV06"], ako: "rozdiel" },
+    { metrika: "Videos", polia: ["YTEV04"], ako: "sucet" },
+    { metrika: "Views", polia: ["YTEV02"], ako: "sucet" },
+  ] },
+  { kanal: "LinkedIn", metriky: [
+    { metrika: "Followers", polia: ["LIEV01"], ako: "posledna" },
+    { metrika: "Followers balance", polia: ["LIEV08"], ako: "sucet" },
+    { metrika: "Posts", polia: ["LIEV04"], ako: "sucet" },
+    { metrika: "Impressions", polia: ["LIEV18"], ako: "sucet" },
+    { metrika: "Interactions", polia: ["LIEV10"], ako: "sucet" },
+  ] },
+  { kanal: "Threads", metriky: [
+    { metrika: "Followers", polia: ["THEV01"], ako: "posledna" },
+    { metrika: "Followers balance", polia: ["THEV03"], ako: "sucet" },
+    { metrika: "Posts", polia: ["THEV02"], ako: "sucet" },
+    { metrika: "Views", polia: ["THEV06"], ako: "sucet" },
+    { metrika: "Interactions", polia: ["THEV05"], ako: "sucet" },
+  ] },
+  { kanal: "Google Business", metriky: [
+    { metrika: "Views search", polia: ["GMEV18"], ako: "sucet" },
+    { metrika: "Views maps", polia: ["GMEV19"], ako: "sucet" },
+    { metrika: "Website clicks", polia: ["GMEV21"], ako: "sucet" },
+    { metrika: "Calls", polia: ["GMEV22"], ako: "sucet" },
+    { metrika: "Directions", polia: ["GMEV23"], ako: "sucet" },
+    { metrika: "Reviews", polia: ["GMEV13"], ako: "sucet" },
+  ] },
+];
+
+/** Všetky polia siete v poradí, v akom idú do dopytu (deň príde ako stĺpec navyše na konci). */
+export const poliaSiete = (s: Siet) => [...new Set(s.metriky.flatMap((m) => m.polia))];
+
+/**
+ * Riadky vývoja siete → mesačné čísla. Metrika, ktorej pole za celý mesiac
+ * neprišlo (sieť ho nehlási), sa nezapíše — nula by tvrdila niečo, čo sa nevie.
+ */
+export function mesacneSiete(s: Siet, rows: unknown[][], mesiac: string): { metrika: string; hodnota: number }[] {
+  const polia = poliaSiete(s);
+  const dni = rows
+    .map((r) => ({ den: text(r[r.length - 1]), r }))
+    .filter((d) => /^\d{8}$/.test(d.den) && `${d.den.slice(0, 4)}-${d.den.slice(4, 6)}` === mesiac)
+    .sort((a, b) => a.den.localeCompare(b.den));
+  const hodnoty = (pole: string) => dni.map((d) => d.r[polia.indexOf(pole)]).filter((v) => v != null && v !== "").map(cislo);
+  const out: { metrika: string; hodnota: number }[] = [];
+  for (const m of s.metriky) {
+    const a = hodnoty(m.polia[0]);
+    if (!a.length) continue;
+    if (m.ako === "posledna") out.push({ metrika: m.metrika, hodnota: a[a.length - 1] });
+    else if (m.ako === "sucet") out.push({ metrika: m.metrika, hodnota: a.reduce((x, y) => x + y, 0) });
+    else out.push({ metrika: m.metrika, hodnota: a.reduce((x, y) => x + y, 0) - hodnoty(m.polia[1]).reduce((x, y) => x + y, 0) });
+  }
+  return out;
+}
+
+/** 403 „Access denied to blog" = Kokpit dostal prístup k inej značke než ProSapiens. */
+export const jeInaZnacka = (sprava: string) => /access denied to blog/i.test(sprava);

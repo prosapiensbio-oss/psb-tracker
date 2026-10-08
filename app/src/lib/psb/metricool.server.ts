@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { MCP_URL, rozoberOdpovedMcp, riadkyZVysledku } from "./metricool";
+import { BRAND_PSB, MCP_URL, POUZIVATEL_MC, rozoberOdpovedMcp, riadkyZVysledku } from "./metricool";
 
 /**
  * Kokpit ako MCP klient Metricoolu (viď metricool.ts, prečo nie API).
@@ -80,6 +80,10 @@ export async function adresaPripojenia(DB: D1Database, redirectUri: string): Pro
   const q = new URLSearchParams({
     response_type: "code", client_id: k.client_id, redirect_uri: redirectUri, scope: ROZSAH,
     state, code_challenge: challenge, code_challenge_method: "S256", resource: MCP_URL,
+    // Metricool viaže povolenie na ZNAČKU — bez tohto ju doplní podľa toho,
+    // ktorá je v jeho okne práve otvorená (8. 10. 2026 to bola Ahsoka a sťah
+    // ProSapiens padol na 403 „Access denied to blog").
+    blogId: BRAND_PSB, userId: POUZIVATEL_MC,
   });
   return `${AUTH}?${q}`;
 }

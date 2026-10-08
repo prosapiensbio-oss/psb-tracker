@@ -5,8 +5,8 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeMesiac } from "../../lib/psb/format";
 import {
-  BRAND_PSB, mesacneInstagram, POLIA_POSTS, POLIA_REELS, POLIA_STORIES, POLIA_VYVOJ,
-  riadkyNaPrispevky, rozsahMesiaca, type PrispevokMc,
+  BRAND_PSB, jeInaZnacka, mesacneInstagram, mesacneSiete, POLIA_POSTS, POLIA_REELS, POLIA_STORIES, POLIA_VYVOJ,
+  poliaSiete, riadkyNaPrispevky, rozsahMesiaca, SIETE, type PrispevokMc,
 } from "../../lib/psb/metricool";
 import { adresaPripojenia, odpoj, sedenieMcp, stavPripojenia } from "../../lib/psb/metricool.server";
 
@@ -58,7 +58,19 @@ export const Route = createFileRoute("/api/metricool")({
             const stories = riadkyNaPrispevky("story", await mcp.riadky(BRAND_PSB, from, to, POLIA_STORIES));
             const vyvoj = await mcp.riadky(BRAND_PSB, from, to, POLIA_VYVOJ);
             const vsetky: PrispevokMc[] = [...reels, ...posty, ...stories].filter((p) => p.mesiac === mesiac);
-            const kanaly = mesacneInstagram(vyvoj, vsetky, mesiac);
+            const kanaly = mesacneInstagram(vyvoj, vsetky, mesiac).map((k) => ({ ...k, kanal: "Instagram" }));
+            // Ostatné siete: každá vlastný krátky dopyt. Sieť, ktorá zlyhá
+            // (nepripojená, zmenené pole), nezhodí zvyšok — povie sa to.
+            const preskocene: string[] = [];
+            for (const s of SIETE) {
+              try {
+                const rows = await mcp.riadky(BRAND_PSB, from, to, poliaSiete(s));
+                for (const k of mesacneSiete(s, rows, mesiac)) kanaly.push({ ...k, kanal: s.kanal });
+              } catch (e) {
+                if (jeInaZnacka(String(e))) throw e;
+                preskocene.push(s.kanal);
+              }
+            }
             const now = new Date().toISOString();
 
             // Ten istý zápis ako import CSV exportu (db.server.ts → mkt_prispevky).
@@ -71,20 +83,26 @@ export const Route = createFileRoute("/api/metricool")({
             // A tie isté riadky, aké zapisuje PDF zostava (kanaly_mesiace).
             for (const k of kanaly) {
               stmts.push(DB.prepare(
-                `INSERT INTO kanaly_mesiace (mesiac, kanal, metrika, hodnota, zmena, poznamka, updated_at) VALUES (?1, 'Instagram', ?2, ?3, NULL, 'Metricool (priamo)', ?4)
+                `INSERT INTO kanaly_mesiace (mesiac, kanal, metrika, hodnota, zmena, poznamka, updated_at) VALUES (?1, ?2, ?3, ?4, NULL, 'Metricool (priamo)', ?5)
                  ON CONFLICT(mesiac, kanal, metrika) DO UPDATE SET hodnota = excluded.hodnota, poznamka = excluded.poznamka, updated_at = excluded.updated_at`,
-              ).bind(mesiac, k.metrika, k.hodnota, now));
+              ).bind(mesiac, k.kanal, k.metrika, k.hodnota, now));
             }
             // Záznam nahratia — krok uzávierky aj „nahraté" pri ňom sa riadia ním.
             stmts.push(DB.prepare("INSERT INTO upload_log (id, date, filename, type, added, skipped) VALUES (?1, ?2, ?3, 'metricool', ?4, 0)")
               .bind(crypto.randomUUID(), now, `metricool-priamo ${mesiac}`, vsetky.length));
             for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
 
-            const vysledok = { reels: reels.length, posty: posty.length, stories: stories.length, metrik: kanaly.length };
+            const siete = [...new Set(kanaly.map((k) => k.kanal))];
+            const vysledok = { reels: reels.length, posty: posty.length, stories: stories.length, metrik: kanaly.length, siete, preskocene };
             await audit(DB, { action: "metricool-stiahnute", predmet: mesiac, neu: `${vysledok.reels} reels, ${vysledok.posty} príspevkov, ${vysledok.stories} stories, ${vysledok.metrik} metrík`, actor: (await currentUser(request)) || undefined });
             return Response.json({ ok: true, mesiac, ...vysledok }, { headers: hlavicky });
           } catch (e) {
             const sprava = e instanceof Error ? e.message : String(e);
+            // Povolenie pre inú značku je ako žiadne — treba pripojiť znova.
+            if (jeInaZnacka(sprava)) {
+              await odpoj(DB);
+              return Response.json({ ok: false, nepripojeny: true, error: "Metricool dal Kokpitu prístup k inej značke než ProSapiens. Klikni „Pripojiť Metricool“ — Kokpit si teraz pýta ProSapiens výslovne." }, { status: 409, headers: hlavicky });
+            }
             const nepripojeny = /nie je pripojený|vypršal|pripoj ho znova/i.test(sprava);
             return Response.json({ ok: false, error: sprava, nepripojeny }, { status: nepripojeny ? 409 : 502, headers: hlavicky });
           }
