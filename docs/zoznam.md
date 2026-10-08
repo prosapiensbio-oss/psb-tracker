@@ -210,8 +210,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
-- **Odpočet hodín na stránke klienta — tri návrhy, čaká sa na A/B/C.** `navrhy-kokpitu/odpocet-hodin.html` (Vaškove skutočné čísla). A = rad pod sebou (beží teraz), B = pás hodín (balíček ako šesť políčok), C = dve kôpky (z balíčka / nad balíček). Hotové nezávisle od voľby: „Nezaplaceno" namiesto „Nad rámec", červená (5,2 : 1 na zelenom), preč s listovaním do strany aj s druhým rozbaľovaním.
-- **Faktúra 20261001 (Martin Vaško, 7 790 Kč) je o 800 Kč vyššia než jeho předplatné.** Doklad už odišiel klientovi. Príčina opravená 8. 10. (klik na popis prepisoval sumu), ale samotná faktúra je vystavená — rozhodni, či sa má stornovať a vystaviť nová na 6 990 Kč, alebo nechať tak. Ostatné faktúry so svojím balíčkom sedia (overené na všetkých nestornovaných).
+- ~~Odpočet hodín — tri návrhy~~ — **Jerry 8. 10. 2026 vybral A** (rad pod sebou, teda to, čo beží). Návrhy B (pás hodín) a C (dve kôpky) zostávajú v `navrhy-kokpitu/odpocet-hodin.html`, keby sa k tomu raz vrátil.
+- ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Klientovi ešte neodišla — pošli ju z karty Faktúry. Príčina (klik na popis prepisoval sumu) je opravená.
 
 - **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, overené naostro 8. 10.** (Workspace → Kalendár → Firma, ‹ ‹ › a Alt+← vrátia presne poradie). Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
 
