@@ -78,7 +78,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -121,6 +121,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   otvorKrok?: string | null;
   onKrokOtvoreny?: () => void;
   onOtvoreny?: () => void;
+  /**
+   * Karta, na ktorú skočiť — „krok:<id>" alebo druh karty („klient").
+   * Používa to tlačidlo späť/dopredu: bez toho by sa krok vrátil na záložku
+   * Workspace, ale na tú kartu, na ktorej človek stál naposledy, nie na tú,
+   * z ktorej odišiel (Jerry, 8. 10. 2026).
+   */
+  otvorKartu?: string | null;
+  onKartaOtvorena?: () => void;
+  /** Hlási von, kde vo Workspace človek stojí — aby to stopa pohybu vedela. */
+  onKde?: (kde: { karta: string; klient: string }) => void;
 }) {
   const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
@@ -354,6 +364,24 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (idx >= 0) setI(idx);
     onKrokOtvoreny?.();
   }, [otvorKrok, zive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Meno karty pre stopu pohybu. Kroky sa rozlišujú svojím id, ostatné karty
+   * stačí druhom — dve rovnaké vedľa seba nie sú.
+   */
+  const idKarty = useCallback((x: Karta): string => (x.druh === "krok" ? `krok:${x.krok}` : x.druh), []);
+
+  // Späť/dopredu: skok na konkrétnu kartu a hlásenie, kde človek stojí.
+  useEffect(() => {
+    if (!otvorKartu) return;
+    const idx = zive.findIndex((x) => idKarty(x) === otvorKartu);
+    if (idx >= 0) setI(idx);
+    onKartaOtvorena?.();
+  }, [otvorKartu, zive, idKarty, onKartaOtvorena, setI]);
+  const kdeSom = k ? idKarty(k) : "";
+  useEffect(() => {
+    onKde?.({ karta: kdeSom, klient: klientNaStole });
+  }, [kdeSom, klientNaStole, onKde]);
 
   /**
    * Komu sa dá založiť anamnéza.

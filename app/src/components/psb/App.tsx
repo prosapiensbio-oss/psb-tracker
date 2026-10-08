@@ -96,6 +96,7 @@ import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 import { dnesPraha } from "../../lib/psb/cas";
+import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -354,6 +355,13 @@ function NovaVerziaPas() {
   );
 }
 
+/** Jedno miesto v Kokpite — to, čo vie tlačidlo späť obnoviť. */
+type Miesto = {
+  active: string; trackerSection: string; firmaSub: string; vzasSub: string;
+  vysledkySub: string; marketingSub: string; treningySub: string; klientiSub: string;
+  wsKarta: string; wsKlient: string;
+};
+
 export function PSBApp() {
   // Zvolená paleta sa musí nasadiť pri ŠTARTE appky.
   //
@@ -380,6 +388,10 @@ export function PSBApp() {
   const [workspaceKlient, setWorkspaceKlient] = useState<string | null>(null);
   /** Krok Workspace, na ktorý sa má skočiť (odkaz z upozornenia alebo inej záložky). */
   const [workspaceKrok, setWorkspaceKrok] = useState<string | null>(null);
+  /** Karta Workspace, na ktorú sa má skočiť — používa to späť/dopredu. */
+  const [workspaceKarta, setWorkspaceKartu] = useState<string | null>(null);
+  /** Kde vo Workspace človek stojí — hlási to Workspace, číta stopa pohybu. */
+  const [kdeWorkspace, setKdeWorkspace] = useState<{ karta: string; klient: string }>({ karta: "", klient: "" });
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   // Mesiac, od ktorého sú peniaze z Kokpitu — číta ho výpočet ručného príjmu
   // v efekte banky, ktorý na `data` nezávisí (viď `zaradCiast`).
@@ -530,6 +542,96 @@ export function PSBApp() {
     // „algoritmus" prestal byť záložkou, „dosah" sa rozdelil na tri.
     if (zal === "marketing" && pod) setMarketingSub(MKT_ALIAS[pod] || pod);
   }, []);
+
+  /**
+   * SPÄŤ A DOPREDU PO KOKPITE (Jerry, 8. 10. 2026).
+   *
+   * „Keď sa začínam pohybovať po Kokpite, potrebujem niekedy uskočiť na jednu
+   * podstránku a potom sa z nej vrátiť späť — a vlastne to musí nanovo
+   * vyhľadať, pretože späť tam nikde nie je."
+   *
+   * Adresa na to nestačí: appka do nej píše `replaceState` (inak by jedno
+   * kliknutie na podzáložku znamenalo jeden krok späť v prehliadači) a hlavne
+   * v nej nie je, ktorého KLIENTA mal človek otvoreného — a práve ten sa
+   * hľadá nanovo. Stopa si preto pamätá celé miesto vrátane karty Workspace
+   * a mena na stole.
+   */
+  const miesto: Miesto = {
+    active, trackerSection, firmaSub, vzasSub, vysledkySub, marketingSub,
+    treningySub, klientiSub,
+    // Karta a klient patria k miestu len vtedy, keď je Workspace naozaj
+    // otvorený. Inak by sa „Dnes" líšilo samo od seba podľa toho, čo zostalo
+    // otvorené vedľa, a návrat by nikdy nesadol na svoj cieľ.
+    wsKarta: active === "workspace" ? kdeWorkspace.karta : "",
+    wsKlient: active === "workspace" ? kdeWorkspace.klient : "",
+  };
+  const klucMiesta = JSON.stringify(miesto);
+  const [stopa, setStopa] = useState<Stopa<Miesto>>(() => zacni(miesto));
+  /**
+   * Kam sa práve vraciame. Nie boolean: návrat sa neudeje jedným
+   * prekreslením — appka prepne záložku hneď, ale kartu Workspace si nastaví
+   * až on sám, keď dostane signál. Medzitým by miesto „polovice cesty"
+   * spadlo do stopy ako nový pohyb a vetva dopredu by sa stratila. Kým
+   * nesedí cieľ, nezapisuje sa nič; poistka ho po dvoch sekundách pustí,
+   * aby zablúdený návrat stopu neumŕtvil navždy.
+   */
+  const vraciameSa = useRef<string | null>(null);
+  useEffect(() => {
+    if (vraciameSa.current !== null) {
+      if (vraciameSa.current === klucMiesta) vraciameSa.current = null;
+      return;
+    }
+    setStopa((x) => pridaj(x, JSON.parse(klucMiesta) as Miesto, (a, b) => JSON.stringify(a) === JSON.stringify(b)));
+  }, [klucMiesta]);
+
+  /**
+   * Stopa aj mimo prekreslenia — `chodPo` ju musí vedieť prečítať bez toho,
+   * aby sa na ňu viazalo. Dosadzovanie stavu sa NESMIE diať vnútri updatera
+   * `setStopa`: React ho vo vývoji volá dvakrát a appka by preskočila o dve
+   * miesta.
+   */
+  const stopaRef = useRef(stopa);
+  stopaRef.current = stopa;
+
+  const chodPo = useCallback((smer: -1 | 1) => {
+    const novy = posun(stopaRef.current, smer);
+    if (!novy) return;
+    {
+      const m = tu(novy);
+      vraciameSa.current = JSON.stringify(m);
+      setTimeout(() => { vraciameSa.current = null; }, 2000);
+      setStopa(novy);
+      setActive(m.active);
+      setTrackerSection(m.trackerSection);
+      setFirmaSub(m.firmaSub);
+      setVzasSub(m.vzasSub);
+      setVysledkySub(m.vysledkySub);
+      setMarketingSub(m.marketingSub);
+      setTreningySub(m.treningySub);
+      setKlientiSub(m.klientiSub);
+      // Workspace si kartu aj klienta drží sám — povie sa mu, kam skočiť.
+      if (m.active === "workspace") {
+        if (m.wsKarta) setWorkspaceKartu(m.wsKarta);
+        if (m.wsKlient) setWorkspaceKlient(m.wsKlient);
+      }
+    }
+  }, []);
+
+  // Klávesnica ako v prehliadači. V poli na písanie sa to nesmie chytať —
+  // Alt+šípka tam posúva kurzor po slovách.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+      const spat = (e.altKey && e.key === "ArrowLeft") || ((e.metaKey || e.ctrlKey) && e.key === "[");
+      const dopredu = (e.altKey && e.key === "ArrowRight") || ((e.metaKey || e.ctrlKey) && e.key === "]");
+      if (!spat && !dopredu) return;
+      e.preventDefault();
+      chodPo(spat ? -1 : 1);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [chodPo]);
 
   // Pri štarte a pri tlačidle späť čítame z adresy.
   useEffect(() => {
@@ -2729,6 +2831,26 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
+        {/* Späť a dopredu ako v prehliadači (Jerry, 8. 10. 2026). Stoja pred
+            záložkami, lebo sa to číta zľava: odkiaľ idem, potom kam. */}
+        {[{ smer: -1 as const, znak: "‹", popis: "Späť (Alt + ←)", moze: mozeSpat(stopa) },
+          { smer: 1 as const, znak: "›", popis: "Dopredu (Alt + →)", moze: mozeDopredu(stopa) }].map((b) => (
+          <button
+            key={b.smer}
+            onClick={() => chodPo(b.smer)}
+            disabled={!b.moze}
+            title={b.popis}
+            aria-label={b.popis}
+            style={{
+              ...tab(false), flexShrink: 0, padding: "8px 11px", fontSize: 15, lineHeight: 1,
+              color: b.moze ? C.textMuted : C.textDim,
+              opacity: b.moze ? 1 : 0.4,
+              cursor: b.moze ? "pointer" : "default",
+            }}
+          >
+            {b.znak}
+          </button>
+        ))}
         {/* Workspace už nie je len v bete (Jerry, 23. 9. 2026: „nasaď to aj
             naostro"). Prešiel siedmimi kolami jeho pripomienok — karty dokola,
             filter podľa prihláseného, pevná výška, pracovný stôl klienta —
@@ -2844,7 +2966,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
 
         {active === "jarvis" && (
           <JarvisOkno
