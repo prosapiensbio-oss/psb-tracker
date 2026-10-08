@@ -1,7 +1,8 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
+import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { VyberKategorie } from "./VyberKategorie";
@@ -26,6 +27,26 @@ type Riadok = {
   isty: boolean;
   kategoria?: string;
   vypnuty?: boolean;
+  /** Ten istý riadok už v Kokpite stojí (server, `oznacZosit`). */
+  uzMame?: boolean;
+  kategoriaVDb?: string;
+  /** Mesiac je uzavretý — zápis by server aj tak odmietol. */
+  zamknuty?: boolean;
+};
+
+/**
+ * Rozpracovaný náhľad prežije obnovenie stránky (Jerry, 8. 10. 2026: „nahral
+ * som fotku, a keď som dal Kokpit aktualizovať, dáta zmizli — nech je to tam,
+ * dokým to všetko nepotvrdím"). Žije v prehliadači, kým sa nezapíše alebo
+ * nezahodí — rovnako ako náhľad výpisu z banky.
+ */
+const NAHLAD_KLUC = "psb-zosit-nahlad";
+type UlozenyNahlad = { riadky: Riadok[]; rok: string; kedy: string };
+const nacitajNahlad = (): UlozenyNahlad | null => {
+  try {
+    const v = JSON.parse(localStorage.getItem(NAHLAD_KLUC) || "null") as UlozenyNahlad | null;
+    return v && Array.isArray(v.riadky) && v.riadky.length ? v : null;
+  } catch { return null; }
 };
 
 // Dátum sa zobrazuje ako v zošite: „14.5." Rok je hore vo vlastnom poli a
@@ -57,11 +78,21 @@ const dataUrl = (f: File) => new Promise<string>((res, rej) => {
 });
 
 export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
-  const [riadky, setRiadky] = useState<Riadok[] | null>(null);
+  const [ulozeny] = useState(nacitajNahlad);
+  const [riadky, setRiadky] = useState<Riadok[] | null>(ulozeny?.riadky ?? null);
   const [busy, setBusy] = useState(false);
-  const [stav, setStav] = useState("");
+  const [stav, setStav] = useState(ulozeny
+    ? `Rozpracovaný náhľad z ${new Date(ulozeny.kedy).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} — pokračuj, alebo ho zahoď.`
+    : "");
   const [vysledok, setVysledok] = useState<string | null>(null);
-  const [rok, setRok] = useState(String(new Date().getFullYear()));
+  const [rok, setRok] = useState(ulozeny?.rok || String(new Date().getFullYear()));
+  // Každá zmena náhľadu sa odloží; zápis a „Zahodiť" ho zmažú.
+  useEffect(() => {
+    try {
+      if (riadky && riadky.length) localStorage.setItem(NAHLAD_KLUC, JSON.stringify({ riadky, rok, kedy: ulozeny?.kedy || new Date().toISOString() }));
+      else localStorage.removeItem(NAHLAD_KLUC);
+    } catch { /* bez úložiska ostane náhľad len do obnovenia stránky */ }
+  }, [riadky, rok, ulozeny]);
   const [nadZonou, setNadZonou] = useState(false);
   // Poradie riadkov. Chronologicky sa to kontroluje proti papieru, opačne sa
   // hľadá posledný zápis — obe sa hodia, tak nech sa dá prepnúť. Nemení to
@@ -87,8 +118,13 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
       const j = (await r.json()) as { ok?: boolean; riadky?: Riadok[]; error?: string; zahodenych?: number };
       if (!j.ok || !j.riadky) { setStav(j.error || "Nepodarilo sa prečítať."); return; }
       // Nové riadky sa pripájajú — zošit má dve strany a fotí sa po častiach.
-      setRiadky((p) => [...(p || []), ...j.riadky!.map((x) => ({ ...x, kategoria: "", vypnuty: false }))]);
-      setStav(`Prečítaných ${j.riadky.length} riadkov${j.zahodenych ? ` (${j.zahodenych} sa nedalo prečítať)` : ""}. Skontroluj ich, potom zapíš.`);
+      // Čo už v Kokpite je alebo leží v uzavretom mesiaci, je vypnuté hneď —
+      // zapísať sa to nemá; nový výdavok má kategóriu navrhnutú z pravidiel.
+      setRiadky((p) => [...(p || []), ...j.riadky!.map((x) => ({ ...x, kategoria: x.kategoria || "", vypnuty: !!(x.uzMame || x.zamknuty) }))]);
+      const uz = j.riadky.filter((x) => x.uzMame).length;
+      setStav(`Prečítaných ${j.riadky.length} riadkov${j.zahodenych ? ` (${j.zahodenych} sa nedalo prečítať)` : ""}`
+        + (uz ? `, z toho ${uz} už v Kokpite je — sú vypnuté` : "")
+        + `. Skontroluj nové, potom zapíš.`);
     } catch (e) {
       setStav(`Nepodarilo sa: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -244,7 +280,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                   }}>
                     <td style={{ padding: "5px 8px", width: 28 }}>
                       <input
-                        type="checkbox" checked={!r.vypnuty}
+                        type="checkbox" checked={!r.vypnuty} disabled={r.zamknuty && !r.uzMame}
                         onChange={(e) => uprav(i, { vypnuty: !e.target.checked })}
                         title="Zapísať tento riadok"
                         style={{ accentColor: C.accent, cursor: "pointer" }}
@@ -286,7 +322,15 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                       />
                     </td>
                     <td style={{ padding: "5px 8px" }}>
-                      <VyberKategorie hodnota={r.kategoria || ""} onZmena={(k) => uprav(i, { kategoria: k })} sirka={190} />
+                      {r.uzMame ? (
+                        <span style={{ fontSize: 11.5, color: C.green }} title="Tento riadok je už zapísaný — zaškrtni ho, len ak je to naozaj iná platba.">
+                          ✓ už v Kokpite · {r.kategoriaVDb ? nazovKategorie(r.kategoriaVDb) || r.kategoriaVDb : "bez kategórie"}
+                        </span>
+                      ) : r.zamknuty ? (
+                        <span style={{ fontSize: 11.5, color: C.textMuted }}>uzavretý mesiac — nezapíše sa</span>
+                      ) : (
+                        <VyberKategorie hodnota={r.kategoria || ""} onZmena={(k) => uprav(i, { kategoria: k })} sirka={190} />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -309,7 +353,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
               Zahodiť
             </button>
             <span style={{ fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
-              Súčet označených: <b style={{ color: spolu < 0 ? C.red : C.green }}>{fmtCZK(spolu)}</b>
+              Súčet na zápis: <b style={{ color: spolu < 0 ? C.red : C.green }}>{fmtCZK(spolu)}</b>
             </span>
           </div>
         </>

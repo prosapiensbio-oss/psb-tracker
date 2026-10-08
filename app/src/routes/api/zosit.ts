@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { oznacZosit, type HotovostVDb } from "../../lib/psb/zositNahlad";
 import { bindings } from "../../lib/bindings.server";
 
 // Prepis zošita hotovostných platieb z fotky.
@@ -114,7 +116,25 @@ export const Route = createFileRoute("/api/zosit")({
           // kvôli ktorej náhľad existuje. (Hotové tabuľky v appke majú
           // najnovšie hore; tu je to naopak zámerne.)
           .sort((a, b2) => a.datum.localeCompare(b2.datum));
-        return Response.json({ ok: true, riadky: cisté, zahodenych: riadky.length - cisté.length });
+        // Čo z toho už v Kokpite je — strana zošita nesie aj staré mesiace.
+        // Bez tohto vyzerali zapísané a zaradené riadky z júna až augusta
+        // ako nezaradené a zápis by ich vložil druhýkrát (viď zositNahlad.ts).
+        const { DB } = bindings();
+        let oznacene = cisté.map((x) => ({ ...x, uzMame: false, kategoriaVDb: "", kategoria: "", zamknuty: false }));
+        if (DB && cisté.length) {
+          const od = new Date(Date.parse(`${cisté[0].datum}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
+          const doDna = new Date(Date.parse(`${cisté[cisté.length - 1].datum}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
+          const [vDb, pr, zamky] = await Promise.all([
+            DB.prepare("SELECT date, amount_czk, counterparty, category FROM fio_transactions WHERE typ = 'hotovosť' AND date BETWEEN ?1 AND ?2")
+              .bind(od, doDna).all().then((x) => (x.results || []) as unknown as HotovostVDb[]).catch(() => [] as HotovostVDb[]),
+            DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
+              .then((x) => ((x.results || []) as { text_pattern: string; category: string }[]).map((y) => ({ vzor: String(y.text_pattern || ""), kategoria: String(y.category || "") })))
+              .catch(() => []),
+            zamknuteMesiace(DB),
+          ]);
+          oznacene = oznacZosit(cisté, vDb, pr).map((x) => ({ ...x, poznamka: x.poznamka || "", isty: x.isty !== false, zamknuty: jeZamknuty(zamky, x.datum) }));
+        }
+        return Response.json({ ok: true, riadky: oznacene, zahodenych: riadky.length - cisté.length });
       },
     },
   },
