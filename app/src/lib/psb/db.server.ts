@@ -87,11 +87,16 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      */
     DB.prepare("SELECT klient, datum, oblasti_json, posun, poznamka, zdroj FROM klient_merania ORDER BY datum")
       .all().catch(() => ({ results: [] })),
-    // Posledný beh nočnej kontroly webu (migrácia 0102). Len POSLEDNÝ: história
-    // je na obrazovke, do registra patrí dnešný stav.
+    // Nočná kontrola webu (migrácia 0102): POSLEDNÝ STAV KAŽDEJ KONTROLY,
+    // nie posledný beh. Časti bežia každá vo vlastnom čase, takže „posledný
+    // beh" by do registra pustil len tú, ktorá bežala naposledy, a rozbitý
+    // formulár by z neho zmizol, len čo dobehne kontrola reklám.
     DB.prepare(
-      `SELECT kluc, nazov, stav, detail, beh FROM web_kontroly
-        WHERE beh = (SELECT MAX(beh) FROM web_kontroly) ORDER BY kluc`,
+      `SELECT w.kluc, w.nazov, w.stav, w.detail, w.beh
+         FROM web_kontroly w
+         JOIN (SELECT kluc, MAX(beh) beh FROM web_kontroly GROUP BY kluc) p
+           ON p.kluc = w.kluc AND p.beh = w.beh
+        ORDER BY w.kluc`,
     ).all().catch(() => ({ results: [] })),
   ]);
 

@@ -145,11 +145,13 @@ const push = (env: Env) =>
  * `/api/lead-web` prijme aj token plánovača, ale vtedy smie zapísať výhradne
  * kontrolný riadok.
  */
-const kontrolaWebu = async (env: Env) => {
+const kontrolaWebu = async (env: Env, cast: "formulare" | "stranky" | "meranie" | "reklamy" = "formulare") => {
   const zac = Date.now();
-  let dopyt: { ok: boolean; id?: string; detail: string; trvanie: number } = {
-    ok: false, detail: "syntetický dopyt sa neodoslal", trvanie: 0,
-  };
+  let dopyt: { ok: boolean; id?: string; detail: string; trvanie: number } | undefined;
+  // Dopyt sa posiela LEN s časťou „formulare" — je to kontrola tej istej
+  // cesty. Pri ostatných častiach by to bol zbytočný zápis a mazanie.
+  if (cast === "formulare") {
+  dopyt = { ok: false, detail: "syntetický dopyt sa neodoslal", trvanie: 0 };
   try {
     const r = await env.KOKPIT.fetch(
       new Request("https://kokpit.prosapiensbio.workers.dev/api/lead-web", {
@@ -178,11 +180,12 @@ const kontrolaWebu = async (env: Env) => {
   } catch (e) {
     dopyt = { ok: false, detail: `spojenie zlyhalo: ${String(e).slice(0, 200)}`, trvanie: Date.now() - zac };
   }
+  }
   return env.KOKPIT.fetch(
-    new Request("https://kokpit.prosapiensbio.workers.dev/api/web-kontrola?cron=1", {
+    new Request(`https://kokpit.prosapiensbio.workers.dev/api/web-kontrola?cron=1&cast=${cast}`, {
       method: "POST",
       headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
-      body: JSON.stringify({ dopyt }),
+      body: JSON.stringify(dopyt ? { dopyt } : {}),
     }),
   );
 };
@@ -219,17 +222,30 @@ export default {
       })());
       return;
     }
-    // Kontrola webu beží o 3:50 UTC, teda PRED nočným sťahovaním textu webu
-    // aj pred rannou dávkou push. Keď sa formulár cez deň pokazí, Jerry sa to
-    // dozvie ráno — nie o dva týždne, ako pri teste postury (23. 9. – 7. 10.).
-    if (event.cron === "50 3 * * *") {
-      ctx.waitUntil(
-        kontrolaWebu(env).then(
-          async (r) => console.log(`kontrola webu: HTTP ${r.status} ${(await r.text()).slice(0, 400)}`),
-          (e) => console.error("kontrola webu zlyhala:", e),
-        ),
-      );
-      return;
+    // Kontrola webu — ŠTYRI ČASTI, ŠTYRI BEHY, päť minút od seba.
+    //
+    // Dokopy je to ~15 podžiadostí a desiatky zápisov; v jednom volaní je to
+    // presne ten tvar práce, ktorý 29. 8. 2026 zabil workera na limite CPU
+    // a Kokpit vracal 503 na všetko. Každá časť má preto vlastný spúšťač.
+    // Všetky bežia PRED rannou dávkou push, takže čo sa v noci pokazí, je
+    // ráno v registri.
+    {
+      const casti: Record<string, "formulare" | "stranky" | "meranie" | "reklamy"> = {
+        "50 3 * * *": "formulare",
+        "55 3 * * *": "stranky",
+        "0 4 * * *": "meranie",
+        "5 4 * * *": "reklamy",
+      };
+      const cast = casti[event.cron];
+      if (cast) {
+        ctx.waitUntil(
+          kontrolaWebu(env, cast).then(
+            async (r) => console.log(`kontrola webu (${cast}): HTTP ${r.status} ${(await r.text()).slice(0, 400)}`),
+            (e) => console.error(`kontrola webu (${cast}) zlyhala:`, e),
+          ),
+        );
+        return;
+      }
     }
     if (event.cron === "30 3 * * *") {
       ctx.waitUntil(
@@ -278,10 +294,25 @@ export default {
   // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
   async fetch(req: Request, env: Env) {
     const q = new URL(req.url).searchParams;
-    // `?kontrola=1` spustí nočnú kontrolu webu hneď.
-    if (q.get("kontrola") === "1") {
-      const r = await kontrolaWebu(env);
-      return new Response(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
+    // `?kontrola=1` pustí všetky štyri časti za sebou (na overenie po zásahu),
+    // `?kontrola=stranky` len jednu. Za sebou, nie naraz — dôvod je ten istý,
+    // prečo majú vlastné spúšťače.
+    const ktoraKontrola = q.get("kontrola");
+    if (ktoraKontrola) {
+      const vsetky = ["formulare", "stranky", "meranie", "reklamy"] as const;
+      const zoznam = ktoraKontrola === "1"
+        ? vsetky
+        : vsetky.filter((c) => c === ktoraKontrola);
+      if (!zoznam.length) {
+        return Response.json({ ok: false, chyba: `neznáma časť „${ktoraKontrola}" — poznám ${vsetky.join(", ")}` }, { status: 400 });
+      }
+      const von: unknown[] = [];
+      for (const cast of zoznam) {
+        const r = await kontrolaWebu(env, cast);
+        const t = await r.text();
+        try { von.push(JSON.parse(t)); } catch { von.push({ cast, stav: r.status, telo: t.slice(0, 300) }); }
+      }
+      return Response.json(zoznam.length === 1 ? von[0] : von);
     }
     // `?web=1` skúša načítanie textu webu bez čakania na 3:30 ráno.
     // `?push=1` pošle rannú dávku hneď — inak by sa overovalo až zajtra ráno.
