@@ -2893,3 +2893,28 @@ potom „Stiahnuť mesiac z Metricoolu".
   s názvami metrík PDF zostavy; `upload_log` typ `metricool`.
 - Jednotky: čas pozerania MCP v sekundách → ×1000 (CSV je v ms); view rate v %.
 - Brand ProSapiens = 2101108 (`BRAND_PSB`). Ostatné siete zatiaľ nie.
+
+## „Vybavené" platí na to, čo bolo, keď padlo (9. 10. 2026)
+
+Jerry: „vyskakujú mi notifikácie, ktoré sú už vybavené, a iné zas nie."
+Odpoveď v `anomaly_ack` je trvalá a viaže sa na KĽÚČ. Stály kľúč nad niečím,
+čo sa mení, je preto pasca v oboch smeroch:
+
+- **Zoskupená položka** (`kalendar|zmeny|<tréner>`, `dopyt|nevyriesene`,
+  `kalendar|konanie|…`) — jedno „je to hotové" z 29. 8. schovalo 51 zmien,
+  ktoré prišli až potom. Riešenie: položka nesie `platneOd` (čas najnovšej
+  veci v nej) a `stavPolozkyRegistra(…, platneOd)` staršiu odpoveď nepočíta.
+- **Epizóda** (`gone|`, `duch|`) — `platneOd` = posledný tréning; odpoveď na
+  jedno z dvojice kryje obe (je to to isté ticho). Duch mlčí aj pri termíne
+  v kalendári alebo otvorenom závere, rovnako ako „Prestal chodiť".
+- **Kľúč s dátumom behu alebo týždňa** (`nezname|…|<týždeň>`) sa vracia každý
+  pondelok — kľúč je zo samotných mien. Pri kontrole webu nesie deň PÁDU.
+- **Stupne tej istej pripomienky** (narodeniny 7/3/1/0) — vybavené na skoršom
+  zavrie ďalšie; odloženie nie.
+- **„+ Zápis" berie rituály cez `ritualyZapisu`** (odpoveď + tréner), nie surové.
+- Stav hotovosti „ku koncu mesiaca" je `stavHotovostiHotovy` — jedna definícia
+  pre krok uzávierky aj pripomienku (zošit ≠ zostatok v obálke).
+- Do notifikácie idú zmeny v kalendári len za 14 dní; staršie len vo Workspace.
+
+Pri novej položke registra sa pýtaj: čo sa stane s odpoveďou, keď pribudne
+nová vec rovnakého druhu, a keď sa tá istá vec zopakuje o mesiac?
