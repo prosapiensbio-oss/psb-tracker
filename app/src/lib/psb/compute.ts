@@ -1365,6 +1365,8 @@ export type Anomaly = {
   client?: string; // the client this item is about (for click-through to Klienti)
   /** Možnosti na jeden klik — viď `RegisterItem["akcie"]`. */
   akcie?: RegisterItem["akcie"];
+  /** Odpoveď staršia než tento čas sa nepočíta — viď `stavPolozkyRegistra`. */
+  platneOd?: string;
 };
 
 // Odpoveď na otázku „je toto duch?" sa ukladá s dátumom ("ano|2026-08-03").
@@ -2023,8 +2025,8 @@ export function deriveAnomalies(
 ): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
-  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"]) =>
-    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie });
+  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"], platneOd?: string) =>
+    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie, platneOd });
 
   // ── Kontrola webu ────────────────────────────────────────────────────────
   //
@@ -2053,8 +2055,16 @@ export function deriveAnomalies(
        * nad vecou, o ktorej Jerry už vie. Takto odklepnutie drží, kým padá to
        * isté — a len čo padne čokoľvek iné, kľúč sa zmení a položka sa vráti.
        */
+      /*
+       * …a pri zlyhaniach formulára aj DEŇ POSLEDNÉHO ZLYHANIA (nie deň behu —
+       * ten sa mení každú noc). Odklepnutie je trvalé, takže bez dňa by
+       * „Vybavené" nad jedným starým pádom umlčalo aj každú budúcu poruchu
+       * toho istého druhu (9. 10. 2026). Deň sa číta z vety, ktorú skladá
+       * `webKontrolaMeranie.ts` („Naposledy RRRR-MM-DD") — test to stráži.
+       */
+      const denPadu = zle.map((k) => /Naposledy (\d{4}-\d{2}-\d{2})/.exec(k.detail)?.[1] || "").sort().pop() || "";
       push(
-        `web-kontrola|${zle.map((k) => k.kluc).sort().join(",")}`,
+        `web-kontrola|${zle.map((k) => k.kluc).sort().join(",")}${denPadu ? `|${denPadu}` : ""}`,
         chyby.length ? "red" : "orange",
         chyby.length ? "Web nefunguje" : "Web — upozornenie",
         `${(chyby.length ? chyby : zle).map((k) => `${k.nazov}: ${k.detail}`).join(" · ")}`,
@@ -2105,6 +2115,14 @@ export function deriveAnomalies(
     const { dni } = najblizsie;
     const stupen = dni === 0 ? 0 : dni <= 1 ? 1 : dni <= 3 ? 3 : dni <= 7 ? 7 : null;
     if (stupen === null) continue;
+    // „Vybavené" na stupni 7 alebo 3 zavrie aj ďalšie stupne toho roku —
+    // Broskvovi sa dovtedy klikalo trikrát (9. 10. 2026). Odloženie nie.
+    const rokNar = new Date(najblizsie.t).getUTCFullYear();
+    const vybavene = [7, 3, 1, 0].some((st) => {
+      const a = ack[`narodeniny|${c.name}|${rokNar}|${st}`];
+      return !!a && !(a.note || "").startsWith("odlozene|");
+    });
+    if (vybavene && !ack[`narodeniny|${c.name}|${rokNar}|${stupen}`]) continue;
     const vek = c.narodeniny.length >= 10 ? rok - Number(c.narodeniny.slice(0, 4)) : null;
     const kolky = vek !== null && dni === 0 ? ` — má ${vek}` : vek !== null ? ` (bude mať ${vek})` : "";
     push(
@@ -2134,6 +2152,15 @@ export function deriveAnomalies(
     const days = daysBetween(poslednyDen, now);
 
     const duch = duchOdpoved({ duch: c.duch, lastSession: poslednyDen });
+    /*
+     * „Prestal chodiť" a „Je toto duch?" sú JEDNA epizóda ticha (9. 10. 2026).
+     * Odpoveď na ktorúkoľvek z nich po poslednom tréningu kryje obe — inak
+     * „Vybavené" pri 14 dňoch nepomohlo na 30. deň (Bambúšková, Tchuřova).
+     * A odpoveď spred posledného tréningu je o MINULOM tichu: nové už nekryje
+     * (deväť klientov bolo takto umlčaných navždy, hoci medzitým trénovali).
+     */
+    const odpovedEpizody = [`gone|${c.name}`, `duch|${c.name}`].some((k) =>
+      stavPolozkyRegistra(k, ack, undefined, now, poslednyDen).acked);
 
     // Regular client who stopped coming — reach out before they churn.
     // Od 30 dní preberá štafetu otázka „Je toto duch?" — obe naraz by boli tá
@@ -2156,8 +2183,8 @@ export function deriveAnomalies(
       // To isté platí o otvorenom ZÁVERE. Keď Jerry s Jarvisom vyriešil, čo je
       // s klientom, appka nemá o dva riadky nižšie pýtať to isté — pripomienku
       // vydá sám záver v deň, na ktorý si ju nastavil.
-      if (!najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
-        push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
+      if (!odpovedEpizody && !najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
+        push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name, undefined, poslednyDen);
       }
     }
 
@@ -2199,7 +2226,11 @@ export function deriveAnomalies(
     // 20. 8. 2026 tak svietila Leonora, ktorej odchod bol od 13. 8. zodpovedaný
     // („finančné dôvody"). Vysvetlená vec nie je otázka.
     const odchodVysvetleny = !!ack[`strata|${c.name}`];
-    if (days >= 30 && !duch && !odchodVysvetleny) {
+    // Kto má termín v kalendári alebo otvorený záver, nie je duch — tá istá
+    // podmienka ako pri „Prestal chodiť" (Svetopluk Stoklasko mal 12. 10.
+    // objednaný tréning a svietil ako duch, 9. 10. 2026).
+    if (days >= 30 && !duch && !odchodVysvetleny && !odpovedEpizody
+      && !najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
       const hodiny = c.packageRemaining > 0
         ? ` a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín`
         : "";
@@ -2209,6 +2240,8 @@ export function deriveAnomalies(
         "Je toto duch?",
         `${c.name}: ${days} dní bez tréningu${hodiny} — je to duch, alebo to má vysvetlenie?`,
         c.name,
+        undefined,
+        poslednyDen,
       );
     }
   }
@@ -2435,6 +2468,17 @@ export function stavPolozkyRegistra(
   ack: Record<string, { note?: string; ackedAt?: string; actor?: string } | undefined>,
   rodinaVstup?: string,
   dnes: Date = new Date(),
+  /**
+   * Odpoveď platí len na to, čo EXISTOVALO, keď padla (9. 10. 2026).
+   *
+   * Zoskupené položky („Zmeny v kalendári bez vysvetlenia (51)") a epizódy
+   * („Prestal chodiť") majú stály kľúč, a tak jedno „Vybavené" z augusta
+   * umlčalo všetko, čo prišlo po ňom — 51 nevysvetlených zmien nevidel nikto.
+   * `platneOd` = čas najnovšej veci v položke (alebo posledného tréningu):
+   * odpoveď staršia než on sa nepočíta a položka sa vráti aj s predošlou
+   * odpoveďou. Umlčanie celej rodiny („nehlásiť") platí ďalej.
+   */
+  platneOd?: string,
 ): {
   acked: boolean; note?: string; rodina: string; vratene?: boolean;
   /** Kto odpoveď napísal. Prázdne pri odpovediach spred 24. 8. 2026. */
@@ -2447,8 +2491,12 @@ export function stavPolozkyRegistra(
   // upozornenia, nie na jeden dátum.
   const mute = rodina ? ack[`mute|${rodina}`] : undefined;
   if (mute) return { acked: true, note: mute.note || "nehlásiť", rodina };
-  const z = ack[key];
+  const zPovodne = ack[key];
+  const z = zPovodne && platneOd && casOdpovede(zPovodne.ackedAt) < casOdpovede(platneOd) ? undefined : zPovodne;
   if (!z) {
+    if (zPovodne && zPovodne.note && !zPovodne.note.startsWith("odlozene|")) {
+      return { acked: false, rodina, predchadzajuca: { text: zPovodne.note, kedy: zPovodne.ackedAt || "", kto: zPovodne.actor || undefined } };
+    }
     const predchadzajuca = poslednaOdpovedRodiny(ack, rodina, key);
     return predchadzajuca ? { acked: false, rodina, predchadzajuca } : { acked: false, rodina };
   }
@@ -2459,6 +2507,9 @@ export function stavPolozkyRegistra(
   if (m[1] <= den) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true, rodina };
   return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, rodina };
 }
+
+/** Čas na porovnanie — `2026-10-09T05:06:55Z` aj `2026-10-09 05:06` aj holý deň. */
+const casOdpovede = (t?: string | null) => String(t || "").replace(" ", "T").slice(0, 19);
 
 /** Z kľúča na ľudskú vetu — čoho sa odpoveď týkala. */
 const DRUH_KLUCA: Record<string, string> = {
@@ -2687,6 +2738,8 @@ export function patriTrenerovi(
 
 export type RegisterItem = {
   key: string;
+  /** Odpoveď staršia než tento čas sa nepočíta — viď `stavPolozkyRegistra`. */
+  platneOd?: string;
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
   tone: "red" | "orange" | "blue";
   title: string;
@@ -2936,7 +2989,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string; platneOd?: string },
   ) =>
     items.push({
       key,
@@ -2954,7 +3007,7 @@ export function deriveRegister(
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
-      ...stavPolozkyRegistra(key, ack, rodina),
+      ...stavPolozkyRegistra(key, ack, rodina, undefined, kto?.platneOd),
     });
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.
@@ -3177,7 +3230,10 @@ export function deriveRegister(
       }
     }
     if (nejasne.length) {
-      const key = `nezname|${n.trener}|${weekKey(dnesPraha())}`;
+      // Kľúč z MIEN, nie z týždňa (9. 10. 2026): s týždňom sa tie isté názvy
+      // vracali každý pondelok a nový názov v tom istom týždni sa schoval za
+      // staré „vybavené". Takto odpoveď drží, kým pribudne iný názov.
+      const key = `nezname|${n.trener}|${[...nejasne].sort().join(",")}`;
       const mena = nejasne.slice(0, 6).join(", ") + (nejasne.length > 6 ? `, +${nejasne.length - 6}` : "");
       add(
         key,
@@ -3262,7 +3318,7 @@ export function deriveRegister(
   for (const a of deriveAnomalies(data, clients, kal)) {
     // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
     add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client,
-      undefined, a.akcie ? { akcie: a.akcie } : undefined);
+      undefined, a.akcie || a.platneOd ? { akcie: a.akcie, platneOd: a.platneOd } : undefined);
   }
 
   return items.sort((a, b) => {
@@ -3848,12 +3904,12 @@ export type NezapisaneVstup = {
   /** Mená klientov — dopyt, z ktorého klient vznikol, sa nerieši. */
   menaKlientov: string[];
   /** Nevysvetlené zmeny z kalendára (`vysvetlene = 0`). */
-  zmeny: { druh: string; trener: string }[];
+  zmeny: { druh: string; trener: string; kedy?: string }[];
   /**
    * Tréningy, ktoré z kalendára zmizli až po tom, čo sa mali konať, a nikto
    * na ne neodpovedal. Každý je hodina, o ktorú je zostatok klienta vedľa.
    */
-  sporneKonanie?: { klient: string; trener: string }[];
+  sporneKonanie?: { klient: string; trener: string; zaciatok?: string }[];
   /** Kľúčové podiely, ktoré má appka spochybniť, keď vyzerajú príliš dobre. */
   podiely?: Podiel[];
 };
@@ -3934,6 +3990,8 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
     const najstarsi = [...otvorene].sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
     von.push({
       key: "dopyt|nevyriesene",
+      // Odpoveď platí na dopyty, ktoré boli, keď padla — nový ju prebije.
+      platneOd: otvorene.map((l) => String(l.createdAt || l.date || "")).sort().pop(),
       category: "Zápis",
       tone: "orange",
       trener: "Terezka",
@@ -3960,8 +4018,18 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
   // TAM, nie vedľa.
 
   // ── zmeny v kalendári bez vysvetlenia ────────────────────────────────────
+  /*
+   * VEK: do notifikácie len zmeny za posledných 14 dní (9. 10. 2026).
+   * Terezke svietilo 51 zmien až od 1. 9. — zrušenie spred piatich týždňov
+   * už nikto nevysvetlí a riadok s takým číslom sa prestane čítať (CLAUDE.md:
+   * otázka, s ktorou sa už nedá nič urobiť, do zoznamu nepatrí). Staršie
+   * zostávajú vo Workspace → 1 · Kalendár; detail povie, koľko ich je.
+   */
+  const hranicaZmien = new Date(Date.parse(`${v.dnes}T00:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10);
+  const cerstveZmeny = v.zmeny.filter((z) => !z.kedy || z.kedy.slice(0, 10) >= hranicaZmien);
+  const starsichZmien = (t: string) => v.zmeny.filter((z) => (z.trener || "") === t && z.kedy && z.kedy.slice(0, 10) < hranicaZmien).length;
   const podlaTrenera = new Map<string, Record<string, number>>();
-  for (const z of v.zmeny) {
+  for (const z of cerstveZmeny) {
     const t = z.trener || "";
     const m = podlaTrenera.get(t) || {};
     m[z.druh] = (m[z.druh] || 0) + 1;
@@ -3975,13 +4043,14 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       .join(", ");
     von.push({
       key: `kalendar|zmeny|${trener || "bez"}`,
+      platneOd: cerstveZmeny.filter((z) => (z.trener || "") === trener).map((z) => z.kedy || "").sort().pop() || undefined,
       category: "Zmena",
       tone: "orange",
       // Zmena bez trénera (zdroj sa nedal určiť) zostáva obom — radšej
       // upozornenie navyše než stratené.
       trener: trener || undefined,
       title: `Zmeny v kalendári bez vysvetlenia (${spolu})`,
-      detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa vo Workspace → 1 · Kalendár.`,
+      detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa vo Workspace → 1 · Kalendár.${starsichZmien(trener) ? ` (Ďalších ${starsichZmien(trener)} starších než 14 dní je tam tiež, ale do upozornení už nejdú.)` : ""}`,
       client: "workspace|kalendar",
       priority: 11,
     });
@@ -4002,6 +4071,7 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
     const hodin = (v.sporneKonanie || []).filter((x) => (x.trener || "") === trener).length;
     von.push({
       key: `kalendar|konanie|${trener || "bez"}`,
+      platneOd: (v.sporneKonanie || []).filter((x) => (x.trener || "") === trener).map((x) => x.zaciatok || "").sort().pop() || undefined,
       category: "Zmena",
       tone: "orange",
       trener: trener || undefined,

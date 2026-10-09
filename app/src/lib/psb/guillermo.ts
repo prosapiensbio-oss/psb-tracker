@@ -49,3 +49,36 @@ export function guillermoZostatok(
     odtrenovane,
   };
 }
+
+/**
+ * NOTIFIKÁCIA: SEDENIA U GUILLERMA SÚ MINUTÉ.
+ *
+ * Jerry, 9. 10. 2026: „guillermo −1 mi nevyskakuje." Zostatok sa počítal len
+ * na karte v Kalendári a nikde inde — kto kartu neotvoril, o mínuse nevedel.
+ * Hlási sa pri NULE aj mínuse (nula = ďalšie sedenie už nie je zaplatené).
+ *
+ * Kľúč nesie dátum posledného nákupu alebo kotvy: po dokúpení sedení sa zmení,
+ * takže „Vybavené" umlčí tento výpadok, nie upozornenie navždy — a keď po
+ * dokúpení ešte stále zostane mínus, otázka príde nanovo.
+ *
+ * Volá ju appka (register) aj ranná správa na telefón — jedna funkcia, aby
+ * telefón nehlásil niečo iné než obrazovka.
+ */
+export function polozkaGuillermo(
+  zaznamy: GuillermoZaznam[],
+  udalosti: GuillermoUdalost[],
+  dnesISO: string = dnesPraha(),
+): { key: string; title: string; detail: string; zostatok: number } | null {
+  if (!zaznamy.length) return null;
+  const s = guillermoZostatok(zaznamy, udalosti, dnesISO);
+  if (s.zostatok > 0) return null;
+  const posledny = zaznamy.map((z) => z.datum).sort().pop() || "";
+  return {
+    key: `guillermo|${posledny}`,
+    zostatok: s.zostatok,
+    title: s.zostatok < 0 ? `Guillermo: ${s.zostatok} sedenie` : "Guillermo: zaplatené sedenia sú minuté",
+    detail: s.zostatok < 0
+      ? `U Guillerma si v mínuse (${s.zostatok}) — odtrénoval si viac sedení, než je zaplatených. Keď platbu pošleš, zapíš v Kalendári → Guillermo, koľko sedení kúpila.`
+      : "Zaplatené sedenia u Guillerma sú minuté — ďalšie už nie je zaplatené. Po platbe zapíš v Kalendári → Guillermo, koľko sedení kúpila.",
+  };
+}

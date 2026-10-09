@@ -219,10 +219,9 @@ export function ritualy(
   // sama; hotovosť je jediné číslo, ktoré musí opísať človek — a bez neho sa
   // nedá povedať, koľko firma naozaj má. Peniaze = Jerry.
   //
-  // „Hotové" = stav bol zapísaný v NESKORŠOM mesiaci než ten uzatváraný, teda
-  // spočítaný až keď mesiac skončil. Dátum v strede mesiaca (napr. 8. 8. pre
-  // august) nestačí — to je stav spred uzávierky, nie ku koncu.
-  const hotovostHotova = !!(opts?.stavDatum && opts.stavDatum.slice(0, 7) > mk);
+  // „Hotové" = stav ku POSLEDNÉMU DŇU mesiaca alebo neskôr — viď
+  // `stavHotovostiHotovy`, jedna definícia aj pre krok uzávierky.
+  const hotovostHotova = stavHotovostiHotovy(opts?.stavDatum, mk);
   out.push({
     id: `hotovost-${mk}`,
     druh: "mesiac",
@@ -245,6 +244,9 @@ export function ritualy(
   out.push({
     id: `kvartal-${rokP}-${kvartal}`,
     druh: "kvartal",
+    // Bez trénera chodil aj Terezke do rannej správy (9. 10. 2026). Kvartál
+    // je Jerryho pohľad na ciele, nie práca pre oboch.
+    trener: "Jerry",
     nadpis: `Kvartálny pohľad ${kvartal}`,
     detail: "Prejdi ciele a KPI za kvartál — čo sa pohlo a čo sa nepohlo.",
     ciel: { tab: "vysledky", sub: "kvartalne" },
@@ -307,4 +309,20 @@ export function ritualy(
   }
 
   return out;
+}
+
+/**
+ * JE STAV HOTOVOSTI KU KONCU MESIACA ZAPÍSANÝ?
+ *
+ * Jedna definícia pre pripomienku aj krok „Stav hotovosti" v uzávierke.
+ * 9. 10. 2026 sa rozišli: krok bral `datum >= "2026-09"` (a 7. 9. mu stačilo
+ * — zelená fajka nad stavom zo začiatku mesiaca), pripomienka chcela dátum
+ * až v októbri (a stav zapísaný k 30. 9., ako ho od 8. 10. ponúka karta,
+ * by ju nezhasol). Platí: dátum stavu je POSLEDNÝ DEŇ mesiaca alebo neskôr.
+ */
+export function stavHotovostiHotovy(datum: string | null | undefined, mk: string): boolean {
+  if (!datum || !/^\d{4}-\d{2}$/.test(mk)) return false;
+  const [r, m] = mk.split("-").map(Number);
+  const posledny = new Date(Date.UTC(r, m, 0)).toISOString().slice(0, 10);
+  return datum.slice(0, 10) >= posledny;
 }

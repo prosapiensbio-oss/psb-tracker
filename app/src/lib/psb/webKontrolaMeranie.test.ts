@@ -124,6 +124,29 @@ describe("zlyhania za okno", () => {
     expect(n.detail).toContain("ani jedno zlyhanie");
   });
 
+  it("JEDNO zlyhanie od posledného úspechu je len varovanie — 8. 10. 2026 to bol jeden pokus", () => {
+    const n = zlyhania(data({
+      udalosti: [
+        u({ udalost: "formular_odoslany", den: "2026-10-05", stranka: "/uvodni-trenink/", pocet: 2 }),
+        u({ udalost: "formular_zlyhal", den: VCERA, stranka: "/test-postury/", pocet: 1 }),
+      ],
+      navstevy: ZDRAVY.navstevy,
+    }));
+    expect(n.stav).toBe("varovanie");
+    expect(n.detail).toContain("jediné zlyhanie");
+  });
+
+  it("dve zlyhania od posledného úspechu sú poplach", () => {
+    const n = zlyhania(data({
+      udalosti: [
+        u({ udalost: "formular_odoslany", den: "2026-10-05", stranka: "/uvodni-trenink/", pocet: 2 }),
+        u({ udalost: "formular_zlyhal", den: VCERA, stranka: "/test-postury/", pocet: 2 }),
+      ],
+      navstevy: ZDRAVY.navstevy,
+    }));
+    expect(n.stav).toBe("chyba");
+  });
+
   it("pri zlyhaní včera sa veta o vynechanom behu nepíše", () => {
     const n = zlyhania(data({
       udalosti: [...ZDRAVY.udalosti, u({ udalost: "formular_zlyhal", den: VCERA, stranka: "/test-postury/", pocet: 2 })],

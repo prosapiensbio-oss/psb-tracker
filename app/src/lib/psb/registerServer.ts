@@ -90,11 +90,11 @@ export function registerZoServera(
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
       dnes: dnesPraha(dnes),
-      zmeny: zm.filter((z) => !z.vysvetlene).map((z) => ({ druh: z.druh, trener: String(z.trener || "") })),
+      zmeny: zm.filter((z) => !z.vysvetlene).map((z) => ({ druh: z.druh, trener: String(z.trener || ""), kedy: (z as { kedy?: string }).kedy })),
       // Podozrivé podiely potrebujú celý lievik; do rannej správy nepatria,
       // sú to čísla na pozretie, nie práca na dnes.
       podiely: [],
-    }).map((r) => ({ ...r, ...stavPolozkyRegistra(r.key, data.anomalyAck || {}) })),
+    }).map((r) => ({ ...r, ...stavPolozkyRegistra(r.key, data.anomalyAck || {}, undefined, dnes, r.platneOd) })),
   ]);
 }
 

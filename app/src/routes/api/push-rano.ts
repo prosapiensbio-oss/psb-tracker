@@ -7,7 +7,8 @@ import { temaDna, OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU } from "../../lib/psb
 import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
-import { TRAINERS } from "../../lib/psb/compute";
+import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
+import { polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "../../lib/psb/guillermo";
 import { terazPraha } from "../../lib/psb/cas";
 
 // Ranná dávka notifikácií na telefón.
@@ -110,9 +111,20 @@ export const Route = createFileRoute("/api/push-rano")({
         const poslednyPohyb = await DB.prepare(
           "SELECT MAX(substr(date,1,10)) d FROM fio_transactions WHERE typ <> 'hotovosť'",
         ).first<{ d: string | null }>();
+        // Guillermo (Jerryho sedenia vo FP Spain) — pár riadkov, dva malé dopyty.
+        const [gz, gu] = await DB.batch([
+          DB.prepare("SELECT datum, druh, hodiny FROM guillermo_hodiny"),
+          DB.prepare("SELECT typ, zaciatok FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL"),
+        ]);
+        const g = polozkaGuillermo(gz.results as unknown as GuillermoZaznam[], gu.results as unknown as GuillermoUdalost[]);
         const penazne = [
           polozkaZastaranaBanka(poslednyPohyb?.d || "", data.anomalyAck || {}),
           ...polozkyBtcNesedi(data.payments, await btcPlatby(), data.anomalyAck || {}),
+          g ? {
+            key: g.key, category: "Anomália" as const, tone: (g.zostatok < 0 ? "orange" : "blue") as "orange" | "blue",
+            title: g.title, detail: g.detail, priority: 30, client: "vzas|vyplaty", trener: "Jerry",
+            ...stavPolozkyRegistra(g.key, data.anomalyAck || {}, "guillermo"),
+          } : null,
         ].filter(Boolean) as ReturnType<typeof polozkyBtcNesedi>;
 
         // Týždenné a mesačné zápisy — bez nich by v rannej správe chýbali

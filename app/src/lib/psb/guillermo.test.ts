@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { guillermoZostatok, type GuillermoUdalost, type GuillermoZaznam } from "./guillermo";
+import { guillermoZostatok, polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "./guillermo";
 
 const ev = (zaciatok: string, typ: string | null = "guillermo"): GuillermoUdalost => ({ typ, zaciatok });
 
@@ -68,5 +68,35 @@ describe("guillermoZostatok", () => {
     const zaznamy: GuillermoZaznam[] = [{ datum: "2026-08-01", druh: "zostatok", hodiny: 1 }];
     const r = guillermoZostatok(zaznamy, [ev("2026-08-05T10:00"), ev("2026-08-12T10:00"), ev("2026-08-19T10:00")], "2026-09-09");
     expect(r.zostatok).toBe(-2); // 1 − 3
+  });
+});
+
+describe("polozkaGuillermo — notifikácia pri minutých sedeniach", () => {
+  // Stav z ostrých dát 9. 10. 2026: kotva 3 sedenia k 9. 8., potom štyri tréningy.
+  const zaz: GuillermoZaznam[] = [
+    { datum: "2026-07-29", druh: "nakup", hodiny: 3 },
+    { datum: "2026-08-09", druh: "zostatok", hodiny: 3 },
+  ];
+  const ud = (dni: string[]): GuillermoUdalost[] => dni.map((d) => ({ typ: "guillermo", zaciatok: `${d}T12:00` }));
+
+  test("mínus sa hlási — Jerryho −1 z 9. 10. 2026", () => {
+    const p = polozkaGuillermo(zaz, ud(["2026-08-12", "2026-09-02", "2026-09-16", "2026-09-30"]), "2026-10-09");
+    expect(p?.zostatok).toBe(-1);
+    expect(p?.title).toContain("-1");
+    expect(p?.key).toBe("guillermo|2026-08-09");
+  });
+
+  test("nula sa hlási, plus nie", () => {
+    expect(polozkaGuillermo(zaz, ud(["2026-08-12", "2026-09-02", "2026-09-16"]), "2026-10-09")?.zostatok).toBe(0);
+    expect(polozkaGuillermo(zaz, ud(["2026-08-12"]), "2026-10-09")).toBeNull();
+  });
+
+  test("po dokúpení sa kľúč zmení — staré „vybavené“ novú otázku neumlčí", () => {
+    const po = [...zaz, { datum: "2026-10-10", druh: "nakup", hodiny: 0 }];
+    expect(polozkaGuillermo(po, ud(["2026-08-12", "2026-09-02", "2026-09-16", "2026-09-30"]), "2026-10-11")?.key).toBe("guillermo|2026-10-10");
+  });
+
+  test("bez záznamov mlčí — appka nevie nič, nie „mínus“", () => {
+    expect(polozkaGuillermo([], ud(["2026-09-30"]), "2026-10-09")).toBeNull();
   });
 });

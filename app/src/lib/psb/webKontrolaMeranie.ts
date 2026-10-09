@@ -396,14 +396,33 @@ export function skontrolujMeranie(d: MeranieData, dnes: string = dnesPraha()): N
      * formulár ÚSPEŠNE? Keď áno, cesta zase funguje a riadok je stopa po
      * oprave. Keď od vtedy nikto neodoslal nič, nevieme nič a svieti červená.
      */
+    // Prísne `>`: úspech v ten istý deň môže byť z INÉHO formulára (rozbitý
+    // test postury vedľa funkčného kontaktu) a poradie v rámci dňa GA4 nedá.
     const odoslaneOdVtedy = udalostiTyzden
       .filter((r) => r.udalost === "formular_odoslany" && r.den > poslednyPad)
       .reduce((a, r) => a + r.pocet, 0);
+    /*
+     * JEDEN POKUS NIE JE VÝPADOK.
+     *
+     * 9. 10. 2026 svietilo „Web nefunguje" nad jediným zlyhaním z 8. 10. —
+     * formuláre aj skúšobný dopyt v tú istú noc prešli. `formular_zlyhal`
+     * padá aj na preklep v maile a na spam (`formulare.js`), a kým v GA4 nie
+     * sú zaregistrované rozmery `duvod`/`pole`, nedá sa to od poruchy
+     * rozoznať. Červená preto chce VZOR: aspoň dve zlyhania od posledného
+     * úspechu. Porucha z 2. 10. (desať pokusov) by ňou prešla rovnako.
+     */
+    const posledneOdoslanie = udalostiTyzden
+      .filter((r) => r.udalost === "formular_odoslany")
+      .reduce((m, r) => (r.den > m ? r.den : m), "");
+    const padovOdUspechu = dni.filter((x) => x.den >= posledneOdoslanie).reduce((a, x) => a + x.pocet, 0);
     const cerstve = odoslaneOdVtedy === 0;
-    const dozvuk = cerstve
-      ? ""
-      : ` Odvtedy sa ${odoslaneOdVtedy}× podarilo odoslať, takže cesta zase funguje a toto je stopa po oprave — riadok zhasne sám, keď ${poslednyPad} vypadne zo sedemdňového okna.`;
-    nalezy.push(zlyhaniaNalez(cerstve ? "chyba" : "varovanie",
+    const ojedinele = cerstve && padovOdUspechu < 2;
+    const dozvuk = !cerstve
+      ? ` Odvtedy sa ${odoslaneOdVtedy}× podarilo odoslať, takže cesta zase funguje a toto je stopa po oprave — riadok zhasne sám, keď ${poslednyPad} vypadne zo sedemdňového okna.`
+      : ojedinele
+        ? " Od posledného úspechu je to jediné zlyhanie — môže to byť preklep v maile alebo spam, nie porucha; poplach sa spustí pri druhom."
+        : "";
+    nalezy.push(zlyhaniaNalez(cerstve && !ojedinele ? "chyba" : "varovanie",
       // `dni[0]` tu z definície existuje (zlyhanie v okne má deň, inak by ho
       // `vOkne` nepustilo), ale cez `?.`: táto funkcia beží v nočnej kontrole,
       // v ktorej sú aj body 1 a 3, a výnimka by zhodila zápis všetkých troch.

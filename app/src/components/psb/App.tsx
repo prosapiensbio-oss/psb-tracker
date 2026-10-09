@@ -54,6 +54,7 @@ import { stavPolozkyRegistra,
 import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
+import { polozkaGuillermo } from "../../lib/psb/guillermo";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { BetaPruh } from "./BetaPruh";
 import { Workspace } from "./Workspace";
@@ -95,7 +96,8 @@ import { Udaje } from "./Udaje";
 import { CAS_BUILDU, verziaServera } from "../../lib/psb/verzia";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
-import { mimoWorkspace, ritualy as spocitajRitualy } from "../../lib/psb/rituals";
+import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
+import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
@@ -1816,7 +1818,7 @@ function skupinaFaktur(
   // pripomienky. Kým žil len tu, „Odložiť" fungovalo na menšine položiek a na
   // zvyšku znamenalo navždy — hoci tlačidlo svietilo na každom riadku.
   const stavPolozky = useCallback(
-    (key: string, rodinaVstup?: string) => stavPolozkyRegistra(key, data.anomalyAck || {}, rodinaVstup),
+    (key: string, rodinaVstup?: string, platneOd?: string) => stavPolozkyRegistra(key, data.anomalyAck || {}, rodinaVstup, undefined, platneOd),
     [data.anomalyAck],
   );
 
@@ -1861,6 +1863,16 @@ function skupinaFaktur(
     // v lib/psb/penazneNotifikacie.ts — tú istú funkciu volá ranná dávka
     // notifikácií na telefón, takže sa obrazovka a telefón nemôžu rozísť.
     out.push(...polozkyBtcNesedi(data.payments, btcPlatby, data.anomalyAck || {}));
+
+    // (0c) Sedenia u Guillerma minuté (Jerry, 9. 10. 2026: „guillermo −1 mi
+    // nevyskakuje"). Výpočet aj kľúč sú v lib/psb/guillermo.ts — volá ju aj
+    // ranná správa na telefón.
+    const g = polozkaGuillermo(guillermoZazn, guillermoUdal);
+    if (g) out.push({
+      key: g.key, category: "Anomália", tone: g.zostatok < 0 ? "orange" : "blue",
+      title: g.title, detail: g.detail, priority: 30, client: "vzas|vyplaty", trener: "Jerry",
+      ...stavPolozkyRegistra(g.key, ack, "guillermo"),
+    });
 
     const beziaci = dnesPraha().slice(0, 7);
     const mesiace = Object.keys(bankaSumy).filter((m) => m < beziaci).sort();
@@ -2027,7 +2039,7 @@ function skupinaFaktur(
     out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}));
 
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
@@ -2087,6 +2099,21 @@ function skupinaFaktur(
     () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane, stavDatum: stavHotovosti?.datum }).filter(mimoWorkspace),
     [zapisy, chybajuceDoklady, stavHotovosti],
   );
+  /**
+   * Rituály pre „+ Zápis" — s tou istou odpoveďou a tým istým trénerom ako
+   * register a ranná správa. Do 9. 10. 2026 dostával „+ Zápis" surové
+   * rituály: „Vybavené" ich schovalo v registri aj na telefóne, ale v odznaku
+   * „+ Zápis" ostali červené, a Terezka tam videla Jerryho stav hotovosti.
+   */
+  const ritualyZapisu = useMemo(() => {
+    const ja = trenerZPrihlasenia(ktoSom);
+    return rituals
+      .filter((r) => !ja || !r.trener || r.trener === ja)
+      .map((r) => {
+        const odpovedane = stavPolozky(`zapis|${r.id}`).acked;
+        return odpovedane ? { ...r, hotove: true, splatne: false } : r;
+      });
+  }, [rituals, ktoSom, stavPolozky]);
   // Veci, ktoré čakajú na vetu od človeka — dopyty bez dôvodu a nevysvetlené
   // zmeny v kalendári. Sú v jednom rade s ostatnými, aby sa na dashboarde
   // nemuselo hľadať na troch obrazovkách.
@@ -2095,8 +2122,8 @@ function skupinaFaktur(
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
       dnes: dnesPraha(),
-      zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
-      sporneKonanie: sporneKonanie.map((x) => ({ klient: x.klient, trener: x.trener })),
+      zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener, kedy: z.kedy })),
+      sporneKonanie: sporneKonanie.map((x) => ({ klient: x.klient, trener: x.trener, zaciatok: x.zaciatok })),
       // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
       // v Marketingu. Keby sa počítali zvlášť, appka by spochybňovala niečo
       // iné, než ukazuje.
@@ -2115,7 +2142,7 @@ function skupinaFaktur(
           },
         ];
       })(),
-    }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key) })),
+    }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key, undefined, r.platneOd) })),
     [data.leads, clients, kalNevysvetlene, sporneKonanie, stavPolozky],
   );
 
@@ -2364,9 +2391,9 @@ function skupinaFaktur(
         // appky; hotovosť je jediné číslo, ktoré musí opísať človek.
         id: "hotovostStav",
         label: "Stav hotovosti",
-        hotovo: !!stavHotovosti && stavHotovosti.datum >= mk,
+        hotovo: stavHotovostiHotovy(stavHotovosti?.datum, mk),
         detail: stavHotovosti
-          ? (stavHotovosti.datum >= mk
+          ? (stavHotovostiHotovy(stavHotovosti.datum, mk)
               ? `${Math.round(stavHotovosti.hotovost).toLocaleString("cs-CZ")} Kč k ${fmtDMY(stavHotovosti.datum)}`
               : `naposledy ${fmtDMY(stavHotovosti.datum)} — prepíš na koniec mesiaca`)
           : "nezapísaný — spočítaj obálku",
@@ -2940,7 +2967,7 @@ function skupinaFaktur(
         </button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
-          <ZapisButton ritualy={rituals} onNavigate={(t, sub, tyzden) => {
+          <ZapisButton ritualy={ritualyZapisu} onNavigate={(t, sub, tyzden) => {
             navigate(t, sub, tyzden ? { week: tyzden, nonce: Date.now() } : undefined);
             void nacitajZapisy();
           }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti, { zmeny: kalZmeny })} onDennikZapis={chat.spracujDennik} />

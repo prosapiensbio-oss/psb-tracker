@@ -19,6 +19,7 @@ import {
   udalostiBezMena, znieAkoZrusenie, zruseneTreningy,
 } from "../src/lib/psb/compute";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
+import { dnesPraha } from "../src/lib/psb/cas";
 
 const D = process.env.NAOSTRO_DATA;
 if (!D) throw new Error("chýba NAOSTRO_DATA — pusti ./scripts/naostro.sh");
@@ -92,10 +93,12 @@ const vsetko = (d: PSBData, zm = zmeny, ud = udalosti) => {
     ...reg(d, zm, ud),
     ...pripomienkySlubov(ud as any, d.leads as any, d.anomalyAck, new Date(), zm),
     ...pripomienkaDovodu(c, d.packages as any, ud as any, d.anomalyAck),
+    // Odpoveď sa dopĺňa rovnako ako v App.tsx a na serveri — bez toho skript
+    // hlásil ako otvorené aj odklepnuté zoskupené položky (9. 10. 2026).
     ...nezapisaneDoRegistra({
-      leads: d.leads || [], menaKlientov: Object.keys(c), dnes: new Date().toISOString().slice(0, 10),
-      zmeny: zm.filter((z: any) => !z.vysvetlene).map((z: any) => ({ druh: z.druh, trener: z.trener })),
-      podiely: [] }),
+      leads: d.leads || [], menaKlientov: Object.keys(c), dnes: dnesPraha(),
+      zmeny: zm.filter((z: any) => !z.vysvetlene).map((z: any) => ({ druh: z.druh, trener: z.trener, kedy: z.kedy })),
+      podiely: [] }).map((r) => ({ ...r, ...stavPolozkyRegistra(r.key, d.anomalyAck || {}, undefined, new Date(), r.platneOd) })),
   ]);
 };
 const otvorene = (r: any[]) => new Set(r.filter((x) => !x.acked).map((x) => x.key));
