@@ -66,11 +66,29 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       return x && x.mesiac === mesiac && Array.isArray(x.faktury) ? x.faktury : [];
     } catch { return []; }
   });
-  // Čo čaká na potvrdenie, musí byť vidieť aj mimo tejto karty.
+  /**
+   * Čo čaká na potvrdenie, musí byť vidieť aj mimo tejto karty — a hlavne
+   * sa NESMIE stratiť.
+   *
+   * Prvé prekreslenie karty má `nove` prázdne, takže holé „keď je prázdne,
+   * zmaž" by uložený rozpis vymazalo skôr, než ho človek uvidí — stačí, aby
+   * sa karta otvorila pre iný mesiac. Maže sa preto LEN to, čo patrí tomuto
+   * mesiacu, a len keď sme naozaj niečo zapísali (`bolo` drží, či v tomto
+   * okne nejaký rozpis bol).
+   */
+  const bolo = useRef(nove.length > 0);
   useEffect(() => {
     try {
-      if (nove.length) localStorage.setItem(ALZA_CAKA, JSON.stringify({ mesiac, faktury: nove }));
-      else localStorage.removeItem(ALZA_CAKA);
+      if (nove.length) {
+        bolo.current = true;
+        localStorage.setItem(ALZA_CAKA, JSON.stringify({ mesiac, faktury: nove }));
+        oznam("peniaze");
+        return;
+      }
+      if (!bolo.current) return;           // nič tu nebolo — nie je čo mazať
+      const x = JSON.parse(localStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string } | null;
+      if (!x || x.mesiac === mesiac) localStorage.removeItem(ALZA_CAKA);
+      bolo.current = false;
       oznam("peniaze");
     } catch { /* bez úložiska ostane rozpis len do obnovenia */ }
   }, [nove, mesiac]);
