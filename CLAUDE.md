@@ -695,6 +695,14 @@ zariadenie/PWA, nie appka. Nepúšťaj sa do lovu v kóde skôr, než vylúčiš
 A `naostro.sh` vie spadnúť na rate-limite wranglera (stlmený stderr) —
 prechodná chyba nástroja nie je nález; zopakuj beh.
 
+**Druhá vrstva (9. 10. 2026):** keď appka už beží a pri prechode pýta chunk,
+ktorý nasadenie zmazalo, spadne do koreňovej hranice („This page didn't
+load"). `ErrorComponent` v `__root.tsx` pri chybe načítania modulu appku sám
+tvrdo obnoví (raz za 30 s) a každú inú chybu zapíše cez
+`/api/chyba-prehliadaca` do `vzas_audit` (action `chyba-prehliadaca`: správa,
+stack, adresa, šírka, prehliadač). **Pri „spadlo mi to na telefóne" sa
+najprv pozri tam** — predtým o chybe vedela len obrazovka telefónu.
+
 ## Export bez ID operace zahadzoval rovnaké platby v jeden deň
 
 13. 9. 2026: Jerry nahráva „Pohyby na všech účtech" namiesto „Výpisu z účtu".
