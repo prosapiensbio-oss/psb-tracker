@@ -8,6 +8,8 @@ import { bindings } from "../../lib/bindings.server";
 //
 //   GET                        → uložené položky
 //   POST { polozky }           → zapíše potvrdený rozpis a naučí sa pravidlá
+//   POST { akcia: "kategoria", id, kategoria } → zmení kategóriu uloženej
+//                                položky (krok Alza v uzávierke, 9. 10. 2026)
 //
 // PDF sa nespracúva tu, ale v prehliadači — súbor má aj pol megabajtu a posielať
 // ho na server len preto, aby sa z neho vytiahli tri kilobajty textu, nedáva
@@ -28,12 +30,12 @@ export const Route = createFileRoute("/api/faktury")({
         if (!DB) return Response.json({ ok: false, polozky: [] });
         try {
           const rs = await DB.prepare(
-            "SELECT faktura, dodavatel, date, nazov, kod, ks, cena_czk, category FROM faktura_polozky ORDER BY date DESC, faktura LIMIT 800",
+            "SELECT id, faktura, dodavatel, date, nazov, kod, ks, cena_czk, category FROM faktura_polozky ORDER BY date DESC, faktura LIMIT 800",
           ).all();
           return Response.json({
             ok: true,
             polozky: (rs.results as Record<string, unknown>[]).map((r) => ({
-              faktura: r.faktura, dodavatel: r.dodavatel, datum: r.date, nazov: r.nazov,
+              id: r.id, faktura: r.faktura, dodavatel: r.dodavatel, datum: r.date, nazov: r.nazov,
               kod: r.kod, ks: r.ks, cena: r.cena_czk, kategoria: r.category,
             })),
           });
@@ -46,9 +48,25 @@ export const Route = createFileRoute("/api/faktury")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { polozky?: Vstup[] };
+        let b: { polozky?: Vstup[]; akcia?: string; id?: string; kategoria?: string };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
+
+        // Zmena kategórie jednej uloženej položky — rozdelenie „náklad /
+        // výplata / Ahsoka" po zapísaní dokladu, bez nového nahrávania.
+        if (b.akcia === "kategoria") {
+          const id = String(b.id || "");
+          const kategoria = String(b.kategoria ?? "").slice(0, 80);
+          if (!id) return Response.json({ ok: false, error: "Chýba položka." }, { status: 400 });
+          const pred = await DB.prepare("SELECT faktura, nazov, date, category FROM faktura_polozky WHERE id = ?1").bind(id).first<{ faktura: string; nazov: string; date: string; category: string }>();
+          if (!pred) return Response.json({ ok: false, error: "Položka neexistuje." }, { status: 404 });
+          // Uzamknutý mesiac sa nemení — rovnaké pravidlo ako pri banke a zošite.
+          const zamok = await DB.prepare("SELECT locked FROM vzas_periods WHERE month = ?1").bind(String(pred.date || "").slice(0, 7)).first<{ locked: number }>().catch(() => null);
+          if (zamok?.locked) return Response.json({ ok: false, error: "Mesiac je uzamknutý — najprv ho odomkni." }, { status: 409 });
+          await DB.prepare("UPDATE faktura_polozky SET category = ?2 WHERE id = ?1").bind(id, kategoria).run();
+          await audit(DB, { action: "faktura-kategoria", predmet: `${pred.faktura} · ${pred.nazov}`.slice(0, 200), month: String(pred.date || "").slice(0, 7), old: pred.category, neu: kategoria, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true });
+        }
 
         const polozky = Array.isArray(b.polozky) ? b.polozky.slice(0, 500) : [];
         if (!polozky.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });

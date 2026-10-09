@@ -29,6 +29,7 @@ import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { kontrolyMesiaca } from "../../lib/psb/rituals";
+import { AlzaUzavierka } from "./AlzaUzavierka";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
@@ -79,7 +80,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -115,6 +116,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   register?: RegisterItem[];
   pohybSplits?: PohybSplits;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
+  /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
+  btcUzavierky?: Parameters<typeof AlzaUzavierka>[0]["btc"];
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
   /**
@@ -1583,6 +1586,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             return {
               // Mesačné kontroly uzatváraného mesiaca — krok uzávierky, nie
               // samostatná karta (Jerry, 9. 10. 2026).
+              alza: <AlzaUzavierka mesiac={mk} btc={btcUzavierky} />,
               kontroly: (
                 <KrokKontroly
                   kontroly={kontrolyMesiaca(mk)}

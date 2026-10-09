@@ -1065,6 +1065,8 @@ export function PSBApp() {
   useEffect(() => pocuvaj("kalendar", () => setKalVerzia((v) => v + 1)), []);
   const [stavHotovosti, setStavHotovosti] = useState<{ hotovost: number; datum: string } | null>(null);
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
+  /** Položky faktúr bez kategórie po mesiacoch — krok „Alza" v uzávierke. */
+  const [fakturyNezaradene, setFakturyNezaradene] = useState<Record<string, number>>({});
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
@@ -1496,6 +1498,11 @@ function skupinaFaktur(
           .then((x: { polozky?: FaPol[] }) => x.polozky || [])
           .catch(() => [] as FaPol[]);
         const doklady = new Map<string, { datum: string; celkom: number; polozky: FaPol[] }>();
+        {
+          const nez: Record<string, number> = {};
+          for (const p of fa) if (!p.kategoria) { const m = String(p.datum).slice(0, 7); nez[m] = (nez[m] || 0) + 1; }
+          setFakturyNezaradene(nez);
+        }
         for (const p of fa) {
           const e = doklady.get(p.faktura) || { datum: p.datum, celkom: 0, polozky: [] as FaPol[] };
           e.celkom += p.cena;
@@ -2371,6 +2378,23 @@ function skupinaFaktur(
         sub: "uzavierka",
       },
       {
+        // Alza a nákupy bitcoinom (Jerry, 9. 10. 2026): faktúry nahrané,
+        // spárované s platbami bitcoinom a položky rozdelené. Kto v mesiaci
+        // bitcoinom nenakupoval a nemá faktúru, má krok hotový sám.
+        id: "alza",
+        label: "Alza a nákupy bitcoinom",
+        ...(() => {
+          const bez = btcBezDokladu.filter((p) => String(p.datum).slice(0, 7) === mk).length;
+          const nez = fakturyNezaradene[mk] || 0;
+          return {
+            hotovo: bez === 0 && nez === 0,
+            detail: bez || nez
+              ? [bez ? `${bez} ${bez === 1 ? "platba" : bez < 5 ? "platby" : "platieb"} bitcoinom bez faktúry` : "", nez ? `${nez} ${nez === 1 ? "položka" : nez < 5 ? "položky" : "položiek"} bez kategórie` : ""].filter(Boolean).join(" · ")
+              : "faktúry spárované a rozdelené",
+          };
+        })(),
+      },
+      {
         id: "metricool",
         label: "Metricool",
         hotovo: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk),
@@ -2454,7 +2478,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.
@@ -3210,7 +3234,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
 
         {active === "jarvis" && (
           <JarvisOkno
