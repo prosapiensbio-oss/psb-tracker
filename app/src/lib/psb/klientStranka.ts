@@ -108,6 +108,27 @@ function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: bo
  *
  * Pod QR stojí statická adresa: faktúra po hodine vyprší, adresa nie.
  */
+/**
+ * TLAČIDLO „ULOŽIT QR DO FOTEK" — cez systémové zdieľanie.
+ *
+ * Jerry, 9. 10. 2026: Gažovi „nešlo uložiť QR, inak fungovalo dobre".
+ * Odkaz na `data:` adresu s `download` Safari na iPhone do Fotiek neuloží —
+ * buď nespraví nič, alebo súbor pošle do Súborov, kde ho banka ani
+ * peňaženka nenájde. Zdieľanie súboru (`navigator.share`) otvorí systémovú
+ * ponuku a v nej je „Uložit obrázek" — rovno do Fotiek. Android ponúkne
+ * to isté (alebo Uložiť do galérie).
+ *
+ * Bez `<script>`: obsluha je atribút `onclick`, rovnako ako `onfocus` pri
+ * čísle účtu. Keď zdieľanie nie je (počítač, starý prehliadač), klik spadne
+ * na pôvodný `download`. A vždy sa dá podržať prst na samotnom QR.
+ */
+const ZDIELAJ_QR = "try{if(navigator.canShare){var d=this.href,b=atob(d.split(',')[1]),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);var f=new File([a],this.getAttribute('download'),{type:d.slice(5,d.indexOf(';'))});if(navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return false;}}}catch(e){}";
+
+function tlacidloUlozQr(qrUrl: string, subor: string, farba: string): string {
+  return `<a href="${esc(qrUrl)}" download="${esc(subor)}" onclick="${ZDIELAJ_QR}" style="display:inline-block;text-decoration:none;border:2px solid ${farba};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${farba}">Uložit QR do fotek</a>
+<div style="margin-top:7px;font-size:12px;line-height:1.5;color:#4d5940">Na iPhonu zvol v nabídce „Uložit obrázek". Jde to i podržením prstu na QR.</div>`;
+}
+
 function blokLightning(v: VypisKlienta, qrUrl?: string): string {
   const s = SADZBA;
   const l = v.lightning;
@@ -119,7 +140,7 @@ function blokLightning(v: VypisKlienta, qrUrl?: string): string {
     : "";
   const ulozQr = qrUrl
     ? `<div style="margin-top:14px">
-<a href="${esc(qrUrl)}" download="platba-lightning.gif" style="display:inline-block;text-decoration:none;border:2px solid ${s.pozadie};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${s.pozadie}">Uložit QR do fotek</a>
+${tlacidloUlozQr(qrUrl, "platba-lightning.gif", s.pozadie)}
 </div>`
     : "";
   return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
@@ -168,8 +189,8 @@ function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
    */
   const ulozQr = qrUrl
     ? `<div style="margin-top:14px">
-<a href="${esc(qrUrl)}" download="platba-prosapiens.gif" style="display:inline-block;text-decoration:none;border:2px solid ${s.pozadie};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${s.pozadie}">Uložit QR do fotek</a>
-<div style="margin-top:7px;font-size:12px;line-height:1.5;color:#4d5940">V bankovní aplikaci pak dej „načíst QR z galerie" — umí to všechny české banky.</div>
+${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
+<div style="margin-top:4px;font-size:12px;line-height:1.5;color:#4d5940">V bankovní aplikaci pak dej „načíst QR z galerie" — umí to všechny české banky.</div>
 </div>`
     : "";
 

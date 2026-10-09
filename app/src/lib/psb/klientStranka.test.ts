@@ -183,6 +183,15 @@ describe("platba na telefóne", () => {
     expect(h).toMatch(/<input value="2702034550\/2010" readonly/);
   });
 
+  it("Uložit QR otvorí zdieľanie (iPhone → Uložit obrázek), a obsluha je platný JavaScript", () => {
+    const h = klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" });
+    const m = /download="platba-prosapiens\.gif" onclick="([^"]+)"/.exec(h);
+    expect(m).not.toBeNull();
+    expect(m![1]).toContain("navigator.share");
+    // Atribút sa musí dať preložiť ako telo funkcie — preklep by tlačidlo ticho rozbil.
+    expect(() => new Function(m![1].replace(/&#39;/g, "'"))).not.toThrow();
+  });
+
   it("nič z toho nestojí na JavaScripte", () => {
     expect(klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,AAA" })).not.toContain("<script");
   });
