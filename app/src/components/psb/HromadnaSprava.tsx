@@ -5,6 +5,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
+import { NAHLAD_DOTAZNIKA } from "../../lib/psb/dotaznik";
 
 /**
  * HROMADNÁ SPRÁVA — jedna SMS všetkým klientom alebo vybraným.
@@ -47,6 +48,8 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
   const [bezi, setBezi] = useState(false);
   const [stop, setStop] = useState(false);
   const [vysledok, setVysledok] = useState<{ ok: string[]; zle: { meno: string; chyba: string }[] } | null>(null);
+  /** Náhľad stránky dotazníka — presne to, čo klient otvorí z odkazu. */
+  const [nahladDotaznika, setNahladDotaznika] = useState(false);
 
   /** Kto ešte neodpovedal na dotazník v otvorenom kole — pre pripomienku. */
   const [neodpovedali, setNeodpovedali] = useState<string[] | null>(null);
@@ -190,6 +193,18 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
           {najdlhsi} znakov · {dlzka.sprav} SMS na klienta{dlzka.unicode ? " (diakritika: 70 znakov na SMS)" : ""}
           {prijemcovia.length > 0 && text.trim() && <> · spolu <b>{spolu} SMS</b></>}
         </div>
+        {/\{dotaznik\}/i.test(text) && (
+          <div style={{ marginTop: 8 }}>
+            <button style={cip(nahladDotaznika)} onClick={() => setNahladDotaznika((o) => !o)}>
+              {nahladDotaznika ? "skryť náhľad dotazníka" : "ukázať, čo klient uvidí za odkazom"}
+            </button>
+            {nahladDotaznika && (
+              // Ten istý obsah ako skutočný odkaz, len odoslanie nič neuloží.
+              <iframe title="Náhľad dotazníka" src={`/d/${NAHLAD_DOTAZNIKA}`}
+                style={{ display: "block", marginTop: 8, width: "100%", maxWidth: 400, height: 640, border: `1px solid ${C.border}`, borderRadius: 12, background: "#232b1c" }} />
+            )}
+          </div>
+        )}
         {filter === "dotaznik" && neodpovedali && !neodpovedali.length && (
           <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>Nikto nečaká — dotazník ešte neodišiel, alebo odpovedali všetci.</div>
         )}

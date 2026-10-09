@@ -16,6 +16,13 @@ export type OtazkaDotazniku =
   | { id: string; druh: "vyber"; text: string; moznosti: { id: string; text: string }[]; najviac: number }
   | { id: string; druh: "text"; text: string; nepovinne?: boolean };
 
+/**
+ * Token NÁHĽADU (Jerry, 9. 10. 2026: „daj, aby sa mi obsah toho odkazu ukázal
+ * pred odoslaním"). Ukáže presne tú stránku, ktorú dostane klient; odoslanie
+ * z náhľadu nič neuloží. Tvar ako skutočný token, aby prešiel tým istým kódom.
+ */
+export const NAHLAD_DOTAZNIKA = "NAHLADDOTAZNIK";
+
 /** Výsledky sa ukazujú až od tohto počtu — prvá odpoveď by bola skoro podpísaná. */
 export const MIN_ODPOVEDI = 5;
 

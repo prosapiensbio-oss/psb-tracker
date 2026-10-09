@@ -64,9 +64,12 @@ function otazka(q: OtazkaDotazniku, i: number): string {
 }
 
 /** Formulár dotazníka. */
-export function dotaznikStranka(v: { logoUrl?: string; chyba?: string }): string {
+export function dotaznikStranka(v: { logoUrl?: string; chyba?: string; nahlad?: boolean }): string {
   const otazky = OTAZKY.map((q, i) => `<div style="margin-top:30px">${otazka(q, i)}</div>`).join("\n");
-  return obal(`<div style="font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:${s.tlmeny}">Krátký dotazník · 2 minuty</div>
+  const pruh = v.nahlad
+    ? `<div style="margin-bottom:18px;padding:10px 14px;border-radius:12px;background:${s.zelena};color:${s.pozadie};font-size:13px;font-weight:600">Náhľad pre Kokpit — takto stránku uvidí klient. Odoslanie odtiaľto nič neuloží.</div>`
+    : "";
+  return obal(`${pruh}<div style="font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:${s.tlmeny}">Krátký dotazník · 2 minuty</div>
 <h1 style="margin:8px 0 0;font-family:'Raleway',sans-serif;font-weight:800;font-size:28px;line-height:1.15;color:${s.biela}">Jak se vám u nás trénuje?</h1>
 <div style="margin-top:14px;padding:14px 16px;border-radius:14px;background:${s.plocha};font-size:14px;line-height:1.6">
 Dotazník je <b>anonymní</b>. Odkaz je osobní jen proto, aby se dalo odpovědět jednou — odpovědi ukládáme odděleně a nevíme, kdo co napsal. Výsledky uvidíme až souhrnně, když odpoví aspoň pět lidí. Žádná otázka není povinná.

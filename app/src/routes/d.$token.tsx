@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { bindings } from "../lib/bindings.server";
-import { rozoberFormular } from "../lib/psb/dotaznik";
+import { NAHLAD_DOTAZNIKA, rozoberFormular } from "../lib/psb/dotaznik";
 import { stavOdkazu, ulozOdpoved } from "../lib/psb/dotaznik.server";
 import { dotaznikHotovo, dotaznikNeplati, dotaznikStranka } from "../lib/psb/dotaznikStranka";
 
@@ -23,6 +23,9 @@ export const Route = createFileRoute("/d/$token")({
     handlers: {
       GET: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
+        if (token === NAHLAD_DOTAZNIKA) {
+          return html(new URL(request.url).searchParams.get("hotovo") === "1" ? dotaznikHotovo({}) : dotaznikStranka({ nahlad: true }));
+        }
         const { DB } = bindings();
         if (!DB || !platnyTvar(token)) return html(dotaznikNeplati({}), 404);
         const s = await stavOdkazu(DB, token);
@@ -36,6 +39,10 @@ export const Route = createFileRoute("/d/$token")({
       },
       POST: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
+        // Náhľad nič neukladá — len ukáže, čo uvidí klient po odoslaní.
+        if (token === NAHLAD_DOTAZNIKA) {
+          return new Response(null, { status: 303, headers: { location: `/d/${NAHLAD_DOTAZNIKA}?hotovo=1`, "cache-control": "no-store" } });
+        }
         const { DB } = bindings();
         if (!DB || !platnyTvar(token)) return html(dotaznikNeplati({}), 404);
         const s = await stavOdkazu(DB, token);

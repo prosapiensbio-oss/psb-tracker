@@ -30,6 +30,12 @@ describe("anonymný dotazník — formulár", () => {
     expect(h).not.toMatch(/required/);
   });
 
+  it("náhľad pre Kokpit je tá istá stránka s pruhom navrchu", () => {
+    const h = dotaznikStranka({ nahlad: true });
+    expect(h).toContain("Náhľad pre Kokpit");
+    expect(h.replace(/<div style="margin-bottom:18px[^]*?<\/div>/, "")).toBe(dotaznikStranka({}));
+  });
+
   it("poďakovanie rozlišuje „práve teraz“ a „už predtým“", () => {
     expect(dotaznikHotovo({})).toContain("uložili");
     expect(dotaznikHotovo({ uzPredtym: true })).toContain("jen jednou");
