@@ -1931,6 +1931,14 @@ export function terminSlovom(iso: string): string {
  * overiť nedá a nesmie ním byť umlčaný.
  */
 const ZAVER_O_TERMINE = /dohodn|term[ií]n|ozva[tť] sa|tr[ée]ning|objedna/i;
+/**
+ * Termín pre INÉHO ČLOVEKA než klienta, o ktorom záver hovorí (Jerry, 9. 10.
+ * 2026: „Panagiotis chce pre kolegu úvodný + 2 tréningy, pripomeň mi to v
+ * nedeľu"). Panagiotis má vlastné tréningy v kalendári — a appka by z nich
+ * usúdila, že je dohodnuté, a pripomienku v nedeľu zamlčala. Úvodný alebo
+ * zmienka o kolegovi, kamarátovi, rodine znamená nového človeka.
+ */
+const ZAVER_PRE_INEHO = /koleg|kamar[aá]t|\bzn[aá]m(eh|ej|u|y)\b|man[zž]el|partner|priate[lľ]|\bsyn(a|ovi)?\b|\bdc[eé]r|\bmam[uy]\b|\botc[ai]|\bbrat(a|ovi)?\b|\bsestr|\bpre (jeho|jej|svojho|svoju)\b|[uú]vodn/i;
 
 /** Sedí názov udalosti z kalendára na TOHTO klienta? Znesie aj skratku
  *  s iniciálou priezviska („Lukas H." → Lukas Hanus). */
@@ -1948,6 +1956,7 @@ export function zaverUzMaTermin(
   dnes: Date = new Date(),
 ): string | null {
   if (!ZAVER_O_TERMINE.test(z.overit || "")) return null;
+  if (ZAVER_PRE_INEHO.test(`${z.zaver || ""} ${z.overit || ""}`)) return null;
   const text = normName(`${z.zaver || ""} ${z.tema || ""}`);
   // Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov.
   const meno = menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
@@ -2204,6 +2213,10 @@ export function deriveAnomalies(
      * isté sa nepýta každý deň znova.
      */
     for (const x of zostavaPoPlatnosti([c], dnesISO)) {
+      // VEK: dva týždne po konci platnosti otázka do notifikácií nepatrí —
+      // Sofia Resnerová svietila 26 dní po termíne, hoci medzitým začal nový
+      // balíček (9. 10. 2026). Rozhodnutie čaká ďalej vo Workspace → Platby.
+      if (x.dni > 14) continue;
       push(`platnost|${c.name}|${x.platnostDo}`, x.dni >= 0 ? "orange" : "blue",
         "Platnosť končí, hodiny zostávajú", vetaPlatnosti(x), c.name, moznostiPlatnosti(x));
     }

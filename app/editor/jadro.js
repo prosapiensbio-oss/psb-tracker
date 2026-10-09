@@ -361,9 +361,14 @@
       const d = p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0;
       return { x, y, d };
     };
+    // Prázdna polovica otvára výber až na KLIKNUTIE (ťuknutie), nie na
+    // pointerdown: Safari na iPhone/iPade pustí okno na výber súboru len
+    // z kliknutia, z pointerdown ho potichu zahodí (Jerry, 9. 10. 2026:
+    // „keď kliknem na vložiť fotku, nič sa nedeje").
+    el.addEventListener("click", () => { if (!stav[i].src) { aktivne = i; kresli(); otvorVyber(); } });
     el.addEventListener("pointerdown", (e) => {
       aktivne = i;
-      if (!stav[i].src) { kresli(); otvorVyber(); return; }
+      if (!stav[i].src) { kresli(); return; }
       el.setPointerCapture(e.pointerId);
       prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
       posledne = stredPrstov();
@@ -493,7 +498,8 @@
       else vlozSubor(i, e.dataTransfer?.files?.[0]);
     });
   });
-  document.getElementById("vlozit").onclick = otvorVyber;
+  // „Vložiť fotku…" je <label for="subor"> — výber otvorí prehliadač sám,
+  // spoľahlivo aj na iPhone a iPade.
   document.querySelectorAll("#vyberOkna button").forEach((b) => b.onclick = () => { aktivne = Number(b.dataset.i); kresli(); });
   document.getElementById("zoom").oninput = (e) => {
     const s = stav[aktivne]; const { ow, oh } = rozmerOkna(okna[aktivne]);

@@ -44,7 +44,7 @@
           <div class="riadok">zväčšenie <input type="range" id="zoom" min="1" max="6" step="0.01" value="1"></div>
           <div class="riadok">deň fotky <input type="date" id="den"></div>
           <div class="tlacidla">
-            <button class="tl" id="vlozit">Vložiť fotku…</button>
+            <label class="tl" id="vlozit" for="subor" role="button" style="display:inline-block">Vložiť fotku…</label>
             <button class="tl" id="zrkadlo">↔ zrkadlo</button>
             <button class="tl" id="reset">na stred</button>
             <button class="tl" id="vymenit" title="Vymeniť ľavú a pravú">⇄</button>
@@ -124,7 +124,8 @@
     </div>
   </aside>
 </div>
-<input type="file" id="subor" accept="image/*" hidden>
+<!-- Nie `hidden`: iPhone/iPad otvorenie skrytého (display:none) políčka zahodí (9. 10. 2026). -->
+<input type="file" id="subor" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none">
 
 <script>
 <!--sklad-js--><!--/sklad-js-->

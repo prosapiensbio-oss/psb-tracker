@@ -22,6 +22,16 @@ describe("záver o termíne sa overuje kalendárom", () => {
     expect(r).toBe("2026-09-01T10:30:00Z");
   });
 
+  it("termín pre INÉHO človeka (kolega, úvodný) sa vlastným tréningom klienta neumlčí — Panagiotis 9. 10. 2026", () => {
+    const z = { zaver: "Panagiotis Tsiolis chce pre kolegu úvodný tréning + 2 tréningy.", tema: "klienti", overit: "Ozvať sa Panagiotisovi a dohodnúť termín úvodného + 2 tréningov pre jeho kolegu." };
+    expect(zaverUzMaTermin(z, ["Panagiotis Tsiolis"], [u("Panagiotis Tsiolis", "2026-09-03T17:00:00Z")], DNES)).toBeNull();
+  });
+
+  it("„zobrať“ či „brať“ nie je brat — bežný záver sa ďalej overuje kalendárom", () => {
+    const z = { ...ROMAN, overit: "Ozvať sa Romanovi, či si chce zobrať termín na začiatok septembra." };
+    expect(zaverUzMaTermin(z, KLIENTI, [u("Roman Pavlik", "2026-09-01T10:30:00Z")], DNES)).toBe("2026-09-01T10:30:00Z");
+  });
+
   it("keď termín nemá, nehlási nič", () => {
     expect(zaverUzMaTermin(ROMAN, KLIENTI, [], DNES)).toBeNull();
   });

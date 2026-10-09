@@ -29,6 +29,23 @@ export const Route = createFileRoute("/api/anomaly")({
         const kto = (await currentUser(request)) || "";
         if (ack) await ackAnomaly(DB, key, note, kto);
         else await unackAnomaly(DB, key);
+        /*
+         * ZÁVER Z DEBATY: odpoveď ho zavrie aj v Jarvisovej pamäti (9. 10. 2026).
+         * Dovtedy „Vybavené" len schovalo riadok a v `jarvis_zavery` záver
+         * ostal otvorený — Jarvis ho viedol ako nevyriešený a zavretie záviselo
+         * od toho, či zareaguje na tichú správu. Odloženie záver nezatvára;
+         * vrátenie odpovede ho znova otvorí.
+         */
+        if (key.startsWith("zaver|")) {
+          const id = key.slice(6);
+          const realna = ack && note && !note.startsWith("odlozene|");
+          if (realna) {
+            await DB.prepare("UPDATE jarvis_zavery SET stav = 'vybavene', vysledok = COALESCE(NULLIF(vysledok, ''), ?2) WHERE id = ?1 AND stav = 'otvoreny'")
+              .bind(id, note.slice(0, 800)).run().catch(() => null);
+          } else if (!ack) {
+            await DB.prepare("UPDATE jarvis_zavery SET stav = 'otvoreny' WHERE id = ?1 AND stav = 'vybavene'").bind(id).run().catch(() => null);
+          }
+        }
         await audit(DB, { action: ack ? "skrytie-signalu" : "vratenie-signalu", predmet: key, reason: note || undefined, actor: kto || undefined });
         return Response.json({ ok: true });
       },

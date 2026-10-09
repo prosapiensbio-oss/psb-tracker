@@ -93,7 +93,7 @@
         <summary><span class="sipka">▸</span>Videá<span class="stav" id="stavVidea"></span></summary>
         <div class="obsah">
           <div class="videa" id="zoznamVidei"></div>
-          <button class="tl" id="vlozit">Vložiť video…</button>
+          <label class="tl" id="vlozit" for="subor" role="button" style="display:inline-block">Vložiť video…</label>
           <div class="riadok">natočené pri <select id="fps"><option>30</option><option>60</option><option>120</option><option>240</option></select> snímkach/s</div>
           <div class="napoveda">Video môžeš aj <b>pretiahnuť z Findera</b>. Vlož predtým aj potom — prepínaš klikom v zozname. Snímky/s určujú, o koľko skočí ← →.</div>
         </div>
@@ -152,7 +152,8 @@
     </div>
   </aside>
 </div>
-<input type="file" id="subor" accept="video/*" hidden>
+<!-- Nie `hidden`: iPhone/iPad otvorenie skrytého (display:none) políčka zahodí (9. 10. 2026). -->
+<input type="file" id="subor" accept="video/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none">
 
 <script>
 <!--sklad-js--><!--/sklad-js-->
@@ -529,7 +530,7 @@
       };
     });
   }
-  $("vlozit").onclick = () => $("subor").click();
+  // „Vložiť video…" je <label for="subor"> — výber otvorí prehliadač sám.
   $("prazdne").onclick = () => $("subor").click();
   $("subor").onchange = () => { vlozVideo($("subor").files?.[0]); $("subor").value = ""; };
   scena.addEventListener("dragover", (e) => { e.preventDefault(); scena.classList.add("nad"); });
