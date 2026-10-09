@@ -32,7 +32,9 @@ const zlozText = (text: string, meno: string) => text.replace(/\{meno\}/gi, krst
 /** Dĺžka sa ráta s odkazom takej dĺžky, aký server naozaj vloží. */
 const ukazkaOdkazu = () => verejnyOdkaz(`/d/${"x".repeat(14)}`, typeof window === "undefined" ? "" : window.location.origin);
 const naPocitanie = (text: string, meno: string) => zlozText(text, meno).replace(/\{dotaznik\}/gi, ukazkaOdkazu());
-const TEXT_DOTAZNIKA = "Ahoj {meno}, máš 2 minuty? Krátký anonymní dotazník o ProSapiens: {dotaznik} Moc nám pomůže. Jerry a Terezka";
+// Bez diakritiky zámerne: s mäkčeňmi má SMS limit 70 znakov a s odkazom by
+// to boli tri správy na človeka; takto je to jedna (pri ~60 klientoch 120 SMS rozdiel).
+const TEXT_DOTAZNIKA = "Ahoj {meno}, mas 2 minuty? Kratky anonymni dotaznik o ProSapiens: {dotaznik} Moc nam pomuze. Jerry a Terezka";
 
 export function HromadnaSprava({ clients, trener }: { clients: Record<string, ClientAgg>; trener: string | null }) {
   const [kontakty, setKontakty] = useState<Kontakt[] | null>(null);
