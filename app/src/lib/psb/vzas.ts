@@ -406,6 +406,11 @@ export const SPOLOCNE: Record<string, Vals> = {
   "Výlety": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2924, 0],
   "Doplnky": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2377, 0, 1544, 0, 978, 1216],
   "Iné": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1400, 6300, 3654, 17500, 2999, 3789],
+  // Jerry, 9. 10. 2026: „potrebujem doplniť Spoločné Domácnosť." Veci do bytu,
+  // ktoré nie sú potraviny ani doplnky — riad, čistiace prostriedky, drobnosti
+  // z Alzy. Historické mesiace zostávajú na nule: dovtedy padali do „Iné"
+  // a prepisovať minulosť by znamenalo tvrdiť o nej niečo, čo sa nestalo.
+  "Domácnosť": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 // Matyáš — employee for all of 2025 and jan–mar 2026 (no entitlement/debt

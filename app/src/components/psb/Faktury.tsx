@@ -24,13 +24,23 @@ import { Card, H3, Info, TableWrap } from "./ui";
 // deväťdesiat rozbaľovačiek a väčšina z nich patrí do tej istej kategórie.
 
 export function FakturyNahlad({
-  faktury, onZmena, onHotovo, btcPlatby,
+  faktury, onZmena, onHotovo, btcPlatby, uzZapisane,
 }: {
   faktury: Faktura[];
   onZmena: (i: number, f: Faktura) => void;
   onHotovo: () => void;
   /** Výbery z bitcoinovej peňaženky — na zobrazenie, čím sa doklad zaplatil. */
   btcPlatby?: PlatbaBtc[];
+  /**
+   * Čísla dokladov, ktoré sú už zapísané.
+   *
+   * Jerry, 9. 10. 2026: „prečo mám pocit, že je to tam teraz 2× zapisovanie
+   * dvoma rôznymi spôsobmi?" Lebo bolo: ten istý doklad stál v náhľade
+   * (kde sa zapisuje) aj v zozname mesiaca (kde sa triedi), každý s inou
+   * obsluhou. Zapísaný doklad sa v náhľade odteraz nekreslí ako práca —
+   * povie, že je hotový, a triedi sa dole, na jednom mieste.
+   */
+  uzZapisane?: Set<string>;
 }) {
   const [busy, setBusy] = useState(false);
   const [vysledok, setVysledok] = useState("");
@@ -69,7 +79,9 @@ export function FakturyNahlad({
 
   const spolu = faktury.reduce((a, f) => a + f.polozky.reduce((x, p) => x + p.cena, 0), 0);
   const nezaradene = faktury.reduce((a, f) => a + f.polozky.filter((p) => !p.kategoria).length, 0);
-  const polozekSpolu = faktury.reduce((a, f) => a + f.polozky.length, 0);
+  /** Doklady, ktoré sa ešte zapisujú — zapísané sú len na jeden zbalený riadok. */
+  const naZapis = faktury.filter((f) => !uzZapisane?.has(f.cislo));
+  const polozekSpolu = naZapis.reduce((a, f) => a + f.polozky.length, 0);
 
   const uprav = (fi: number, pi: number, zmena: Partial<Faktura["polozky"][0]>) => {
     const f = faktury[fi];
@@ -86,7 +98,7 @@ export function FakturyNahlad({
 
   const zapis = async () => {
     setBusy(true);
-    const riadky = faktury.flatMap((f) =>
+    const riadky = naZapis.flatMap((f) =>
       f.polozky.filter((p) => p.nazov.trim() && p.cena).map((p) => ({
         faktura: f.cislo, dodavatel: f.dodavatel, datum: f.datum,
         nazov: p.nazov, kod: p.kod, ks: p.ks, cena: p.cena, kategoria: p.kategoria,
@@ -106,7 +118,7 @@ export function FakturyNahlad({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            label={`Faktúry — ${faktury.length} ${faktury.length === 1 ? "doklad" : "doklady"}, ${polozekSpolu} položiek`}
+            label={`Faktúry — ${naZapis.length} ${naZapis.length === 1 ? "doklad" : "doklady"}, ${polozekSpolu} položiek${faktury.length > naZapis.length ? ` (${faktury.length - naZapis.length} už zapísaných)` : ""}`}
             text="Rozpis dokladu na jednotlivé veci, aby sa dala každá zaradiť zvlášť. Opraviť sa dá názov aj suma — parser číta dobre, ale nie neomylne. Čo zaradíš, appka si zapamätá podľa prvých troch slov názvu, takže ďalšie granule sa zaradia samy."
           />
         </H3>
@@ -149,6 +161,20 @@ export function FakturyNahlad({
       {faktury.map((f, fi) => {
         const sucet = f.polozky.reduce((a, p) => a + p.cena, 0);
         const sedi = sediSucet(f);
+        /**
+         * Doklad, ktorý už v Kokpite JE, sa druhýkrát nezapisuje. Zbalí sa na
+         * jeden riadok a práca s ním (kategórie) patrí do zoznamu mesiaca —
+         * jedno miesto, nie dve obsluhy toho istého.
+         */
+        if (uzZapisane?.has(f.cislo)) {
+          return (
+            <div key={`${f.cislo}-${fi}`} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8, opacity: 0.75 }}>
+              <span style={{ fontSize: 12.5, color: C.textMuted }}>{f.dodavatel || "Faktúra"} · {f.cislo}</span>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>{f.datum}</span>
+              <span style={{ fontSize: 11.5, color: C.green }}>✓ už zapísaná — kategórie sa menia v zozname nižšie</span>
+            </div>
+          );
+        }
         return (
           <div key={`${f.cislo}-${fi}`} style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>

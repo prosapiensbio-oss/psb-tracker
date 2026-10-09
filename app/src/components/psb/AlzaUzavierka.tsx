@@ -187,7 +187,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       {chyby.length > 0 && <div style={{ fontSize: 12, color: C.orange, marginTop: 6 }}>{chyby.join(" · ")}</div>}
       {nove.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <FakturyNahlad faktury={nove} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} />
+          <FakturyNahlad faktury={nove} uzZapisane={new Set((polozky || []).map((p) => p.faktura))} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} />
         </div>
       )}
 
