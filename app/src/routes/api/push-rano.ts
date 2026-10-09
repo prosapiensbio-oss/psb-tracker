@@ -155,13 +155,26 @@ export const Route = createFileRoute("/api/push-rano")({
           mesiace[r.month] = { note: r.note || "", answers };
         }
 
+        // Komu kedy odišla SMS — pre „posledná hodina / mínus" (ten istý dopyt
+        // ako /api/sms?odoslane=1).
+        const smsRs = await DB.prepare(
+          `SELECT payment_id predmet, MAX(at) kedy FROM vzas_audit
+            WHERE action = 'sms-odoslana' AND at >= datetime('now', '-120 days')
+            GROUP BY payment_id`,
+        ).all<{ predmet: string; kedy: string }>().catch(() => ({ results: [] as { predmet: string; kedy: string }[] }));
+        const smsOdoslane: Record<string, string> = {};
+        for (const r of smsRs.results || []) {
+          const klient = String(r.predmet || "").split(" · ")[0].trim();
+          if (klient && (!smsOdoslane[klient] || r.kedy > smsOdoslane[klient])) smsOdoslane[klient] = r.kedy;
+        }
+
         const register = penazne.concat(registerZoServera(data, {
           udalosti: (ud.results as unknown as Record<string, unknown>[]).map((u) => ({
             zaciatok: String(u.zaciatok), klient: (u.klient as string) || null, typ: (u.typ as string) || null,
             nazov: String(u.nazov || ""), trener: String(u.trener || ""), zmizlaAt: null,
           })),
           zmeny: zm.results as never,
-        }, new Date(), { weeks, mesiace, stavDatum }));
+        }, new Date(), { weeks, mesiace, stavDatum }, smsOdoslane));
 
         // ── Téma na dnešné hovorené video ──────────────────────────────
         //

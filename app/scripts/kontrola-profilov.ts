@@ -12,6 +12,7 @@
  * platí aj tu: kým nevieš o každom náleze povedať, prečo tam je, kontrola
  * nie je hotová.
  */
+import { polozkyHodin } from "../src/lib/psb/notifikaciaHodin";
 import { deriveClients } from "../src/lib/psb/compute";
 import { normName } from "../src/lib/psb/format";
 import { hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
@@ -431,6 +432,16 @@ sekcia("ODKAZ PRE KLIENTA");
   hlas("diera v odpočte hodín", diery, "6, 5, 4… sa nesmie preskočiť");
   hlas("nadpis odkazu proti karte klienta", nadpisy, "obe čísla majú hovoriť to isté");
   hlas("suma na QR proti karte dlžníkov", sumy, "dve definície dlhu sa rozišli");
+}
+
+// ── NOTIFIKÁCIA „POSLEDNÁ HODINA / MÍNUS" (9. 10. 2026) ──
+// Len vypíše, komu by svietila (bez filtra odoslanej SMS — audit skript
+// nesťahuje), aby sa dalo pred nasadením vidieť, či nezaplaví register.
+{
+  console.log("\n\u001b[1mNOTIFIKÁCIA POSLEDNÁ HODINA / MÍNUS\u001b[0m");
+  const p = polozkyHodin(clients, kalUdalosti, platbyKokpit, data.balickyKokpit || [], {}, data.anomalyAck || {}, new Date());
+  console.log(`  kandidátov ${p.length} (pred filtrom odoslanej SMS)`);
+  for (const x of p) console.log(`      ${x.title}${x.acked ? " · odpovedané" : ""}`);
 }
 
 console.log(`\n${nalezov ? `\u001b[33m${nalezov} vecí na pozretie\u001b[0m` : "\u001b[32mbez nálezov\u001b[0m"}\n`);

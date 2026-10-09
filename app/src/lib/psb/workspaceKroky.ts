@@ -340,6 +340,126 @@ export function zoznamSms(
   return out.sort((a, b) => a.zostatok - b.zostatok || b.dlh - a.dlh || a.meno.localeCompare(b.meno, "cs"));
 }
 
+/* ──────────── NOTIFIKÁCIA: POSLEDNÁ HODINA ALEBO MÍNUS (9. 10. 2026) ──────────── */
+
+/**
+ * POSLEDNÁ ZMENA STAVU KLIENTA — tréning, ktorý už začal, platba, balíček.
+ *
+ * Časy sú PRAŽSKÉ (`RRRR-MM-DDTHH:MM`), nie UTC: kalendár ich tak nesie
+ * a server beží v UTC — `new Date("…T18:00")` by tam posunulo tréning
+ * o dve hodiny. Odoslanú SMS (audit je v UTC) treba pred porovnaním
+ * previesť cez `terazPraha(new Date(at))`.
+ */
+export function poslednaZmenaStavu(
+  mena: string[],
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null }[],
+  platby: { klient: string; datum: string }[],
+  balicky: { klient: string; platnost_od?: string; platnostOd?: string }[],
+  terazP: string,
+): { zmena: Record<string, string>; reset: Record<string, string>; objednane: Set<string> } {
+  const podla = new Map(mena.map((m) => [normName(m), m]));
+  const zmena: Record<string, string> = {};
+  /** Len platba alebo balíček — to, čo hodiny DOPĹŇA. Tréning ich len míňa. */
+  const reset: Record<string, string> = {};
+  const objednane = new Set<string>();
+  const posun = (meno: string | null, cas: string, ajReset = false) => {
+    if (!meno || !cas) return;
+    const k = podla.get(normName(meno)) || meno;
+    if (cas > terazP) return;
+    if (!zmena[k] || cas > zmena[k]) zmena[k] = cas;
+    if (ajReset && (!reset[k] || cas > reset[k])) reset[k] = cas;
+  };
+  for (const u of udalosti) {
+    if (!u.klient || (u.typ !== "trening" && u.typ !== "uvodny")) continue;
+    const cas = u.zaciatok.slice(0, 16);
+    if (cas > terazP) objednane.add(normName(u.klient));
+    else posun(u.klient, cas);
+  }
+  for (const p of platby) posun(p.klient, `${p.datum.slice(0, 10)}T00:00`, true);
+  for (const b of balicky) posun(b.klient, `${String(b.platnost_od || b.platnostOd || "").slice(0, 10)}T00:00`, true);
+  return { zmena, reset, objednane };
+}
+
+export type UpozornenieHodin = {
+  meno: string;
+  trener: string;
+  /** posledná = zostáva najviac hodina; nula = minuté; mínus = trénuje nad rámec. */
+  stav: "posledna" | "nula" | "minus";
+  zostatok: number;
+  /** Odpoveď (aj „SMS poslaná") staršia než toto sa nepočíta — posledná platba alebo balíček. */
+  platneOd: string;
+};
+
+/** Ako dávno musel klient trénovať, aby sa ho notifikácia týkala (bez objednaného termínu). */
+export const HODINY_AKTIVNY_DNI = 21;
+
+/**
+ * KTO MÁ POSLEDNÚ HODINU ALEBO JE V MÍNUSE.
+ *
+ * Jerry, 9. 10. 2026: „sprav mi upozornenie, že klient má poslednú hodinu
+ * alebo že je v mínuse, a pridaj mi tam poslať SMS." Tie isté hranice ako
+ * krok 2 · SMS (aktívny klient s balíčkom, trénoval za 60 dní alebo má
+ * termín), len s jedným stupňom navyše: POSLEDNÁ HODINA — vtedy sa ešte dá
+ * napísať skôr, než klient prejde do mínusu.
+ *
+ * NEOTRAVUJE PO KAŽDOM TRÉNINGU. Prvá verzia brala ako zmenu aj tréning —
+ * klient v mínuse by svietil znova po každej hodine a pri prvom spustení
+ * by ich naraz svietilo 30. Preto:
+ *  - epizódu ukončí len PLATBA alebo BALÍČEK (`reset`), nie tréning;
+ *  - SMS odoslaná v tejto epizóde ju umlčí celú (stránka za odkazom ukazuje
+ *    stav živo — ďalšia správa by hovorila to isté);
+ *  - „Vybavené" platí na STUPEŇ: posledná hodina a mínus sú dve otázky;
+ *  - hlási sa len, kto trénoval za 21 dní alebo má objednaný termín.
+ */
+export function upozorneniaHodin(
+  clients: KlientPreSms[],
+  odoslane: Record<string, string>,
+  reset: Record<string, string>,
+  objednane: Set<string>,
+  dnes: string,
+): UpozornenieHodin[] {
+  const out: UpozornenieHodin[] = [];
+  for (const c of clients) {
+    if (c.status === "Neaktívny" || c.status === "Pauza") continue;
+    if (!(c.packageTotal > 0)) continue;
+    const zostatok = Math.round(c.packageRemaining * 100) / 100;
+    if (zostatok > 1) continue;
+    const nedavno = !!c.lastSession && dniMedzi(c.lastSession, dnes) <= HODINY_AKTIVNY_DNI;
+    if (!nedavno && !objednane.has(normName(c.name))) continue;
+    const zm = reset[c.name] || "";
+    const sms = odoslane[c.name];
+    if (sms && (!zm || sms > zm)) continue;
+    out.push({
+      meno: c.name,
+      trener: c.primaryTrainer,
+      stav: zostatok < 0 ? "minus" : zostatok === 0 ? "nula" : "posledna",
+      zostatok,
+      platneOd: zm,
+    });
+  }
+  return out.sort((a, b) => a.zostatok - b.zostatok || a.meno.localeCompare(b.meno, "cs"));
+}
+
+/** Veta do notifikácie — bez slovesa v minulom čase (rod sa z mena nevyčíta). */
+export function vetaHodin(u: UpozornenieHodin): { title: string; detail: string } {
+  if (u.stav === "minus") {
+    return {
+      title: `${u.meno}: v mínuse ${u.zostatok} h`,
+      detail: `${u.meno} trénuje nad rámec balíčka (${u.zostatok} h). Pošli SMS s odkazom — stránka za ním ukáže stav hodín aj QR na platbu.`,
+    };
+  }
+  if (u.stav === "nula") {
+    return {
+      title: `${u.meno}: balíček minutý (0 h)`,
+      detail: `${u.meno} má balíček minutý — ďalší tréning už bude v mínuse. Pošli SMS s odkazom na stav hodín a platbu.`,
+    };
+  }
+  return {
+    title: `${u.meno}: posledná hodina z balíčka`,
+    detail: `${u.meno} má v balíčku poslednú hodinu (${u.zostatok} h). Pošli SMS, nech vie skôr, než prejde do mínusu — za odkazom vidí stav hodín.`,
+  };
+}
+
 /* ───────────────────────── 3 · PLATBY: KTORÁ PLATBA Z BANKY K DLHU ─────────── */
 
 export type KandidatPlatby = { fioId: string; datum: string; suma: number; text: string; preco: "meno" | "suma" | "meno+suma" };

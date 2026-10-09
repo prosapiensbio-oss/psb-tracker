@@ -55,6 +55,7 @@ import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { polozkaGuillermo } from "../../lib/psb/guillermo";
+import { polozkyHodin } from "../../lib/psb/notifikaciaHodin";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { BetaPruh } from "./BetaPruh";
 import { Workspace } from "./Workspace";
@@ -1163,6 +1164,19 @@ export function PSBApp() {
   const [guillermoUdal, setGuillermoUdal] = useState<KalUdalost[]>([]);
   /** Zmeny, ktoré ešte nikto nevysvetlil — `vysvetlene = 0`. */
   const [kalNevysvetlene, setKalNevysvetlene] = useState<KalZmena[]>([]);
+  /**
+   * Komu kedy naposledy odišla SMS (audit) — pre notifikáciu „posledná
+   * hodina / mínus". Načíta sa pri štarte a po každej odoslanej SMS
+   * (signál „sms"), inak by klient po správe z kroku 2 ostal svietiť.
+   */
+  const [smsOdoslane, setSmsOdoslane] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    const nacitaj = () => void fetch("/api/sms?odoslane=1", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json()).then((j) => setSmsOdoslane(j?.ok ? (j.odoslane || {}) : {}))
+      .catch(() => setSmsOdoslane({}));
+    nacitaj();
+    return pocuvaj("sms", nacitaj);
+  }, []);
   // Ktoré mesiace sú uzavreté. Jarvis to potrebuje vedieť, aby nenavrhoval
   // opravy v zamknutom mesiaci a vedel povedať „júl sa už dá zamknúť".
   /** Hlavné dáta sú načítané — až potom sa smú spustiť ďalšie ťažké dopyty. */
@@ -2205,6 +2219,13 @@ function skupinaFaktur(
     [kalUdalosti, kalZmeny, data.leads, data.anomalyAck],
   );
 
+  // Posledná hodina / mínus s tlačidlom na SMS (Jerry, 9. 10. 2026) — tá
+  // istá funkcia ako v rannej správe na telefón (registerServer).
+  const hodinyPolozky = useMemo(
+    () => (smsOdoslane ? polozkyHodin(clients, kalUdalosti, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}) : []),
+    [clients, kalUdalosti, data.platbyKokpit, data.balickyKokpit, smsOdoslane, data.anomalyAck],
+  );
+
   const registerAll = useMemo(() => {
     const ack = data.anomalyAck || {};
     const extra = rituals
@@ -2248,9 +2269,9 @@ function skupinaFaktur(
       ...stavPolozky(`tema|${dnesPraha()}`),
     }] : [];
     return odstranDuplicity(
-      [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register, ...temaPolozka],
+      [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register, ...hodinyPolozky, ...temaPolozka],
     ).sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, temaDna, data.anomalyAck]);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, hodinyPolozky, temaDna, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.

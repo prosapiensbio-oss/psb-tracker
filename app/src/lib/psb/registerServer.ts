@@ -21,6 +21,7 @@ import {
 import { mimoWorkspace, ritualy } from "./rituals";
 import type { PSBData } from "./types";
 import { dnesPraha } from "./cas";
+import { polozkyHodin } from "./notifikaciaHodin";
 
 export type KalendarPreRegister = {
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null; nazov?: string; trener?: string }[];
@@ -71,6 +72,8 @@ export function registerZoServera(
     /** Dátum posledného zapísaného stavu hotovosti — pre pripomienku na uzávierku. */
     stavDatum?: string;
   },
+  /** Kedy klientovi naposledy odišla SMS (audit, UTC) — bez neho sa „posledná hodina / mínus" nepočíta. */
+  smsOdoslane?: Record<string, string>,
 ): RegisterItem[] {
   const clients = deriveClients(data);
   const ud = kal.udalosti;
@@ -84,6 +87,8 @@ export function registerZoServera(
     ...deriveRegister(data, clients, sixM, capacityByTrainer(clients, data.sessions), { udalosti: ud, zmeny: zm }),
     ...pripomienkySlubov(ud as never, (data.leads || []) as never, data.anomalyAck, dnes, zm as never),
     ...pripomienkaDovodu(clients, (data.packages || []) as never, ud as never, data.anomalyAck, dnes),
+    // Posledná hodina / mínus — tá istá funkcia ako v appke (9. 10. 2026).
+    ...(smsOdoslane ? polozkyHodin(clients, ud, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, dnes) : []),
     // `nezapisaneDoRegistra` vracia položky BEZ stavu odpovede — doplní sa tu,
     // rovnako ako v App.tsx. Bez toho by odklepnutá vec prišla ako push.
     ...nezapisaneDoRegistra({

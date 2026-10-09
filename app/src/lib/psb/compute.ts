@@ -2522,7 +2522,8 @@ const DRUH_KLUCA: Record<string, string> = {
   prijmy: "príjmy", barter: "barterové členstvo", data: "staré dáta z PTmindera",
   web: "text webu", zapis: "chýbajúci zápis", cap: "kapacita", zaver: "záver z debaty",
   balicek: "končiaci balíček", btcbezdokladu: "bitcoin bez dokladu", odchody: "odchody klientov",
-  platnost: "platnosť končí a hodiny zostávajú",
+  platnost: "platnosť končí a hodiny zostávajú", hodiny: "posledná hodina alebo mínus",
+  guillermo: "sedenia u Guillerma",
 };
 
 /**
@@ -2740,6 +2741,8 @@ export type RegisterItem = {
   key: string;
   /** Odpoveď staršia než tento čas sa nepočíta — viď `stavPolozkyRegistra`. */
   platneOd?: string;
+  /** Tlačidlo „Poslať SMS" priamo v notifikácii (notifikaciaHodin.ts). */
+  sms?: { meno: string; trener: string; zostatok: number };
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
   tone: "red" | "orange" | "blue";
   title: string;
@@ -2858,11 +2861,16 @@ export function odstranDuplicity(polozky: RegisterItem[]): RegisterItem[] {
     if (meno) maDnesTrening.add(normName(meno));
   }
 
+  const dnesSoSms = new Set(polozky.filter((p) => !p.acked && p.key.startsWith("dnes|") && p.sms).map((p) => normName(menoPolozky(p))));
+
   return polozky.filter((p) => {
     if (p.acked) return true;
     const meno = normName(menoPolozky(p));
     if (p.key.startsWith("novy|")) return !inde.has(meno);
     if (p.key.startsWith("sixm|")) return !maDnesTrening.has(meno);
+    // (3) „Posledná hodina / mínus" ustúpi dnešnej pripomienke, ktorá to
+    // isté hovorí aj s časom tréningu a nesie to isté tlačidlo na SMS.
+    if (p.key.startsWith("hodiny|")) return !dnesSoSms.has(meno);
     return true;
   });
 }
@@ -2919,6 +2927,7 @@ export function dnesneTreningy(
        * posledná hodina, ktorú mu appka pozná" — Lukáš Hanus mal −1 (členstvo
        * z 2. 10. čakalo na platbu) a Jerry to čítal ako „má poslednú hodinu".
        */
+      let sms: RegisterItem["sms"];
       if (c.packageRemaining != null && c.packageTotal != null) {
         const zacal = u.zaciatok.slice(0, 16) <= terazPraha(dnes);
         const pred = c.packageRemaining + (zacal ? 1 : 0);
@@ -2928,6 +2937,9 @@ export function dnesneTreningy(
         const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín — over v PTminderi)" : "";
         if (pred === 1) dovody.push(`dnes má poslednú hodinu z balíčka${odkial}`);
         else if (pred <= 0) dovody.push(`hodiny má minuté — dnešný tréning je nad rámec (−${1 - pred})${odkial}`);
+        // Tlačidlo „Poslať SMS" aj tu (9. 10. 2026) — samostatná notifikácia
+        // „posledná hodina / mínus" o tom istom človeku vtedy ustúpi.
+        if (pred <= 1 && c.packageTotal > 0) sms = { meno: c.name, trener: c.primaryTrainer, zostatok: c.packageRemaining };
       }
       // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
       // z fázy a mesiaca druhýkrát a inak než Prevádzka.
@@ -2956,6 +2968,7 @@ export function dnesneTreningy(
         detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
         ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
         oKom: u.klient as string,
+        sms,
       });
     }
   return out;

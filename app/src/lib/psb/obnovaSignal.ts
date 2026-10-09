@@ -41,7 +41,9 @@ export type Oblast =
   /** Nápady, sloty v mape cyklu, marketingové plány. */
   | "marketing"
   /** Kartotéka fotiek a čo do nej uloží editor → kartotéka v profile aj v anamnéze. */
-  | "fotky";
+  | "fotky"
+  /** Odoslaná SMS klientovi → notifikácia „posledná hodina / mínus" zmizne. */
+  | "sms";
 
 type Poslucháč = () => void;
 const poslucháči = new Map<Oblast, Set<Poslucháč>>();

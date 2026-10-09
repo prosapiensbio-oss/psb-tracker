@@ -43,6 +43,7 @@ import {
   type SekciaId, type WidgetMeta,
 } from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { bezDiakritiky, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
@@ -2389,6 +2390,8 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
   const jePoUvodnom = item.key.startsWith("sms|");
   const uvDruh: "pred" | "po" = jePoUvodnom ? "po" : "pred";
   const [uvOtvoreny, setUvOtvoreny] = useState(false);
+  /** Okno SMS pri notifikácii „posledná hodina / mínus" (9. 10. 2026). */
+  const [smsOtvorene, setSmsOtvorene] = useState(false);
   const [uvDatum, setUvDatum] = useState("");
   const [uvCas, setUvCas] = useState("10:00");
   const [uvTrener, setUvTrener] = useState(item.trener === "Jerry" ? "Jerry" : "Terezka");
@@ -2689,6 +2692,11 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               {ozyvamSa ? "zapisujem…" : "Ozval som sa"}
             </button>
           )}
+          {item.sms && !item.acked && (
+            <button onClick={() => setSmsOtvorene((o) => !o)} style={{ ...linkBtn, color: smsOtvorene ? C.accentLight : C.green }}>
+              {smsOtvorene ? "Zavrieť" : "Poslať SMS"}
+            </button>
+          )}
           {jeSms && !item.acked && (
             <button onClick={() => setUvOtvoreny((o) => !o)} style={{ ...linkBtn, color: uvOtvoreny ? C.accentLight : C.green }}>
               {uvOtvoreny ? "Zavrieť" : "Pripraviť SMS"}
@@ -2898,6 +2906,21 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
             {dopytBusy ? "Zapisujem…" : "Zapísať dopyt"}
           </button>
           {dopytChyba && <span style={{ fontSize: 12, color: C.red }}>{dopytChyba}</span>}
+        </div>
+      )}
+
+      {smsOtvorene && item.sms && !item.acked && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
+          {/* To isté okno ako v kroku 2 · SMS: text s odkazom, počet znakov,
+              odošle sa až klikom. Po odoslaní sa notifikácia uzavrie
+              („SMS poslaná") a vráti sa pri ďalšej zmene stavu. */}
+          <SmsKlientovi
+            vlozene
+            meno={item.sms.meno}
+            trener={item.sms.trener}
+            zostatok={item.sms.zostatok}
+            onOdoslane={() => { actions.ackAnomaly(item.key, "SMS poslaná", true); setSmsOtvorene(false); }}
+          />
         </div>
       )}
 
