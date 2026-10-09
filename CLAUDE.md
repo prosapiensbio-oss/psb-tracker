@@ -656,7 +656,11 @@ a tam sa termín dopisuje, lebo je to odpoveď na otázku, ktorú si sám polož
 Kto má termín v kalendári, neprestal chodiť; má pauzu.
 
 **Pravidlo:** každá pripomienka, ktorá posiela človeka NIEČO UROBIŤ, musí
-najprv overiť, či to už nie je urobené. Falošný poplach je horší než
+najprv overiť, či to už nie je urobené. **Výnimka (9. 10. 2026): „pripomeň mi" + deň
+je výslovná pripomienka a príde v ten deň vždy** — kalendár ju neumlčí
+(Panagiotis chcel termín pre KOLEGU, jeho vlastný tréning 22. 10. by ju
+zamlčal). Zápis z denníka s „pripomeň" nesie pôvodnú vetu v `preco`;
+`zaverUzMaTermin` hľadá „pripom" v zaver/preco/overit. Falošný poplach je horší než
 zmeškaný, lebo podľa neho sa koná — a druhá strana to vidí.
 
 ## naostro.sh vidí závery — odkedy sa umlčujú notifikácie
