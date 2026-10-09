@@ -210,6 +210,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Mobilné ovládanie — BETA na skúšku od 9. 10. 2026** (Jerry: „postav A a C ako betu, len tak na preštukanie"): na telefóne v bete tenký riadok hore + lišta dole. A = Dnes · Workspace · Kalendár · Firma · Viac (hore hľadanie, + Zápis, Jarvis); C = Dnes · Workspace · veľké + · Kalendár · Jarvis, ostatné pod ≡ Viac. Prepína sa vo Viac (localStorage `psb-mobil-rozlozenie`). Workspace bez bočných šípok (prepína rad kariet a švih), podzáložky v jednom posuvnom rade, bez plávajúceho Jarvisa. Kód `MobilNavigacia.tsx`, `useMobilRozlozenie.ts` (jeBeta + useUzke). Náčrty `navrhy-kokpitu/mobil-navrhy.html`. **Čaká na Jerryho výber A/C → potom zapnúť naostro** (vyhodiť podmienku jeBeta).
+
+
 - ~~Tri veci z 9. 10. 2026~~ — **HOTOVÉ 9. 10.**: (1) mesačné kontroly sú krok uzávierky a podmienka zámku (karta Mesačné kontroly zrušená, `kontrolyMesiaca(mk)`, kľúče `zapis|kontrola-*-RRRR-MM` ostali); (2) hodiny: Tréningy „Posledný mesiac" boli posledných 31 dní → teraz „Minulý mesiac" = celý kalendárny mesiac, karta sa volá Mzdové hodiny (bez úvodných), report má riadok Mzdové hodiny; (3) platby bitcoinom bez dokladu majú tlačidlo „Súkromné — nie je náklad PSB" (ručný pár `sukromne` v `btc_parovanie`). (4) **krok uzávierky „Alza a nákupy bitcoinom"** (Jerry: „samostatná súčasť mesačnej uzávierky, kde nahrám faktúry z Alzy, Kokpit ich spáruje s BTC platbami a ja rozdelím položky — náklad, výplata, Ahsoka"): nahratie PDF, faktúry mesiaca s kategóriou meniteľnou aj po zápise (`/api/faktury` akcia `kategoria`, zamknutý mesiac nie), platby bitcoinom mesiaca bez faktúry so „Súkromné"; hotový pri 0/0. Čaká na Jerryho: september — 8 platieb bitcoinom bez faktúry, faktúry za september v Kokpite nie sú; „Oprava zostatku Muun na 0" 23 527 Kč označiť ako súkromné.
 
 
