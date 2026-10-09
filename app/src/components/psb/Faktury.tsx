@@ -1,8 +1,9 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { useMemo, useState } from "react";
 
-import { fmtCZK } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { sediSucet, type Faktura } from "../../lib/psb/faktura";
+import { platbaKDokladu, type PlatbaBtc } from "../../lib/psb/btcKFakture";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
 import { VyberKategorie } from "./VyberKategorie";
@@ -23,11 +24,13 @@ import { Card, H3, Info, TableWrap } from "./ui";
 // deväťdesiat rozbaľovačiek a väčšina z nich patrí do tej istej kategórie.
 
 export function FakturyNahlad({
-  faktury, onZmena, onHotovo,
+  faktury, onZmena, onHotovo, btcPlatby,
 }: {
   faktury: Faktura[];
   onZmena: (i: number, f: Faktura) => void;
   onHotovo: () => void;
+  /** Výbery z bitcoinovej peňaženky — na zobrazenie, čím sa doklad zaplatil. */
+  btcPlatby?: PlatbaBtc[];
 }) {
   const [busy, setBusy] = useState(false);
   const [vysledok, setVysledok] = useState("");
@@ -159,6 +162,22 @@ export function FakturyNahlad({
                   ? `✓ ${fmtCZK(sucet)} sedí s dokladom`
                   : `✗ položky ${fmtCZK(sucet)}, doklad ${fmtCZK(f.celkom)} — chýba ${fmtCZK(f.celkom - sucet)}`}
               </span>
+              {/* ČÍM SA TO ZAPLATILO (Jerry, 9. 10. 2026: „to párovanie
+                  transakcií rovno na faktúry, podľa dátumu a sumy").
+                  Dátum rozhoduje, suma je kontrola — pri viacerých platbách
+                  v okne appka povie, že si nie je istá, a nevyberie za
+                  človeka. */}
+              {(() => {
+                if (!btcPlatby?.length) return null;
+                const ine = faktury.map((x) => ({ cislo: x.cislo, datum: x.datum, celkom: x.celkom }));
+                const v = platbaKDokladu({ cislo: f.cislo, datum: f.datum, celkom: f.celkom }, btcPlatby, ine);
+                if (!v) return <span style={{ fontSize: 11.5, color: C.textDim }}>bez platby bitcoinom — zrejme z účtu alebo kartou</span>;
+                return (
+                  <span style={{ fontSize: 11.5, color: v.isto ? C.orange : C.textMuted }}>
+                    ₿ {v.isto ? "zaplatené bitcoinom" : "zrejme bitcoinom (viac platieb sedí)"} {fmtDMY(v.platba.datum)} · {fmtCZK(Math.round(v.platba.czk))}
+                  </span>
+                );
+              })()}
               {!sedi && !odomknute.has(fi) && (
                 <button
                   onClick={() => setOdomknute((p) => new Set(p).add(fi))}

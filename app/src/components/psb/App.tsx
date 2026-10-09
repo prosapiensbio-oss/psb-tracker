@@ -2413,7 +2413,7 @@ function skupinaFaktur(
            */
           const caka = (() => {
             try {
-              const x = JSON.parse(sessionStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: unknown[] } | null;
+              const x = JSON.parse(localStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: unknown[] } | null;
               return x && x.mesiac === mk && Array.isArray(x.faktury) ? x.faktury.length : 0;
             } catch { return 0; }
           })();

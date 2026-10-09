@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BtcNakup } from "../../lib/psb/client";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
+import { platbaKDokladu } from "../../lib/psb/btcKFakture";
 import { VYPLATY_JERRY } from "../../lib/psb/fio";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
@@ -51,18 +52,25 @@ const RYCHLE: { kat: string; text: string }[] = [
  */
 export const ALZA_CAKA = "psb-alza-caka";
 
+/**
+ * Prečo localStorage a nie sessionStorage: Jerry, 9. 10. 2026 — „keď nahrám
+ * dokumenty a odídem niekam preč, je to nastavené tak, aby som o tú robotu
+ * neprišiel?" Session zomrie so zavretou kartou; rozpis faktúr je práca na
+ * dvadsať minút a nemá ju zmazať zatvorené okno. To isté robí náhľad zošita.
+ */
+
 export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavierky }) {
   const [nove, setNove] = useState<Faktura[]>(() => {
     try {
-      const x = JSON.parse(sessionStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: Faktura[] } | null;
+      const x = JSON.parse(localStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: Faktura[] } | null;
       return x && x.mesiac === mesiac && Array.isArray(x.faktury) ? x.faktury : [];
     } catch { return []; }
   });
   // Čo čaká na potvrdenie, musí byť vidieť aj mimo tejto karty.
   useEffect(() => {
     try {
-      if (nove.length) sessionStorage.setItem(ALZA_CAKA, JSON.stringify({ mesiac, faktury: nove }));
-      else sessionStorage.removeItem(ALZA_CAKA);
+      if (nove.length) localStorage.setItem(ALZA_CAKA, JSON.stringify({ mesiac, faktury: nove }));
+      else localStorage.removeItem(ALZA_CAKA);
       oznam("peniaze");
     } catch { /* bez úložiska ostane rozpis len do obnovenia */ }
   }, [nove, mesiac]);
@@ -121,8 +129,19 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
     }
     const rucne = new Set(Object.values(btc?.parovanie || {}).flat());
     const obsadene = new Set((btc?.faktury || []).filter((f) => f.obsadena).map((f) => f.cislo));
-    return [...m.values()]
-      .map((d) => ({ ...d, sparovana: rucne.has(d.cislo) || obsadene.has(d.cislo), celkom: d.polozky.reduce((a, p) => a + p.cena, 0) }))
+    const vsetky = [...m.values()].map((d) => ({ ...d, celkom: d.polozky.reduce((a, p) => a + p.cena, 0) }));
+    // Ručný pár vie, KTORÁ platba to je; inak sa hľadá podľa dňa a sumy
+    // (`platbaKDokladu`) — to isté, čo vidno hneď pri nahratí.
+    const rucnaPreDoklad = new Map<string, string>();
+    for (const [id, cisla] of Object.entries(btc?.parovanie || {})) for (const c of cisla) rucnaPreDoklad.set(c, id);
+    const platby = (btc?.platby || []).map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }));
+    return vsetky
+      .map((d) => {
+        const rucnaId = rucnaPreDoklad.get(d.cislo);
+        const rucna = rucnaId ? platby.find((x) => String(x.id) === rucnaId) : undefined;
+        const najdena = rucna ? { platba: rucna, isto: true } : platbaKDokladu(d, platby, vsetky);
+        return { ...d, sparovana: rucne.has(d.cislo) || obsadene.has(d.cislo), platba: najdena };
+      })
       .sort((a, b) => a.datum.localeCompare(b.datum));
   }, [polozky, btc]);
   const nezaradene = (polozky || []).filter((p) => !p.kategoria).length;
@@ -148,7 +167,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       {chyby.length > 0 && <div style={{ fontSize: 12, color: C.orange, marginTop: 6 }}>{chyby.join(" · ")}</div>}
       {nove.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <FakturyNahlad faktury={nove} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} />
+          <FakturyNahlad faktury={nove} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} />
         </div>
       )}
 
@@ -166,8 +185,10 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{fmtDMY(d.datum)} · {d.dodavatel || "faktúra"}</span>
                 <span style={{ fontSize: 11, color: C.textDim }}>{d.cislo}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{fmtCZK(d.celkom)}</span>
-                <span style={{ fontSize: 11, color: d.sparovana ? C.green : C.textDim, marginLeft: "auto" }}>
-                  {d.sparovana ? "✓ spárovaná s platbou bitcoinom" : "bez platby bitcoinom"}
+                <span style={{ fontSize: 11, color: d.sparovana ? C.green : d.platba ? C.orange : C.textDim, marginLeft: "auto" }}>
+                  {d.platba
+                    ? `${d.sparovana ? "✓ spárovaná" : "₿ zrejme"} · platba ${fmtDMY(d.platba.platba.datum)} ${fmtCZK(Math.round(d.platba.platba.czk))}${d.platba.isto ? "" : " (viac platieb sedí)"}`
+                    : d.sparovana ? "✓ spárovaná s platbou bitcoinom" : "bez platby bitcoinom — z účtu alebo kartou"}
                 </span>
               </div>
               {d.polozky.map((p) => (
