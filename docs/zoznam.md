@@ -210,6 +210,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- ~~Tri veci z 9. 10. 2026~~ — **HOTOVÉ 9. 10.**: (1) mesačné kontroly sú krok uzávierky a podmienka zámku (karta Mesačné kontroly zrušená, `kontrolyMesiaca(mk)`, kľúče `zapis|kontrola-*-RRRR-MM` ostali); (2) hodiny: Tréningy „Posledný mesiac" boli posledných 31 dní → teraz „Minulý mesiac" = celý kalendárny mesiac, karta sa volá Mzdové hodiny (bez úvodných), report má riadok Mzdové hodiny; (3) platby bitcoinom bez dokladu majú tlačidlo „Súkromné — nie je náklad PSB" (ručný pár `sukromne` v `btc_parovanie`). Čaká na Jerryho: označiť súkromné platby (september 8 bez dokladu, vrátane „Oprava zostatku Muun na 0" 23 527 Kč).
+
+
 - **Metriky z výskumu kníh — postavené 8.–9. 10. 2026** (Jerry: „postav to, strop Jerry 120 Terezka 120"; 9. 10. „pokračuj s reportom"): obnova balíčkov, retencia 6 mes., prežitie 100 dní, hodnota klienta, koncentrácia, vyťaženie voči stropu, rezerva, predplatené hodiny, dlhy, Profit First, odporúčatelia. 9. 10. doplnené: **lievik z `krokyZa`** (noví klienti = jeKlient ako v Marketingu; rozpis „z úvodného / rovno na balíček" — úvodný je produkt, nie každý prvý tréning, viď test v MarketingLievik), **konverzia dopytov** zDopytu/dopyty (september 1 zo 7 = 14 %, predtým chybne 57 %), **noví klienti podľa zdroja + cena za klienta** (len pri reklame; september 0 z reklamy, 2 bez zapísaného zdroja — Dominika Križová, Lukáš Kríž), **štvrtá otázka kvartálu** „Splnili sme, čo report navrhol?" (`report_akcie`, snímka pri zamknutí mesiaca, áno/čiastočne/nie; staršie mesiace dopočítané).
 
 - ~~Heinrich 24. 9.: 2 400 Kč Terezkina výplata~~ — **zapísané 9. 10. 2026** (Jerry: „áno 2400"): hotovosť 24. 9. −2 400, kategória výplata Terezka; september 46 329 → 48 729 Kč. Tržba je v septembri z PTmindera (7 790), takže príjem sa nezapisoval. Krátke odkazy /t/ a /k/ cez prosapiens.cz naostro od 9. 10. (snippet 26).
