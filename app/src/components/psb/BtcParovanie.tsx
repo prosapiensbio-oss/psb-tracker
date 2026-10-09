@@ -18,6 +18,14 @@ import { Card, Empty, H3, Info } from "./ui";
  * o kategóriách; platba len hovorí, že sa zaplatilo. Kto k čomu patrí, vie
  * najlepšie ten, kto to kupoval.
  */
+/**
+ * ZNAČKA „SÚKROMNÉ" namiesto čísla faktúry (Jerry, 9. 10. 2026: „nie všetko,
+ * čo sa zaplatí na Alze bitcoinom, je náklad PSB"). Uloží sa ako ručný pár
+ * v `btc_parovanie` — automatika sa platby už nedotkne, faktúru jej nehľadá
+ * a do P&L z nej nejde nič (neexistujúce číslo dokladu sa nezapočíta).
+ */
+export const SUKROMNE = "sukromne";
+
 export function BtcParovanie({
   platby,
   faktury,
@@ -45,6 +53,7 @@ export function BtcParovanie({
   );
 
   const bezDokladu = platby.filter((p) => !(parovanie[String(p.id)] || []).length);
+  // Do „ručne spárovaných" patria aj súkromné — dajú sa tam vrátiť späť.
   const sparovane = platby.filter((p) => (parovanie[String(p.id)] || []).length);
   // Vybavené veci nemajú visieť na obrazovke. Zoznam ukazuje to, čo čaká;
   // spárované sú za jedným klikom, aby sa dali opraviť, keby niečo nesedelo.
@@ -62,7 +71,7 @@ export function BtcParovanie({
               onClick={() => setUkazHotove(true)}
               style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0 }}
             >
-              Ukázať ručne spárované ({sparovane.length})
+              Ukázať ručne spárované a súkromné ({sparovane.length})
             </button>
           )}
         </div>
@@ -76,14 +85,14 @@ export function BtcParovanie({
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "4px 0 12px" }}>
         <span style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, flex: 1, minWidth: 200 }}>
           Kým platba nemá doklad, jej náklad v P&L chýba a zisk za ten mesiac je o toľko vyšší, než bol.
-          Ak to bol súkromný nákup, nechaj to tak — do výkazu ani nepatrí.
+          Súkromný nákup označ tlačidlom „Súkromné" — do výkazu nepatrí a zo zoznamu zmizne.
         </span>
         {sparovane.length > 0 && (
           <button
             onClick={() => setUkazHotove((v) => !v)}
             style={{ background: "none", border: "none", color: C.accentLight, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}
           >
-            {ukazHotove ? "Skryť spárované" : `Ukázať ručne spárované (${sparovane.length})`}
+            {ukazHotove ? "Skryť spárované" : `Ukázať ručne spárované a súkromné (${sparovane.length})`}
           </button>
         )}
       </div>
@@ -103,17 +112,37 @@ export function BtcParovanie({
               <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 82 }}>{fmtDMY(p.datum)}</span>
               <span style={{ fontSize: 13.5, color: C.orange, fontWeight: 700, minWidth: 92 }}>{fmtCZK(p.czk || 0)}</span>
               <span style={{ fontSize: 11.5, color: C.textDim, flex: 1, minWidth: 120 }}>{p.poznamka || "bez poznámky"}</span>
-              {zvolene.length > 0 && !jeOtvorena && (
+              {zvolene.includes(SUKROMNE) && !jeOtvorena && (
+                <span style={{ fontSize: 11.5, color: C.textMuted }}>✓ súkromné — nie je náklad PSB</span>
+              )}
+              {zvolene.length > 0 && !zvolene.includes(SUKROMNE) && !jeOtvorena && (
                 <span style={{ fontSize: 11.5, color: C.green }}>
                   ✓ ručne spárované ({zvolene.length}{zvolene.length === 1 ? " faktúra" : zvolene.length < 5 ? " faktúry" : " faktúr"})
                 </span>
               )}
-              <button
+              {!zvolene.length && !jeOtvorena && (
+                <button
+                  onClick={() => onSparuj(p.id, [SUKROMNE])}
+                  title="Súkromný nákup — do výkazu PSB nepatrí, faktúru netreba"
+                  style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "3px 11px", color: C.textMuted, fontSize: 11.5, cursor: "pointer" }}
+                >
+                  Súkromné — nie je náklad PSB
+                </button>
+              )}
+              {zvolene.includes(SUKROMNE) && (
+                <button
+                  onClick={() => onSparuj(p.id, [])}
+                  style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}
+                >
+                  vrátiť medzi platby bez dokladu
+                </button>
+              )}
+              {!zvolene.includes(SUKROMNE) && <button
                 onClick={() => (jeOtvorena ? setOtvorena(null) : otvor(p))}
                 style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "3px 11px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}
               >
-                {jeOtvorena ? "Zavrieť" : zvolene.length ? "Upraviť" : "Spárovať"}
-              </button>
+                {jeOtvorena ? "Zavrieť" : zvolene.length ? "Upraviť" : "Spárovať s faktúrou"}
+              </button>}
             </div>
 
             {jeOtvorena && (
@@ -152,7 +181,7 @@ export function BtcParovanie({
                     })}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
                       <button
-                        onClick={() => { onSparuj(p.id, vyber); setOtvorena(null); }}
+                        onClick={() => { onSparuj(p.id, vyber.filter((c) => c !== SUKROMNE)); setOtvorena(null); }}
                         style={{ padding: "6px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}
                       >
                         Potvrdiť
