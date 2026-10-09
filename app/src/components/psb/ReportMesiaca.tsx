@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-import { reportNaMarkdown, type OtazkaReportu, type Report } from "../../lib/psb/mesacnyReport";
+import { reportNaMarkdown, suhrnPlnenia, type OtazkaReportu, type Report, type StavPlnenia } from "../../lib/psb/mesacnyReport";
 import { stlpcovyGraf, FARBY } from "../../lib/psb/reportGrafy";
 import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
@@ -128,7 +128,88 @@ function tlac(report: Report) {
   vytlacReport(reportNaMarkdown(report), report.druh === "kvartal" ? `Kvartálny report ${report.nadpis}` : report.nadpis, grafy);
 }
 
-export function ReportMesiaca({ report, nahlad, onZavri }: { report: Report; nahlad: boolean; onZavri: () => void }) {
+/** Návrhy jedného mesiaca kvartálu — dopočítané z dát; uložená snímka má prednosť. */
+export type NavrhyMesiaca = { m: string; nazov: string; navrhy: { otazka: string; text: string; nadpis: string }[] };
+
+const STAV_TEXT: Record<StavPlnenia, string> = { ano: "áno", ciastocne: "čiastočne", nie: "nie" };
+const STAV_FARBA = (s: StavPlnenia) => (s === "ano" ? C.green : s === "ciastocne" ? C.orange : C.red);
+
+/**
+ * ŠTVRTÁ OTÁZKA KVARTÁLNEHO REPORTU: „SPLNILI SME, ČO REPORT NAVRHOL?"
+ *
+ * Jerry, 8. 10. 2026. Každý mesačný report končí vetou „Urob:"; tu sa za
+ * kvartál ukážu všetky a pri každej sa klikne áno / čiastočne / nie. Text je
+ * snímka z času zamknutia mesiaca (`report_akcie`) — keď chýba, je dopočítaný
+ * z dnešných dát a je to pri ňom napísané.
+ */
+function PlnenieKvartalu({ mesiace }: { mesiace: NavrhyMesiaca[] }) {
+  const [ulozene, setUlozene] = useState<Record<string, { navrh: string; stav: StavPlnenia | null }> | null>(null);
+  const [chyba, setChyba] = useState("");
+  const od = mesiace[0]?.m, dd = mesiace[mesiace.length - 1]?.m;
+  useEffect(() => {
+    if (!od || !dd) return;
+    void fetch(`/api/report-akcie?od=${od}&do=${dd}`, { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const m: Record<string, { navrh: string; stav: StavPlnenia | null }> = {};
+        for (const r of (j?.riadky || []) as { mesiac: string; otazka: string; navrh: string; stav: StavPlnenia | null }[]) m[`${r.mesiac}|${r.otazka}`] = { navrh: r.navrh, stav: r.stav };
+        setUlozene(m);
+      })
+      .catch(() => setUlozene({}));
+  }, [od, dd]);
+
+  if (!ulozene) return <div style={{ fontSize: 12.5, color: C.textDim }}>načítavam návrhy z mesačných reportov…</div>;
+  const riadky = mesiace.flatMap((mes) => mes.navrhy.map((n) => {
+    const u = ulozene[`${mes.m}|${n.otazka}`];
+    return { m: mes.m, nazov: mes.nazov, otazka: n.otazka, nadpis: n.nadpis, text: u?.navrh || n.text, dopocitane: !u, stav: u?.stav ?? null };
+  }));
+  const s = suhrnPlnenia(riadky.map((r) => r.stav));
+
+  const nastav = async (r: (typeof riadky)[number], stav: StavPlnenia) => {
+    const novy = r.stav === stav ? "" : stav;
+    setChyba("");
+    const j = await fetch("/api/report-akcie", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "stav", mesiac: r.m, otazka: r.otazka, stav: novy, navrh: r.dopocitane ? r.text : undefined }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    if (!j?.ok) { setChyba(j?.error || "Neuložilo sa."); return; }
+    setUlozene((u) => ({ ...(u || {}), [`${r.m}|${r.otazka}`]: { navrh: r.text, stav: (novy || null) as StavPlnenia | null } }));
+  };
+
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", background: mix(C.surface, 92) }}>
+      <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Splnili sme, čo report navrhol?</div>
+      <div style={{ fontSize: 13, color: C.textMuted, margin: "4px 0 12px" }}>
+        {riadky.length
+          ? `Z ${s.spolu} návrhov: áno ${s.ano} · čiastočne ${s.ciastocne} · nie ${s.nie}${s.bez ? ` · neodpovedané ${s.bez}` : ""}.`
+          : "V mesiacoch kvartálu report nič nenavrhol."}
+      </div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {riadky.map((r) => (
+          <div key={`${r.m}|${r.otazka}`} style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap", padding: "8px 0", borderTop: `1px solid ${mix(C.border, 55)}` }}>
+            <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: C.textDim }}>{r.nazov} · {r.nadpis}{r.dopocitane ? " · dopočítané z dnešných dát" : ""}</div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{r.text}</div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["ano", "ciastocne", "nie"] as StavPlnenia[]).map((st) => (
+                <button key={st} onClick={() => void nastav(r, st)}
+                  style={{ padding: "4px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                    border: `1px solid ${r.stav === st ? STAV_FARBA(st) : C.border}`, background: r.stav === st ? mix(STAV_FARBA(st), 16) : "transparent",
+                    color: r.stav === st ? STAV_FARBA(st) : C.textMuted, fontWeight: r.stav === st ? 700 : 500 }}>
+                  {STAV_TEXT[st]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}
+    </div>
+  );
+}
+
+export function ReportMesiaca({ report, nahlad, onZavri, plnenie }: { report: Report; nahlad: boolean; onZavri: () => void; plnenie?: NavrhyMesiaca[] }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onZavri(); };
     window.addEventListener("keydown", k);
@@ -150,6 +231,7 @@ export function ReportMesiaca({ report, nahlad, onZavri }: { report: Report; nah
         </div>
         <div style={{ display: "grid", gap: 12 }}>
           {report.otazky.map((o) => <Otazka key={o.id} o={o} kvartal={report.druh === "kvartal"} />)}
+          {report.druh === "kvartal" && plnenie && <PlnenieKvartalu mesiace={plnenie} />}
         </div>
         <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 14, lineHeight: 1.5 }}>
           Zisk je z P&L Kokpitu, hodiny a klienti zo sedení, Instagram z Metricoolu, reklama z Mety. Všetky porovnania sú s priemerom ({report.porovnanie.replace("proti priemeru ", "")}), nie s predošlým obdobím.

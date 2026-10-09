@@ -57,6 +57,10 @@ export type MesiacReportu = {
   odchodyPct?: number;
   /** Úvodné tréningy a dopyty z reklamy — pre lievik a cenu dopytu. */
   uvodne?: number;
+  /** Z úvodných sa stali klientmi (krokyZa.zUvodnehoKlient). */
+  zUvodneho?: number;
+  /** Dopyty, z ktorých sa stal klient (krokyZa.zDopytu) — konverzia dopytov. */
+  zDopytu?: number;
   dopytyReklama?: number;
 };
 
@@ -69,6 +73,8 @@ export type ExtraReportu = {
   topVydaje?: { nazov: string; suma: number }[];
   /** Odkiaľ prišli dopyty v období. */
   zdroje?: { zdroj: string; pocet: number }[];
+  /** Noví klienti obdobia podľa zdroja; cena len pri reklame (spend / klienti). */
+  noviPodlaZdroja?: { zdroj: string; pocet: number; cena?: number }[];
   /** Najlepší reels obdobia podľa zhliadnutí. */
   najlepsiReel?: { hook: string; views: number };
   /** Klienti, ktorým v období skončil balíček a nový neprišiel. */
@@ -112,6 +118,26 @@ export const kvartalMesiaca = (m: string) => Math.ceil(Number(m.slice(5, 7)) / 3
 export const koniecKvartalu = (m: string) => Number(m.slice(5, 7)) % 3 === 0;
 
 /** 1 nový klient · 2–4 noví klienti · 5 nových klientov. */
+/** Odpovede na „splnili sme, čo report navrhol?" (štvrtá otázka kvartálneho reportu). */
+export const STAVY_PLNENIA = ["ano", "ciastocne", "nie"] as const;
+export type StavPlnenia = (typeof STAVY_PLNENIA)[number];
+
+/**
+ * Návrhy, ktoré sa dajú splniť — „Urob:" otázok reportu bez viet, ktoré nič
+ * nenavrhujú („Bez zmeny…", „Držať."). Snímka sa ukladá pri zamknutí mesiaca.
+ */
+export const navrhyReportu = (r: Report): { otazka: string; text: string; nadpis: string }[] =>
+  r.otazky
+    .filter((o) => o.akcia && !/^(bez zmeny|držať)/i.test(o.akcia.trim()))
+    .map((o) => ({ otazka: o.id, text: o.akcia, nadpis: o.otazka }));
+
+/** Súhrn plnenia za kvartál — počty podľa odpovede. */
+export function suhrnPlnenia(stavy: (StavPlnenia | null | undefined)[]): { spolu: number; ano: number; ciastocne: number; nie: number; bez: number } {
+  const n = (x: StavPlnenia) => stavy.filter((s) => s === x).length;
+  const ano = n("ano"), ciastocne = n("ciastocne"), nie = n("nie");
+  return { spolu: stavy.length, ano, ciastocne, nie, bez: stavy.length - ano - ciastocne - nie };
+}
+
 export const noviKlienti = (n: number) => `${n} ${n === 1 ? "nový klient" : n >= 2 && n <= 4 ? "noví klienti" : "nových klientov"}`;
 const kc = (n: number) => Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ");
 const sucet = (xs: (number | undefined)[]) => xs.reduce<number>((a, x) => a + (x || 0), 0);
@@ -160,6 +186,8 @@ function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
     breakEven: sum("breakEven"),
     dan: sum("dan"),
     uvodne: sum("uvodne"),
+    zUvodneho: sum("zUvodneho"),
+    zDopytu: sum("zDopytu"),
     dopytyReklama: sum("dopytyReklama"),
     obnovaPct: priemerPola(ms, "obnovaPct"),
     prezitiePct: priemerPola(ms, "prezitiePct"),
@@ -236,7 +264,9 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
   const naKlienta = (x: MesiacReportu) => (x.aktivni ? x.hodiny / x.aktivni : undefined);
   const marza = (x: MesiacReportu) => (x.prijmy && x.zisk !== undefined ? (x.zisk / x.prijmy) * 100 : undefined);
   const naHodinu = (x: MesiacReportu) => (x.prijmy && x.hodiny ? x.prijmy / x.hodiny : undefined);
-  const konverzia = (x: MesiacReportu) => (x.dopyty ? (x.novi / x.dopyty) * 100 : undefined);
+  // Konvertujú sa DOPYTY (koľké sa stali klientom), nie počet nových proti
+  // počtu dopytov — klient z odporúčania dopyt nemá a podiel by klamal.
+  const konverzia = (x: MesiacReportu) => (x.dopyty ? ((x.zDopytu ?? x.novi) / x.dopyty) * 100 : undefined);
   /** Prevádzkový break-even: náklady bez výplat zakladateľov. */
   const beBezOdmien = (x: MesiacReportu) => (x.naklady !== undefined && x.vyplaty !== undefined ? x.naklady - x.vyplaty : undefined);
   const nadBe = (x: MesiacReportu) => (x.prijmy !== undefined && x.breakEven !== undefined ? x.prijmy - x.breakEven : undefined);
@@ -354,9 +384,16 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     detail: nn([
       riadok("Dopyty", akt.dopyty, h("dopyty"), cele),
       riadok("Noví klienti", akt.novi, h("novi"), cele),
-      riadokText("Lievik: dopyty → úvodné → noví klienti", `${kc(akt.dopyty)} → ${akt.uvodne ?? "?"} → ${kc(akt.novi)}`),
+      riadokText("Lievik: dopyty → úvodné → noví klienti", `${kc(akt.dopyty)} → ${akt.uvodne ?? "?"} → ${kc(akt.novi)}`,
+        "—", akt.zUvodneho !== undefined && akt.novi > (akt.zUvodneho || 0)
+          ? `${akt.zUvodneho} z úvodného, ${akt.novi - (akt.zUvodneho || 0)} rovno na balíček`
+          : akt.zUvodneho !== undefined ? "všetci cez úvodný" : "—"),
       riadok("Z dopytu klient", konverzia(akt), historia.map(konverzia), pct, true, true),
       akt.dopytyReklama && akt.reklama ? riadokText("Reklama na 1 dopyt z reklamy", `${kc(akt.reklama / akt.dopytyReklama)} Kč`, "—", `${akt.dopytyReklama} dopytov`) : null,
+      ...(() => {
+        const r = extra.noviPodlaZdroja?.find((z) => z.cena !== undefined);
+        return r ? [riadokText("Reklama na 1 nového klienta z reklamy", `${kc(r.cena!)} Kč`, "—", noviKlienti(r.pocet))] : [];
+      })(),
       extra.odporucatelia !== undefined ? riadokText("Klienti, ktorí za 12 mes. niekoho priviedli", `${extra.odporucatelia}${akt.aktivni ? ` · ${Math.round((extra.odporucatelia / akt.aktivni) * 100)} %` : ""}`) : null,
       riadok("Prírastok sledovateľov IG", akt.prirastokIg, h("prirastokIg"), (n) => `${n >= 0 ? "+" : ""}${kc(n)}`),
       riadok("Priemerný dosah reels", akt.dosahReels, h("dosahReels"), cele),
@@ -366,6 +403,10 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     ]),
     zoznamy: [
       ...(extra.zdroje?.length ? [{ nadpis: "Odkiaľ prišli dopyty", polozky: extra.zdroje.map((z) => `${z.zdroj} — ${z.pocet}`) }] : []),
+      ...(extra.noviPodlaZdroja?.length ? [{
+        nadpis: "Noví klienti podľa zdroja",
+        polozky: extra.noviPodlaZdroja.map((z) => `${z.zdroj} — ${z.pocet}${z.cena !== undefined ? ` · ${kc(z.cena)} Kč na klienta` : ""}`),
+      }] : []),
       ...(extra.najlepsiReel ? [{ nadpis: "Najlepší reels", polozky: [`„${extra.najlepsiReel.hook.slice(0, 90)}${extra.najlepsiReel.hook.length > 90 ? "…" : ""}" — ${kc(extra.najlepsiReel.views)} zhliadnutí`] }] : []),
       ...(akt.sledovatelia ? [{ nadpis: "Sledovatelia Instagram", polozky: [`${kc(akt.sledovatelia)} na konci obdobia`] }] : []),
     ],

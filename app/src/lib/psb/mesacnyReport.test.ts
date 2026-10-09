@@ -90,3 +90,31 @@ describe("klienti, strop a koncentrácia", () => {
     expect(o("koncentracia").detail.find((d) => d.metrika === "Hodiny odtrénované Jerrym")?.dobre).toBeUndefined();
   });
 });
+
+describe("štvrtá otázka kvartálu a lievik (9. 10. 2026)", () => {
+  it("návrhy bez „Bez zmeny“ a „Držať“", async () => {
+    const { navrhyReportu, suhrnPlnenia } = await import("./mesacnyReport");
+    const r = { druh: "mesiac" as const, nadpis: "", porovnanie: "", otazky: [
+      { id: "praca", otazka: "Máme dosť práce?", akcia: "Nových dávať Terezke." },
+      { id: "osobne", otazka: "Koľko si berieme domov?", akcia: "Bez zmeny — spoločné výdavky sú v priemere." },
+      { id: "peniaze", otazka: "Zarábame?", akcia: "Držať." },
+    ] } as never;
+    expect(navrhyReportu(r).map((n) => n.otazka)).toEqual(["praca"]);
+    expect(suhrnPlnenia(["ano", "nie", null, "ciastocne", "ano"])).toEqual({ spolu: 5, ano: 2, ciastocne: 1, nie: 1, bez: 1 });
+  });
+});
+
+describe("lievik a cena za klienta podľa zdroja", () => {
+  it("klientov viac než úvodných sa rozpíše — rovno na balíček", () => {
+    const ms = [...mesiace.slice(0, 11), m("2026-09", { dopyty: 7, uvodne: 2, novi: 4, zUvodneho: 2, zDopytu: 3 })];
+    const r = postavReport(ms, "2026-09", "mesiac", { ...extra, noviPodlaZdroja: [{ zdroj: "reklama", pocet: 2, cena: 3270 }, { zdroj: "odporúčanie", pocet: 2 }] });
+    const novi = r.otazky.find((x) => x.id === "novi")!;
+    const lievik = novi.detail.find((d) => d.metrika.startsWith("Lievik"))!;
+    expect(lievik.hodnota).toBe("7 → 2 → 4");
+    expect(lievik.rozdiel).toBe("2 z úvodného, 2 rovno na balíček");
+    // konverzia dopytov: 3 zo 7, nie 4 zo 7
+    expect(novi.detail.find((d) => d.metrika === "Z dopytu klient")?.hodnota).toBe("43 %");
+    expect(novi.detail.find((d) => d.metrika.startsWith("Reklama na 1 nového"))?.hodnota).toContain("3");
+    expect(novi.zoznamy.find((z) => z.nadpis === "Noví klienti podľa zdroja")?.polozky.map((t) => t.replace(/\u00a0|\u202f/g, " "))).toEqual(["reklama — 2 · 3 270 Kč na klienta", "odporúčanie — 2"]);
+  });
+});

@@ -2507,12 +2507,18 @@ function skupinaFaktur(
           const od = odchody(data.sessions, mm);
           return { obnovaPct: pctZ(o.obnovene, o.skoncilo), prezitiePct: pctZ(pr.ostali, pr.novi), retenciaPct: pctZ(re.ostali, re.kohorta), odchodyPct: pctZ(od.odisli, od.pred) };
         })(),
-        uvodne: sed.filter((x) => x.sessionType === "UVODNE").length,
+        // Lievik z TEJ ISTEJ funkcie ako Marketing (krokyZa): noví klienti =
+        // prvý tréning v mesiaci a prišli znova alebo zaplatili (jeKlient),
+        // úvodné = označené úvodné, z nich klientom `zUvodneho`. Kto začal
+        // rovno balíčkom, úvodný nemá — preto môže byť klientov viac než
+        // úvodných (Jerry 9. 10. 2026: „7 → 2 → 4"). Report to rozpíše.
+        ...(() => {
+          const k = krokyZa(data, clients, [mm]);
+          return { uvodne: k.uvodne, novi: k.klienti, zUvodneho: k.zUvodnehoKlient, zDopytu: k.zDopytu, dopyty: k.dopyty };
+        })(),
         dopytyReklama: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mm && l.source === "reklama").length,
         googleTrasy: kanal("Google Business", "Directions"),
         googleWeb: kanal("Google Business", "Website clicks"),
-        novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mm).length,
-        dopyty: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mm).length,
         prijmy: i >= 0 && p.prijmy[i] ? p.prijmy[i] : undefined,
         naklady: i >= 0 && p.prijmy[i] ? p.celkoveNaklady[i] : undefined,
         zisk: i >= 0 && p.prijmy[i] ? p.hrubyZisk[i] : undefined,
@@ -2535,8 +2541,25 @@ function skupinaFaktur(
     const vydaje = Object.entries(spolu).filter(([k]) => !k.startsWith("vyplaty") && !k.startsWith("spolocne") && k !== "mimo").sort((a, b) => b[1] - a[1]);
     const zdroje: Record<string, number> = {};
     for (const l of data.leads || []) if (obdobie.includes((l.date || "").slice(0, 7))) zdroje[l.source || "ine"] = (zdroje[l.source || "ine"] || 0) + 1;
-    const NAZOV_ZDROJA: Record<string, string> = { referencia: "odporúčanie", reklama: "reklama", mail: "mail", web: "web", google: "Google", instagram: "Instagram", instagram_osobny: "Instagram (osobný)", telefon: "telefón", ine: "iné" };
+    const NAZOV_ZDROJA: Record<string, string> = { odporucanie: "odporúčanie", referencia: "odporúčanie", reklama: "reklama", mail: "mail", web: "web", google: "Google", instagram: "Instagram", instagram_osobny: "Instagram (osobný)", telefon: "telefón", ine: "iné" };
     const reels = MKT_TOP.filter((r) => r.typ === "reel" && obdobie.includes(r.m)).sort((a, b) => b.views - a.views);
+    /*
+     * NOVÍ KLIENTI PODĽA ZDROJA A CENA ZA KLIENTA (Jerry 8. 10. 2026, výskum
+     * kníh). Zdroj = dopyt toho človeka (pred prvým tréningom), inak zdroj
+     * zapísaný pri klientovi. Cena sa dá povedať len pri reklame — ostatné
+     * kanály nemajú priamy náklad a vymyslené číslo je horšie než žiadne.
+     */
+    const noviObdobia = krokyZa(data, clients, obdobie).kto.klienti;
+    const podlaZdroja: Record<string, number> = {};
+    for (const n of noviObdobia) {
+      const c = clients[n.meno];
+      const dopyt = (data.leads || [])
+        .filter((l) => l.name && najdiKlienta([n.meno], l.name) && (!n.prvy || (l.date || "") <= n.prvy))
+        .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+      const z = dopyt?.source || c?.zdroj || "nezname";
+      podlaZdroja[z] = (podlaZdroja[z] || 0) + 1;
+    }
+    const reklamaObdobia = obdobie.reduce((a, o) => a + (MKT_MESACNE.find((r) => r.m === o)?.spendAds || 0), 0);
     return {
       mesiace,
       extra: {
@@ -2545,6 +2568,11 @@ function skupinaFaktur(
         topVydaje: vydaje.slice(0, 3).map(([k, v]) => ({ nazov: nazovKategorie(k), suma: v })),
         zdroje: Object.entries(zdroje).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({ zdroj: NAZOV_ZDROJA[z] || z, pocet: n })),
         najlepsiReel: reels[0] ? { hook: reels[0].hook, views: reels[0].views } : undefined,
+        noviPodlaZdroja: Object.entries(podlaZdroja).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({
+          zdroj: NAZOV_ZDROJA[z] || (z === "nezname" ? "zdroj nezapísaný" : z),
+          pocet: n,
+          cena: z === "reklama" && reklamaObdobia > 0 ? Math.round(reklamaObdobia / n) : undefined,
+        })),
         ...(() => {
           // Obnova za celé obdobie (pri kvartáli tri mesiace), ostatné ku koncu obdobia.
           const obnovy = obdobie.map((o) => obnovaBalickov(balickyRiadky, platbyVsetky, o));

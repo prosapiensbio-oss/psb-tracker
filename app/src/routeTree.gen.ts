@@ -42,6 +42,7 @@ import { Route as ApiSmsRouteImport } from './routes/api/sms'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
+import { Route as ApiReportAkcieRouteImport } from './routes/api/report-akcie'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
 import { Route as ApiPushBehRouteImport } from './routes/api/push-beh'
@@ -257,6 +258,11 @@ const ApiSekvenciaNavrhRoute = ApiSekvenciaNavrhRouteImport.update({
 const ApiResetRoute = ApiResetRouteImport.update({
   id: '/api/reset',
   path: '/api/reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReportAkcieRoute = ApiReportAkcieRouteImport.update({
+  id: '/api/report-akcie',
+  path: '/api/report-akcie',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRawUploadsRoute = ApiRawUploadsRouteImport.update({
@@ -571,6 +577,7 @@ export interface FileRoutesByFullPath {
   '/api/push-beh': typeof ApiPushBehRoute
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
+  '/api/report-akcie': typeof ApiReportAkcieRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
@@ -657,6 +664,7 @@ export interface FileRoutesByTo {
   '/api/push-beh': typeof ApiPushBehRoute
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
+  '/api/report-akcie': typeof ApiReportAkcieRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
@@ -744,6 +752,7 @@ export interface FileRoutesById {
   '/api/push-beh': typeof ApiPushBehRoute
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
+  '/api/report-akcie': typeof ApiReportAkcieRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
@@ -832,6 +841,7 @@ export interface FileRouteTypes {
     | '/api/push-beh'
     | '/api/push-rano'
     | '/api/raw-uploads'
+    | '/api/report-akcie'
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
@@ -918,6 +928,7 @@ export interface FileRouteTypes {
     | '/api/push-beh'
     | '/api/push-rano'
     | '/api/raw-uploads'
+    | '/api/report-akcie'
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
@@ -1004,6 +1015,7 @@ export interface FileRouteTypes {
     | '/api/push-beh'
     | '/api/push-rano'
     | '/api/raw-uploads'
+    | '/api/report-akcie'
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
@@ -1091,6 +1103,7 @@ export interface RootRouteChildren {
   ApiPushBehRoute: typeof ApiPushBehRoute
   ApiPushRanoRoute: typeof ApiPushRanoRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
+  ApiReportAkcieRoute: typeof ApiReportAkcieRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
   ApiSessionRoute: typeof ApiSessionRoute
@@ -1352,6 +1365,13 @@ declare module '@tanstack/react-router' {
       path: '/api/reset'
       fullPath: '/api/reset'
       preLoaderRoute: typeof ApiResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/report-akcie': {
+      id: '/api/report-akcie'
+      path: '/api/report-akcie'
+      fullPath: '/api/report-akcie'
+      preLoaderRoute: typeof ApiReportAkcieRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/raw-uploads': {
@@ -1781,6 +1801,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPushBehRoute: ApiPushBehRoute,
   ApiPushRanoRoute: ApiPushRanoRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
+  ApiReportAkcieRoute: ApiReportAkcieRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,
   ApiSessionRoute: ApiSessionRoute,

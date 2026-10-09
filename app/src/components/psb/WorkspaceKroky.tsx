@@ -8,7 +8,7 @@
  * Pravidlá (kto patrí do zoznamu, aký balíček vznikne, kedy sa pýtať na
  * sumu) sú v `lib/psb/workspaceKroky.ts` a majú testy. Tu je len obrazovka.
  */
-import { koniecKvartalu, kvartalMesiaca, postavReport, type ExtraReportu, type MesiacReportu } from "../../lib/psb/mesacnyReport";
+import { koniecKvartalu, kvartalMesiaca, navrhyReportu, postavReport, type ExtraReportu, type MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { ReportMesiaca } from "./ReportMesiaca";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { useEffect, useMemo, useState } from "react";
@@ -1122,6 +1122,12 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
     setBezi("");
     if (!j.ok) { setChyba(j.error || "Mesiac sa nezamkol."); return; }
     setZamknuty(true);
+    // Snímka návrhov reportu („Urob:") v čase zamknutia — kvartálny report sa
+    // na ne spýta „splnili sme?" a nesmie čítať niečo, čo by appka navrhla až neskôr.
+    if (reportVstup) {
+      const v = reportVstup(mesiac, "mesiac");
+      void posli("/api/report-akcie", { akcia: "navrhy", mesiac, navrhy: navrhyReportu(postavReport(v.mesiace, mesiac, "mesiac", v.extra)) });
+    }
     oznam("peniaze");
     onZmena();
   };
@@ -1200,7 +1206,16 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
       )}
       {report && reportVstup && (() => {
         const v = reportVstup(mesiac, report);
-        return <ReportMesiaca report={postavReport(v.mesiace, mesiac, report, v.extra)} nahlad={!zamknuty} onZavri={() => setReport(null)} />;
+        // Pri kvartáli aj návrhy všetkých troch mesiacov — štvrtá otázka.
+        const plnenie = report === "kvartal"
+          ? [2, 1, 0].map((k) => {
+            const [y, mm] = mesiac.split("-").map(Number);
+            const m = new Date(Date.UTC(y, mm - 1 - k, 1)).toISOString().slice(0, 7);
+            const vm = reportVstup(m, "mesiac");
+            return { m, nazov: nazovMesiaca(m), navrhy: navrhyReportu(postavReport(vm.mesiace, m, "mesiac", vm.extra)) };
+          })
+          : undefined;
+        return <ReportMesiaca report={postavReport(v.mesiace, mesiac, report, v.extra)} nahlad={!zamknuty} onZavri={() => setReport(null)} plnenie={plnenie} />;
       })()}
     </>
   );
