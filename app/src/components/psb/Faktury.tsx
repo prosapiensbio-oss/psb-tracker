@@ -124,12 +124,23 @@ export function FakturyNahlad({
     else setVysledok("Zápis sa nepodaril.");
   };
 
+  /**
+   * KEĎ NIE JE ČO ZAPÍSAŤ, KARTA SA NEKRESLÍ (Jerry, 9. 10. 2026:
+   * „«Faktúry — 0 doklady, 0 položiek (10 už zapísaných)» mi tam príde
+   * maximálne zbytočné").
+   *
+   * Zoznam už zapísaných dokladov hovoril to isté, čo zoznam mesiaca o pár
+   * centimetrov nižšie — len bez možnosti s nimi čokoľvek urobiť. Miesto
+   * na nahrávanie zostáva prázdne a čisté.
+   */
+  if (!naZapis.length) return null;
+
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            label={`Faktúry — ${naZapis.length} ${naZapis.length === 1 ? "doklad" : "doklady"}, ${polozekSpolu} položiek${faktury.length > naZapis.length ? ` (${faktury.length - naZapis.length} už zapísaných)` : ""}`}
+            label={`Faktúry — ${naZapis.length} ${naZapis.length === 1 ? "doklad" : "doklady"}, ${polozekSpolu} položiek`}
             text="Rozpis dokladu na jednotlivé veci, aby sa dala každá zaradiť zvlášť. Opraviť sa dá názov aj suma — parser číta dobre, ale nie neomylne. Čo zaradíš, appka si zapamätá podľa prvých troch slov názvu, takže ďalšie granule sa zaradia samy."
           />
         </H3>
