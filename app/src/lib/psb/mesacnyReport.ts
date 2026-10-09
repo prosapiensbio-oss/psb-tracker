@@ -25,6 +25,8 @@ export type MesiacReportu = {
   dopyty: number;
   /** Trénovali v predošlom mesiaci, v tomto nie. */
   prestali?: number;
+  /** Hodiny úvodných tréningov — mzdové hodiny sú hodiny bez nich (Tréningy → Prehľad). */
+  hodinyUvodne?: number;
   hodinyJerry?: number;
   hodinyTerezka?: number;
   /** P&L — chýba, keď mesiac v P&L nie je. */
@@ -171,6 +173,7 @@ function spoj(ms: MesiacReportu[], m: string): MesiacReportu {
     novi: sucet(ms.map((x) => x.novi)),
     dopyty: sucet(ms.map((x) => x.dopyty)),
     prestali: sum("prestali"),
+    hodinyUvodne: sum("hodinyUvodne"),
     hodinyJerry: sum("hodinyJerry"),
     hodinyTerezka: sum("hodinyTerezka"),
     prijmy: sum("prijmy"),
@@ -296,6 +299,11 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     hlavne: { hodnota: Math.round(akt.hodiny), jednotka: "hodín", ...protiPriemeru(akt.hodiny, pHodin), seria: seriaMes.map((x) => x.hodiny), popisSerie },
     detail: nn([
       riadok("Odtrénované hodiny", akt.hodiny, h("hodiny"), cele),
+      // To isté číslo ako karta „Mzdové hodiny" v Tréningoch (bez úvodných) —
+      // bez neho vyzerali report a Tréningy ako dve rôzne pravdy (9. 10. 2026).
+      akt.hodinyUvodne !== undefined
+        ? riadok("Mzdové hodiny (bez úvodných)", akt.hodiny - akt.hodinyUvodne, historia.map((x) => (x.hodinyUvodne !== undefined ? x.hodiny - x.hodinyUvodne : undefined)), cele)
+        : null,
       riadok(druh === "kvartal" ? "Klienti (najviac v mesiaci)" : "Klienti, ktorí trénovali", akt.aktivni, h("aktivni"), cele),
       riadok("Hodín na klienta", naKlienta(akt), historia.map(naKlienta), (n) => n.toFixed(1).replace(".", ",")),
       riadok("Hodiny — Jerry", akt.hodinyJerry, h("hodinyJerry"), cele),

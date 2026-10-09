@@ -253,9 +253,10 @@ describe("beta: peniaze podľa trénera klienta", () => {
     const k = postavKarty(zdroj("Jerry"));
     const ids = (b: ReturnType<typeof krokyBety>) => b.filter((x) => x.druh === "krok").map((x) => (x.druh === "krok" ? x.krok : ""));
     expect(ids(krokyBety(k))).toEqual(["kalendar", "sms", "platby"]);
-    expect(ids(krokyBety(k, { mesacne: true }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka", "kontroly"]);
-    // Dopyty len Terezke, kontroly len Jerrymu, uzávierka obom (Terezka v nej má svoje kroky).
+    // Mesačné kontroly sú od 9. 10. 2026 krok uzávierky, nie samostatná karta.
+    expect(ids(krokyBety(k, { mesacne: true }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka"]);
+    // Dopyty len Terezke, uzávierka obom (Terezka v nej má svoje kroky).
     expect(ids(krokyBety(k, { mesacne: true, ja: "Terezka" }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka"]);
-    expect(ids(krokyBety(k, { mesacne: true, ja: "Jerry" }))).toEqual(["kalendar", "sms", "platby", "uzavierka", "kontroly"]);
+    expect(ids(krokyBety(k, { mesacne: true, ja: "Jerry" }))).toEqual(["kalendar", "sms", "platby", "uzavierka"]);
   });
 });

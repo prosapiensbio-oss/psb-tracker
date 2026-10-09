@@ -97,7 +97,7 @@ import { Udaje } from "./Udaje";
 import { CAS_BUILDU, verziaServera } from "../../lib/psb/verzia";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
-import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
+import { kontrolyMesiaca, mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
@@ -2421,6 +2421,21 @@ function skupinaFaktur(
         tab: "vzas",
         sub: "cashflow",
       },
+      ...(() => {
+        // Mesačné kontroly sú krok uzávierky (Jerry, 9. 10. 2026) — bez nich
+        // sa mesiac nezamkne. Odpoveď „odložené" kontrolu nesplní.
+        const ack = data.anomalyAck || {};
+        const kontroly = kontrolyMesiaca(mk);
+        const chyba = kontroly.filter((k) => { const a = ack[`zapis|${k.id}`]; return !a || (a.note || "").startsWith("odlozene|"); });
+        return [{
+          id: "kontroly",
+          label: "Mesačné kontroly",
+          hotovo: chyba.length === 0,
+          detail: chyba.length
+            ? `${kontroly.length - chyba.length} zo ${kontroly.length} — chýba ${chyba.map((k) => k.nadpis.replace(/^Mesačná kontrola: /, "")).join(", ")}`
+            : "všetky štyri skontrolované",
+        }];
+      })(),
       {
         id: "upozornenia",
         label: "Upozornenia mesiaca",
@@ -2484,6 +2499,7 @@ function skupinaFaktur(
         hodiny: sed.reduce((a, x) => a + (x.duration || 60) / 60, 0),
         aktivni: terazKlienti.size,
         prestali: [...predKlienti].filter((c) => !terazKlienti.has(c)).length,
+        hodinyUvodne: sed.filter((x) => x.sessionType === "UVODNE").reduce((a, x) => a + (x.duration || 60) / 60, 0),
         hodinyJerry: hodinyTrenera("jerry"),
         hodinyTerezka: hodinyTrenera("terez"),
         // Len zakladatelia — `vyplatySpolu` nesie aj Matyášovu mzdu (DPP), a tá je náklad prevádzky.

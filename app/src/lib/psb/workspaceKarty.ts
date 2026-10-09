@@ -151,7 +151,6 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
         ? "prehľad mesiaca a tvoje odpovede — odkiaľ prišli noví a otázky mesiaca"
         : "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
       ...(pre("Jerry") ? [
-        krok("kontroly", "Mesačné kontroly", "jedna oblasť každý týždeň — peniaze, klienti, marketing, Jarvis", []),
       ] : []),
     ] : []),
     ...daj("faktury"),

@@ -65,7 +65,8 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     if (period === "custom" || win === "custom") return { from, to };
     // Roky ako pevné hranice, okná ako posun od dneška. Štandard rodiny T.
     if (win === "2026" || win === "2025") return { from: `${win}-01-01`, to: `${win}-12-31` };
-    const dni: Record<string, number> = { "6m": 183, "3m": 92, "1m": 31, "1t": 7 };
+    if (win === "1m") return minulyMesiac();
+    const dni: Record<string, number> = { "6m": 183, "3m": 92, "1t": 7 };
     if (dni[win]) return { from: dnesPraha(new Date(Date.now() - dni[win] * 86400000)) };
     return undefined;
   }, [period, from, to, win]);
@@ -262,7 +263,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
             { value: "2026", label: "2026" },
             { value: "6m", label: "Posledných 6 mes." },
             { value: "3m", label: "Posledné 3 mes." },
-            { value: "1m", label: "Posledný mesiac" },
+            { value: "1m", label: `Minulý mesiac (${monthLabel(minulyMesiac().from.slice(0, 7))})` },
             { value: "1t", label: "Posledný týždeň" },
             { value: "custom", label: "Vlastné" },
           ]} />
@@ -289,8 +290,8 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
         <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 11, border: `1px solid ${C.border}`, background: mix(C.accent, 4) }}>
           <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 8 }}>
             <Info
-              label="Odrobené hodiny za zvolené obdobie"
-              text="Mzdové hodiny sú bez úvodných tréningov — tie sa platia zvlášť a do mzdy nevstupujú. Presne tieto čísla idú do VZAS → J&T Výplaty pre mesiace od júla 2026."
+              label="Mzdové hodiny za zvolené obdobie (bez úvodných)"
+              text="Mzdové hodiny sú bez úvodných tréningov — tie sa platia zvlášť a do mzdy nevstupujú. Presne tieto čísla idú do VZAS → J&T Výplaty pre mesiace od júla 2026. Mesačný report ráta odtrénované hodiny AJ s úvodnými — to je číslo pod týmto riadkom; mzdové hodiny má report vo vlastnom riadku."
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
@@ -301,7 +302,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
                   {h.mzdove.toFixed(1)} h
                 </div>
                 <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
-                  {h.sedeni} sedení · {h.vsetky.toFixed(1)} h vrátane úvodných
+                  {h.sedeni} sedení · {h.vsetky.toFixed(1)} h spolu s úvodnými (toto je v reporte)
                 </div>
               </div>
             ))}
@@ -427,6 +428,21 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
   );
 }
 
+/**
+ * MINULÝ MESIAC = CELÝ KALENDÁRNY MESIAC, nie posledných 31 dní.
+ *
+ * Jerry, 9. 10. 2026: „počet hodín za mesiac v reporte bol iný ako počet
+ * hodín v analýze tréningov." „Posledný mesiac" bol posun od dneška
+ * (9. 9. – 9. 10.), report počíta september — dve čísla pod tým istým
+ * menom. Teraz je to tá istá hranica ako v reporte a v uzávierke.
+ */
+function minulyMesiac(): { from: string; to: string } {
+  const [r, m] = dnesPraha().split("-").map(Number);
+  const od = new Date(Date.UTC(r, m - 2, 1)).toISOString().slice(0, 10);
+  const doD = new Date(Date.UTC(r, m - 1, 0)).toISOString().slice(0, 10);
+  return { from: od, to: doD };
+}
+
 // Štandard rodiny T — roky nemajú days, hranice sa počítajú z hodnoty.
 const WINDOWS = [
   { value: "all", label: "Celé obdobie", days: 0 },
@@ -434,7 +450,7 @@ const WINDOWS = [
   { value: "2026", label: "2026", days: 0 },
   { value: "6m", label: "Posledných 6 mes.", days: 183 },
   { value: "3m", label: "Posledné 3 mes.", days: 92 },
-  { value: "1m", label: "Posledný mesiac", days: 31 },
+  { value: "1m", label: "Minulý mesiac", days: 0 },
   { value: "1t", label: "Posledný týždeň", days: 7 },
   { value: "custom", label: "Vlastné", days: -1 },
 ];
@@ -532,6 +548,9 @@ function Analyza({ data }: { data: PSBData }) {
       // Rok = pevné hranice, nie posun od dneška.
       lo = Date.parse(`${win}-01-01`);
       hi = Date.parse(`${win}-12-31`) + 86400000;
+    } else if (win === "1m") {
+      const m = minulyMesiac();
+      lo = Date.parse(m.from); hi = Date.parse(m.to) + 86400000;
     } else {
       const days = Number(WINDOWS.find((w) => w.value === win)?.days || 0);
       if (days > 0) lo = Date.now() - days * 86400000;

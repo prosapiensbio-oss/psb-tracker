@@ -1240,7 +1240,11 @@ export function KrokKontroly({ kontroly, acks, onNavigate, onZmena }: {
   const [bezi, setBezi] = useState("");
   const [chyba, setChyba] = useState("");
   const [hotove, setHotove] = useState<Set<string>>(new Set());
-  const jeHotova = (k: KontrolaKarta) => !!acks[`zapis|${k.id}`] || hotove.has(k.id);
+  // „Odložené" nie je skontrolované — tá istá podmienka ako pri zámku mesiaca.
+  const jeHotova = (k: KontrolaKarta) => {
+    const a = acks[`zapis|${k.id}`] as { note?: string } | undefined;
+    return (!!a && !(a.note || "").startsWith("odlozene|")) || hotove.has(k.id);
+  };
 
   const odskrtni = async (k: KontrolaKarta) => {
     setBezi(k.id); setChyba("");

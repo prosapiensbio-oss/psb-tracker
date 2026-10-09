@@ -28,7 +28,7 @@ import type { Actions } from "./App";
 import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
-import { ritualy } from "../../lib/psb/rituals";
+import { kontrolyMesiaca } from "../../lib/psb/rituals";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
@@ -1581,6 +1581,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             ) : null;
             const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
             return {
+              // Mesačné kontroly uzatváraného mesiaca — krok uzávierky, nie
+              // samostatná karta (Jerry, 9. 10. 2026).
+              kontroly: (
+                <KrokKontroly
+                  kontroly={kontrolyMesiaca(mk)}
+                  acks={data.anomalyAck || {}} onNavigate={onNavigate}
+                  onZmena={() => { oznam("klienti"); void actions?.refresh(); }}
+                />
+              ),
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,
               // 8. 10. 2026) — okno na CSV Jerry v ten istý deň zrušil.
@@ -1635,12 +1644,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         )}
         </>
       );
-    }
-    if (k.krok === "kontroly") {
-      if (trenerKroku === "Terezka") return <VsetkoVybavene text="Mesačné kontroly sú Jerryho — tu nič nečaká." />;
-      const kontroly = ritualy(new Date(), {}, {}).filter((r) => r.druh === "kontrola")
-        .map((r) => ({ id: r.id, nadpis: r.nadpis, detail: r.detail, splatne: r.splatne, ciel: r.ciel }));
-      return <KrokKontroly kontroly={kontroly} acks={data.anomalyAck || {}} onNavigate={onNavigate} onZmena={() => oznam("klienti")} />;
     }
     if (k.krok === "sms") {
       return (
