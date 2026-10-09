@@ -150,7 +150,7 @@ export function SubTabs({
   value: string;
   onChange: (v: string) => void;
 }) {
-  // Telefón v bete: jeden posuvný rad namiesto zalomených riadkov — tri vrstvy
+  // Telefón: jeden posuvný rad namiesto zalomených riadkov — tri vrstvy
   // záložiek zjedli pol obrazovky, kým sa ukázal obsah (Jerry, 9. 10. 2026).
   const mobil = useMobilRozlozenie();
   const rad = mobil ? { flexWrap: "nowrap" as const, overflowX: "auto" as const, scrollbarWidth: "none" as const, WebkitOverflowScrolling: "touch" as const } : {};

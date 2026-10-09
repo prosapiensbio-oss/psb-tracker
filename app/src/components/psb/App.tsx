@@ -394,7 +394,7 @@ export function PSBApp() {
 
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [ktoSom, setKtoSom] = useState<string | null>(null);
-  /** Telefón v BETE: nové ovládanie (návrh A alebo C), inak `null`. */
+  /** Telefón: ovládanie podľa návrhu C (naostro od 9. 10. 2026), inak `null`. */
   const mobil = useMobilRozlozenie();
   /** „+" v mobilnej lište otvára okno zápisu — každé ťuknutie zvýši číslo. */
   const [zapisSignal, setZapisSignal] = useState(0);
@@ -3090,7 +3090,6 @@ function skupinaFaktur(
       {mobil && (
         <>
           <MobilNavigacia
-            rozlozenie={mobil}
             aktivna={FIRMA_IDS.includes(active) ? "firma" : active}
             nadpis={FIRMA_IDS.includes(active) ? "Firma" : active === "btc" ? "Bitcoin" : (TABS.find((t) => t.id === active)?.label || "Kokpit")}
             ciele={[
@@ -3237,7 +3236,7 @@ function skupinaFaktur(
         </a>
       </nav>
       </>)}
-      {/* Na telefóne v bete miesto pod spodnou lištou, aby ju obsah nezakrýval. */}
+      {/* Na telefóne miesto pod spodnou lištou, aby ju obsah nezakrýval. */}
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto", paddingBottom: mobil ? "calc(96px + env(safe-area-inset-bottom))" : 16 }}>
         {FIRMA_IDS.includes(active) && (
           <div style={{ display: "flex", gap: 6, marginBottom: mobil ? 10 : 14, flexWrap: mobil ? "nowrap" : "wrap", overflowX: mobil ? "auto" : undefined, scrollbarWidth: mobil ? "none" : undefined }}>

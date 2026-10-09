@@ -2,10 +2,10 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { C, mix } from "../../lib/psb/theme";
 import { Icon } from "./ui";
-import { nastavMobilRozlozenie, type MobilRozlozenie } from "./useMobilRozlozenie";
 
 /**
- * OVLÁDANIE KOKPITU NA TELEFÓNE (beta, návrhy A a C — navrhy-kokpitu/mobil-navrhy.html).
+ * OVLÁDANIE KOKPITU NA TELEFÓNE — návrh C, naostro od 9. 10. 2026
+ * (náčrty navrhy-kokpitu/mobil-navrhy.html; A sa skúšalo v bete a prehralo).
  *
  * Nahrádza na telefóne dvojriadkovú hlavičku a posuvný rad záložiek, ktoré
  * zaberali ~40 % obrazovky a polovicu záložiek schovávali mimo nej. Obsah
@@ -15,10 +15,9 @@ import { nastavMobilRozlozenie, type MobilRozlozenie } from "./useMobilRozlozeni
 export type CielMobil = { id: string; label: string; icon: string };
 
 export function MobilNavigacia({
-  rozlozenie, aktivna, nadpis, ciele, chod, onZapis, zapisCaka, onJarvis, hladanie,
+  aktivna, nadpis, ciele, chod, onZapis, zapisCaka, onJarvis, hladanie,
   mozeSpat, spat, ktoSom, odhlasit,
 }: {
-  rozlozenie: MobilRozlozenie;
   /** id aktívneho miesta v lište (Firma = "firma"). */
   aktivna: string;
   nadpis: string;
@@ -41,7 +40,7 @@ export function MobilNavigacia({
   // Prechod inam zavrie otvorený zoznam aj hľadanie.
   useEffect(() => { setViac(false); setHladat(false); }, [aktivna]);
 
-  const vListe = rozlozenie === "A" ? ["dashboard", "workspace", "kalendar", "firma"] : ["dashboard", "workspace", "kalendar"];
+  const vListe = ["dashboard", "workspace", "kalendar"];
   const ciel = (id: string) => ciele.find((c) => c.id === id);
   const ostatne = ciele.filter((c) => !vListe.includes(c.id));
 
@@ -75,29 +74,22 @@ export function MobilNavigacia({
     </div>
   );
 
-  const lista = rozlozenie === "A"
-    ? [
-      ...vListe.map((id) => { const c = ciel(id); return c ? polozkaListy(id, c.label, c.icon, () => chod(id)) : null; }),
-      polozkaListy("viac", "Viac", "⋯", () => setViac((v) => !v)),
-    ]
-    : [
-      ...["dashboard", "workspace"].map((id) => { const c = ciel(id); return c ? polozkaListy(id, c.label, c.icon, () => chod(id)) : null; }),
-      plus,
-      ...["kalendar"].map((id) => { const c = ciel(id); return c ? polozkaListy(id, c.label, c.icon, () => chod(id)) : null; }),
-      polozkaListy("jarvis", "Jarvis", "sparkles", onJarvis),
-    ];
+  const lista = [
+    ...["dashboard", "workspace"].map((id) => { const c = ciel(id); return c ? polozkaListy(id, c.label, c.icon, () => chod(id)) : null; }),
+    plus,
+    ...["kalendar"].map((id) => { const c = ciel(id); return c ? polozkaListy(id, c.label, c.icon, () => chod(id)) : null; }),
+    polozkaListy("jarvis", "Jarvis", "sparkles", onJarvis),
+  ];
 
   return (
     <>
       {/* Hore jeden riadok: (≡) (‹) názov obrazovky … ikony. */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
         background: mix(C.bg, 96), backdropFilter: "blur(10px)", borderBottom: `1px solid ${mix(C.border, 60)}` }}>
-        {rozlozenie === "C" && ikona("≡", () => setViac((v) => !v), "Viac — ostatné obrazovky", viac)}
+        {ikona("≡", () => setViac((v) => !v), "Viac — ostatné obrazovky", viac)}
         {mozeSpat && ikona("‹", spat, "Späť")}
         <span style={{ fontSize: 18, fontWeight: 800, color: C.accent, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nadpis}</span>
         {ikona("⌕", () => setHladat((h) => !h), "Hľadať klienta", hladat)}
-        {rozlozenie === "A" && ikona("+", onZapis, "Zápis", zapisCaka > 0, zapisCaka)}
-        {rozlozenie === "A" && ikona("sparkles", onJarvis, "Jarvis")}
       </div>
       {hladat && (
         <div style={{ position: "sticky", top: 59, zIndex: 39, padding: "8px 12px", background: mix(C.bg, 96), borderBottom: `1px solid ${mix(C.border, 60)}` }}>
@@ -119,17 +111,6 @@ export function MobilNavigacia({
                 <Icon name={c.icon} size={19} /> {c.label}
               </button>
             ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: C.textMuted }}>Rozloženie (beta):</span>
-              {(["A", "C"] as MobilRozlozenie[]).map((r) => (
-                <button key={r} onClick={() => nastavMobilRozlozenie(r)}
-                  style={{ padding: "6px 14px", borderRadius: 14, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                    border: `1px solid ${rozlozenie === r ? C.accent : C.border}`, background: rozlozenie === r ? C.accentBg : "transparent",
-                    color: rozlozenie === r ? C.accentLight : C.textMuted, fontWeight: rozlozenie === r ? 700 : 500 }}>
-                  {r === "A" ? "A · lišta s Firmou" : "C · lišta s „+“"}
-                </button>
-              ))}
-            </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, fontSize: 13, color: C.textMuted }}>
               <span>{ktoSom ? ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1) : ""}</span>
               <button onClick={odhlasit} style={{ background: "none", border: "none", color: C.textDim, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Odhlásiť sa</button>

@@ -182,7 +182,7 @@ export function ZapisButton({
   otvor = 0,
 }: {
   ritualy: Ritual[];
-  /** Mobilné rozloženie (beta): tlačidlo je v lište, tu len okno. */
+  /** Telefón (návrh C): tlačidlo je v lište, tu len okno. */
   bezTlacidla?: boolean;
   /** Každá zmena čísla okno otvorí — „+" v mobilnej lište. */
   otvor?: number;

@@ -501,7 +501,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const gesto = useRef(novyStavGesta());
   const svih = useRef(novyStavSvihu());
   const uzke = useUzke();
-  // Beta na telefóne (návrh C): karta cez celú šírku, bez bočných šípok.
+  // Telefón (návrh C, naostro od 9. 10. 2026): karta cez celú šírku, bez bočných šípok.
   // Prepína sa radom kariet hore (ťuk) a švihom — rad kariet je tá overená
   // náhrada, bez ktorej sa šípky 28. 9. 2026 skryť nesmeli.
   const mobil = useMobilRozlozenie();

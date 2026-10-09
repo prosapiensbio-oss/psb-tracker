@@ -1322,7 +1322,7 @@ export function AssistantInline({ chat, onClientClick, onNavigate }: { chat: Ass
 
 // Floating bottom-right panel (resizable). Open state lives in the shared chat.
 export function Assistant({ chat, onClientClick, onNavigate, bezSpustaca = false }: { chat: AssistantChat; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void;
-  /** Mobilné rozloženie (beta): Jarvis je v lište, plávajúce tlačidlo by zakrývalo obsah. */
+  /** Telefón (návrh C): Jarvis je v lište, plávajúce tlačidlo by zakrývalo obsah. */
   bezSpustaca?: boolean }) {
   const open = chat.floatingOpen;
   const setOpen = chat.setFloatingOpen;

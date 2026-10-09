@@ -1985,6 +1985,13 @@ pretože tam nie sú ani tie gombíky po strane." **Starý spôsob sa vypína a�
 vtedy, keď je nový overený rukou na tom zariadení, kde má bežať.** Nie keď
 prejdú testy a nie keď to dáva zmysel.
 
+**Od 9. 10. 2026 má telefón vlastné ovládanie (návrh C, `MobilNavigacia.tsx`):**
+tenký riadok hore (≡ Viac · ‹ · názov · hľadanie) a lišta dole Dnes · Workspace ·
++ · Kalendár · Jarvis; Firma, Marketing, Prechod, Upload a Bitcoin sú vo „Viac".
+Vybral si ho Jerry po skúške A/C v bete. Bočné šípky vo Workspace na telefóne
+zmizli — nahrádza ich rad kariet hore (ťuk, overené) a švih; plávajúci Jarvis
+na telefóne nie je. Prepínač je `useMobilRozlozenie()` (= `useUzke()`).
+
 **Pravidlo:** keď karta pribudne do kopy, pozri sa na ňu aj v šírke telefónu.
 Súčet `minWidth` v jednom riadku je strop, pod ktorý sa layout nezmestí.
 
