@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -149,6 +150,10 @@ export function SubTabs({
   value: string;
   onChange: (v: string) => void;
 }) {
+  // Telefón v bete: jeden posuvný rad namiesto zalomených riadkov — tri vrstvy
+  // záložiek zjedli pol obrazovky, kým sa ukázal obsah (Jerry, 9. 10. 2026).
+  const mobil = useMobilRozlozenie();
+  const rad = mobil ? { flexWrap: "nowrap" as const, overflowX: "auto" as const, scrollbarWidth: "none" as const, WebkitOverflowScrolling: "touch" as const } : {};
   // Rodiny v poradí, v akom prišli. Bez `skupina` sa správa ako predtým.
   const skupiny: { nazov: string; polozky: typeof tabs }[] = [];
   for (const t of tabs) {
@@ -161,9 +166,9 @@ export function SubTabs({
 
   if (maSkupiny) {
     return (
-      <div style={{ display: "flex", gap: 18, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 18, marginBottom: 12, flexWrap: "wrap", alignItems: "center", ...rad }}>
         {skupiny.map((sk, i) => (
-          <div key={sk.nazov || i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div key={sk.nazov || i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: mobil ? "nowrap" : "wrap", flex: mobil ? "none" : undefined }}>
             {sk.nazov && (
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: C.textDim, textTransform: "uppercase", marginRight: 2 }}>
                 {sk.nazov}
@@ -192,13 +197,14 @@ export function SubTabs({
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", ...rad }}>
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
           style={{
-            padding: "7px 14px",
+            flex: mobil ? "none" : undefined,
+            padding: mobil ? "6px 12px" : "7px 14px",
             borderRadius: 8,
             border: `1px solid ${value === t.id ? C.accent : C.border}`,
             cursor: "pointer",

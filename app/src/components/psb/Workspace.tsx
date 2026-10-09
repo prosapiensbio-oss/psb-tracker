@@ -30,6 +30,7 @@ import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { kontrolyMesiaca } from "../../lib/psb/rituals";
 import { AlzaUzavierka } from "./AlzaUzavierka";
+import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
@@ -500,6 +501,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const gesto = useRef(novyStavGesta());
   const svih = useRef(novyStavSvihu());
   const uzke = useUzke();
+  // Beta na telefóne (návrh C): karta cez celú šírku, bez bočných šípok.
+  // Prepína sa radom kariet hore (ťuk) a švihom — rad kariet je tá overená
+  // náhrada, bez ktorej sa šípky 28. 9. 2026 skryť nesmeli.
+  const mobil = useMobilRozlozenie();
   const poistka = useRef(0 as unknown as ReturnType<typeof setTimeout>);
   useEffect(() => {
     const el = kopa.current;
@@ -1801,8 +1806,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             pretože tam nie sú ani tie gombíky po strane." Náhrada sa smie
             zapnúť až vtedy, keď je overené, že naozaj funguje; dovtedy platí
             to, čo fungovalo. Na telefóne sú len užšie. */}
-        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1, uzke)}>‹</button>
-        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1, uzke)}>›</button>
+        {!mobil && <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1, uzke)}>‹</button>}
+        {!mobil && <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1, uzke)}>›</button>}
         {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
             rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
@@ -1823,7 +1828,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           key={`${kk.druh}|${kk.druh === "krok" ? kk.krok : ""}`}
           aria-hidden={!aktivna}
           style={{
-            position: "absolute", top: 0, bottom: 0, left: uzke ? 30 : 46, right: uzke ? 30 : 46,
+            position: "absolute", top: 0, bottom: 0, left: mobil ? 0 : uzke ? 30 : 46, right: mobil ? 0 : uzke ? 30 : 46,
             zIndex: aktivna ? 1 : 0, visibility: aktivna ? "visible" : "hidden",
             ...(aktivna ? pohybKarty(prechod) : {}),
           }}

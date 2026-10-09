@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { fetchVzasSettings, saveLead, saveVzasSetting } from "../../lib/psb/client";
 import type { Ritual } from "../../lib/psb/rituals";
@@ -168,6 +168,9 @@ function zlucRitualy(ritualy: Ritual[]): Polozka[] {
   });
 }
 
+/** Koľko zápisov čaká — ten istý počet ako odznak na „+ Zápis". */
+export const pocetCakajucich = (ritualy: Ritual[]) => zlucRitualy(ritualy).filter((p) => p.stav === "chyba").length;
+
 export function ZapisButton({
   ritualy,
   onNavigate,
@@ -175,8 +178,14 @@ export function ZapisButton({
   klienti = [],
   dnesTrenoval = [],
   onDennikZapis,
+  bezTlacidla = false,
+  otvor = 0,
 }: {
   ritualy: Ritual[];
+  /** Mobilné rozloženie (beta): tlačidlo je v lište, tu len okno. */
+  bezTlacidla?: boolean;
+  /** Každá zmena čísla okno otvorí — „+" v mobilnej lište. */
+  otvor?: number;
   onNavigate: (tab: string, sub?: string, tyzden?: string) => void;
   /** Mená + stále poznámky — stála poznámka sa pri vybranom klientovi ukáže
    *  ako kontext, zápis ide do denníka. */
@@ -190,6 +199,7 @@ export function ZapisButton({
   onDennikZapis?: (meno: string, text: string) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (otvor > 0) setOpen(true); }, [otvor]);
   const [dopytMeno, setDopytMeno] = useState("");
   const [dopytZdroj, setDopytZdroj] = useState("reklama");
   /** Pri referencii: kto ho poslal — meno z klientov, alebo „iné" + voľný text
@@ -283,7 +293,7 @@ export function ZapisButton({
 
   return (
     <>
-      <button
+      {!bezTlacidla && <button
         onClick={() => setOpen(true)}
         title="Kam sa čo zapisuje — a čo za toto obdobie ešte chýba"
         style={{
@@ -300,7 +310,7 @@ export function ZapisButton({
             {cakajuce}
           </span>
         )}
-      </button>
+      </button>}
 
       {open && (
         <Modal title="Čo chceš zapísať" onClose={() => setOpen(false)}>

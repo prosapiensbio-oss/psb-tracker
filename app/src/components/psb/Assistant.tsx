@@ -1321,7 +1321,9 @@ export function AssistantInline({ chat, onClientClick, onNavigate }: { chat: Ass
 }
 
 // Floating bottom-right panel (resizable). Open state lives in the shared chat.
-export function Assistant({ chat, onClientClick, onNavigate }: { chat: AssistantChat; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
+export function Assistant({ chat, onClientClick, onNavigate, bezSpustaca = false }: { chat: AssistantChat; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void;
+  /** Mobilné rozloženie (beta): Jarvis je v lište, plávajúce tlačidlo by zakrývalo obsah. */
+  bezSpustaca?: boolean }) {
   const open = chat.floatingOpen;
   const setOpen = chat.setFloatingOpen;
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
@@ -1350,6 +1352,7 @@ export function Assistant({ chat, onClientClick, onNavigate }: { chat: Assistant
   }
 
   if (!open) {
+    if (bezSpustaca) return null;
     // Odsadenie zdola kvôli odznaku platformy: sedí napevno vpravo dole a má
     // najvyšší možný z-index, takže sa prekryť nedá — Jarvis sa mu teda uhne.
     // Nie je to naša značka a potláčať ju nebudeme.
@@ -1361,7 +1364,7 @@ export function Assistant({ chat, onClientClick, onNavigate }: { chat: Assistant
   }
 
   return (
-    <div className="psb-card" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
+    <div className="psb-card" style={{ position: "fixed", right: 20, bottom: bezSpustaca ? "calc(84px + env(safe-area-inset-bottom))" : 20, zIndex: 61, width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
       <div onPointerDown={startResize} title="Potiahni pre zmenu veľkosti" style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22, cursor: "nwse-resize", zIndex: 2, padding: 4 }}>
         <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
       </div>
