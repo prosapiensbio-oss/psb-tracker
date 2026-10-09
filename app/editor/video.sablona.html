@@ -430,11 +430,41 @@
   rp.ondblclick = () => { rp.value = String(naPas(1)); rp.oninput(); };
 
   // ── VIDEÁ ──
-  function vlozVideo(f) {
+  /**
+   * DÁTUM NAHRÁVANIA Z VIDEA (atóm `mvhd` v MP4/MOV, Jerry 9. 10. 2026:
+   * „nech berie dátum z fotky" — to isté platí pre video a snímky z neho).
+   * iPhone píše `moov` často na KONIEC súboru, preto sa hľadá v prvých aj
+   * posledných 2 MB. Čas je v sekundách od 1. 1. 1904 (UTC).
+   */
+  async function datumVidea(f) {
+    const kus = 2 << 20;
+    const casti = [f.slice(0, kus)];
+    if (f.size > kus) casti.push(f.slice(Math.max(kus, f.size - kus)));
+    for (const c of casti) {
+      const b = new Uint8Array(await c.arrayBuffer());
+      for (let i = 0; i + 20 < b.length; i++) {
+        if (b[i] !== 0x6d || b[i + 1] !== 0x76 || b[i + 2] !== 0x68 || b[i + 3] !== 0x64) continue; // „mvhd"
+        const verzia = b[i + 4];
+        const u32 = (o) => ((b[o] << 24) >>> 0) + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
+        const sek = verzia === 1 ? u32(i + 8) * 2 ** 32 + u32(i + 12) : u32(i + 8);
+        const t = (sek - 2082844800) * 1000;
+        const d = new Date(t);
+        if (Number.isFinite(t) && d.getUTCFullYear() >= 2000 && t <= Date.now() + 86400000) {
+          // Deň podľa Prahy, nie UTC — nahrávka o 0:30 je ešte ten deň.
+          return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Prague" }).format(d);
+        }
+      }
+    }
+    return "";
+  }
+  async function vlozVideo(f) {
     if (!f || !f.type.startsWith("video/")) return;
+    let den = "";
+    try { den = await datumVidea(f); } catch { /* bez metadát */ }
+    if (!den && f.lastModified) den = new Date(f.lastModified).toISOString().slice(0, 10);
     const v = {
       id: dalsieId++, src: URL.createObjectURL(f), nazov: f.name.replace(/\.[^.]+$/, ""),
-      den: f.lastModified ? new Date(f.lastModified).toISOString().slice(0, 10) : "",
+      den,
       oznacenie: videa.length === 0 ? "predtým" : videa.length === 1 ? "potom" : "",
       fw: 0, fh: 0, dlzka: 0, strih: null, ciary: [], cas: 0, view: { zoom: 1, x: 0, y: 0 }, nahlad: "",
     };

@@ -430,10 +430,57 @@
     aktivne = i;
     kresli();
   }
-  function vlozSubor(i, f) {
+  /**
+   * DÁTUM ODFOTENIA ZO SÚBORU (EXIF DateTimeOriginal).
+   *
+   * Jerry, 9. 10. 2026: „uprav to, nech berie dátum z fotky." Dátum súboru
+   * (`lastModified`) pri výbere z galérie iPhonu často nie je deň odfotenia,
+   * ale chvíľa výberu — a z neho sa píše štítok PŘEDTÍM/POTOM aj nadpis karty
+   * „N týdnů práce". EXIF nesie skutočný deň: hľadá sa blok „Exif\0\0" + TIFF
+   * hlavička (JPEG aj HEIC ho majú rovnako) a v ňom tag 0x9003, potom 0x9004
+   * a 0x0132. Nič z toho nie je = prázdny reťazec, nastúpi dátum súboru.
+   */
+  function datumExif(b) {
+    const n = Math.min(b.length, 1 << 19);
+    let t = -1;
+    for (let i = 0; i + 10 < n; i++) {
+      if (b[i] === 0x45 && b[i + 1] === 0x78 && b[i + 2] === 0x69 && b[i + 3] === 0x66 && b[i + 4] === 0 && b[i + 5] === 0
+        && ((b[i + 6] === 0x49 && b[i + 7] === 0x49) || (b[i + 6] === 0x4d && b[i + 7] === 0x4d))) { t = i + 6; break; }
+    }
+    if (t < 0) return "";
+    const le = b[t] === 0x49;
+    const u16 = (o) => (t + o + 1 < b.length ? (le ? b[t + o] | (b[t + o + 1] << 8) : (b[t + o] << 8) | b[t + o + 1]) : 0);
+    const u32 = (o) => (t + o + 3 < b.length ? (le ? (b[t + o] | (b[t + o + 1] << 8) | (b[t + o + 2] << 16)) + b[t + o + 3] * 2 ** 24 : b[t + o] * 2 ** 24 + ((b[t + o + 1] << 16) | (b[t + o + 2] << 8) | b[t + o + 3])) : 0);
+    const precitajIfd = (o) => {
+      const tagy = {};
+      if (!o || t + o + 2 > b.length) return tagy;
+      const pocet = u16(o);
+      for (let k = 0; k < pocet && k < 400; k++) {
+        const e = o + 2 + k * 12;
+        tagy[u16(e)] = { typ: u16(e + 2), pocet: u32(e + 4), hodnota: u32(e + 8) };
+      }
+      return tagy;
+    };
+    const text = (z) => {
+      if (!z || z.typ !== 2 || z.pocet < 10) return "";
+      const o = z.pocet <= 4 ? -1 : z.hodnota;
+      if (o < 0) return "";
+      let s = "";
+      for (let k = 0; k < Math.min(z.pocet, 20); k++) s += String.fromCharCode(b[t + o + k] || 0);
+      const m = /^(\d{4}):(\d{2}):(\d{2})/.exec(s);
+      return m && m[1] !== "0000" ? `${m[1]}-${m[2]}-${m[3]}` : "";
+    };
+    const ifd0 = precitajIfd(u32(4));
+    const exif = ifd0[0x8769] ? precitajIfd(ifd0[0x8769].hodnota) : {};
+    return text(exif[0x9003]) || text(exif[0x9004]) || text(ifd0[0x0132]);
+  }
+  async function vlozSubor(i, f) {
     if (!f || !f.type.startsWith("image/")) return;
-    // deň z dátumu súboru (fotka z mobilu ho nesie) — dá sa prepísať
-    vlozObrazok(i, URL.createObjectURL(f), f.lastModified ? new Date(f.lastModified).toISOString().slice(0, 10) : "", true);
+    // Deň odfotenia z EXIF; keď chýba, dátum súboru. Dá sa prepísať v „deň fotky".
+    let den = "";
+    try { den = datumExif(new Uint8Array(await f.slice(0, 1 << 19).arrayBuffer())); } catch { /* bez EXIF */ }
+    if (!den && f.lastModified) den = new Date(f.lastModified).toISOString().slice(0, 10);
+    vlozObrazok(i, URL.createObjectURL(f), den, true);
   }
   subor.addEventListener("change", () => { vlozSubor(aktivne, subor.files?.[0]); subor.value = ""; });
   // Pretiahnutie z Findera alebo zo zásobníka snímok priamo do polovice.
@@ -630,7 +677,7 @@
   document.getElementById("stiahnut").onclick = async () => stiahni(await vyrobJpeg(), "predtim-potom.jpg");
 
   window.skladacka = {
-    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg, vyrobInstagram,
+    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg, vyrobInstagram, datumExif,
     get rezimCiar() { return rezimCiar; },
     get vybrana() { return vybrana; },
     get pocetCiar() { return ciary.length; },
