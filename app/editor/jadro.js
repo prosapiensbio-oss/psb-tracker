@@ -294,9 +294,11 @@
   const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
 
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
+  // Po česky: hotová fotka ide klientovi alebo na sociálne siete (Jerry vybral
+  // návrh D s českými štítkami, 9. 10. 2026).
   const popisky = () => {
     const [a, b] = [stav[0].den, stav[1].den];
-    return a && b && a > b ? ["potom", "predtým"] : ["predtým", "potom"];
+    return a && b && a > b ? ["potom", "předtím"] : ["předtím", "potom"];
   };
   const rozmerOkna = (el) => ({ ow: el.clientWidth, oh: el.clientHeight });
 
@@ -501,6 +503,18 @@
   });
   addEventListener("resize", kresli);
 
+  // ── ZNAČKA DO EXPORTU (návrh D a karta na Instagram, Jerry 9. 10. 2026) ──
+  // Písmo Agrandir a postavička/nápis z /public. Načítajú sa raz; keď niečo
+  // nedorazí, export ide ďalej bez toho (systémové písmo, bez vodoznaku).
+  const ZNACKA = { pismo: false, figura: null, napis: null };
+  const obrazok = (src) => new Promise((r) => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+  const znackaHotova = (async () => {
+    try { const f = new FontFace("Agrandir", "url(/agrandir.woff2)"); await f.load(); document.fonts.add(f); ZNACKA.pismo = true; } catch { /* systémové písmo */ }
+    ZNACKA.figura = await obrazok("/znacka-figura-biela.svg");
+    ZNACKA.napis = await obrazok("/znacka-napis-zelena.svg");
+  })();
+  const pismo = (vaha, px) => `${vaha} ${px}px ${ZNACKA.pismo ? "Agrandir, " : ""}-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+
   // ── EXPORT: ten istý výrez vo veľkom rozlíšení ──
   /** Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c. */
   function kresliCelok(c) {
@@ -528,25 +542,31 @@
       } else { x.fillStyle = "#ddd"; x.fillRect(ox, oy, ow, oh); }
       x.restore();
       if (sPopiskami && s.src) {
-        const k = pomer;
-        const t1 = pop[i], t2 = denCz(s.den);
-        x.font = `600 ${13 * k}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        const w1 = x.measureText(t1).width;
-        x.font = `400 ${13 * k}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        const w2 = t2 ? x.measureText(t2).width + 6 * k : 0;
-        const bw = w1 + w2 + 20 * k, bh = 27 * k;
-        const bx = cez && i === 1 ? ox + ow - 10 * k - bw : ox + 10 * k, by = oy + oh - 10 * k - bh;
-        x.fillStyle = "rgba(20,20,20,.62)";
-        x.beginPath(); x.roundRect(bx, by, bw, bh, 7 * k); x.fill();
-        x.fillStyle = "#fff"; x.textBaseline = "middle";
-        x.font = `600 ${13 * k}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        x.fillText(t1, bx + 10 * k, by + bh / 2);
-        x.globalAlpha = 0.85;
-        x.font = `400 ${13 * k}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        if (t2) x.fillText(t2, bx + 10 * k + w1 + 6 * k, by + bh / 2);
-        x.globalAlpha = 1;
+        // Návrh D: biely štítok v hornom rohu polovice — PŘEDTÍM 3. 6. 2026.
+        // Pri prekrytí („cez") stojí druhý štítok vpravo, aby sa neprekryli.
+        const k = N / 2000;
+        const t1 = pop[i].toUpperCase(), t2 = denCz(s.den);
+        x.font = pismo(600, 40 * k);
+        const w1 = x.measureText(t1).width + (ZNACKA.pismo ? 3 * k * t1.length : 0);
+        x.font = pismo(400, 36 * k);
+        const w2 = t2 ? x.measureText(t2).width + 30 * k : 0;
+        const bw = w1 + w2 + 80 * k, bh = 84 * k;
+        const bx = cez && i === 1 ? ox + ow - 50 * k - bw : ox + 50 * k, by = oy + 50 * k;
+        x.fillStyle = "rgba(251,250,246,.94)";
+        x.beginPath(); x.roundRect(bx, by, bw, bh, bh / 2); x.fill();
+        x.textBaseline = "middle"; x.textAlign = "left";
+        x.fillStyle = "#141513"; x.font = pismo(600, 40 * k);
+        if ("letterSpacing" in x) x.letterSpacing = `${3 * k}px`;
+        x.fillText(t1, bx + 40 * k, by + bh / 2 + 2 * k);
+        if ("letterSpacing" in x) x.letterSpacing = "0px";
+        if (t2) { x.fillStyle = "#8A8C85"; x.font = pismo(400, 36 * k); x.fillText(t2, bx + 40 * k + w1 + 30 * k, by + bh / 2 + 2 * k); }
       }
     });
+    // Postavička ako nenápadný vodoznak vpravo dole (návrh D).
+    if (ZNACKA.figura) {
+      const k = N / 2000, fw = 70 * k, fh = fw * ZNACKA.figura.height / ZNACKA.figura.width;
+      x.globalAlpha = 0.85; x.drawImage(ZNACKA.figura, N - 60 * k - fw, N - 60 * k - fh, fw, fh); x.globalAlpha = 1;
+    }
     if (document.getElementById("mriezkaExport").checked) {
       const { zvisle, vodorovne } = ciaryMriezky();
       x.strokeStyle = mriezka.farba; x.lineWidth = Math.max(1, pomer);
@@ -562,22 +582,55 @@
   }
   /** Hotový štvorec ako JPEG — na stiahnutie aj do kartotéky klienta. */
   async function vyrobJpeg(N = 2000) {
+    await znackaHotova;
     const c = document.createElement("canvas");
     c.width = N; c.height = N;
     kresliCelok(c);
     return new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
   }
-  document.getElementById("stiahnut").onclick = async () => {
-    const blob = await vyrobJpeg();
+
+  /** „12 týdnů práce" z dátumov fotiek; bez dátumov všeobecný nadpis. */
+  function nadpisKarty() {
+    const [a, b] = [stav[0].den, stav[1].den].filter(Boolean).sort();
+    if (!a || !b) return "Předtím a potom";
+    const t = Math.round((Date.parse(b) - Date.parse(a)) / (7 * 86400000));
+    if (t < 1) return "Předtím a potom";
+    return `${t} ${t === 1 ? "týden" : t < 5 ? "týdny" : "týdnů"} práce`;
+  }
+
+  /**
+   * KARTA NA INSTAGRAM 4 : 5 (návrh E). Nadpis z dátumov, štvorec z návrhu D
+   * v zaoblenom okne, dole nápis a web. Zverejnenie chce samostatný súhlas
+   * klienta — súhlas v anamnéze hovorí „nikde se nezveřejňují".
+   */
+  async function vyrobInstagram() {
+    await znackaHotova;
+    const W = 1600, H = 2000, m = 80, S = W - 2 * m, Y = 330;
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d");
+    x.fillStyle = "#F2EFE7"; x.fillRect(0, 0, W, H);
+    x.textBaseline = "alphabetic"; x.textAlign = "left";
+    x.fillStyle = "#16483A"; x.font = pismo(700, 104); x.fillText(nadpisKarty(), m, 190);
+    const dni = [stav[0].den, stav[1].den].filter(Boolean).sort().map(denCz);
+    if (dni.length) { x.fillStyle = "#8A8C85"; x.font = pismo(400, 42); x.fillText(dni.join("  →  "), m, 262); }
+    const sq = document.createElement("canvas"); sq.width = S; sq.height = S;
+    kresliCelok(sq);
+    x.save(); x.beginPath(); x.roundRect(m, Y, S, S, 36); x.clip(); x.drawImage(sq, m, Y); x.restore();
+    if (ZNACKA.napis) { const w = 380, h = w * ZNACKA.napis.height / ZNACKA.napis.width; x.drawImage(ZNACKA.napis, m, H - 110 - h / 2, w, h); }
+    x.fillStyle = "#141513"; x.font = pismo(500, 40); x.textAlign = "right"; x.fillText("prosapiens.cz", W - m, H - 96);
+    return new Promise((res) => c.toBlob(res, "image/jpeg", 0.92));
+  }
+  const stiahni = (blob, nazov) => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "predtym-potom.jpg";
-    a.click();
+    a.href = URL.createObjectURL(blob); a.download = nazov; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
+  const tlIg = document.getElementById("stiahnutIg");
+  if (tlIg) tlIg.onclick = async () => stiahni(await vyrobInstagram(), "predtim-potom-instagram.jpg");
+  document.getElementById("stiahnut").onclick = async () => stiahni(await vyrobJpeg(), "predtim-potom.jpg");
 
   window.skladacka = {
-    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg,
+    nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg, vyrobInstagram,
     get rezimCiar() { return rezimCiar; },
     get vybrana() { return vybrana; },
     get pocetCiar() { return ciary.length; },
