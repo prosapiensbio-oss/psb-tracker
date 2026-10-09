@@ -210,6 +210,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Septembrové faktúry z Alzy sú zapísané, ale BEZ kategórií (9. 10. 2026).** 10 dokladov, 42 položiek, 13 572 Kč — prečítané z PDF v Downloads tým istým parserom ako v appke. Do P&L nevstúpi ani koruna, kým položky nedostanú kategóriu; rozdelenie je Jerryho rozhodnutie (väčšina sú psie veci a súkromné nákupy). Appka sama navrhla len tri: Plyo box 1 899 Kč → `variabilne.prevadzka2.pomocky`, čistič uší a maškrty pre psa → `spolocne.Ahsoka`, Glycine + nôž Victorinox → `spolocne.Doplnky` / `spolocne.Iné`. Zvyšok (AirPods 5 509, termoska 1 838, pleťové veci, misky, vitamíny) čaká v karte Alza.
+
 - ~~Mobilné ovládanie~~ — **C NAOSTRO od 9. 10. 2026** (Jerry po skúške A/C v bete: „vyhráva C"): na každom telefóne (≤ 640 px) tenký riadok hore (≡ Viac · ‹ · názov · hľadanie) a lišta dole Dnes · Workspace · + · Kalendár · Jarvis; Firma, Marketing, Prechod, Upload, Bitcoin a odhlásenie vo Viac. Workspace bez bočných šípok, podzáložky v jednom posuvnom rade, bez plávajúceho Jarvisa. Počítač a iPad bez zmeny. Kód `MobilNavigacia.tsx`, `useMobilRozlozenie.ts`.
 
 
