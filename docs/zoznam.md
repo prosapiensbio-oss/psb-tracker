@@ -217,18 +217,18 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Tlač/PDF hotová 8. 10. Otvorené: štvrtá otázka v kvartálnom („splnili sme, čo report navrhol?") — vyžaduje ukladať akcie.
 
 - ~~Odpočet hodín — tri návrhy~~ — **Jerry 8. 10. 2026 vybral A** (rad pod sebou, teda to, čo beží). Návrhy B (pás hodín) a C (dve kôpky) zostávajú v `navrhy-kokpitu/odpocet-hodin.html`, keby sa k tomu raz vrátil.
-- ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Klientovi ešte neodišla — pošli ju z karty Faktúry. Príčina (klik na popis prepisoval sumu) je opravená.
+- ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Jerry 9. 10.: posielať netreba. Príčina (klik na popis prepisoval sumu) je opravená.
 
 - **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, overené naostro 8. 10.** (Workspace → Kalendár → Firma, ‹ ‹ › a Alt+← vrátia presne poradie). Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
 
 - **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
   **Doplnené 8. 10. 2026** (Jerry: „áno doplň tie staršie úvodné"): sedem úvodných z augusta a septembra má vlastný balíček — Pavlik, Hrdinova, Spoligova, Pehalova, Malinova, Dvořak, Matl. Nikomu z nich nevznikol dlh (všetci zaplatili) a nikomu sa nezmenili hodiny okrem troch, ktorí dovtedy nemali žiadny záznam.
   **Čo sa doplniť NEDÁ:** zvyšných 59 úvodných späť do januára 2025. Nasucho to vymyslelo dlh 1 100 Kč štrnástim ľuďom, ktorí zaplatili (ich platby z 2025 sa k balíčku nespárujú), dvom iným naopak dlh 6 990 Kč zmazalo a piatim stlačilo hodiny do mínusu. Keby to raz malo zmysel, musí sa k tomu prilepiť párovanie starých platieb — nie samotné balíčky.
-- **Nadpis stránky klienta vs. os (Jerry sa k tomu ešte nevyjadril).** Pri Lukášovi Hanusovi riadky končia na 4 h, ale nadpis hlási 5 h — nadpis ide za kartou klienta, os za vlastným prepočtom. Má sa nadpis riadiť osou (stránka bude sama so sebou v zhode), alebo ostať na karte?
+- ~~Nadpis stránky klienta vs. os~~ — **vyriešené samo** (overené 9. 10. 2026 kontrolórom profilov nad ostrou DB: nadpis odkazu = karta u všetkých, os = karta okrem Milana Bařinu, kde os vidí dokúpených 8 h z 21. 6. 2025). Hanus: os aj karta rovnako.
 
-- **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"):**
+- **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"; 9. 10.: „vyskúšam najskôr"):**
   1. **Kalendár v mobile** (8. 10.: zatiaľ nikto nemá odkaz, `klient_kalendar` je prázdna) — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
-  2. **Ponuka termínov** — zápis z /t/ do Google FUNGUJE (overené 8. 10. v dátach): ponuka pre Mateja Prochadzku vytvorená 7. 10. o 9:47, termín vybraný o 31 s neskôr, udalosť 14. 10. 10:00 je v Google aj v Kokpite. **Otázka na Jerryho: bola to skúška? Ak áno, udalosť 14. 10. treba zmazať, inak sa Matejovi zaráta tréning.** Push trénerovi neoverený.
+  2. **Ponuka termínov** — zápis z /t/ do Google FUNGUJE (overené 8. 10. v dátach): ponuka pre Mateja Prochadzku vytvorená 7. 10. o 9:47, termín vybraný o 31 s neskôr, udalosť 14. 10. 10:00 je v Google aj v Kokpite. **Jerry 9. 10. 2026: nebola to skúška** — termín 14. 10. platí. Prvý ostrý výber teda prešiel. Push trénerovi neoverený.
   3. **Gestá v Kalendári** — švih prstom (telefón/iPad) a dva prsty na touchpade medzi týždňami; overené len simuláciou.
 - ~~September: chýbalo 10 výdavkov z banky (−17 641 Kč)~~ — HOTOVÉ 7. 10. 2026: Jerry stiahol mesiac z Fio (september má 132 pohybov); krok Fio odvtedy hlási hotovo až pri 0 nepotvrdených a 0 nezaradených výdavkoch.
 - ~~Pravidlo Terezkinho účtu → Služby~~ — HOTOVÉ 7. 10. 2026: výplata 29. 9. prehodená na Výplata Terezka, pravidlo účtu teraz → výplata Terezka; SmsManager ostáva Apps AI (Jerry).
@@ -279,7 +279,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   netreba (pred 1. 10. platí PTminder). **Čaká na Jerryho:** priradiť
   októbrové príjmy z banky (4, 33 580 Kč), zapisovať hotovosť a bitcoin do
   Kokpitu (zošit nie je v Kokpite od 28. 8.), potom tlačidlo „Prepnúť peniaze
-  na Kokpit od 10/2026". Stav 6. 10.: október Kokpit 0 / PTminder 17 190.
+  na Kokpit od 10/2026" (Jerry 9. 10.: „to ešte počká"). Stav 6. 10.: október Kokpit 0 / PTminder 17 190.
   **Bitcoin sa berie sám z BTC knihy** (6. 10., Jerry: „prečo sa BTC platby
   nečítajú?") — od začiatku súbežného chodu, nespoznané mená ukáže karta.
   V knihe zatiaľ žiadna októbrová platba (posledná 17. 9.).
