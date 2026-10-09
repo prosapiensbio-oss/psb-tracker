@@ -41,8 +41,31 @@ const RYCHLE: { kat: string; text: string }[] = [
   { kat: "spolocne.Ahsoka", text: "Ahsoka" },
 ];
 
+/**
+ * KĽÚČ, POD KTORÝM ČAKÁ ROZPÍSANÁ, ALE NEPOTVRDENÁ FAKTÚRA.
+ *
+ * Jerry, 9. 10. 2026: „nahral som 1 faktúru, aj to som ju nepotvrdil,
+ * a ukazuje mi, že je všetko hotové a zaradené." Mal pravdu: rozpis žil len
+ * v pamäti komponentu, takže o ňom nevedel ani krok uzávierky, ani on sám po
+ * obnovení stránky. To isté už raz riešil náhľad zošita.
+ */
+export const ALZA_CAKA = "psb-alza-caka";
+
 export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavierky }) {
-  const [nove, setNove] = useState<Faktura[]>([]);
+  const [nove, setNove] = useState<Faktura[]>(() => {
+    try {
+      const x = JSON.parse(sessionStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: Faktura[] } | null;
+      return x && x.mesiac === mesiac && Array.isArray(x.faktury) ? x.faktury : [];
+    } catch { return []; }
+  });
+  // Čo čaká na potvrdenie, musí byť vidieť aj mimo tejto karty.
+  useEffect(() => {
+    try {
+      if (nove.length) sessionStorage.setItem(ALZA_CAKA, JSON.stringify({ mesiac, faktury: nove }));
+      else sessionStorage.removeItem(ALZA_CAKA);
+      oznam("peniaze");
+    } catch { /* bez úložiska ostane rozpis len do obnovenia */ }
+  }, [nove, mesiac]);
   const [chyby, setChyby] = useState<string[]>([]);
   const [polozky, setPolozky] = useState<Polozka[] | null>(null);
   const [uklada, setUklada] = useState("");

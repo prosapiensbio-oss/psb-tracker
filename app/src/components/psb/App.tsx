@@ -11,6 +11,7 @@ import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prv
 import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { PRESUN } from "../../lib/psb/fio";
+import { ALZA_CAKA } from "./AlzaUzavierka";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
 
@@ -96,7 +97,9 @@ import { VYCHODZIA_TEMA } from "./ThemeSwitch";
 import { Udaje } from "./Udaje";
 import { CAS_BUILDU, verziaServera } from "../../lib/psb/verzia";
 import { HladanieKlienta } from "./Hladanie";
-import { ZapisButton } from "./Zapis";
+import { pocetCakajucich, ZapisButton } from "./Zapis";
+import { MobilNavigacia } from "./MobilNavigacia";
+import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { kontrolyMesiaca, mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
@@ -391,6 +394,10 @@ export function PSBApp() {
 
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [ktoSom, setKtoSom] = useState<string | null>(null);
+  /** Telefón v BETE: nové ovládanie (návrh A alebo C), inak `null`. */
+  const mobil = useMobilRozlozenie();
+  /** „+" v mobilnej lište otvára okno zápisu — každé ťuknutie zvýši číslo. */
+  const [zapisSignal, setZapisSignal] = useState(0);
   /** Koho otvoriť v pracovnom stole vo Workspace. */
   const [workspaceKlient, setWorkspaceKlient] = useState<string | null>(null);
   /** Krok Workspace, na ktorý sa má skočiť (odkaz z upozornenia alebo inej záložky). */
@@ -1067,6 +1074,8 @@ export function PSBApp() {
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
   /** Položky faktúr bez kategórie po mesiacoch — krok „Alza" v uzávierke. */
   const [fakturyNezaradene, setFakturyNezaradene] = useState<Record<string, number>>({});
+  /** Koľko dokladov má mesiac — „nič za mesiac" a „všetko vybavené" nie je to isté. */
+  const [fakturyMesiaca, setFakturyMesiaca] = useState<Record<string, number>>({});
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
@@ -1500,8 +1509,14 @@ function skupinaFaktur(
         const doklady = new Map<string, { datum: string; celkom: number; polozky: FaPol[] }>();
         {
           const nez: Record<string, number> = {};
-          for (const p of fa) if (!p.kategoria) { const m = String(p.datum).slice(0, 7); nez[m] = (nez[m] || 0) + 1; }
+          const poMesiacoch: Record<string, Set<string>> = {};
+          for (const p of fa) {
+            const m = String(p.datum).slice(0, 7);
+            if (!p.kategoria) nez[m] = (nez[m] || 0) + 1;
+            (poMesiacoch[m] ||= new Set()).add(p.faktura);
+          }
           setFakturyNezaradene(nez);
+          setFakturyMesiaca(Object.fromEntries(Object.entries(poMesiacoch).map(([m, v]) => [m, v.size])));
         }
         for (const p of fa) {
           const e = doklady.get(p.faktura) || { datum: p.datum, celkom: 0, polozky: [] as FaPol[] };
@@ -2386,11 +2401,36 @@ function skupinaFaktur(
         ...(() => {
           const bez = btcBezDokladu.filter((p) => String(p.datum).slice(0, 7) === mk).length;
           const nez = fakturyNezaradene[mk] || 0;
+          /**
+           * ČO NEVIEM, NEHLÁSIM AKO HOTOVÉ (Jerry, 9. 10. 2026: „nahral som
+           * 1 faktúru, aj to som ju nepotvrdil, a ukazuje mi, že je všetko
+           * hotové"). Krok počítal len to, čo je V DATABÁZE — a rozpísaná,
+           * nepotvrdená faktúra tam nie je. Tri ticha, ktoré sa tvárili ako
+           * poriadok:
+           *   • rozpis čaká na potvrdenie (sessionStorage `psb-alza-caka`),
+           *   • bitcoinová kniha sa nenačítala, takže niet s čím porovnávať,
+           *   • za mesiac nie je ANI faktúra, ani platba — to nie je „spárované".
+           */
+          const caka = (() => {
+            try {
+              const x = JSON.parse(sessionStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: unknown[] } | null;
+              return x && x.mesiac === mk && Array.isArray(x.faktury) ? x.faktury.length : 0;
+            } catch { return 0; }
+          })();
+          const knihaChyba = btcNenacitane || Object.keys(btcNakupy).length === 0;
+          const platiebVMesiaci = (btcNakupy[mk] || []).length;
+          const nic = platiebVMesiaci === 0 && !fakturyMesiaca[mk];
+          const problemy = [
+            caka ? `${caka} ${caka === 1 ? "faktúra čaká" : caka < 5 ? "faktúry čakajú" : "faktúr čaká"} na potvrdenie` : "",
+            bez ? `${bez} ${bez === 1 ? "platba" : bez < 5 ? "platby" : "platieb"} bitcoinom bez faktúry` : "",
+            nez ? `${nez} ${nez === 1 ? "položka" : nez < 5 ? "položky" : "položiek"} bez kategórie` : "",
+            knihaChyba ? "bitcoinová kniha sa nenačítala — neviem to posúdiť" : "",
+          ].filter(Boolean);
           return {
-            hotovo: bez === 0 && nez === 0,
-            detail: bez || nez
-              ? [bez ? `${bez} ${bez === 1 ? "platba" : bez < 5 ? "platby" : "platieb"} bitcoinom bez faktúry` : "", nez ? `${nez} ${nez === 1 ? "položka" : nez < 5 ? "položky" : "položiek"} bez kategórie` : ""].filter(Boolean).join(" · ")
-              : "faktúry spárované a rozdelené",
+            hotovo: problemy.length === 0 && !nic,
+            detail: problemy.length ? problemy.join(" · ")
+              : nic ? "za tento mesiac nie je faktúra ani platba bitcoinom"
+                : "faktúry spárované a rozdelené",
           };
         })(),
       },
@@ -2478,7 +2518,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, btcNakupy, btcNenacitane]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.
@@ -3047,6 +3087,35 @@ function skupinaFaktur(
           {chybaZapisu} <span style={{ color: C.textDim }}>· zavrieť</span>
         </div>
       )}
+      {mobil && (
+        <>
+          <MobilNavigacia
+            rozlozenie={mobil}
+            aktivna={FIRMA_IDS.includes(active) ? "firma" : active}
+            nadpis={FIRMA_IDS.includes(active) ? "Firma" : active === "btc" ? "Bitcoin" : (TABS.find((t) => t.id === active)?.label || "Kokpit")}
+            ciele={[
+              ...TABS.filter((t) => !MIMO_RAD.includes(t.id) && !(FIRMA_IDS.includes(t.id) && t.id !== FIRMA_IDS[0]))
+                .map((t) => (FIRMA_IDS.includes(t.id) ? { id: "firma", label: "Firma", icon: "barChart" } : { id: t.id, label: t.label, icon: t.icon })),
+              { id: "btc", label: "Bitcoin", icon: "bitcoin" },
+            ]}
+            chod={(id) => setActive(id === "firma" ? firmaSub : id)}
+            onZapis={() => setZapisSignal((n) => n + 1)}
+            zapisCaka={pocetCakajucich(ritualyZapisu)}
+            onJarvis={() => navigate("jarvis")}
+            hladanie={<HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />}
+            mozeSpat={mozeSpat(stopa)}
+            spat={() => chodPo(-1)}
+            ktoSom={ktoSom}
+            odhlasit={logout}
+          />
+          {/* Okno zápisu bez vlastného tlačidla — otvára ho „+" v lište. */}
+          <ZapisButton bezTlacidla otvor={zapisSignal} ritualy={ritualyZapisu} onNavigate={(t, sub, tyzden) => {
+            navigate(t, sub, tyzden ? { week: tyzden, nonce: Date.now() } : undefined);
+            void nacitajZapisy();
+          }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti, { zmeny: kalZmeny })} onDennikZapis={chat.spracujDennik} />
+        </>
+      )}
+      {!mobil && (<>
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
         {/* Logo je zároveň cesta domov — najstarší weborý zvyk a jediné miesto,
             kde ho každý hľadá inštinktívne. */}
@@ -3167,9 +3236,11 @@ function skupinaFaktur(
           ↗
         </a>
       </nav>
-      <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
+      </>)}
+      {/* Na telefóne v bete miesto pod spodnou lištou, aby ju obsah nezakrýval. */}
+      <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto", paddingBottom: mobil ? "calc(96px + env(safe-area-inset-bottom))" : 16 }}>
         {FIRMA_IDS.includes(active) && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: mobil ? 10 : 14, flexWrap: mobil ? "nowrap" : "wrap", overflowX: mobil ? "auto" : undefined, scrollbarWidth: mobil ? "none" : undefined }}>
             {FIRMA_SEKCIE.map((s) => {
               const on = s.tab === active && (!s.sekcia || s.sekcia === trackerSection);
               return (
@@ -3177,8 +3248,8 @@ function skupinaFaktur(
                   key={s.id}
                   onClick={() => { setActive(s.tab); setFirmaSub(s.tab); if (s.sekcia) setTrackerSection(s.sekcia); }}
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 7,
-                    padding: "7px 14px", borderRadius: 8,
+                    display: "inline-flex", alignItems: "center", gap: 7, flex: "none",
+                    padding: mobil ? "6px 12px" : "7px 14px", borderRadius: 8,
                     border: `1px solid ${on ? C.accent : C.border}`,
                     background: on ? C.accentBg : "transparent",
                     color: on ? C.accentLight : C.textMuted,
@@ -3273,7 +3344,7 @@ function skupinaFaktur(
         isté dvakrát a rozišli by sa pri rolovaní a písaní.
       */}
       {active !== "jarvis" && (
-        <Assistant chat={chat} onClientClick={onClientClick} onNavigate={(tab2, sub) => navigate(tab2, sub)} />
+        <Assistant chat={chat} onClientClick={onClientClick} onNavigate={(tab2, sub) => navigate(tab2, sub)} bezSpustaca={!!mobil} />
       )}
     </div>
     </ObdobieCtx.Provider>
