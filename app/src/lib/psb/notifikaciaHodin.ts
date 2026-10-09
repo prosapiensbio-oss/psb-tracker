@@ -42,14 +42,14 @@ export function polozkyHodin(
 ): RegisterItem[] {
   const terazP = terazPraha(dnes);
   const mena = Object.keys(clients);
-  const { reset, objednane } = poslednaZmenaStavu(mena, udalosti, platby, balicky, terazP);
+  const { reset, dnesTrenuje } = poslednaZmenaStavu(mena, udalosti, platby, balicky, terazP);
   // Audit je v UTC, zmena v pražskom čase — porovnáva sa v jednom pásme.
   const odoslane: Record<string, string> = {};
   for (const [k, v] of Object.entries(odoslaneUtc)) {
     const t = Date.parse(v);
     if (Number.isFinite(t)) odoslane[k] = terazPraha(new Date(t));
   }
-  return upozorneniaHodin(Object.values(clients), odoslane, reset, objednane, terazP.slice(0, 10)).map((u) => {
+  return upozorneniaHodin(Object.values(clients), odoslane, reset, dnesTrenuje).map((u) => {
     // Stupeň v kľúči: „Vybavené" pri poslednej hodine neumlčí prechod do mínusu.
     const key = `hodiny|${u.meno}|${u.stav === "posledna" ? "posledna" : "minus"}`;
     const v = vetaHodin(u);

@@ -356,12 +356,14 @@ export function poslednaZmenaStavu(
   platby: { klient: string; datum: string }[],
   balicky: { klient: string; platnost_od?: string; platnostOd?: string }[],
   terazP: string,
-): { zmena: Record<string, string>; reset: Record<string, string>; objednane: Set<string> } {
+): { zmena: Record<string, string>; reset: Record<string, string>; objednane: Set<string>; dnesTrenuje: Set<string> } {
   const podla = new Map(mena.map((m) => [normName(m), m]));
   const zmena: Record<string, string> = {};
   /** Len platba alebo balíček — to, čo hodiny DOPĹŇA. Tréning ich len míňa. */
   const reset: Record<string, string> = {};
   const objednane = new Set<string>();
+  /** Kto má DNES tréning (už bol alebo ešte len bude). */
+  const dnesTrenuje = new Set<string>();
   const posun = (meno: string | null, cas: string, ajReset = false) => {
     if (!meno || !cas) return;
     const k = podla.get(normName(meno)) || meno;
@@ -372,12 +374,13 @@ export function poslednaZmenaStavu(
   for (const u of udalosti) {
     if (!u.klient || (u.typ !== "trening" && u.typ !== "uvodny")) continue;
     const cas = u.zaciatok.slice(0, 16);
+    if (cas.slice(0, 10) === terazP.slice(0, 10)) dnesTrenuje.add(normName(u.klient));
     if (cas > terazP) objednane.add(normName(u.klient));
     else posun(u.klient, cas);
   }
   for (const p of platby) posun(p.klient, `${p.datum.slice(0, 10)}T00:00`, true);
   for (const b of balicky) posun(b.klient, `${String(b.platnost_od || b.platnostOd || "").slice(0, 10)}T00:00`, true);
-  return { zmena, reset, objednane };
+  return { zmena, reset, objednane, dnesTrenuje };
 }
 
 export type UpozornenieHodin = {
@@ -390,8 +393,6 @@ export type UpozornenieHodin = {
   platneOd: string;
 };
 
-/** Ako dávno musel klient trénovať, aby sa ho notifikácia týkala (bez objednaného termínu). */
-export const HODINY_AKTIVNY_DNI = 21;
 
 /**
  * KTO MÁ POSLEDNÚ HODINU ALEBO JE V MÍNUSE.
@@ -409,14 +410,15 @@ export const HODINY_AKTIVNY_DNI = 21;
  *  - SMS odoslaná v tejto epizóde ju umlčí celú (stránka za odkazom ukazuje
  *    stav živo — ďalšia správa by hovorila to isté);
  *  - „Vybavené" platí na STUPEŇ: posledná hodina a mínus sú dve otázky;
- *  - hlási sa len, kto trénoval za 21 dní alebo má objednaný termín.
+ *  - hlási sa LEN V DEŇ TRÉNINGU (Jerry, 9. 10. 2026: „daj mi tú notifikáciu
+ *    len v deň, keď má ten klient tréning, nech mi tam nesvieti 10 ľudí len
+ *    tak"). Zoznam všetkých, komu treba písať, ostáva v kroku 2 · SMS.
  */
 export function upozorneniaHodin(
   clients: KlientPreSms[],
   odoslane: Record<string, string>,
   reset: Record<string, string>,
-  objednane: Set<string>,
-  dnes: string,
+  dnesTrenuje: Set<string>,
 ): UpozornenieHodin[] {
   const out: UpozornenieHodin[] = [];
   for (const c of clients) {
@@ -424,8 +426,7 @@ export function upozorneniaHodin(
     if (!(c.packageTotal > 0)) continue;
     const zostatok = Math.round(c.packageRemaining * 100) / 100;
     if (zostatok > 1) continue;
-    const nedavno = !!c.lastSession && dniMedzi(c.lastSession, dnes) <= HODINY_AKTIVNY_DNI;
-    if (!nedavno && !objednane.has(normName(c.name))) continue;
+    if (!dnesTrenuje.has(normName(c.name))) continue;
     const zm = reset[c.name] || "";
     const sms = odoslane[c.name];
     if (sms && (!zm || sms > zm)) continue;
