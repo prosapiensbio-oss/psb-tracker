@@ -76,7 +76,10 @@ function buildHead(meta: AppMeta) {
   return {
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // `maximum-scale=1`: iPhone/iPad inak pri ťuknutí do políčka s písmom
+      // pod 16 px priblíži celú stránku a späť ju nevráti (Jerry, 9. 10. 2026:
+      // „robí to neplechu"). Priblíženie dvoma prstami iOS nechá aj tak.
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1" },
       { title },
       { name: "description", content: description },
       { name: "author", content: "Higgsfield" },
