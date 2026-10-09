@@ -1,4 +1,5 @@
 import { PeniazePrehlad } from "./PeniazePrehlad";
+import { DotaznikVysledky } from "./DotaznikVysledky";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
@@ -3414,6 +3415,7 @@ export const VYSLEDKY_LISTY = [
   { id: "kpi", label: "KPI" },
   { id: "ciele", label: "Ciele" },
   { id: "report", label: "Report" },
+  { id: "dotaznik", label: "Dotazník" },
 ];
 
 /**
@@ -3519,6 +3521,7 @@ export function Vysledky({
           { id: "kohorty", label: "Prežitie" },
           { id: "ciele", label: "Ciele" },
           { id: "report", label: "Report" },
+          { id: "dotaznik", label: "Dotazník" },
         ]}
         value={sub}
         onChange={setSub}
@@ -3529,6 +3532,7 @@ export function Vysledky({
       {sub === "kohorty" && <KohortyTab clients={clients} />}
       {sub === "ciele" && <CieleTab data={data} />}
       {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
+      {sub === "dotaznik" && <DotaznikVysledky />}
     </>
   );
 }

@@ -18,6 +18,7 @@ import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as TTokenRouteImport } from './routes/t.$token'
 import { Route as KTokenRouteImport } from './routes/k.$token'
+import { Route as DTokenRouteImport } from './routes/d.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -80,6 +81,7 @@ import { Route as ApiFotkyRouteImport } from './routes/api/fotky'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
+import { Route as ApiDotaznikRouteImport } from './routes/api/dotaznik'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
@@ -135,6 +137,11 @@ const TTokenRoute = TTokenRouteImport.update({
 const KTokenRoute = KTokenRouteImport.update({
   id: '/k/$token',
   path: '/k/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DTokenRoute = DTokenRouteImport.update({
+  id: '/d/$token',
+  path: '/d/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssetsSplatRoute = AssetsSplatRouteImport.update({
@@ -447,6 +454,11 @@ const ApiExportRoute = ApiExportRouteImport.update({
   path: '/api/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDotaznikRoute = ApiDotaznikRouteImport.update({
+  id: '/api/dotaznik',
+  path: '/api/dotaznik',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDataRoute = ApiDataRouteImport.update({
   id: '/api/data',
   path: '/api/data',
@@ -519,6 +531,7 @@ export interface FileRoutesByFullPath {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -581,6 +594,7 @@ export interface FileRoutesByFullPath {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/d/$token': typeof DTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -603,6 +617,7 @@ export interface FileRoutesByTo {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -665,6 +680,7 @@ export interface FileRoutesByTo {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/d/$token': typeof DTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -688,6 +704,7 @@ export interface FileRoutesById {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -750,6 +767,7 @@ export interface FileRoutesById {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/d/$token': typeof DTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -774,6 +792,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/dotaznik'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -836,6 +855,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/d/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -858,6 +878,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/dotaznik'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -920,6 +941,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/d/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -942,6 +964,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/dotaznik'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1004,6 +1027,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/d/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -1027,6 +1051,7 @@ export interface RootRouteChildren {
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
   ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiDotaznikRoute: typeof ApiDotaznikRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
@@ -1089,6 +1114,7 @@ export interface RootRouteChildren {
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
+  DTokenRoute: typeof DTokenRoute
   KTokenRoute: typeof KTokenRouteWithChildren
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
@@ -1158,6 +1184,13 @@ declare module '@tanstack/react-router' {
       path: '/k/$token'
       fullPath: '/k/$token'
       preLoaderRoute: typeof KTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/d/$token': {
+      id: '/d/$token'
+      path: '/d/$token'
+      fullPath: '/d/$token'
+      preLoaderRoute: typeof DTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assets/$': {
@@ -1594,6 +1627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dotaznik': {
+      id: '/api/dotaznik'
+      path: '/api/dotaznik'
+      fullPath: '/api/dotaznik'
+      preLoaderRoute: typeof ApiDotaznikRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/data': {
       id: '/api/data'
       path: '/api/data'
@@ -1701,6 +1741,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientDeleteRoute: ApiClientDeleteRoute,
   ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiDotaznikRoute: ApiDotaznikRoute,
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,
@@ -1763,6 +1804,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
+  DTokenRoute: DTokenRoute,
   KTokenRoute: KTokenRouteWithChildren,
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,

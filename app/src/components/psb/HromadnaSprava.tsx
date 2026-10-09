@@ -4,6 +4,7 @@ import { normName } from "../../lib/psb/format";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
 /**
  * HROMADNÁ SPRÁVA — jedna SMS všetkým klientom alebo vybraným.
@@ -17,13 +18,21 @@ import { C, mix } from "../../lib/psb/theme";
  * vyčistil zoznam v kroku SMS, ktorý hovorí o stave hodín.
  *
  * `{meno}` v texte sa nahradí krstným menom.
+ *
+ * `{dotaznik}` (9. 10. 2026) nahradí až SERVER osobným odkazom na anonymný
+ * dotazník — odkaz vzniká pri odoslaní a do auditu ide ako `sms-dotaznik`.
+ * Filter „neodpovedali na dotazník" je na pripomienku po týždni.
  */
 
 type Kontakt = { klient: string; telefon?: string };
-type Filter = "aktivni" | "pauza" | "vsetci";
+type Filter = "aktivni" | "pauza" | "vsetci" | "dotaznik";
 
 const krstne = (meno: string) => meno.trim().split(/\s+/)[0] || meno;
 const zlozText = (text: string, meno: string) => text.replace(/\{meno\}/gi, krstne(meno));
+/** Dĺžka sa ráta s odkazom takej dĺžky, aký server naozaj vloží. */
+const ukazkaOdkazu = () => verejnyOdkaz(`/d/${"x".repeat(14)}`, typeof window === "undefined" ? "" : window.location.origin);
+const naPocitanie = (text: string, meno: string) => zlozText(text, meno).replace(/\{dotaznik\}/gi, ukazkaOdkazu());
+const TEXT_DOTAZNIKA = "Ahoj {meno}, máš 2 minuty? Krátký anonymní dotazník o ProSapiens: {dotaznik} Moc nám pomůže. Jerry a Terezka";
 
 export function HromadnaSprava({ clients, trener }: { clients: Record<string, ClientAgg>; trener: string | null }) {
   const [kontakty, setKontakty] = useState<Kontakt[] | null>(null);
@@ -36,6 +45,16 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
   const [bezi, setBezi] = useState(false);
   const [stop, setStop] = useState(false);
   const [vysledok, setVysledok] = useState<{ ok: string[]; zle: { meno: string; chyba: string }[] } | null>(null);
+
+  /** Kto ešte neodpovedal na dotazník v otvorenom kole — pre pripomienku. */
+  const [neodpovedali, setNeodpovedali] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (filter !== "dotaznik" || neodpovedali) return;
+    void fetch("/api/dotaznik", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setNeodpovedali(j?.ok && j.kolo && !j.kolo.uzavrete_at ? (j.neodpovedali || []) : []))
+      .catch(() => setNeodpovedali([]));
+  }, [filter, neodpovedali]);
 
   useEffect(() => {
     let zive = true;
@@ -56,11 +75,13 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
   }, [kontakty]);
 
   /** Kto spadá do filtra — predvýber, ktorý sa dá ručne meniť. */
-  const vFiltri = useMemo(() => Object.values(clients)
-    .filter((c) => filter === "vsetci" || (filter === "pauza" ? c.status !== "Neaktívny" : c.status === "Aktívny" || c.status === "Sporadický"))
-    .filter((c) => !lenMoji || !trener || c.primaryTrainer === trener)
-    .map((c) => c.name)
-    .sort((a, b) => a.localeCompare(b, "sk")), [clients, filter, lenMoji, trener]);
+  const vFiltri = useMemo(() => (filter === "dotaznik"
+    ? (neodpovedali || []).filter((m) => !lenMoji || !trener || clients[m]?.primaryTrainer === trener)
+    : Object.values(clients)
+      .filter((c) => filter === "vsetci" || (filter === "pauza" ? c.status !== "Neaktívny" : c.status === "Aktívny" || c.status === "Sporadický"))
+      .filter((c) => !lenMoji || !trener || c.primaryTrainer === trener)
+      .map((c) => c.name))
+    .sort((a, b) => a.localeCompare(b, "sk")), [clients, filter, lenMoji, trener, neodpovedali]);
 
   // Zmena filtra = nový predvýber (len tí s číslom).
   useEffect(() => { setVybrani(null); setPotvrd(false); }, [filter, lenMoji]);
@@ -79,10 +100,10 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
   const prijemcovia = [...vyber].filter((m) => cislo[m]);
   const bezCisla = vFiltri.filter((m) => !cislo[m]).length;
 
-  const najdlhsi = prijemcovia.reduce((d, m) => Math.max(d, zlozText(text, m).length), text.length);
-  const ukazka = prijemcovia[0] ? zlozText(text, prijemcovia[0]) : text;
-  const dlzka = dlzkaSpravy(prijemcovia.length ? prijemcovia.map((m) => zlozText(text, m)).sort((a, b) => b.length - a.length)[0] : text);
-  const spolu = prijemcovia.reduce((n, m) => n + dlzkaSpravy(zlozText(text, m)).sprav, 0);
+  const najdlhsi = prijemcovia.reduce((d, m) => Math.max(d, naPocitanie(text, m).length), naPocitanie(text, "").length);
+  const ukazka = prijemcovia[0] ? naPocitanie(text, prijemcovia[0]) : text;
+  const dlzka = dlzkaSpravy(prijemcovia.length ? prijemcovia.map((m) => naPocitanie(text, m)).sort((a, b) => b.length - a.length)[0] : naPocitanie(text, ""));
+  const spolu = prijemcovia.reduce((n, m) => n + dlzkaSpravy(naPocitanie(text, m)).sprav, 0);
 
   const posli = async () => {
     setBezi(true); setStop(false);
@@ -122,6 +143,8 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
         <button style={cip(filter === "aktivni")} onClick={() => setFilter("aktivni")}>Aktívni</button>
         <button style={cip(filter === "pauza")} onClick={() => setFilter("pauza")}>Aktívni + pauza</button>
         <button style={cip(filter === "vsetci")} onClick={() => setFilter("vsetci")}>Všetci</button>
+        <button style={cip(filter === "dotaznik")} onClick={() => { setFilter("dotaznik"); setNeodpovedali(null); }}
+          title="Kto dostal odkaz na dotazník a ešte neodpovedal — na jednu pripomienku po týždni">Neodpovedali na dotazník</button>
         {trener && (
           <label style={{ fontSize: 11.5, color: C.textMuted, display: "inline-flex", gap: 5, alignItems: "center", marginLeft: 6 }}>
             <input type="checkbox" checked={lenMoji} onChange={(e) => setLenMoji(e.target.checked)} /> len moji klienti ({trener})
@@ -153,13 +176,22 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
       </div>
 
       <div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+          <button style={cip(/\{dotaznik\}/i.test(text))} onClick={() => { setText((t) => (t.trim() ? (/\{dotaznik\}/i.test(t) ? t : `${t.trim()} {dotaznik}`) : TEXT_DOTAZNIKA)); setPotvrd(false); }}
+            title="Každý klient dostane vlastný odkaz na anonymný dotazník — dá sa vyplniť raz">
+            + odkaz na anonymný dotazník
+          </button>
+        </div>
         <textarea value={text} onChange={(e) => { setText(e.target.value); setPotvrd(false); }} rows={3}
           placeholder="Ahoj {meno}, …  ({meno} sa nahradí krstným menom)" style={{ ...pole, width: "100%", resize: "vertical" }} />
         <div style={{ fontSize: 11.5, color: dlzka.sprav > 1 ? C.orange : C.textDim, marginTop: 4 }}>
           {najdlhsi} znakov · {dlzka.sprav} SMS na klienta{dlzka.unicode ? " (diakritika: 70 znakov na SMS)" : ""}
           {prijemcovia.length > 0 && text.trim() && <> · spolu <b>{spolu} SMS</b></>}
         </div>
-        {/\{meno\}/i.test(text) && prijemcovia[0] && (
+        {filter === "dotaznik" && neodpovedali && !neodpovedali.length && (
+          <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>Nikto nečaká — dotazník ešte neodišiel, alebo odpovedali všetci.</div>
+        )}
+        {(/\{meno\}/i.test(text) || /\{dotaznik\}/i.test(text)) && prijemcovia[0] && (
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, padding: "6px 10px", borderLeft: `2px solid ${mix(C.accent, 60)}` }}>
             ukážka pre {prijemcovia[0]}: „{ukazka}“
           </div>

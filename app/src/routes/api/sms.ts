@@ -9,6 +9,7 @@ import { bindings } from "../../lib/bindings.server";
 import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
+import { koloNaOdoslanie, tokenKlienta } from "../../lib/psb/dotaznik.server";
 
 /**
  * SMS KLIENTOVI.
@@ -18,6 +19,7 @@ import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
  *   POST { klient, telefon, text } → pošle jednu správu
  *   POST { …, hromadna: true }     → to isté, ale v audite ako `sms-hromadna`
  *   POST { …, druh: "ponuka" | "kalendar" } → v audite `sms-ponuka` / `sms-kalendar`
+ *   `{dotaznik}` v texte → osobný odkaz na anonymný dotazník, v audite `sms-dotaznik`
  *                                    (ponuka termínov, kalendár do mobilu — nie správa o hodinách)
  *                                    (oznam pre všetkých nemení zoznam v kroku SMS)
  *
@@ -184,10 +186,23 @@ export const Route = createFileRoute("/api/sms")({
         }
 
         const klient = kus(b.klient, 120);
-        const text = String(b.text ?? "").slice(0, 600).trim();
+        let text = String(b.text ?? "").slice(0, 600).trim();
         const cislo = cisloPreBranu(kus(b.telefon, 40));
         if (!cislo) return Response.json({ ok: false, error: "Toto nie je telefónne číslo, na ktoré sa dá poslať SMS." }, { status: 400 });
         if (!text) return Response.json({ ok: false, error: "Prázdna správa." }, { status: 400 });
+
+        /**
+         * ANONYMNÝ DOTAZNÍK (9. 10. 2026): `{dotaznik}` v texte sa nahradí
+         * OSOBNÝM odkazom klienta v otvorenom kole (pri pripomienke ten istý).
+         * Odkaz vzniká až tu, pri odoslaní — počet „odišlo" tak nikdy neklame.
+         */
+        const jeDotaznik = /\{dotaznik\}/i.test(text);
+        if (jeDotaznik) {
+          if (!klient) return Response.json({ ok: false, error: "Dotazník sa posiela len klientovi zo zoznamu." }, { status: 400 });
+          const kolo = await koloNaOdoslanie(DB);
+          const token = await tokenKlienta(DB, kolo.id, klient);
+          text = text.replace(/\{dotaznik\}/gi, verejnyOdkaz(`/d/${token}`, new URL(request.url).origin));
+        }
 
         const n = await nastavenia(DB);
         const v = await posliSms(n, cislo, text);
@@ -203,7 +218,7 @@ export const Route = createFileRoute("/api/sms")({
         await audit(DB, {
           // Hromadná správa a ponuka termínov nie sú správa o hodinách —
           // `sms-odoslana` by klienta vyčistil zo zoznamu kroku 2 · SMS.
-          action: b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : "sms-odoslana",
+          action: jeDotaznik ? "sms-dotaznik" : b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : "sms-odoslana",
           predmet: `${klient} · ${cislo}`,
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,
