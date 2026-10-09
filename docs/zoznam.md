@@ -210,11 +210,11 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
-- **Ďalšie metriky do reportu z výskumu kníh (8. 10. 2026)** — 15 kandidátov v `docs/metriky-z-knih.md` (prežitie 100 dní, retencia 6 mes., obnova balíčkov, rezerva v mesiacoch, predplatené vs. dlžné hodiny, koncentrácia, lievik po krokoch, referral číslo, cena za klienta podľa kanála, Profit First…). Čaká na výber. Break-even, aplikácie/AI a osobné financie sú už v reporte.
+- **Metriky z výskumu kníh — postavené 8. 10. 2026** (Jerry: „postav to, strop Jerry 120 Terezka 120"): obnova balíčkov, retencia 6 mes., prežitie 100 dní, hodnota klienta, koncentrácia, vyťaženie voči stropu, rezerva, predplatené hodiny, dlhy, Profit First, lievik, reklama na dopyt, odporúčatelia. Zostáva: **cena za klienta podľa kanála** a **lievik nesedí** (7 dopytov → 2 úvodné → 4 noví v 9/2026 — úvodný nie je v kalendári vždy označený).
 
 - **Heinrich 24. 9.: 2 400 Kč, ktoré si nechala Terezka v hotovosti, zapísať ako TEREZKINU VÝPLATU (Jerry, 8. 10. 2026).** PTminder má 7 790, na účet prišlo 5 390; rozdiel nie je v zošite ani v banke. Zapísať ako hotovostný výdavok/výplatu Terezka za 9/2026 (nie ako tržbu). Pri porovnaní tržieb sept.: PTminder 324 849 vs Kokpit 323 639 (banka+zošit 285 577 + bitcoin 38 062) — rozdiel 1 210 = +2 400 Heinrich − 1 100 druhá platba Dvořáka 16. 9. (v PTminderi chýba) − 90 preklep Papiež. Kalmus (15. 9.) a Kaňovský (1. 7.) platili bitcoinom, PTminder ich má ako banku.
 
-- **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Otvorené: tlač/PDF, štvrtá otázka v kvartálnom („splnili sme, čo report navrhol?") — vyžaduje ukladať akcie.
+- **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Tlač/PDF hotová 8. 10. Otvorené: štvrtá otázka v kvartálnom („splnili sme, čo report navrhol?") — vyžaduje ukladať akcie.
 
 - ~~Odpočet hodín — tri návrhy~~ — **Jerry 8. 10. 2026 vybral A** (rad pod sebou, teda to, čo beží). Návrhy B (pás hodín) a C (dve kôpky) zostávajú v `navrhy-kokpitu/odpocet-hodin.html`, keby sa k tomu raz vrátil.
 - ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Klientovi ešte neodišla — pošli ju z karty Faktúry. Príčina (klik na popis prepisoval sumu) je opravená.
