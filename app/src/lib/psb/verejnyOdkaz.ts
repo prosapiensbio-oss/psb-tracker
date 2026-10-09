@@ -9,9 +9,12 @@
  * doménu má 28 a správa sa zmestí do jednej. Pri 56 úvodných ročne je to 56
  * správ zadarmo — len za dĺžku adresy.
  *
- * Presmerovanie robí WordPress (snippet „Krátky odkaz pre SMS (/u/ a /v/)",
- * id 26): `/u/<token>` aj `/v/<token>` pošle 302 na workera a všetko ostatné
- * nechá na webe. Doména NIE JE na Cloudflare (DNS je na Websupporte), takže
+ * Presmerovanie robí WordPress (snippet „Krátky odkaz pre SMS", id 26):
+ * `/u/`, `/v/`, `/t/` a `/k/` + token pošle 302 na workera a všetko ostatné
+ * nechá na webe. `/t/` (ponuka termínov) a `/k/` (kalendár v mobile)
+ * pribudli 9. 10. 2026 (Jerry: „zmeň to, sprav snippet"). Feed `/k/<token>/
+ * kalendar.ics` cez doménu NEJDE — stránka /k/ ho skladá z adresy workera,
+ * na ktorú klient po presmerovaní dorazí, a odber v telefóne tak 302 nečaká. Doména NIE JE na Cloudflare (DNS je na Websupporte), takže
  * vlastná doména workera ani Workers Route neprichádzajú do úvahy.
  *
  * `bez www`: `prosapiens.cz` sa 301-kou presmeruje na `www`, ale v SMS sa
@@ -20,7 +23,7 @@
 export const VEREJNA_DOMENA = "https://prosapiens.cz";
 
 /**
- * Verejný odkaz pre klienta. `cesta` je `/u/<token>` alebo `/v/<token>`.
+ * Verejný odkaz pre klienta. `cesta` je `/u/`, `/v/`, `/t/` alebo `/k/` + token.
  *
  * `zaloha` je adresa workera — keď sa presmerovanie na webe raz rozbije,
  * zmení sa JEDNA konštanta tu a odkazy začnú znova chodiť priamo. Bez tohto
@@ -28,7 +31,7 @@ export const VEREJNA_DOMENA = "https://prosapiens.cz";
  */
 export function verejnyOdkaz(cesta: string, zaloha?: string): string {
   const c = cesta.startsWith("/") ? cesta : `/${cesta}`;
-  if (!/^\/(u|v)\/[A-Za-z0-9]{8,24}$/.test(c)) {
+  if (!/^\/(u|v|t|k)\/[A-Za-z0-9]{8,24}$/.test(c)) {
     // Čo presmerovanie na webe nepozná, musí ísť priamo na workera —
     // inak by klient dostal odkaz, ktorý končí na 404.
     return `${(zaloha || "").replace(/\/+$/, "")}${c}`;

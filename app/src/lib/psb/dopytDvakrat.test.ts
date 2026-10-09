@@ -17,11 +17,15 @@ import { EMPTY_DATA, type Lead, type PSBData } from "./types";
  * vec. Preto sa tu skladá CELÝ register — presne ako ho skladá ranný push.
  */
 
-const DNES = new Date("2026-09-25T09:00:00Z");
+// deriveRegister meria vek dopytu proti SKUTOČNÉMU teraz a starý dopyt
+// z registra vypadne — s pevným dátumom test 9. 10. 2026 sám od seba padol.
+// Dopyt je preto vždy zo včera.
+const DNES = new Date();
+const VCERA = new Date(DNES.getTime() - 86400000).toISOString().slice(0, 10);
 
 const dopyt = (o: Partial<Lead> = {}): Lead => ({
   id: "lead-1",
-  date: "2026-09-24",
+  date: VCERA,
   name: "Hana Marko",
   source: "web",
   referrer: "",
@@ -34,7 +38,7 @@ const dopyt = (o: Partial<Lead> = {}): Lead => ({
   stranka: "",
   odpovedaneAt: "",
   dovod: "",
-  createdAt: "2026-09-24T18:00:00Z",
+  createdAt: `${VCERA}T18:00:00Z`,
   druh: "dopyt",
   ...o,
 });

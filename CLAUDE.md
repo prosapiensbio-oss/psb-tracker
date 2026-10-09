@@ -2844,9 +2844,9 @@ jediné miesto, kde sa robí" — jeho rozhodnutie) a „tie +/- 15 preč"
 - Po výbere ide push trénerovi („X si vybral(a) …"); SMS s odkazom posiela
   tréner sám cez `SmsKlientovi` s `ponuka` → audit `sms-ponuka` (nie
   `sms-odoslana`, inak by klient zmizol zo zoznamu kroku 2 · SMS).
-- **Odkaz ide cez workers.dev**, nie prosapiens.cz: WordPress snippet (id 26)
-  presmerúva len `/u/` a `/v/`. Kratší odkaz = pridať `/t/` do snippetu
-  a do `verejnyOdkaz` (zmena verejného webu — s Jerryho súhlasom).
+- **Odkaz ide cez prosapiens.cz** (od 9. 10. 2026 — snippet id 26 presmerúva
+  aj `/t/` a `/k/`, Jerry súhlasil). Formulár výberu odosiela na adresu
+  workera, kam klient po 302 dorazil.
 - Overené naostro na vymyslenom „AATest Ponuka" (vytvorenie, odmietnutie
   obsadeného času, stránka, zrušenie) a zmazané. **Výber do kalendára nebol
   skúšaný** — zapísal by skutočnú udalosť; prvý ostrý výber treba sledovať.
@@ -2871,8 +2871,9 @@ v `lib/psb/kalendarMobil.ts`) len z `kal_udalosti` s jeho menom
 - V udalosti: „Trénink ProSapiens", s kým, ako sa ozvať, pripomienky
   −1 deň a −2 h. Žiadne hodiny, peniaze ani iné mená. Riadky .ics sa lámu
   na 75 bajtov (`zalom`), časy idú v UTC (`prahaNaUtcIcs`).
-- Migrácia 0101 (`klient_kalendar`). Odkaz ide cez workers.dev — `/k/`
-  nie je vo WP snippete (id 26).
+- Migrácia 0101 (`klient_kalendar`). Odkaz `/k/<token>` ide cez prosapiens.cz
+  (snippet id 26 od 9. 10. 2026); feed `.ics` NIE — stránka ho skladá z adresy
+  workera, aby odber v telefóne nemusel prejsť presmerovaním.
 - **Neoverené na skutočnom telefóne**: či iPhone pri odbere nevypne
   upozornenia a ako rýchlo Google Kalendár obnovuje.
 

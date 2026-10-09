@@ -10,6 +10,12 @@ describe("krátka adresa pre SMS", () => {
     expect(verejnyOdkaz("/v/AZG5rX2v4bdP", WORKER)).toBe(`${VEREJNA_DOMENA}/v/AZG5rX2v4bdP`);
   });
 
+  it("ponuka termínov aj kalendár v mobile idú cez doménu, feed .ics nie", () => {
+    expect(verejnyOdkaz("/t/Ab3xK9mQ2r1Zqw", WORKER)).toBe(`${VEREJNA_DOMENA}/t/Ab3xK9mQ2r1Zqw`);
+    expect(verejnyOdkaz("/k/Ab3xK9mQ2r1Zqw", WORKER)).toBe(`${VEREJNA_DOMENA}/k/Ab3xK9mQ2r1Zqw`);
+    expect(verejnyOdkaz("/k/Ab3xK9mQ2r1Zqw/kalendar.ics", WORKER)).toBe(`${WORKER}/k/Ab3xK9mQ2r1Zqw/kalendar.ics`);
+  });
+
   it("je naozaj kratšia — o toľko ide o jednu SMS menej", () => {
     const kratka = verejnyOdkaz("/u/DD7bibTzQk9A", WORKER);
     expect(kratka.length).toBeLessThan(`${WORKER}/u/DD7bibTzQk9A`.length - 15);
