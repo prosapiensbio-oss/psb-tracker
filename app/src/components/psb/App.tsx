@@ -2312,6 +2312,12 @@ function skupinaFaktur(
    * kontrolu tak, že sa pokúsi vzlietnuť a lietadlo mu povie, čo zabudol.
    * Teraz je to zoznam krokov s fajkami, ktorý sa dá pozerať kedykoľvek.
    */
+  /** Mesiac uzávierky — ten istý výpočet ako vo Workspace (predošlý mesiac). */
+  const mesiacUzavierkyApp = useMemo(() => {
+    const d = new Date();
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1)).toISOString().slice(0, 7);
+  }, []);
+
   const krokyZamku = useCallback((mk: string): KrokUzavierky[] => {
     const k = kotvaDat(data);
     const z = zapisy.mesiace?.[mk];
@@ -3304,7 +3310,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
 
         {active === "jarvis" && (
           <JarvisOkno

@@ -1001,12 +1001,27 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
 }) {
   const [zamknuty, setZamknuty] = useState<boolean | null>(null);
   // Terezke sa otázky mesiaca otvoria hneď — kvôli nim kartu má.
-  const [otvoreny, setOtvoreny] = useState(trener === "Terezka" ? "otazky" : "");
+  /**
+   * KTORÝ KROK JE OTVORENÝ, PREŽIJE ODCHOD (Jerry, 9. 10. 2026: „odkliknem
+   * preč… vrátim sa a stále je to presne tak, ako som to tam nechal").
+   * Workspace sa prepnutím záložky odmontuje, takže rozbalený krok sa bez
+   * tohto zavrel a človek sa k rozrobenej práci musel preklikať znova.
+   */
+  const [otvoreny, setOtvoreny] = useState(() => {
+    try { return localStorage.getItem("psb-uzavierka-krok") || (trener === "Terezka" ? "otazky" : ""); }
+    catch { return trener === "Terezka" ? "otazky" : ""; }
+  });
+  useEffect(() => {
+    try {
+      if (otvoreny) localStorage.setItem("psb-uzavierka-krok", otvoreny);
+      else localStorage.removeItem("psb-uzavierka-krok");
+    } catch { /* bez úložiska */ }
+  }, [otvoreny]);
   const [bezi, setBezi] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
   const [report, setReport] = useState<"mesiac" | "kvartal" | null>(null);
-  useEffect(() => { if (trener === "Terezka") setOtvoreny("otazky"); }, [trener]);
+  useEffect(() => { if (trener === "Terezka") setOtvoreny((x) => x || "otazky"); }, [trener]);
 
   useEffect(() => {
     let zive = true;

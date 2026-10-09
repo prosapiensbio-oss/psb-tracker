@@ -34,6 +34,8 @@ type BtcUzavierky = {
   faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[];
   parovanie: Record<string, string[]>;
   onSparuj: (id: number, f: string[]) => void;
+  /** Koľko výberov mal mesiac spolu — aby zoznam ukázal aj hotovú prácu. */
+  vsetkyMesiaca?: number;
 };
 
 /** Rýchle voľby — to, čo sa na Alze kupuje najčastejšie mimo nákladov firmy. */
@@ -232,7 +234,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
 
       {nadpis("3", "Platby bitcoinom bez faktúry")}
       {btc ? (
-        <BtcParovanie platby={platbyMesiaca} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />
+        <BtcParovanie platby={platbyMesiaca} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} vsetkyMesiaca={btc.vsetkyMesiaca} />
       ) : <div style={{ fontSize: 12, color: C.textDim }}>Bitcoinová kniha nie je načítaná.</div>}
     </div>
   );

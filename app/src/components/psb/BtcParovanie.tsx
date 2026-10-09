@@ -31,6 +31,7 @@ export function BtcParovanie({
   faktury,
   parovanie,
   onSparuj,
+  vsetkyMesiaca,
 }: {
   /** Výbery z peňaženky, ku ktorým automatika doklad nenašla. */
   platby: BtcNakup[];
@@ -38,6 +39,13 @@ export function BtcParovanie({
   faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[];
   parovanie: Record<string, string[]>;
   onSparuj: (idVyberu: number, faktury: string[]) => void;
+  /**
+   * Koľko platieb mal mesiac spolu. Bez toho zoznam vyzeral ako kopa
+   * nespravenej práce aj vtedy, keď bola väčšina vybavená (Jerry, 9. 10.
+   * 2026: „keď sa raz tie platby priradia k faktúram, dole už nemusia byť
+   * vypísané — potom to vyzerá ako nespravená práca").
+   */
+  vsetkyMesiaca?: number;
 }) {
   const [otvorena, setOtvorena] = useState<number | null>(null);
   const [vyber, setVyber] = useState<string[]>([]);
@@ -84,6 +92,9 @@ export function BtcParovanie({
       <H3><Info text="Automatika páruje podľa sumy, lenže koruny sa z bitcoinu odvodzujú kurzom a platobná brána si berie spread — tri a pol percenta rozdielu je bežné. Tu rozhodneš ty a tvoje rozhodnutie sa pamätá; automatika sa doň už nemieša. Faktúra zostáva zdrojom pravdy o sume aj kategóriách." label={`Platby bitcoinom bez dokladu (${bezDokladu.length})`} /></H3>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "4px 0 12px" }}>
         <span style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, flex: 1, minWidth: 200 }}>
+          {typeof vsetkyMesiaca === "number" && vsetkyMesiaca > bezDokladu.length && (
+            <b style={{ color: C.green }}>{vsetkyMesiaca - bezDokladu.length} z {vsetkyMesiaca} platieb mesiaca už doklad má. </b>
+          )}
           Kým platba nemá doklad, jej náklad v P&L chýba a zisk za ten mesiac je o toľko vyšší, než bol.
           Súkromný nákup označ tlačidlom „Súkromné" — do výkazu nepatrí a zo zoznamu zmizne.
         </span>

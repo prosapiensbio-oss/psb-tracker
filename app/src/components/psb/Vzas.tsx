@@ -3,7 +3,7 @@ import { DotaznikVysledky } from "./DotaznikVysledky";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
-import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from "react";
 
 import { PlatobneKanaly } from "./PlatobneKanaly";
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
@@ -2562,10 +2562,32 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva, ja }: {
   const existing = notes[key];
   // Until a month is saved in the app, fall back to what Jerry already wrote in
   // the Excel so nothing has to be retyped.
-  const [note, setNote] = useState(existing?.note ?? SEED_NOTES[key] ?? "");
+  /**
+   * ROZPÍSANÉ SA NESTRÁCA ODCHODOM (Jerry, 9. 10. 2026).
+   *
+   * „Keď to mám nahraté a pracujem s tým a odkliknem preč, tak mi to tam
+   * ostane… vrátim sa a stále je to presne tak, ako som to tam nechal."
+   * Odpovede mesiaca sa ukladajú až tlačidlom, takže prepnutie záložky
+   * (Workspace sa odmontuje) zmazalo rozpísaný text. Teraz čaká v prehliadači,
+   * kým sa neuloží — rovnako ako náhľad zošita a rozpis faktúr.
+   */
+  const konceptKluc = `psb-mesiac-koncept-${key}`;
+  const koncept = (() => {
+    try { return JSON.parse(localStorage.getItem(konceptKluc) || "null") as { note?: string; answers?: Record<string, string> } | null; }
+    catch { return null; }
+  })();
+  const [note, setNote] = useState(koncept?.note ?? existing?.note ?? SEED_NOTES[key] ?? "");
   const [answers, setAnswers] = useState<Record<string, string>>(
-    existing?.answers && Object.keys(existing.answers).length ? existing.answers : (SEED_ANSWERS[key] ?? {}),
+    koncept?.answers && Object.keys(koncept.answers).length
+      ? koncept.answers
+      : existing?.answers && Object.keys(existing.answers).length ? existing.answers : (SEED_ANSWERS[key] ?? {}),
   );
+  /** Kým sa nikto poľa nedotkol, koncept sa nezakladá — pravidlo z 29. 8. 2026. */
+  const dotknute = useRef(false);
+  useEffect(() => {
+    if (!dotknute.current) return;
+    try { localStorage.setItem(konceptKluc, JSON.stringify({ note, answers })); } catch { /* bez úložiska */ }
+  }, [note, answers, konceptKluc]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const devs = useMemo(() => monthDeviations(mi), [mi]);
@@ -2573,7 +2595,11 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva, ja }: {
   const save = async () => {
     setSaving(true);
     const ok = await saveMonthNote(key, note, answers);
-    if (ok) oznam("zapisy");
+    if (ok) {
+      oznam("zapisy");
+      dotknute.current = false;
+      try { localStorage.removeItem(konceptKluc); } catch { /* bez úložiska */ }
+    }
     setSaving(false);
     if (ok) {
       setSaved(true);
@@ -2614,7 +2640,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva, ja }: {
                     <textarea
                       key={pk}
                       value={answers[answerKey(q.id, pk)] ?? ""}
-                      onChange={(e) => setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value })}
+                      onChange={(e) => { dotknute.current = true; setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value }); }}
                       rows={(answers[answerKey(q.id, pk)] ?? "").length > 90 ? 3 : 1}
                       placeholder={ja ? "Tvoja odpoveď…" : SALARY[pk].label}
                       style={{ ...field, padding: "6px 10px" }} />
@@ -2625,7 +2651,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva, ja }: {
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Voľná poznámka</div>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} style={field}
+        <textarea value={note} onChange={(e) => { dotknute.current = true; setNote(e.target.value); }} rows={3} style={field}
           placeholder="Čokoľvek, čo by si o tomto mesiaci chcel vedieť o rok…" />
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
