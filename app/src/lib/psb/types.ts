@@ -297,6 +297,8 @@ export type ZaverRow = {
   datum: string;
   tema: string;
   zaver: string;
+  /** Prečo / z čoho záver vznikol — pri zápise z denníka aj pôvodná veta. */
+  preco?: string;
   overit?: string;
   overitDo?: string;
   stav: string;

@@ -43,7 +43,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // Otvorené závery z debát — do registra sa dostanú tie, ktorým prešiel
     // termín overenia. Bez toho by rozhodnutie žilo len v Jarvisovom prompte
     // a nikto by sa k nemu nevrátil, kým sa naň sám nespýta.
-    DB.prepare("SELECT id, datum, tema, zaver, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'")
+    DB.prepare("SELECT id, datum, tema, zaver, preco, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'")
       .all().catch(() => ({ results: [] })),
     // Text sa zámerne NEČÍTA — rešerš má 8 000 znakov a do kontextu každej
     // správy nepatrí. Jarvis dostane prehľad a text si vytiahne SQL dopytom,
@@ -151,7 +151,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       overeneAt: r.overene_at || "", znakov: Number(r.znakov) || 0,
     })),
     zavery: (zavery.results as any[]).map((r) => ({
-      id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
+      id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver, preco: r.preco || undefined,
       overit: r.overit, overitDo: r.overit_do, stav: r.stav,
     })),
     /**

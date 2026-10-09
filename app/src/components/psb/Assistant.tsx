@@ -874,7 +874,8 @@ export function useAssistantChat(
           `Zápis z denníka klienta «${meno}» (${dnes}):\n„${zapis}“\n\n` +
           `Ak zo zápisu vyplýva úloha alebo pripomienka do budúcnosti (napr. „o dva týždne sa mu ozvať", ` +
           `„v septembri rieši predĺženie"), pridaj psb-action blok zapis-zaver: tema = meno klienta a vec, ` +
-          `zaver = čo sa deje, overit = čo treba spraviť, overitDo = konkrétny dátum odvodený zo zápisu.\n\n` +
+          `zaver = čo sa deje, overit = čo treba spraviť, overitDo = konkrétny dátum odvodený zo zápisu.\n` +
+          `Keď zápis hovorí „pripomeň mi" a deň alebo dátum, overitDo je PRESNE ten deň a overit začni slovom „Pripomeň:".\n\n` +
           `A ak zo zápisu vyplýva, že klient nejaký čas NEPRÍDE — operácia, dovolenka, ` +
           `„príde až v septembri", zranenie, sťahovanie — pridaj NAVYŠE blok set-override ` +
           `s field "status" a value "Pauza|YYYY-MM-DD", kde dátum je koniec tej neprítomnosti. ` +
@@ -896,8 +897,17 @@ export function useAssistantChat(
     // stopa, ktorú si Jarvis zo zápisu berie — keď sa neuloží a nikto to
     // nepovie, vyzerá to ako úspech a pripomienka nikdy nepríde (19. 8. 2026).
     let zaverovZlyhalo = 0;
+    // „Pripomeň mi" v zápise je výslovná pripomienka (Jerry, 9. 10. 2026) —
+    // pôvodná veta ide k záveru, aby ju appka spoznala aj vtedy, keď Jarvis
+    // vec preformuluje. Taká pripomienka príde v ten deň VŽDY, kalendár ju
+    // neumlčí (`zaverUzMaTermin`).
+    const vyslovna = /pripom/i.test(zapis);
     for (const a of zavery) {
-      const ok = await saveZaver(a.data as never).catch(() => false);
+      const d = a.data as Record<string, unknown>;
+      if (vyslovna && !/pripom/i.test(`${d.zaver || ""} ${d.preco || ""} ${d.overit || ""}`)) {
+        d.preco = `${String(d.preco || "").trim()}${d.preco ? " · " : ""}zápis: „${zapis.trim().slice(0, 300)}“`;
+      }
+      const ok = await saveZaver(d as never).catch(() => false);
       if (!ok) zaverovZlyhalo++;
     }
 

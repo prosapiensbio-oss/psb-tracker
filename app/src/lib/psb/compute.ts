@@ -1950,12 +1950,16 @@ function nazovSediNaMeno(nazov: string, meno: string): boolean {
 }
 
 export function zaverUzMaTermin(
-  z: { zaver?: string | null; tema?: string | null; overit?: string | null },
+  z: { zaver?: string | null; tema?: string | null; overit?: string | null; preco?: string | null },
   menaKlientov: string[],
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null; nazov?: string }[] | undefined,
   dnes: Date = new Date(),
 ): string | null {
   if (!ZAVER_O_TERMINE.test(z.overit || "")) return null;
+  // „PRIPOMEŇ MI" + deň = výslovná pripomienka a príde v ten deň VŽDY
+  // (Jerry, 9. 10. 2026: „ja by som povedal, keď tam bude ‚pripomeň mi'
+  // a dám mu nejaký deň a dátum"). Kalendár ju neumlčí.
+  if (/pripom/i.test(`${z.zaver || ""} ${z.preco || ""} ${z.overit || ""}`)) return null;
   if (ZAVER_PRE_INEHO.test(`${z.zaver || ""} ${z.overit || ""}`)) return null;
   const text = normName(`${z.zaver || ""} ${z.tema || ""}`);
   // Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov.

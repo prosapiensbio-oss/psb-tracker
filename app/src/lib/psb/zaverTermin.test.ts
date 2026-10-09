@@ -27,6 +27,12 @@ describe("záver o termíne sa overuje kalendárom", () => {
     expect(zaverUzMaTermin(z, ["Panagiotis Tsiolis"], [u("Panagiotis Tsiolis", "2026-09-03T17:00:00Z")], DNES)).toBeNull();
   });
 
+  it("„pripomeň mi“ v zápise príde vždy, aj keď má klient termín v kalendári", () => {
+    const z = { ...ROMAN, preco: "zápis: „ozvi sa mu, pripomeň mi to v piatok“" };
+    expect(zaverUzMaTermin(z, KLIENTI, [u("Roman Pavlik", "2026-09-01T10:30:00Z")], DNES)).toBeNull();
+    expect(zaverUzMaTermin({ ...ROMAN, overit: "Pripomeň: dohodnúť termín s Romanom." }, KLIENTI, [u("Roman Pavlik", "2026-09-01T10:30:00Z")], DNES)).toBeNull();
+  });
+
   it("„zobrať“ či „brať“ nie je brat — bežný záver sa ďalej overuje kalendárom", () => {
     const z = { ...ROMAN, overit: "Ozvať sa Romanovi, či si chce zobrať termín na začiatok septembra." };
     expect(zaverUzMaTermin(z, KLIENTI, [u("Roman Pavlik", "2026-09-01T10:30:00Z")], DNES)).toBe("2026-09-01T10:30:00Z");
