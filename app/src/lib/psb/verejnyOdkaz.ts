@@ -10,7 +10,7 @@
  * správ zadarmo — len za dĺžku adresy.
  *
  * Presmerovanie robí WordPress (snippet „Krátky odkaz pre SMS", id 26):
- * `/u/`, `/v/`, `/t/` a `/k/` + token pošle 302 na workera a všetko ostatné
+ * `/u/`, `/v/`, `/t/`, `/k/` a `/d/` (dotazník, 9. 10.) + token pošle 302 na workera a všetko ostatné
  * nechá na webe. `/t/` (ponuka termínov) a `/k/` (kalendár v mobile)
  * pribudli 9. 10. 2026 (Jerry: „zmeň to, sprav snippet"). Feed `/k/<token>/
  * kalendar.ics` cez doménu NEJDE — stránka /k/ ho skladá z adresy workera,
@@ -23,7 +23,7 @@
 export const VEREJNA_DOMENA = "https://prosapiens.cz";
 
 /**
- * Verejný odkaz pre klienta. `cesta` je `/u/`, `/v/`, `/t/` alebo `/k/` + token.
+ * Verejný odkaz pre klienta. `cesta` je `/u/`, `/v/`, `/t/`, `/k/` alebo `/d/` + token.
  *
  * `zaloha` je adresa workera — keď sa presmerovanie na webe raz rozbije,
  * zmení sa JEDNA konštanta tu a odkazy začnú znova chodiť priamo. Bez tohto
@@ -31,7 +31,7 @@ export const VEREJNA_DOMENA = "https://prosapiens.cz";
  */
 export function verejnyOdkaz(cesta: string, zaloha?: string): string {
   const c = cesta.startsWith("/") ? cesta : `/${cesta}`;
-  if (!/^\/(u|v|t|k)\/[A-Za-z0-9]{8,24}$/.test(c)) {
+  if (!/^\/(u|v|t|k|d)\/[A-Za-z0-9]{8,24}$/.test(c)) {
     // Čo presmerovanie na webe nepozná, musí ísť priamo na workera —
     // inak by klient dostal odkaz, ktorý končí na 404.
     return `${(zaloha || "").replace(/\/+$/, "")}${c}`;

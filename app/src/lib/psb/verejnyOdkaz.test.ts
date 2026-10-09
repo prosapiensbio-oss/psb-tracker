@@ -13,6 +13,7 @@ describe("krátka adresa pre SMS", () => {
   it("ponuka termínov aj kalendár v mobile idú cez doménu, feed .ics nie", () => {
     expect(verejnyOdkaz("/t/Ab3xK9mQ2r1Zqw", WORKER)).toBe(`${VEREJNA_DOMENA}/t/Ab3xK9mQ2r1Zqw`);
     expect(verejnyOdkaz("/k/Ab3xK9mQ2r1Zqw", WORKER)).toBe(`${VEREJNA_DOMENA}/k/Ab3xK9mQ2r1Zqw`);
+    expect(verejnyOdkaz("/d/Ab3xK9mQ2r1Zqw", WORKER)).toBe(`${VEREJNA_DOMENA}/d/Ab3xK9mQ2r1Zqw`);
     expect(verejnyOdkaz("/k/Ab3xK9mQ2r1Zqw/kalendar.ics", WORKER)).toBe(`${WORKER}/k/Ab3xK9mQ2r1Zqw/kalendar.ics`);
   });
 
