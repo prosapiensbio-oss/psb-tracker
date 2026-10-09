@@ -86,6 +86,7 @@ import { Route as ApiDotaznikRouteImport } from './routes/api/dotaznik'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
+import { Route as ApiChybaPrehliadacaRouteImport } from './routes/api/chyba-prehliadaca'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiBalickyRouteImport } from './routes/api/balicky'
@@ -480,6 +481,11 @@ const ApiClientDeleteRoute = ApiClientDeleteRouteImport.update({
   path: '/api/client-delete',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChybaPrehliadacaRoute = ApiChybaPrehliadacaRouteImport.update({
+  id: '/api/chyba-prehliadaca',
+  path: '/api/chyba-prehliadaca',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -534,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
@@ -621,6 +628,7 @@ export interface FileRoutesByTo {
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
@@ -709,6 +717,7 @@ export interface FileRoutesById {
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
@@ -798,6 +807,7 @@ export interface FileRouteTypes {
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/chyba-prehliadaca'
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
@@ -885,6 +895,7 @@ export interface FileRouteTypes {
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/chyba-prehliadaca'
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
@@ -972,6 +983,7 @@ export interface FileRouteTypes {
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/chyba-prehliadaca'
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
@@ -1060,6 +1072,7 @@ export interface RootRouteChildren {
   ApiBalickyRoute: typeof ApiBalickyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiChybaPrehliadacaRoute: typeof ApiChybaPrehliadacaRoute
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
   ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
@@ -1675,6 +1688,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClientDeleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chyba-prehliadaca': {
+      id: '/api/chyba-prehliadaca'
+      path: '/api/chyba-prehliadaca'
+      fullPath: '/api/chyba-prehliadaca'
+      preLoaderRoute: typeof ApiChybaPrehliadacaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -1758,6 +1778,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBalickyRoute: ApiBalickyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiChybaPrehliadacaRoute: ApiChybaPrehliadacaRoute,
   ApiClientDeleteRoute: ApiClientDeleteRoute,
   ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,

@@ -142,33 +142,67 @@ function NotFoundComponent() {
   );
 }
 
+/**
+ * STARÁ VERZIA APPKY = SAMA SA NAČÍTA NANOVO (9. 10. 2026).
+ *
+ * Jerry na iPhone po sérii nasadení: „This page didn't load". Appka na ploche
+ * drží starý bundle; pri prechode na obrazovku pýta chunk, ktorý nasadenie
+ * zmazalo — Safari to hlási „Importing a module script failed", Chrome
+ * „Failed to fetch dynamically imported module". „Try again" to nevyrieši,
+ * lebo appku nenačíta nanovo. Preto: pri takej chybe tvrdé obnovenie (najviac
+ * raz za 30 s, aby sa pri skutočnej poruche nezacyklila).
+ */
+const JE_STARY_CHUNK = /Importing a module script failed|Failed to fetch dynamically imported module|error loading dynamically imported module|Loading chunk|ChunkLoadError|dynamically imported module/i;
+const obnovNanovo = () => { window.location.href = `/?v=${Date.now()}${window.location.hash}`; };
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const sprava = String(error?.message || error || "");
+  const staryChunk = JE_STARY_CHUNK.test(sprava);
   useEffect(() => {
     reportHiggsfieldError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+    if (staryChunk) {
+      try {
+        const posledne = Number(sessionStorage.getItem("psb-obnova-chunk") || 0);
+        if (Date.now() - posledne > 30_000) {
+          sessionStorage.setItem("psb-obnova-chunk", String(Date.now()));
+          obnovNanovo();
+          return;
+        }
+      } catch { obnovNanovo(); return; }
+    }
+    // Chyba sa zapíše na server — inak o nej vie len obrazovka telefónu
+    // a príčina sa hľadá naslepo (9. 10. 2026).
+    void fetch("/api/chyba-prehliadaca", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sprava: sprava.slice(0, 500), stack: String(error?.stack || "").slice(0, 1500), adresa: window.location.href.slice(0, 300), sirka: window.innerWidth, ua: navigator.userAgent.slice(0, 200) }),
+    }).catch(() => {});
+  }, [error, staryChunk, sprava]);
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-q-background-primary px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-q-title-lg-semi-bold text-q-text-primary">This page didn't load</h1>
+        <h1 className="text-q-title-lg-semi-bold text-q-text-primary">{staryChunk ? "Načítavam novú verziu…" : "Kokpit spadol"}</h1>
         <p className="mt-2 text-q-body-sm-regular text-q-text-secondary">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {staryChunk ? "Appka mala v pamäti starú verziu." : "Chyba je zapísaná, aby sa dala opraviť. Skús Kokpit načítať nanovo."}
         </p>
+        {!staryChunk && sprava && (
+          <p className="mt-2 text-q-body-sm-regular text-q-text-secondary" style={{ fontSize: 11, opacity: 0.7, wordBreak: "break-word" }}>{sprava.slice(0, 200)}</p>
+        )}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <button onClick={obnovNanovo} className={button({ variant: "primary", size: "md" })}>
+            Načítať nanovo
+          </button>
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className={button({ variant: "primary", size: "md" })}
+            className={button({ variant: "outline", size: "md" })}
           >
-            Try again
+            Skúsiť znova
           </button>
-          <a href="/" className={button({ variant: "outline", size: "md" })}>
-            Go home
-          </a>
         </div>
       </div>
     </div>
