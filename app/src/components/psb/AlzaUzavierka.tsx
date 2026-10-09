@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BtcNakup } from "../../lib/psb/client";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
 import { platbaKDokladu } from "../../lib/psb/btcKFakture";
-import { VYPLATY_JERRY } from "../../lib/psb/fio";
+import { RYCHLE } from "../../lib/psb/kategorieRychle";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
@@ -37,12 +37,6 @@ type BtcUzavierky = {
   /** Koľko výberov mal mesiac spolu — aby zoznam ukázal aj hotovú prácu. */
   vsetkyMesiaca?: number;
 };
-
-/** Rýchle voľby — to, čo sa na Alze kupuje najčastejšie mimo nákladov firmy. */
-const RYCHLE: { kat: string; text: string }[] = [
-  { kat: VYPLATY_JERRY, text: "výplata Jerry" },
-  { kat: "spolocne.Ahsoka", text: "Ahsoka" },
-];
 
 /**
  * KĽÚČ, POD KTORÝM ČAKÁ ROZPÍSANÁ, ALE NEPOTVRDENÁ FAKTÚRA.

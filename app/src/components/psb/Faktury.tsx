@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { sediSucet, type Faktura } from "../../lib/psb/faktura";
 import { platbaKDokladu, type PlatbaBtc } from "../../lib/psb/btcKFakture";
+import { RYCHLE } from "../../lib/psb/kategorieRychle";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
 import { VyberKategorie } from "./VyberKategorie";
@@ -82,6 +83,16 @@ export function FakturyNahlad({
   /** Doklady, ktoré sa ešte zapisujú — zapísané sú len na jeden zbalený riadok. */
   const naZapis = faktury.filter((f) => !uzZapisane?.has(f.cislo));
   const polozekSpolu = naZapis.reduce((a, f) => a + f.polozky.length, 0);
+  /**
+   * RÝCHLE VOĽBY PRIAMO V RIADKU (Jerry, 9. 10. 2026).
+   *
+   * „Veľmi mi vyhovovalo, že čo som nepotreboval, to som mohol krížikom
+   * odstrániť, a celkovo sa mi to rozhranie páčilo viac — ale páči sa mi,
+   * že tam je tá predvoľba Ahsoka, výplata Jerry, a dal by som aj
+   * domácnosť." Takže jedno rozhranie: tento náhľad (krížik, + položka,
+   * oprava názvu) PLUS tri tlačidlá na jeden klik. Roleta zostáva pre
+   * všetko ostatné.
+   */
 
   const uprav = (fi: number, pi: number, zmena: Partial<Faktura["polozky"][0]>) => {
     const f = faktury[fi];
@@ -265,14 +276,38 @@ export function FakturyNahlad({
                         ) : fmtCZK(p.cena)}
                       </td>
                       <td style={{ ...S.td, padding: "3px 6px" }}>
-                        <VyberKategorie
-                          hodnota={p.kategoria}
-                          pocetOznacenych={oznacene.has(kluc(fi, pi)) ? oznacene.size : 0}
-                          onZmena={(kat) => {
-                            if (oznacene.has(kluc(fi, pi)) && oznacene.size > 1) { nastavVsetkymOznacenym(kat); return; }
-                            uprav(fi, pi, { kategoria: kat });
-                          }}
-                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                          {RYCHLE.map((r) => {
+                            const zvolene = p.kategoria === r.kat;
+                            return (
+                              <button
+                                key={r.kat}
+                                onClick={() => {
+                                  const kat = zvolene ? "" : r.kat;
+                                  if (oznacene.has(kluc(fi, pi)) && oznacene.size > 1) { nastavVsetkymOznacenym(kat); return; }
+                                  uprav(fi, pi, { kategoria: kat });
+                                }}
+                                title={zvolene ? "Zrušiť" : r.kat}
+                                style={{
+                                  padding: "3px 8px", borderRadius: 999, fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                                  border: `1px solid ${zvolene ? mix(C.accent, 60) : C.border}`,
+                                  background: zvolene ? mix(C.accent, 16) : "transparent",
+                                  color: zvolene ? C.accentLight : C.textMuted,
+                                }}
+                              >
+                                {r.text}
+                              </button>
+                            );
+                          })}
+                          <VyberKategorie
+                            hodnota={p.kategoria}
+                            pocetOznacenych={oznacene.has(kluc(fi, pi)) ? oznacene.size : 0}
+                            onZmena={(kat) => {
+                              if (oznacene.has(kluc(fi, pi)) && oznacene.size > 1) { nastavVsetkymOznacenym(kat); return; }
+                              uprav(fi, pi, { kategoria: kat });
+                            }}
+                          />
+                        </div>
                       </td>
                       <td style={{ ...S.td, padding: "3px 4px" }}>
                         <button onClick={() => zmazPolozku(fi, pi)} title="Zmazať položku"
