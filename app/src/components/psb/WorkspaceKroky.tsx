@@ -1264,6 +1264,9 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onOtazkaJarvis
   const [chyba, setChyba] = useState("");
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [nalezy, setNalezy] = useState<Record<string, string>>({});
+  const [navody, setNavody] = useState<Set<string>>(new Set());
+  const prepniNavod = (id: string) =>
+    setNavody((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   /**
    * Ktorú kontrolu si naposledy otvoril.
    *
@@ -1303,6 +1306,23 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onOtazkaJarvis
     onZmena();
   };
 
+  /**
+   * Odškrtnutá kontrola, v ktorej appka TERAZ vidí nález, sa dá otvoriť späť.
+   *
+   * ✓ a oranžový výkričník vedľa seba sú dve protichodné tvrdenia o tej istej
+   * veci — a to je horšie než jedno chýbajúce. Odškrtnutie platilo na stav,
+   * aký bol vtedy; keď sa dáta odvtedy pohli, musí sa to dať povedať nahlas
+   * a vrátiť riadok do práce.
+   */
+  const vrat = async (k: KontrolaKarta) => {
+    setBezi(k.id); setChyba("");
+    const j = await posli("/api/anomaly", { key: `zapis|${k.id}`, ack: false });
+    setBezi("");
+    if (!j.ok) { setChyba(j.error || "Nepodarilo sa vrátiť."); return; }
+    setHotove((s2) => { const n = new Set(s2); n.delete(k.id); return n; });
+    onZmena();
+  };
+
   const otvor = (k: KontrolaKarta) => {
     setOtvorena(k.id);
     try { localStorage.setItem(POSLEDNA_KONTROLA, k.id); } catch { /* bez úložiska sa po návrate len nezvýrazní */ }
@@ -1321,16 +1341,21 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onOtazkaJarvis
         const vratil = otvorena === k.id && !hotova;
         return (
           <div key={k.id} style={{ ...riadok, alignItems: "flex-start", opacity: hotova ? 0.6 : 1, background: vratil ? mix(C.accent, 7) : undefined }}>
-            <span style={{ width: 20, fontSize: 14, color: hotova ? C.green : spolu === "pozor" ? C.orange : C.textDim }}>{hotova ? "✓" : "○"}</span>
+            <span style={{ width: 20, fontSize: 14, color: spolu === "pozor" ? C.orange : hotova ? C.green : C.textDim }}>{hotova ? (spolu === "pozor" ? "!" : "✓") : "○"}</span>
             <div style={{ flex: "1 1 340px" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
                 {k.nadpis.replace(/^Mesačná kontrola: /, "")}
                 <span style={{ fontSize: 11, fontWeight: 500, color: C.textDim, marginLeft: 8 }}>{i + 1}. týždeň mesiaca</span>
               </div>
 
-              {/* ČO OVERILA APPKA — výsledok, nie zadanie. */}
+              {/* ČO OVERILA APPKA — výsledok, nie zadanie.
+                  Jerry, 10. 10. 2026: „kto to kontroluje?" Z obrazovky to
+                  nebolo vidieť — tri rôzne ruky (appka, Jarvis, človek) stáli
+                  v jednom bloku bez popisu. Teraz je nad každou časťou
+                  napísané, čia je. */}
               {vysledky.length > 0 && (
-                <div style={{ marginTop: 4, display: "grid", gap: 1 }}>
+                <div style={{ marginTop: 5, display: "grid", gap: 1 }}>
+                  <div style={{ fontSize: 10.5, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.4 }}>overil Kokpit</div>
                   {vysledky.map((v, j) => (
                     <div key={j} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5, color: farbaStavu(v.stav) }}>
                       <span style={{ width: 10 }}>{v.stav === "ok" ? "✓" : v.stav === "pozor" ? "!" : "?"}</span>
@@ -1348,13 +1373,33 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onOtazkaJarvis
                 </div>
               )}
 
-              {/* ČO MUSÍŠ TY — to, čo stroj nespraví. */}
-              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 3 }}>{k.detail}</div>
+              {/* ČO MUSÍŠ TY — to, čo stroj nespraví. Zbalené: je to návod,
+                  nie nález, a nad rozrobenou prácou zaberal tri riadky. */}
+              <div style={{ marginTop: 5 }}>
+                <button onClick={() => prepniNavod(k.id)}
+                  style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 10.5, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  {navody.has(k.id) ? "▾" : "▸"} na teba zostáva
+                </button>
+                {navody.has(k.id) && (
+                  <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 2 }}>{k.detail}</div>
+                )}
+              </div>
 
               {hotova ? (
-                poznamkaHotovej(k) && poznamkaHotovej(k) !== "sedelo" && (
-                  <div style={{ fontSize: 11.5, color: C.orange, marginTop: 3 }}>nález: {poznamkaHotovej(k)}</div>
-                )
+                <>
+                  {poznamkaHotovej(k) && poznamkaHotovej(k) !== "sedelo" && (
+                    <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>tvoj zápis: {poznamkaHotovej(k)}</div>
+                  )}
+                  {spolu === "pozor" && (
+                    <div style={{ fontSize: 11.5, color: C.orange, marginTop: 3 }}>
+                      odškrtnuté, ale appka tu teraz vidí nález —{" "}
+                      <button disabled={bezi === k.id} onClick={() => void vrat(k)}
+                        style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, color: C.orange, textDecoration: "underline" }}>
+                        vrátiť do práce
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <input
                   value={nalezy[k.id] || ""}
