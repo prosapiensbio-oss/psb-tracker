@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BtcNakup } from "../../lib/psb/client";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
+import { jeBeta } from "../../lib/psb/beta";
+import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { platbaKDokladu } from "../../lib/psb/btcKFakture";
 import { RYCHLE } from "../../lib/psb/kategorieRychle";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
@@ -10,6 +12,7 @@ import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
 import { C, mix } from "../../lib/psb/theme";
 import { BtcParovanie } from "./BtcParovanie";
 import { FakturyNahlad } from "./Faktury";
+import { FakturyUctenka } from "./FakturyUctenka";
 import { VyberKategorie } from "./VyberKategorie";
 
 /**
@@ -148,6 +151,25 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
     oznam("peniaze");
   };
 
+  /**
+   * Zmazanie riadku (alebo celej zbalenej skupiny dopravy a zliav).
+   *
+   * Optimisticky sa neuberá nič: kým server nepovie, že riadok je preč,
+   * zostáva na obrazovke. Zmazaná položka, ktorá sa po načítaní vráti, je
+   * horšia než sekunda čakania.
+   */
+  const zmazPolozky = async (ids: string[]) => {
+    setUklada(ids[0] || ""); setChyba("");
+    const j = await fetch("/api/faktury", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "zmaz", ids }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setUklada("");
+    if (!j?.ok) { setChyba(j?.error || "Nezmazalo sa."); return; }
+    setPolozky((x) => (x || []).filter((q) => !ids.includes(q.id)));
+    oznam("peniaze");
+  };
+
   // Faktúry mesiaca po dokladoch, s tým, či ich drží platba bitcoinom.
   const doklady = useMemo(() => {
     const m = new Map<string, { cislo: string; datum: string; dodavatel: string; polozky: Polozka[] }>();
@@ -174,6 +196,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       .sort((a, b) => a.datum.localeCompare(b.datum));
   }, [polozky, btc]);
   const nezaradene = (polozky || []).filter((p) => !p.kategoria).length;
+  const nezaradeneTovar = (polozky || []).filter((p) => !p.kategoria && !jeNehmotny(p.nazov)).length;
   const platbyMesiaca = useMemo(() => (btc?.platby || []).filter((p) => String(p.datum).slice(0, 7) === mesiac), [btc, mesiac]);
 
   const nadpis = (n: string, t: string) => (
@@ -205,6 +228,13 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
         <div style={{ fontSize: 12, color: C.textDim }}>načítavam faktúry…</div>
       ) : !doklady.length ? (
         <div style={{ fontSize: 12, color: C.textDim }}>Za tento mesiac nie je zapísaná žiadna faktúra.</div>
+      ) : jeBeta() ? (
+        /* NÁVRH A — ÚČTENKA, zatiaľ len v bete (Jerry, 10. 10. 2026).
+           Naostro zostáva pôvodný zoznam, kým si to Jerry neodklepne. */
+        <div style={{ display: "grid", gap: 8 }}>
+          {nezaradeneTovar > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradeneTovar} {nezaradeneTovar === 1 ? "vec nemá" : "vecí nemá"} kategóriu — bez nej v P&L chýba.</div>}
+          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} />
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {nezaradene > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradene} {nezaradene === 1 ? "položka nemá" : "položiek nemá"} kategóriu — bez nej v P&L chýba.</div>}

@@ -10,6 +10,9 @@ import { bindings } from "../../lib/bindings.server";
 //   POST { polozky }           → zapíše potvrdený rozpis a naučí sa pravidlá
 //   POST { akcia: "kategoria", id, kategoria } → zmení kategóriu uloženej
 //                                položky (krok Alza v uzávierke, 9. 10. 2026)
+//   POST { akcia: "zmaz", id } | { akcia: "zmaz", ids }
+//                              → zmaže položku (alebo zbalenú skupinu dopravy
+//                                a zliav naraz), 10. 10. 2026
 //
 // PDF sa nespracúva tu, ale v prehliadači — súbor má aj pol megabajtu a posielať
 // ho na server len preto, aby sa z neho vytiahli tri kilobajty textu, nedáva
@@ -48,7 +51,7 @@ export const Route = createFileRoute("/api/faktury")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { polozky?: Vstup[]; akcia?: string; id?: string; kategoria?: string };
+        let b: { polozky?: Vstup[]; akcia?: string; id?: string; ids?: string[]; kategoria?: string };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -66,6 +69,43 @@ export const Route = createFileRoute("/api/faktury")({
           await DB.prepare("UPDATE faktura_polozky SET category = ?2 WHERE id = ?1").bind(id, kategoria).run();
           await audit(DB, { action: "faktura-kategoria", predmet: `${pred.faktura} · ${pred.nazov}`.slice(0, 200), month: String(pred.date || "").slice(0, 7), old: pred.category, neu: kategoria, actor: (await currentUser(request)) || undefined });
           return Response.json({ ok: true });
+        }
+
+        /**
+         * ZMAZANIE RIADKU Z DOKLADU.
+         *
+         * Jerry, 10. 10. 2026: „je tam veľakrát položka nehmotné produkty a to
+         * by som mal rád možnosť vykrížikovať." Mažú sa hlavne tie — doprava
+         * a zľava na dopravné, ktoré sa navzájom nulujú.
+         *
+         * Čo zmizne, musí ísť dohľadať: do auditu sa zapíše názov aj suma
+         * každého zmazaného riadku, nielen ich počet. Bez toho by sa z P&L
+         * nedalo zistiť, prečo doklad stojí inú sumu než PDF.
+         */
+        if (b.akcia === "zmaz") {
+          const ids = (Array.isArray(b.ids) ? b.ids : [b.id]).map((x) => String(x || "")).filter(Boolean).slice(0, 100);
+          if (!ids.length) return Response.json({ ok: false, error: "Chýba položka." }, { status: 400 });
+          const rs = await DB.prepare(
+            `SELECT id, faktura, nazov, cena_czk, date FROM faktura_polozky WHERE id IN (${ids.map(() => "?").join(",")})`,
+          ).bind(...ids).all<{ id: string; faktura: string; nazov: string; cena_czk: number; date: string }>();
+          const najdene = rs.results || [];
+          if (!najdene.length) return Response.json({ ok: false, error: "Položka neexistuje." }, { status: 404 });
+          // Uzamknutý mesiac sa nemení — to isté pravidlo ako pri kategórii.
+          const mesiace = [...new Set(najdene.map((r) => String(r.date || "").slice(0, 7)))];
+          for (const m of mesiace) {
+            const zamok = await DB.prepare("SELECT locked FROM vzas_periods WHERE month = ?1").bind(m).first<{ locked: number }>().catch(() => null);
+            if (zamok?.locked) return Response.json({ ok: false, error: `Mesiac ${m} je uzamknutý — najprv ho odomkni.` }, { status: 409 });
+          }
+          await DB.prepare(`DELETE FROM faktura_polozky WHERE id IN (${najdene.map(() => "?").join(",")})`).bind(...najdene.map((r) => r.id)).run();
+          const spolu = najdene.reduce((a, r) => a + (Number(r.cena_czk) || 0), 0);
+          await audit(DB, {
+            action: "faktura-polozka-zmazana",
+            month: mesiace[0],
+            old: najdene.map((r) => `${r.faktura} · ${r.nazov} · ${r.cena_czk} Kč`).join(" | ").slice(0, 900),
+            neu: `zmazaných ${najdene.length}, spolu ${Math.round(spolu)} Kč`,
+            actor: (await currentUser(request)) || undefined,
+          });
+          return Response.json({ ok: true, zmazane: najdene.length, suma: Math.round(spolu * 100) / 100 });
         }
 
         const polozky = Array.isArray(b.polozky) ? b.polozky.slice(0, 500) : [];
