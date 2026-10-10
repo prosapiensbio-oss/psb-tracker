@@ -131,7 +131,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   chat?: AssistantChat;
   register?: RegisterItem[];
   /** Ku ktorému dňu appka pozná zostatok účtu a hotovosti (mesačná kontrola). */
-  stavy?: { ucet?: { datum: string } | null; hotovost?: { datum: string } | null };
+  stavy?: {
+    ucet?: { datum: string } | null;
+    hotovost?: { datum: string } | null;
+    /** Príjmy z banky, ktoré ešte nemajú klienta — práca kroku Platby. */
+    prijmyBezKlienta?: { datum: string; suma: number }[];
+    /** Od ktorého mesiaca sa vlastná evidencia platieb vôbec súdi. */
+    platbyOd?: string;
+  };
   pohybSplits?: PohybSplits;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
@@ -1630,7 +1637,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     trzby: {
                       kokpit: (data.platbyKokpit || []).filter((p) => String(p.datum).slice(0, 7) === mk).reduce((a, p) => a + p.suma, 0),
                       ptminder: (data.paymentsPtminder || []).filter((p) => String(p.date).slice(0, 7) === mk).reduce((a, p) => a + (p.amount || 0), 0),
+                      mesiac: mk,
+                      platbyOd: stavy?.platbyOd,
                     },
+                    prijmyBezKlienta: (() => {
+                      const v = (stavy?.prijmyBezKlienta || []).filter((x) => String(x.datum).slice(0, 7) === mk);
+                      return { pocet: v.length, suma: v.reduce((a, x) => a + x.suma, 0) };
+                    })(),
                     dopyty: (() => {
                       const l = (data.leads || []).filter((x) => String(x.date || "").slice(0, 7) === mk);
                       return l.length ? { spolu: l.length, bezZdroja: l.filter((x) => !String(x.source || "").trim()).length } : null;

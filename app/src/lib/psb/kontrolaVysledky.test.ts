@@ -72,7 +72,7 @@ describe("vysledkyKontroly", () => {
 
 describe("tržby z dvoch zdrojov", () => {
   const s = (kokpit: number, ptminder: number) =>
-    vysledkyKontroly("peniaze", { ...ZAKLAD, trzby: { kokpit, ptminder } })[0];
+    vysledkyKontroly("peniaze", { ...ZAKLAD, trzby: { kokpit, ptminder, mesiac: "2026-10", platbyOd: "2026-10" } })[0];
 
   it("zhoda do tolerancie je v poriadku a ukáže obe čísla", () => {
     const r = s(324849, 324849);
@@ -107,6 +107,35 @@ describe("tržby z dvoch zdrojov", () => {
   it("bez vstupu sa riadok nekreslí — netvárime sa, že porovnanie prebehlo", () => {
     const bez = vysledkyKontroly("peniaze", { ...ZAKLAD, trzby: null });
     expect(bez.some((x) => x.text.startsWith("Tržby"))).toBe(false);
+  });
+
+  it("mesiac spred súbežného chodu sa NESÚDI — rozdiel je tam zámer", () => {
+    const r = vysledkyKontroly("peniaze", {
+      ...ZAKLAD,
+      trzby: { kokpit: 232967, ptminder: 324849, mesiac: "2026-09", platbyOd: "2026-10" },
+    })[0];
+    expect(r.stav).toBe("nevie");
+    expect(r.text).toContain("2026-10");
+    // Žiadne číslo — porovnanie neprebehlo, tak sa ani netvári.
+    expect(r.kokpit).toBeUndefined();
+  });
+
+  it("od zvoleného mesiaca sa už súdi", () => {
+    const r = vysledkyKontroly("peniaze", {
+      ...ZAKLAD,
+      trzby: { kokpit: 232967, ptminder: 324849, mesiac: "2026-10", platbyOd: "2026-10" },
+    })[0];
+    expect(r.stav).toBe("pozor");
+  });
+});
+
+describe("príjmy z banky bez klienta", () => {
+  it("je to práca, nie rozpor — a vidno, koľko peňazí to je", () => {
+    const r = (pocet: number, suma: number) =>
+      vysledkyKontroly("peniaze", { ...ZAKLAD, prijmyBezKlienta: { pocet, suma } }).find((x) => x.text.includes("Príjmy z banky"));
+    expect(r(0, 0)?.stav).toBe("ok");
+    expect(r(8, 91882)?.stav).toBe("pozor");
+    expect((r(8, 91882)?.kokpit || "").replace(/\s/g, " ")).toBe("91 882 Kč");
   });
 });
 

@@ -45,8 +45,19 @@ export type VstupKontroly = {
   /** Ku ktorému dňu je známy zostatok účtu a hotovosti. */
   stavUctu?: { datum: string } | null;
   stavHotovosti?: { datum: string } | null;
-  /** Tržby uzatváraného mesiaca z dvoch zdrojov. */
-  trzby?: { kokpit: number; ptminder: number } | null;
+  /**
+   * Tržby uzatváraného mesiaca z dvoch zdrojov — a od ktorého mesiaca sa
+   * vôbec SMÚ porovnávať.
+   *
+   * `platbyOd` je to isté nastavenie, ktorým sa riadi karta vlastnej
+   * evidencie: staršie mesiace sa nesúdia, lebo bankové platby sa doplniť
+   * dajú, ale HOTOVOSŤ nie — tá je v zošite a nikto ju rok dozadu
+   * prepisovať nebude. Bez tejto hranice kontrola hlási ako nález to, čo
+   * je zámer, a to je horšie než keby mlčala.
+   */
+  trzby?: { kokpit: number; ptminder: number; mesiac: string; platbyOd?: string } | null;
+  /** Príjmy z banky, ktoré ešte nemajú klienta — to je práca, nie rozpor. */
+  prijmyBezKlienta?: { pocet: number; suma: number } | null;
   /** Dopyty mesiaca — koľko ich je a koľkým chýba zdroj. */
   dopyty?: { spolu: number; bezZdroja: number } | null;
 };
@@ -86,8 +97,15 @@ const najnovsi = (importy: Record<string, string>, druhy: string[]): string | un
  */
 function trzbyRiadok(v: VstupKontroly): VysledokKontroly[] {
   if (!v.trzby) return [];
-  const { kokpit, ptminder } = v.trzby;
+  const { kokpit, ptminder, mesiac, platbyOd } = v.trzby;
   const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
+  // Mesiac spred súbežného chodu sa NESÚDI — rozdiel v ňom je zámer.
+  if (platbyOd && mesiac && mesiac < platbyOd) {
+    return [{
+      text: `Tržby mesiaca sa neporovnávajú — vlastná evidencia beží až od ${platbyOd}`,
+      stav: "nevie",
+    }];
+  }
   if (ptminder <= 0) {
     return [{ text: "Tržby mesiaca", kokpit: kc(kokpit), druhy: "nemá platby", zdroj: "PTminder", stav: "nevie" }];
   }
@@ -109,6 +127,15 @@ export function vysledkyKontroly(id: string, v: VstupKontroly): VysledokKontroly
     case "peniaze":
       return [
         ...trzbyRiadok(v),
+        ...(v.prijmyBezKlienta
+          ? [{
+              text: v.prijmyBezKlienta.pocet === 0
+                ? "Príjmy z banky majú klienta"
+                : `Príjmy z banky bez klienta: ${v.prijmyBezKlienta.pocet}`,
+              kokpit: v.prijmyBezKlienta.pocet ? `${Math.round(v.prijmyBezKlienta.suma).toLocaleString("sk-SK")} Kč` : undefined,
+              stav: (v.prijmyBezKlienta.pocet === 0 ? "ok" : "pozor") as StavVysledku,
+            }]
+          : []),
         v.stavUctu
           ? vek("Stav účtu je k", v.stavUctu.datum, v.dnes, 31)
           : { text: "Stav účtu: appka ho nepozná", stav: "nevie" },

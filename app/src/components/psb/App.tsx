@@ -1161,6 +1161,8 @@ export function PSBApp() {
   const [balickyPorovnanie, setBalickyPorovnanie] = useState<{ spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null>(null);
   // Tretia tretina: platby. Bez nej by Jarvis na „môžeme vypnúť PTminder?"
   // odpovedal z dvoch tretín obrazu.
+  const [prijmyBezKlienta, setPrijmyBezKlienta] = useState<{ datum: string; suma: number }[]>([]);
+  const [platbyOd, setPlatbyOd] = useState("");
   const [platbyPorovnanie, setPlatbyPorovnanie] = useState<{ mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null>(null);
   const [platbyCakaju, setPlatbyCakaju] = useState(0);
   // Zmeny v kalendári si App drží kvôli Jarvisovi. Test 11. 8.: na „kde vidím
@@ -1258,10 +1260,14 @@ export function PSBApp() {
       .catch(() => undefined);
     void fetch("/api/platby", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; porovnanie?: typeof platbyPorovnanie; nepriradene?: unknown[] }) => {
+      .then((j: { ok?: boolean; porovnanie?: typeof platbyPorovnanie; nepriradene?: { datum: string; suma: number; klientsky?: boolean }[]; odMesiaca?: string }) => {
         if (!j.ok) return;
         if (j.porovnanie) setPlatbyPorovnanie(j.porovnanie);
         setPlatbyCakaju((j.nepriradene || []).length);
+        // Mesačná kontrola potrebuje aj DEŇ a SUMU, nielen počet — „8 príjmov
+        // za 91 882 Kč čaká na priradenie" je práca, „8" je číslo bez akcie.
+        setPrijmyBezKlienta((j.nepriradene || []).filter((x) => x.klientsky !== false).map((x) => ({ datum: String(x.datum), suma: Number(x.suma) || 0 })));
+        if (typeof j.odMesiaca === "string") setPlatbyOd(j.odMesiaca);
       })
       .catch(() => undefined);
   }, [dataHotove, penazVerzia]);
@@ -3330,7 +3336,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} stavy={{ ucet: ucetStav, hotovost: hotovostStav }} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} stavy={{ ucet: ucetStav, hotovost: hotovostStav, prijmyBezKlienta, platbyOd }} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
 
         {active === "jarvis" && (
           <JarvisOkno
