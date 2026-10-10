@@ -8,6 +8,8 @@ import { VYPLATY_JERRY, VYPLATY_TEREZKA } from "./fio";
  * bolo spoločné." 10. 10. 2026 pribudlo NÁRADIE — pomôcky na cvičenie
  * (`variabilne.prevadzka2.pomocky`). To je jediná z piatich, ktorá je
  * skutočný náklad PSB; ostatné sú peniaze trénerov alebo domácnosti.
+ * 10. 10. 2026 ešte DOPLNKY (`spolocne.Doplnky`) — vitamíny a aminokyseliny
+ * chodia na Alza faktúrach skoro v každej objednávke.
  * Naostro od 10. 10. 2026.
  *
  * VÝPLATA SÚ DVE TLAČIDLÁ S MENAMI, nie prepínač. Prvá verzia mala jedno
@@ -28,5 +30,6 @@ export const rychleVolby = (): { kat: string; text: string }[] => [
   { kat: VYPLATY_TEREZKA, text: "Terezka" },
   { kat: "spolocne.Ahsoka", text: "Ahsoka" },
   { kat: "spolocne.Domácnosť", text: "domácnosť" },
+  { kat: "spolocne.Doplnky", text: "doplnky" },
   { kat: NARADIE, text: "náradie" },
 ];

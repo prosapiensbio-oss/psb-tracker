@@ -12,9 +12,20 @@ describe("rychleVolby", () => {
     expect(v.map((x) => x.text)).not.toContain("výplata");
   });
 
-  it("dáva päť skratiek", () => {
-    expect(rychleVolby()).toHaveLength(5);
+  it("dáva šesť skratiek", () => {
+    expect(rychleVolby()).toHaveLength(6);
     expect(rychleVolby().map((x) => x.kat)).toContain(NARADIE);
+    expect(rychleVolby().map((x) => x.kat)).toContain("spolocne.Doplnky");
+  });
+
+  it("spoločné kategórie existujú aj vo VZAS", async () => {
+    // Skratka, ktorá ukazuje do neexistujúcej kategórie, by ticho zapísala
+    // položku tam, kde ju žiadna obrazovka nenájde.
+    const { SPOLOCNE } = (await import("./vzas")) as { SPOLOCNE: Record<string, unknown> };
+    for (const v of rychleVolby()) {
+      if (!v.kat.startsWith("spolocne.")) continue;
+      expect(Object.keys(SPOLOCNE)).toContain(v.kat.slice("spolocne.".length));
+    }
   });
 
   it("náradie je náklad PSB, nie peniaze trénera", () => {
