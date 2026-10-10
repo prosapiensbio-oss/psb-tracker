@@ -167,15 +167,18 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
   };
 
   /** Doklad je vybavený — zmizne z uzávierky, vrátiť sa dá zo zbaleného zoznamu. */
-  const potvrdDoklad = async (cislo: string, potvrdit: boolean) => {
-    setUklada(cislo); setChyba("");
+  const potvrdDoklady = async (cisla: string[], potvrdit: boolean) => {
+    if (!cisla.length) return;
+    setUklada(cisla[0]); setChyba("");
     const j = await fetch("/api/faktury", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: potvrdit ? "potvrd" : "vrat", faktura: cislo }),
+      body: JSON.stringify({ akcia: potvrdit ? "potvrd" : "vrat", faktury: cisla }),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
     setUklada("");
     if (!j?.ok) { setChyba(j?.error || "Neuložilo sa."); return; }
-    setPolozky((x) => (x || []).map((q) => (q.faktura === cislo ? { ...q, potvrdene: (j.potvrdene as string | null) ?? null } : q)));
+    const kedy = (j.potvrdene as string | null) ?? null;
+    const dotknute = new Set(cisla);
+    setPolozky((x) => (x || []).map((q) => (dotknute.has(q.faktura) ? { ...q, potvrdene: kedy } : q)));
     oznam("peniaze");
   };
 
@@ -259,7 +262,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
                 : "Hotovo — všetky doklady sú vybavené."}
             </div>
           )}
-          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} onPotvrd={(c, p) => void potvrdDoklad(c, p)} />
+          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} onPotvrd={(c, p) => void potvrdDoklady(c, p)} />
         </div>
       )}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}

@@ -44,8 +44,8 @@ export function FakturyUctenka({
   uklada: string;
   onKategoria: (p: PolozkaDokladu, kategoria: string) => void;
   onZmaz: (ids: string[]) => void;
-  /** Doklad je vybavený (alebo sa vracia späť do práce). */
-  onPotvrd: (cislo: string, potvrdit: boolean) => void;
+  /** Doklady sú vybavené (alebo sa vracajú späť do práce). */
+  onPotvrd: (cisla: string[], potvrdit: boolean) => void;
 }) {
   const [rozbalene, setRozbalene] = useState<Set<string>>(new Set());
   const volby = rychleVolby();
@@ -82,8 +82,25 @@ export function FakturyUctenka({
     </button>
   );
 
+  // Koľko tovaru ešte nemá kategóriu — tlačidlo to povie, ale nebráni tomu.
+  // Potvrdenie je Jerryho „mám to vybavené", nie kontrola úplnosti.
+  const bezKategorie = zive.reduce((a, d) => a + rozdelDoklad(d.polozky).tovar.filter((p) => !p.kategoria).length, 0);
+
   return (
     <div style={{ display: "grid", gap: 10 }}>
+      {zive.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => onPotvrd(zive.map((d) => d.cislo), true)} disabled={!!uklada}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: C.green, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Potvrdiť všetkých {zive.length} {zive.length < 5 ? "doklady" : "dokladov"}
+          </button>
+          {bezKategorie > 0 && (
+            <span style={{ fontSize: 11.5, color: C.orange }}>
+              {bezKategorie} {bezKategorie === 1 ? "vec je" : "vecí je"} ešte bez kategórie
+            </span>
+          )}
+        </div>
+      )}
       {zive.map((d) => {
         const r = rozdelDoklad(d.polozky);
         const otvorene = rozbalene.has(d.cislo);
@@ -98,7 +115,7 @@ export function FakturyUctenka({
                   ? `${d.sparovana ? "✓ spárovaná" : "₿ zrejme"} · platba ${fmtDMY(d.platba.platba.datum)} ${fmtCZK(Math.round(d.platba.platba.czk))}${d.platba.isto ? "" : " (viac platieb sedí)"}`
                   : d.sparovana ? "✓ spárovaná s platbou bitcoinom" : "bez platby bitcoinom — z účtu alebo kartou"}
               </span>
-              <button onClick={() => onPotvrd(d.cislo, true)} disabled={!!uklada}
+              <button onClick={() => onPotvrd([d.cislo], true)} disabled={!!uklada}
                 style={{ padding: "3px 11px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.green}`, background: "transparent", color: C.green }}>
                 Potvrdiť
               </button>
@@ -160,11 +177,17 @@ export function FakturyUctenka({
             style={{ border: "none", background: "transparent", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
             {vybaveneOtvorene ? "▾" : "▸"} vybavené · {vybavene.length} {vybavene.length === 1 ? "doklad" : vybavene.length < 5 ? "doklady" : "dokladov"} · {fmtCZK(vybavene.reduce((a, d) => a + d.celkom, 0))}
           </button>
+          {vybaveneOtvorene && vybavene.length > 1 && (
+            <button onClick={() => onPotvrd(vybavene.map((d) => d.cislo), false)} disabled={!!uklada}
+              style={{ border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11, borderRadius: 10, padding: "2px 9px", cursor: "pointer", fontFamily: "inherit", marginLeft: 14, marginTop: 4 }}>
+              vrátiť všetky
+            </button>
+          )}
           {vybaveneOtvorene && vybavene.map((d) => (
             <div key={d.cislo} style={{ display: "flex", gap: 8, alignItems: "center", padding: "3px 0 3px 14px", fontSize: 11.5, color: C.textDim }}>
               <span style={{ flex: 1, minWidth: 0 }}>{fmtDMY(d.datum)} · {d.dodavatel || "faktúra"} · {d.cislo}</span>
               <span style={{ minWidth: 70, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(d.celkom)}</span>
-              <button onClick={() => onPotvrd(d.cislo, false)} disabled={!!uklada}
+              <button onClick={() => onPotvrd([d.cislo], false)} disabled={!!uklada}
                 style={{ border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11, borderRadius: 10, padding: "2px 9px", cursor: "pointer", fontFamily: "inherit" }}>
                 vrátiť
               </button>
