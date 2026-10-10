@@ -25,11 +25,20 @@ import { Card, H3, Info, TableWrap } from "./ui";
 // deväťdesiat rozbaľovačiek a väčšina z nich patrí do tej istej kategórie.
 
 export function FakturyNahlad({
-  faktury, onZmena, onHotovo, btcPlatby, uzZapisane,
+  faktury, onZmena, onHotovo, onZahod, btcPlatby, uzZapisane,
 }: {
   faktury: Faktura[];
   onZmena: (i: number, f: Faktura) => void;
   onHotovo: () => void;
+  /**
+   * ZAHODIŤ NAHRATÉ, BEZ ZÁPISU.
+   *
+   * Jerry, 10. 10. 2026: „nechal zmazať, ale aj tak tam ostali." Zmazané boli
+   * — z databázy. Na obrazovke zostal jeho vlastný nepotvrdený rozpis, ktorý
+   * drží prehliadač, aby sa rozrobená práca nestratila. Keď sa raz schválne
+   * odkladá, musí sa dať aj schválne zahodiť.
+   */
+  onZahod?: () => void;
   /** Výbery z bitcoinovej peňaženky — na zobrazenie, čím sa doklad zaplatil. */
   btcPlatby?: PlatbaBtc[];
   /**
@@ -144,10 +153,18 @@ export function FakturyNahlad({
             text="Rozpis dokladu na jednotlivé veci, aby sa dala každá zaradiť zvlášť. Opraviť sa dá názov aj suma — parser číta dobre, ale nie neomylne. Čo zaradíš, appka si zapamätá podľa prvých troch slov názvu, takže ďalšie granule sa zaradia samy."
           />
         </H3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {onZahod && (
+          <button onClick={() => { if (confirm(`Zahodiť ${naZapis.length} nahratých dokladov bez zápisu?`)) onZahod(); }} disabled={busy}
+            style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+            Zahodiť
+          </button>
+        )}
         <button onClick={() => void zapis()} disabled={busy || !polozekSpolu}
           style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: polozekSpolu ? C.accent : C.border, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: polozekSpolu ? "pointer" : "default" }}>
           Zapísať {polozekSpolu} položiek
         </button>
+        </div>
       </div>
       <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 12 }}>
         Spolu <b style={{ color: C.orange }}>{fmtCZK(spolu)}</b>

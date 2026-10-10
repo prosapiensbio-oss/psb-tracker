@@ -103,6 +103,21 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
   }, [mesiac]);
   useEffect(() => { nacitaj(); return pocuvaj("peniaze", nacitaj); }, [nacitaj]);
 
+  /**
+   * ČO UŽ JE ZAPÍSANÉ, PRESTANE ČAKAŤ.
+   *
+   * Odložený rozpis je poistka proti strate práce, nie druhá kópia databázy.
+   * Keď sa doklad medzitým zapíše — tu, v inom okne alebo priamo v dátach —
+   * nemá čo visieť v čakárni; triedi sa dole v zozname mesiaca. Bez tohto
+   * zostal Jerrymu na obrazovke doklad, ktorý z databázy dávno zmizol aj
+   * znovu pribudol, a vyzeralo to ako nespravená práca.
+   */
+  useEffect(() => {
+    if (!polozky?.length || !nove.length) return;
+    const zapisane = new Set(polozky.map((p) => p.faktura));
+    setNove((p) => (p.some((f) => zapisane.has(f.cislo)) ? p.filter((f) => !zapisane.has(f.cislo)) : p));
+  }, [polozky, nove.length]);
+
   /** Prečítanie PDF v prehliadači — tá istá cesta ako v Upload. */
   const nahraj = async (subory: File[]) => {
     const fa: Faktura[] = [];
@@ -181,7 +196,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       {chyby.length > 0 && <div style={{ fontSize: 12, color: C.orange, marginTop: 6 }}>{chyby.join(" · ")}</div>}
       {nove.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <FakturyNahlad faktury={nove} uzZapisane={new Set((polozky || []).map((p) => p.faktura))} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} />
+          <FakturyNahlad faktury={nove} uzZapisane={new Set((polozky || []).map((p) => p.faktura))} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} onZahod={() => { setNove([]); setChyby([]); }} />
         </div>
       )}
 
