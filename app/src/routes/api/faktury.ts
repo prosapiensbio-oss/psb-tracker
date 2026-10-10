@@ -10,6 +10,9 @@ import { bindings } from "../../lib/bindings.server";
 //   POST { polozky }           → zapíše potvrdený rozpis a naučí sa pravidlá
 //   POST { akcia: "kategoria", id, kategoria } → zmení kategóriu uloženej
 //                                položky (krok Alza v uzávierke, 9. 10. 2026)
+//   POST { akcia: "potvrd", faktura } | { akcia: "vrat", faktura }
+//                              → doklad je vybavený a zmizne z uzávierky
+//                                (alebo sa vráti späť), 10. 10. 2026
 //   POST { akcia: "zmaz", id } | { akcia: "zmaz", ids }
 //                              → zmaže položku (alebo zbalenú skupinu dopravy
 //                                a zliav naraz), 10. 10. 2026
@@ -33,13 +36,13 @@ export const Route = createFileRoute("/api/faktury")({
         if (!DB) return Response.json({ ok: false, polozky: [] });
         try {
           const rs = await DB.prepare(
-            "SELECT id, faktura, dodavatel, date, nazov, kod, ks, cena_czk, category FROM faktura_polozky ORDER BY date DESC, faktura LIMIT 800",
+            "SELECT id, faktura, dodavatel, date, nazov, kod, ks, cena_czk, category, potvrdene_at FROM faktura_polozky ORDER BY date DESC, faktura LIMIT 800",
           ).all();
           return Response.json({
             ok: true,
             polozky: (rs.results as Record<string, unknown>[]).map((r) => ({
               id: r.id, faktura: r.faktura, dodavatel: r.dodavatel, datum: r.date, nazov: r.nazov,
-              kod: r.kod, ks: r.ks, cena: r.cena_czk, kategoria: r.category,
+              kod: r.kod, ks: r.ks, cena: r.cena_czk, kategoria: r.category, potvrdene: r.potvrdene_at || null,
             })),
           });
         } catch {
@@ -51,7 +54,7 @@ export const Route = createFileRoute("/api/faktury")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { polozky?: Vstup[]; akcia?: string; id?: string; ids?: string[]; kategoria?: string };
+        let b: { polozky?: Vstup[]; akcia?: string; id?: string; ids?: string[]; kategoria?: string; faktura?: string };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -69,6 +72,36 @@ export const Route = createFileRoute("/api/faktury")({
           await DB.prepare("UPDATE faktura_polozky SET category = ?2 WHERE id = ?1").bind(id, kategoria).run();
           await audit(DB, { action: "faktura-kategoria", predmet: `${pred.faktura} · ${pred.nazov}`.slice(0, 200), month: String(pred.date || "").slice(0, 7), old: pred.category, neu: kategoria, actor: (await currentUser(request)) || undefined });
           return Response.json({ ok: true });
+        }
+
+        /**
+         * DOKLAD JE VYBAVENÝ (alebo sa vracia späť do práce).
+         *
+         * Jerry, 10. 10. 2026: „chcem mať potvrdenie a tým, že to potvrdím,
+         * sa to zapíše a schová, aby som mal uzávierku pekne čistú."
+         *
+         * Kategórie sa zapisujú hneď pri kliku a tak to zostáva — potvrdenie
+         * nie je o zápise, je o tom, že doklad už nemá zaberať miesto. Preto
+         * sa nekontroluje, či má všetko kategóriu: to je Jerryho rozhodnutie,
+         * nie podmienka. Vrátiť sa dá kedykoľvek.
+         */
+        if (b.akcia === "potvrd" || b.akcia === "vrat") {
+          const faktura = String(b.faktura || "");
+          if (!faktura) return Response.json({ ok: false, error: "Chýba doklad." }, { status: 400 });
+          const prvy = await DB.prepare("SELECT date FROM faktura_polozky WHERE faktura = ?1 LIMIT 1").bind(faktura).first<{ date: string }>();
+          if (!prvy) return Response.json({ ok: false, error: "Doklad neexistuje." }, { status: 404 });
+          const mesiac = String(prvy.date || "").slice(0, 7);
+          const zamok = await DB.prepare("SELECT locked FROM vzas_periods WHERE month = ?1").bind(mesiac).first<{ locked: number }>().catch(() => null);
+          if (zamok?.locked) return Response.json({ ok: false, error: "Mesiac je uzamknutý — najprv ho odomkni." }, { status: 409 });
+          const kto = (await currentUser(request)) || null;
+          const kedy = b.akcia === "potvrd" ? new Date().toISOString() : null;
+          await DB.prepare("UPDATE faktura_polozky SET potvrdene_at = ?2, potvrdil = ?3 WHERE faktura = ?1")
+            .bind(faktura, kedy, kedy ? kto : null).run();
+          await audit(DB, {
+            action: b.akcia === "potvrd" ? "faktura-potvrdena" : "faktura-vratena",
+            month: mesiac, neu: faktura, actor: kto || undefined,
+          });
+          return Response.json({ ok: true, potvrdene: kedy });
         }
 
         /**

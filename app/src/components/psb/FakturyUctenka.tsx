@@ -32,19 +32,35 @@ export type DokladUctenky = {
   polozky: PolozkaDokladu[];
   sparovana: boolean;
   platba?: { platba: { datum: string; czk: number }; isto: boolean } | null;
+  /** Kedy ho Jerry označil za vybavený — potom sa v uzávierke nekreslí. */
+  potvrdene?: string | null;
 };
 
 export function FakturyUctenka({
-  doklady, uklada, onKategoria, onZmaz,
+  doklady, uklada, onKategoria, onZmaz, onPotvrd,
 }: {
   doklady: DokladUctenky[];
   /** id položky, ktorá sa práve ukladá — tlačidlá sa na ten čas zamknú. */
   uklada: string;
   onKategoria: (p: PolozkaDokladu, kategoria: string) => void;
   onZmaz: (ids: string[]) => void;
+  /** Doklad je vybavený (alebo sa vracia späť do práce). */
+  onPotvrd: (cislo: string, potvrdit: boolean) => void;
 }) {
   const [rozbalene, setRozbalene] = useState<Set<string>>(new Set());
   const volby = rychleVolby();
+  /**
+   * VYBAVENÉ DOKLADY SA NEKRESLIA (Jerry, 10. 10. 2026: „tým, že to potvrdím,
+   * sa to zapíše a schová, aby som mal uzávierku pekne čistú — podobne ako
+   * zápisy z účtu").
+   *
+   * Zoznam sa nezahadzuje: zbalí sa do jedného riadku s počtom. Prázdna
+   * obrazovka po vybavení tvrdí, že práca neexistuje — to isté pravidlo ako
+   * pri odporúčaniach a pri registri.
+   */
+  const [vybaveneOtvorene, setVybaveneOtvorene] = useState(false);
+  const zive = doklady.filter((d) => !d.potvrdene);
+  const vybavene = doklady.filter((d) => d.potvrdene);
   const prepni = (cislo: string) =>
     setRozbalene((p) => {
       const n = new Set(p);
@@ -68,7 +84,7 @@ export function FakturyUctenka({
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      {doklady.map((d) => {
+      {zive.map((d) => {
         const r = rozdelDoklad(d.polozky);
         const otvorene = rozbalene.has(d.cislo);
         return (
@@ -82,6 +98,10 @@ export function FakturyUctenka({
                   ? `${d.sparovana ? "✓ spárovaná" : "₿ zrejme"} · platba ${fmtDMY(d.platba.platba.datum)} ${fmtCZK(Math.round(d.platba.platba.czk))}${d.platba.isto ? "" : " (viac platieb sedí)"}`
                   : d.sparovana ? "✓ spárovaná s platbou bitcoinom" : "bez platby bitcoinom — z účtu alebo kartou"}
               </span>
+              <button onClick={() => onPotvrd(d.cislo, true)} disabled={!!uklada}
+                style={{ padding: "3px 11px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.green}`, background: "transparent", color: C.green }}>
+                Potvrdiť
+              </button>
             </div>
 
             {r.tovar.map((p) => (
@@ -133,6 +153,25 @@ export function FakturyUctenka({
           </div>
         );
       })}
+
+      {vybavene.length > 0 && (
+        <div style={{ borderTop: `1px solid ${mix(C.border, 45)}`, paddingTop: 8 }}>
+          <button onClick={() => setVybaveneOtvorene((x) => !x)}
+            style={{ border: "none", background: "transparent", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+            {vybaveneOtvorene ? "▾" : "▸"} vybavené · {vybavene.length} {vybavene.length === 1 ? "doklad" : vybavene.length < 5 ? "doklady" : "dokladov"} · {fmtCZK(vybavene.reduce((a, d) => a + d.celkom, 0))}
+          </button>
+          {vybaveneOtvorene && vybavene.map((d) => (
+            <div key={d.cislo} style={{ display: "flex", gap: 8, alignItems: "center", padding: "3px 0 3px 14px", fontSize: 11.5, color: C.textDim }}>
+              <span style={{ flex: 1, minWidth: 0 }}>{fmtDMY(d.datum)} · {d.dodavatel || "faktúra"} · {d.cislo}</span>
+              <span style={{ minWidth: 70, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(d.celkom)}</span>
+              <button onClick={() => onPotvrd(d.cislo, false)} disabled={!!uklada}
+                style={{ border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11, borderRadius: 10, padding: "2px 9px", cursor: "pointer", fontFamily: "inherit" }}>
+                vrátiť
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

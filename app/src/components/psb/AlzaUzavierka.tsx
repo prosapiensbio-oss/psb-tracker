@@ -27,7 +27,7 @@ import { FakturyUctenka } from "./FakturyUctenka";
  * Párovanie robí App (automat podľa dňa a sumy + ručné páry); po zápise sa
  * cez signál „peniaze" prepočíta a tento krok to uvidí.
  */
-type Polozka = { id: string; faktura: string; dodavatel: string; datum: string; nazov: string; ks: number; cena: number; kategoria: string };
+type Polozka = { id: string; faktura: string; dodavatel: string; datum: string; nazov: string; ks: number; cena: number; kategoria: string; potvrdene?: string | null };
 type BtcUzavierky = {
   platby: BtcNakup[];
   faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[];
@@ -166,11 +166,24 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
     oznam("peniaze");
   };
 
+  /** Doklad je vybavený — zmizne z uzávierky, vrátiť sa dá zo zbaleného zoznamu. */
+  const potvrdDoklad = async (cislo: string, potvrdit: boolean) => {
+    setUklada(cislo); setChyba("");
+    const j = await fetch("/api/faktury", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: potvrdit ? "potvrd" : "vrat", faktura: cislo }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setUklada("");
+    if (!j?.ok) { setChyba(j?.error || "Neuložilo sa."); return; }
+    setPolozky((x) => (x || []).map((q) => (q.faktura === cislo ? { ...q, potvrdene: (j.potvrdene as string | null) ?? null } : q)));
+    oznam("peniaze");
+  };
+
   // Faktúry mesiaca po dokladoch, s tým, či ich drží platba bitcoinom.
   const doklady = useMemo(() => {
-    const m = new Map<string, { cislo: string; datum: string; dodavatel: string; polozky: Polozka[] }>();
+    const m = new Map<string, { cislo: string; datum: string; dodavatel: string; potvrdene: string | null; polozky: Polozka[] }>();
     for (const p of polozky || []) {
-      const d = m.get(p.faktura) || { cislo: p.faktura, datum: p.datum, dodavatel: p.dodavatel, polozky: [] };
+      const d = m.get(p.faktura) || { cislo: p.faktura, datum: p.datum, dodavatel: p.dodavatel, potvrdene: p.potvrdene || null, polozky: [] };
       d.polozky.push(p);
       m.set(p.faktura, d);
     }
@@ -191,7 +204,8 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       })
       .sort((a, b) => a.datum.localeCompare(b.datum));
   }, [polozky, btc]);
-  const nezaradeneTovar = (polozky || []).filter((p) => !p.kategoria && !jeNehmotny(p.nazov)).length;
+  const nezaradeneTovar = (polozky || []).filter((p) => !p.kategoria && !jeNehmotny(p.nazov) && !p.potvrdene).length;
+  const nevybavene = new Set((polozky || []).filter((p) => !p.potvrdene).map((p) => p.faktura)).size;
   const platbyMesiaca = useMemo(() => (btc?.platby || []).filter((p) => String(p.datum).slice(0, 7) === mesiac), [btc, mesiac]);
 
   const nadpis = (n: string, t: string) => (
@@ -239,9 +253,13 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
               <span style={{ color: C.textDim }}> Zapisuje sa hneď pri kliku, potvrdzovať netreba.</span>
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: C.green }}>Všetko zaradené a zapísané — potvrdzovať netreba.</div>
+            <div style={{ fontSize: 12, color: nevybavene ? C.textMuted : C.green }}>
+              {nevybavene
+                ? `Všetko zaradené — ${nevybavene} ${nevybavene === 1 ? "doklad čaká" : nevybavene < 5 ? "doklady čakajú" : "dokladov čaká"} na potvrdenie.`
+                : "Hotovo — všetky doklady sú vybavené."}
+            </div>
           )}
-          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} />
+          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} onPotvrd={(c, p) => void potvrdDoklad(c, p)} />
         </div>
       )}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}

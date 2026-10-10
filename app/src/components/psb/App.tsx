@@ -1077,6 +1077,8 @@ export function PSBApp() {
   const [fakturyNezaradene, setFakturyNezaradene] = useState<Record<string, number>>({});
   /** Koľko dokladov má mesiac — „nič za mesiac" a „všetko vybavené" nie je to isté. */
   const [fakturyMesiaca, setFakturyMesiaca] = useState<Record<string, number>>({});
+  /** Doklady, ktoré Jerry ešte neoznačil za vybavené (krok Alza). */
+  const [fakturyNepotvrdene, setFakturyNepotvrdene] = useState<Record<string, number>>({});
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
@@ -1502,7 +1504,7 @@ function skupinaFaktur(
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
         // pohyb do P&L nezapočíta a namiesto neho idú položky faktúry.
-        type FaPol = { faktura: string; dodavatel: string; datum: string; cena: number; kategoria: string; nazov?: string };
+        type FaPol = { faktura: string; dodavatel: string; datum: string; cena: number; kategoria: string; nazov?: string; potvrdene?: string | null };
         const fa: FaPol[] = await fetch("/api/faktury", { credentials: "same-origin" })
           .then((r) => r.json())
           .then((x: { polozky?: FaPol[] }) => x.polozky || [])
@@ -1511,16 +1513,20 @@ function skupinaFaktur(
         {
           const nez: Record<string, number> = {};
           const poMesiacoch: Record<string, Set<string>> = {};
+          const caka: Record<string, Set<string>> = {};
           for (const p of fa) {
             const m = String(p.datum).slice(0, 7);
             // Doprava a zľavy („Nehmotný produkt …") sa v kroku Alza zbalia
             // a kategóriu nikdy nedostanú — keby sa počítali, číslo by sa
             // nikdy nedostalo na nulu a krok uzávierky by sa nedal zavrieť.
-            if (!p.kategoria && !jeNehmotny(p.nazov || "")) nez[m] = (nez[m] || 0) + 1;
+            // Vybavený doklad sa nepočíta vôbec — je uzavretý.
+            if (!p.kategoria && !jeNehmotny(p.nazov || "") && !p.potvrdene) nez[m] = (nez[m] || 0) + 1;
             (poMesiacoch[m] ||= new Set()).add(p.faktura);
+            if (!p.potvrdene) (caka[m] ||= new Set()).add(p.faktura);
           }
           setFakturyNezaradene(nez);
           setFakturyMesiaca(Object.fromEntries(Object.entries(poMesiacoch).map(([m, v]) => [m, v.size])));
+          setFakturyNepotvrdene(Object.fromEntries(Object.entries(caka).map(([m, v]) => [m, v.size])));
         }
         for (const p of fa) {
           const e = doklady.get(p.faktura) || { datum: p.datum, celkom: 0, polozky: [] as FaPol[] };
@@ -2427,6 +2433,7 @@ function skupinaFaktur(
               return x && x.mesiac === mk && Array.isArray(x.faktury) ? x.faktury.length : 0;
             } catch { return 0; }
           })();
+          const nepotvrdenych = fakturyNepotvrdene[mk] || 0;
           const knihaChyba = btcNenacitane || Object.keys(btcNakupy).length === 0;
           const platiebVMesiaci = (btcNakupy[mk] || []).length;
           const nic = platiebVMesiaci === 0 && !fakturyMesiaca[mk];
@@ -2434,13 +2441,16 @@ function skupinaFaktur(
             caka ? `${caka} ${caka === 1 ? "faktúra čaká" : caka < 5 ? "faktúry čakajú" : "faktúr čaká"} na potvrdenie` : "",
             bez ? `${bez} ${bez === 1 ? "platba" : bez < 5 ? "platby" : "platieb"} bitcoinom bez faktúry` : "",
             nez ? `${nez} ${nez === 1 ? "položka" : nez < 5 ? "položky" : "položiek"} bez kategórie` : "",
+            // Potvrdenie je Jerryho „mám to vybavené" — bez neho krok nie je
+            // hotový, aj keby všetko malo kategóriu.
+            !nez && nepotvrdenych ? `${nepotvrdenych} ${nepotvrdenych === 1 ? "doklad čaká" : nepotvrdenych < 5 ? "doklady čakajú" : "dokladov čaká"} na potvrdenie` : "",
             knihaChyba ? "bitcoinová kniha sa nenačítala — neviem to posúdiť" : "",
           ].filter(Boolean);
           return {
             hotovo: problemy.length === 0 && !nic,
             detail: problemy.length ? problemy.join(" · ")
               : nic ? "za tento mesiac nie je faktúra ani platba bitcoinom"
-                : "faktúry spárované a rozdelené",
+                : "faktúry spárované, rozdelené a vybavené",
           };
         })(),
       },
@@ -2528,7 +2538,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, btcNakupy, btcNenacitane]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.

@@ -55,6 +55,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
 } = {}) {
   const [pohyby, setPohyby] = useState<Pohyb[]>([]);
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
+  const [pravidlaOtvorene, setPravidlaOtvorene] = useState(false);
   const [nacitane, setNacitane] = useState(false);
   const [otvorene, setOtvorene] = useState(false);
   const [oznacene, setOznacene] = useState<Set<string>>(new Set());
@@ -522,11 +523,21 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
             </div>
           )}
 
-          {/* Naučené pravidlá. Zle zaradené pravidlo sa tichým opakovaním
-              zavlečie do každého ďalšieho mesiaca, takže musí byť vidieť. */}
+          {/* Naučené pravidlá — ZBALENÉ (Jerry, 10. 10. 2026: „môžeš dať tie
+              naučené pravidlá schovať do zabaľovacieho okna").
+
+              Musia byť dostupné, lebo zle zaradené pravidlo sa tichým
+              opakovaním zavlečie do každého ďalšieho mesiaca. Ale sú to
+              desiatky štítkov pod prácou, ktorá sa práve robí — a človek ich
+              otvára len vtedy, keď niečo hľadá. Počet v nadpise stačí na to,
+              aby sa nezabudlo, že existujú. */}
           <div style={{ marginTop: 18 }}>
-            <H3><Info label={`Naučené pravidlá (${pravidla.length})`} text="Čo si appka zapamätala z tvojho zaraďovania. Nasledujúci import ich použije automaticky. Zlé pravidlo prepíšeš tak, že ten istý text zaradíš inam — posledné zaradenie vyhráva." /></H3>
-            {pravidla.length ? (
+            <button onClick={() => setPravidlaOtvorene((x) => !x)}
+              style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: C.textDim, fontSize: 12 }}>{pravidlaOtvorene ? "▾" : "▸"}</span>
+              <H3><Info label={`Naučené pravidlá (${pravidla.length})`} text="Čo si appka zapamätala z tvojho zaraďovania. Nasledujúci import ich použije automaticky. Zlé pravidlo prepíšeš tak, že ten istý text zaradíš inam — posledné zaradenie vyhráva." /></H3>
+            </button>
+            {!pravidlaOtvorene ? null : pravidla.length ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
                 {pravidla.map((r, i) => (
                   <span key={i} style={{ fontSize: 11, color: C.textMuted, background: C.track, borderRadius: 12, padding: "3px 10px" }}>
