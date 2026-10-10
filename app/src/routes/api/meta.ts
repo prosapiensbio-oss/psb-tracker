@@ -7,10 +7,10 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { bindings } from "../../lib/bindings.server";
 import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
-import { MIN_DENNE_KC, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
+import { MIN_DENNE_KC, POPIS_DORUCOVANIA, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
 /**
  * Meta Graph API — reklama a Instagram.
@@ -148,6 +148,83 @@ async function graph(cesta: string, token: string): Promise<{ ok: boolean; data?
     zapisVolanie(false);
     return { ok: false, chyba: `spojenie zlyhalo: ${String(e).slice(0, 200)}` };
   }
+}
+
+/**
+ * Prepne kampaň aj s jej sadami a reklamami (spustenie s kontrolórom).
+ *
+ * Kampaň ide ako POSLEDNÁ: keby prepínanie spadlo v strede, zostane vypnutá
+ * strecha nad polozapnutými poschodiami — nič sa neminie. Pol zapnutá kampaň
+ * („Ad set off") bola presne pasca, do ktorej Jerry spadol v Ads Manageri.
+ */
+async function prepniKampan(
+  token: string,
+  kampanId: string,
+  cielovyStav: "ACTIVE" | "PAUSED",
+): Promise<{ ok: true; nazov: string; objektov: number } | { ok: false; status: number; error?: string; kontrola?: string[] }> {
+  const [k, sadyR, reklamyR] = await Promise.all([
+    graph(`${kampanId}?fields=name,account_id,daily_budget,lifetime_budget,stop_time`, token),
+    graph(`${kampanId}/adsets?fields=id,daily_budget,lifetime_budget,end_time&limit=25`, token),
+    graph(`${kampanId}/ads?fields=id,effective_status,creative&limit=25`, token),
+  ]);
+  if (!k.ok) return { ok: false, status: 502, error: k.chyba };
+  const kd = k.data as { name?: string; account_id?: string; daily_budget?: string; lifetime_budget?: string; stop_time?: string };
+  const sd = ((sadyR.data as { data?: { id: string; daily_budget?: string; lifetime_budget?: string; end_time?: string }[] })?.data) || [];
+  const rd = ((reklamyR.data as { data?: { id: string; effective_status?: string; creative?: { id?: string } }[] })?.data) || [];
+  const cislo = (x?: string) => (x ? Number(x) : null);
+  if (cielovyStav === "ACTIVE") {
+    const stavPred: StavKampanePredSpustenim = {
+      kampan: { id: kampanId, accountId: String(kd.account_id || ""), dailyBudget: cislo(kd.daily_budget), lifetimeBudget: cislo(kd.lifetime_budget), stopTime: kd.stop_time || null },
+      sady: sd.map((x) => ({ id: x.id, dailyBudget: cislo(x.daily_budget), lifetimeBudget: cislo(x.lifetime_budget), endTime: x.end_time || null })),
+      reklamy: rd.map((x) => ({ id: x.id, efektivnyStav: x.effective_status || null, maKreativu: !!x.creative?.id })),
+    };
+    const chyby = skontrolujPredSpustenim(stavPred);
+    if (chyby.length) return { ok: false, status: 409, kontrola: chyby };
+  }
+  const objekty = [...rd.map((x) => x.id), ...sd.map((x) => x.id), kampanId];
+  for (const o of objekty) {
+    const r = await graphPost(o, { status: cielovyStav }, token);
+    if (!r.ok) return { ok: false, status: 502, error: `Prepnutie ${o} neprešlo: ${r.chyba}` };
+  }
+  return { ok: true, nazov: kd.name || "", objektov: objekty.length };
+}
+
+/** Nový stav kampane do vlastných tabuliek — inak by obrazovka do rána tvrdila starý. */
+async function zapisStavKampane(DB: D1Database, kampanId: string, stav: "ACTIVE" | "PAUSED"): Promise<void> {
+  await DB.prepare("UPDATE mkt_kampane SET stav = ?2, stav_sad = ?3, updated_at = ?4 WHERE id = ?1")
+    .bind(kampanId, stav, stav === "ACTIVE" ? "bezi" : "pozastavena", new Date().toISOString())
+    .run()
+    .catch(() => undefined);
+}
+
+/**
+ * Zmena denného rozpočtu (dozor reklám, 10. 10. 2026).
+ *
+ * Rozpočet je buď na kampani (CBO), alebo na sadách. Pri sadách sa nový
+ * súčet rozdelí v pomere doterajších rozpočtov bežiacich sád — žiadna nesmie
+ * spadnúť pod minimum Mety.
+ */
+async function zmenRozpocet(token: string, kampanId: string, novyKc: number): Promise<{ ok: true; stary: number; objektov: number } | { ok: false; error: string }> {
+  const [k, sadyR] = await Promise.all([
+    graph(`${kampanId}?fields=daily_budget`, token),
+    graph(`${kampanId}/adsets?fields=id,daily_budget,effective_status&limit=50`, token),
+  ]);
+  if (!k.ok) return { ok: false, error: k.chyba || "Kampaň sa nedala načítať." };
+  const kb = Number((k.data as { daily_budget?: string }).daily_budget) || 0;
+  if (kb > 0) {
+    const r = await graphPost(kampanId, { daily_budget: novyKc * 100 }, token);
+    return r.ok ? { ok: true, stary: kb / 100, objektov: 1 } : { ok: false, error: r.chyba || "Zmena neprešla." };
+  }
+  const sady = (((sadyR.data as { data?: { id: string; daily_budget?: string; effective_status?: string }[] })?.data) || [])
+    .filter((x) => Number(x.daily_budget) > 0 && (x.effective_status || "").toUpperCase() === "ACTIVE");
+  if (!sady.length) return { ok: false, error: "Kampaň nemá denný rozpočet ani v kampani, ani v bežiacich sadách — zmeň ho v Ads Manageri." };
+  const sucet = sady.reduce((s, x) => s + Number(x.daily_budget), 0) / 100;
+  for (const x of sady) {
+    const nova = Math.max(MIN_DENNE_KC, Math.round((novyKc * (Number(x.daily_budget) / 100)) / sucet));
+    const r = await graphPost(x.id, { daily_budget: nova * 100 }, token);
+    if (!r.ok) return { ok: false, error: `Sada ${x.id}: ${r.chyba}` };
+  }
+  return { ok: true, stary: sucet, objektov: sady.length };
 }
 
 export const Route = createFileRoute("/api/meta")({
@@ -945,40 +1022,17 @@ export const Route = createFileRoute("/api/meta")({
            *
            * Vzniklo 20. 8. 2026: test doručovania musel spúšťať Claude ručne
            * cez Graph API, lebo appka vedela kampaň len založiť (POZASTAVENÚ).
-           * Odteraz: appka dá preklik do Ads Managera na kontrolu očami
-           * a tlačidlo Spustiť; server pred aktiváciou prejde kontrolórom
-           * (`skontrolujPredSpustenim`) a zapne VŠETKY TRI úrovne — kampaň,
-           * sadu aj reklamu. Pol zapnutá kampaň („Ad set off") bola presne
-           * pasca, do ktorej Jerry spadol v Ads Manageri.
+           * Samotné prepnutie je v `prepniKampan` — od 10. 10. 2026 ho volá aj
+           * „Vypnúť" z notifikácie dozoru reklám.
            */
           const kampanId = String(b.kampanId || "").trim();
           if (!/^[0-9]{5,}$/.test(kampanId)) return Response.json({ ok: false, error: "chyba_kampan" }, { status: 400 });
-          const [k, sadyR, reklamyR] = await Promise.all([
-            graph(`${kampanId}?fields=name,account_id,daily_budget,lifetime_budget,stop_time`, n.token),
-            graph(`${kampanId}/adsets?fields=id,daily_budget,lifetime_budget,end_time&limit=25`, n.token),
-            graph(`${kampanId}/ads?fields=id,effective_status,creative&limit=25`, n.token),
-          ]);
-          if (!k.ok) return Response.json({ ok: false, error: k.chyba }, { status: 502 });
-          const kd = k.data as { name?: string; account_id?: string; daily_budget?: string; lifetime_budget?: string; stop_time?: string };
-          const sd = ((sadyR.data as { data?: { id: string; daily_budget?: string; lifetime_budget?: string; end_time?: string }[] })?.data) || [];
-          const rd = ((reklamyR.data as { data?: { id: string; effective_status?: string; creative?: { id?: string } }[] })?.data) || [];
-          const cislo = (x?: string) => (x ? Number(x) : null);
-          const stavPred: StavKampanePredSpustenim = {
-            kampan: { id: kampanId, accountId: String(kd.account_id || ""), dailyBudget: cislo(kd.daily_budget), lifetimeBudget: cislo(kd.lifetime_budget), stopTime: kd.stop_time || null },
-            sady: sd.map((x) => ({ id: x.id, dailyBudget: cislo(x.daily_budget), lifetimeBudget: cislo(x.lifetime_budget), endTime: x.end_time || null })),
-            reklamy: rd.map((x) => ({ id: x.id, efektivnyStav: x.effective_status || null, maKreativu: !!x.creative?.id })),
-          };
-          if (akcia === "spusti-kampan") {
-            const chyby = skontrolujPredSpustenim(stavPred);
-            if (chyby.length) return Response.json({ ok: false, kontrola: chyby }, { status: 409 });
-          }
           const cielovyStav = akcia === "spusti-kampan" ? "ACTIVE" : "PAUSED";
-          // Kampaň ako posledná: keby prepínanie spadlo v strede, zostane
-          // vypnutá strecha nad polozapnutými poschodiami — nič sa neminie.
-          const objekty = [...rd.map((x) => x.id), ...sd.map((x) => x.id), kampanId];
-          for (const o of objekty) {
-            const r = await graphPost(o, { status: cielovyStav }, n.token);
-            if (!r.ok) return Response.json({ ok: false, error: `Prepnutie ${o} neprešlo: ${r.chyba}` }, { status: 502 });
+          const p = await prepniKampan(n.token, kampanId, cielovyStav);
+          if (!p.ok) {
+            return p.kontrola
+              ? Response.json({ ok: false, kontrola: p.kontrola }, { status: 409 })
+              : Response.json({ ok: false, error: p.error }, { status: p.status });
           }
           /**
            * Zapíš nový stav aj SEBE, nielen Mete.
@@ -993,16 +1047,185 @@ export const Route = createFileRoute("/api/meta")({
            * Bez filtra na mesiac zámerne: `stav` je prepínač kampane, nie
            * vlastnosť mesiaca, a presne tak ho píše aj samotná synchronizácia.
            */
-          await DB.prepare("UPDATE mkt_kampane SET stav = ?2, stav_sad = ?3, updated_at = ?4 WHERE id = ?1")
-            .bind(kampanId, cielovyStav, cielovyStav === "ACTIVE" ? "bezi" : "pozastavena", new Date().toISOString())
-            .run()
-            .catch(() => undefined);
+          await zapisStavKampane(DB, kampanId, cielovyStav);
           await audit(DB, {
             action: "reklama", predmet: akcia,
-            neu: `${kd.name || kampanId} → ${cielovyStav} (${objekty.length} objektov)`,
+            neu: `${p.nazov || kampanId} → ${cielovyStav} (${p.objektov} objektov)`,
             actor: await currentUser(request) || undefined,
           });
-          return Response.json({ ok: true, stav: cielovyStav, nazov: kd.name || "", odkaz: adsManagerOdkaz(kampanId), objektov: objekty.length });
+          return Response.json({ ok: true, stav: cielovyStav, nazov: p.nazov, odkaz: adsManagerOdkaz(kampanId), objektov: p.objektov });
+        }
+
+        /**
+         * DOZOR NAD REKLAMOU (10. 10. 2026) — viď lib/psb/reklamaDozor.ts.
+         *
+         * Bežiace kampane, ich sady a reklamy, stav účtu a výdavok po dňoch
+         * za 60 dní. Spúšťa ho plánovač o 4:20 UTC (pred rannou správou)
+         * a tlačidlo „Stiahnuť teraz" v Marketing → Náklady.
+         *
+         * Ukladá sa SNÍMKA bežiacich kampaní (`reklama_dozor`) a KNIHA dní
+         * (`reklama_dni`). Keď zoznam kampaní zlyhá, nič sa nemaže — prázdna
+         * odpoveď nie je dôkaz, že nič nebeží.
+         */
+        if (akcia === "dozor") {
+          const ucet = `act_${UCET_REKLAM}`;
+          const dnes = dnesPraha();
+          const od = posunDen(dnes, -60);
+          const aktivne = encodeURIComponent(JSON.stringify(["ACTIVE"]));
+          const [kampR, ucetR] = await Promise.all([
+            graph(`${ucet}/campaigns?limit=100&effective_status=${aktivne}&fields=id,name,objective,effective_status,start_time,daily_budget,lifetime_budget`, n.token),
+            graph(`${ucet}?fields=account_status,disable_reason`, n.token),
+          ]);
+          if (!kampR.ok) return Response.json({ ok: false, error: kampR.chyba }, { status: 502 });
+          type R = Record<string, unknown>;
+          const kampane = ((kampR.data as { data?: R[] }).data) || [];
+          const ids = kampane.map((k) => String(k.id || "")).filter(Boolean);
+          const filt = encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: ids }]));
+          const prazdne = Promise.resolve({ ok: true, data: { data: [] } } as { ok: boolean; data?: unknown; chyba?: string });
+          const [sadyR, adsR, dniR] = await Promise.all([
+            ids.length ? graph(`${ucet}/adsets?limit=200&filtering=${filt}&fields=id,name,campaign_id,effective_status,daily_budget,end_time`, n.token) : prazdne,
+            ids.length ? graph(`${ucet}/ads?limit=300&filtering=${filt}&fields=id,name,campaign_id,effective_status,ad_review_feedback,issues_info`, n.token) : prazdne,
+            graph(
+              `${ucet}/insights?level=campaign&time_increment=1&limit=1000&fields=campaign_id,spend,clicks,actions,date_start` +
+              `&time_range=${encodeURIComponent(JSON.stringify({ since: od, until: dnes }))}`,
+              n.token,
+            ),
+          ]);
+          const sady = sadyR.ok ? (((sadyR.data as { data?: R[] }).data) || []) : [];
+          const ads = adsR.ok ? (((adsR.data as { data?: R[] }).data) || []) : [];
+          const teraz = new Date();
+          const stmts: ReturnType<typeof DB.prepare>[] = [];
+          let problemov = 0;
+          for (const k of kampane) {
+            const id = String(k.id);
+            const sadyK = sady.filter((x) => String(x.campaign_id) === id);
+            const problemy: { druh: string; text: string }[] = [];
+            if (sadyR.ok) {
+              const st = stavDorucovania(sadyK.map((x) => ({ effective_status: String(x.effective_status || ""), end_time: x.end_time ? String(x.end_time) : undefined })), teraz);
+              if (st !== "bezi") problemy.push({ druh: "nedorucuje", text: `zapnutá, ale nedoručuje — ${POPIS_DORUCOVANIA[st]}` });
+            }
+            for (const a of ads.filter((x) => String(x.campaign_id) === id)) {
+              const es = String(a.effective_status || "").toUpperCase();
+              if (es === "DISAPPROVED") {
+                const fb = (a.ad_review_feedback as { global?: Record<string, string> } | undefined)?.global || {};
+                problemy.push({ druh: `zamietnuta-${a.id}`, text: `zamietnutá reklama „${a.name || a.id}“ — ${Object.values(fb).join("; ") || "Meta neuviedla dôvod"}` });
+              } else if (es === "WITH_ISSUES") {
+                const iss = ((a.issues_info as { error_message?: string; error_summary?: string }[] | undefined) || [])[0];
+                problemy.push({ druh: `problem-${a.id}`, text: `reklama „${a.name || a.id}“ má problém — ${iss?.error_message || iss?.error_summary || "bez popisu"}` });
+              }
+            }
+            problemov += problemy.length;
+            const kampDenny = Number(k.daily_budget) || 0;
+            const sadyDenny = sadyK.filter((x) => String(x.effective_status || "").toUpperCase() === "ACTIVE")
+              .reduce((s, x) => s + (Number(x.daily_budget) || 0), 0);
+            const denny = kampDenny > 0 ? kampDenny / 100 : sadyDenny > 0 ? sadyDenny / 100 : null;
+            stmts.push(DB.prepare(
+              `INSERT INTO reklama_dozor (kampan_id, nazov, ciel, stav, zaciatok, denny_rozpocet, sady, problemy, updated_at)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+               ON CONFLICT(kampan_id) DO UPDATE SET nazov=?2, ciel=?3, stav=?4, zaciatok=?5, denny_rozpocet=?6, sady=?7, problemy=?8, updated_at=?9`,
+            ).bind(
+              id, String(k.name || ""), String(k.objective || ""), String(k.effective_status || ""), String(k.start_time || ""),
+              denny === null ? null : Math.round(denny),
+              JSON.stringify(sadyK.map((x) => ({ id: String(x.id), nazov: String(x.name || ""), stav: String(x.effective_status || ""), denny: Number(x.daily_budget) ? Math.round(Number(x.daily_budget) / 100) : null }))),
+              JSON.stringify(problemy), now,
+            ));
+          }
+          // Reklamný účet — platba, blokovanie, kontrola rizika.
+          const STAV_UCTU: Record<number, string> = {
+            2: "účet je zablokovaný", 3: "nezaplatená platba — reklamy stoja", 7: "Meta kontroluje riziko účtu",
+            8: "čaká sa na vyrovnanie platby", 9: "účet je v lehote na zaplatenie", 100: "účet sa zatvára", 101: "účet je zatvorený",
+          };
+          const ucetStav = ucetR.ok ? Number((ucetR.data as { account_status?: number }).account_status) : 1;
+          const ucetProblem = STAV_UCTU[ucetStav];
+          const ponechat = [...ids];
+          if (ucetProblem) {
+            problemov++;
+            ponechat.push("ucet");
+            stmts.push(DB.prepare(
+              `INSERT INTO reklama_dozor (kampan_id, nazov, ciel, stav, zaciatok, denny_rozpocet, sady, problemy, updated_at)
+               VALUES ('ucet','Reklamný účet','','UCET','',NULL,'[]',?1,?2)
+               ON CONFLICT(kampan_id) DO UPDATE SET problemy=?1, updated_at=?2`,
+            ).bind(JSON.stringify([{ druh: `ucet-${ucetStav}`, text: `${ucetProblem} — otvor Ads Manager → Nastavenia platieb` }]), now));
+          }
+          stmts.push(DB.prepare("DELETE FROM reklama_dozor WHERE kampan_id NOT IN (SELECT value FROM json_each(?1))").bind(JSON.stringify(ponechat)));
+          let dniZapisanych = 0;
+          if (dniR.ok) {
+            for (const x of ((dniR.data as { data?: R[] }).data) || []) {
+              const akcie = (x.actions as { action_type: string; value: string }[]) || [];
+              const a = (t: string) => Number(akcie.find((y) => y.action_type === t)?.value) || 0;
+              dniZapisanych++;
+              stmts.push(DB.prepare(
+                `INSERT INTO reklama_dni (kampan_id, den, spend, kliky, na_stranke, updated_at) VALUES (?1,?2,?3,?4,?5,?6)
+                 ON CONFLICT(kampan_id, den) DO UPDATE SET spend=?3, kliky=?4, na_stranke=?5, updated_at=?6`,
+              ).bind(String(x.campaign_id || ""), String(x.date_start || "").slice(0, 10), Number(x.spend) || 0, a("link_click") || Number(x.clicks) || 0, a("landing_page_view"), now));
+            }
+          }
+          stmts.push(DB.prepare(
+            `INSERT INTO vzas_settings (key, value, updated_at) VALUES ('reklama_dozor_at', ?1, ?1)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+          ).bind(now));
+          for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
+          return Response.json({
+            ok: true, kampani: ids.length, dni: dniZapisanych, problemov,
+            // Čiastočné zlyhanie sa hlási, nie zametá: bez sád nevidno
+            // nedoručovanie, bez reklám zamietnutie, bez dní útratu.
+            varovania: [!sadyR.ok && `sady: ${sadyR.chyba}`, !adsR.ok && `reklamy: ${adsR.chyba}`, !dniR.ok && `dni: ${dniR.chyba}`, !ucetR.ok && `účet: ${ucetR.chyba}`].filter(Boolean),
+          });
+        }
+
+        /**
+         * Rozhodnutie z notifikácie dozoru: nechať / vypnúť / zmeniť rozpočet.
+         *
+         * Vypnutie nič nestojí a ide hneď. Zmena rozpočtu míňa peniaze, preto
+         * ju obrazovka najprv ukáže so sumou na mesiac a server ju ešte
+         * ohraničí: najviac 2 000 Kč denne a najviac trojnásobok doterajšieho
+         * (+300 Kč) — väčší skok patrí do Ads Managera, nie na jeden klik.
+         */
+        if (akcia === "rozhodni-kampan") {
+          const kampanId = String(b.kampanId || "").trim();
+          const rozhodnutie = String(b.rozhodnutie || "");
+          if (!/^[0-9]{5,}$/.test(kampanId)) return Response.json({ ok: false, error: "chyba_kampan" }, { status: 400 });
+          if (!["nechat", "vypnut", "rozpocet"].includes(rozhodnutie)) return Response.json({ ok: false, error: "nezname_rozhodnutie" }, { status: 400 });
+          const riadok = await DB.prepare("SELECT nazov, denny_rozpocet FROM reklama_dozor WHERE kampan_id = ?1").bind(kampanId).first<{ nazov: string; denny_rozpocet: number | null }>();
+          if (!riadok) return Response.json({ ok: false, error: "Táto kampaň nie je v dozore — stiahni ho znova." }, { status: 404 });
+          const cislo = (v: unknown) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Math.round(Number(v)));
+          let rozpocetPo: number | null = null;
+          let veta = "nechaná";
+          if (rozhodnutie === "vypnut") {
+            const p = await prepniKampan(n.token, kampanId, "PAUSED");
+            if (!p.ok) return Response.json({ ok: false, error: p.error || "Vypnutie neprešlo." }, { status: p.status });
+            await zapisStavKampane(DB, kampanId, "PAUSED");
+            await DB.prepare("UPDATE reklama_dozor SET stav = 'PAUSED', updated_at = ?2 WHERE kampan_id = ?1").bind(kampanId, now).run();
+            veta = `vypnutá (${p.objektov} objektov)`;
+          }
+          if (rozhodnutie === "rozpocet") {
+            const novy = cislo(b.novyDenny);
+            const stary = riadok.denny_rozpocet || 0;
+            if (novy === null || novy < MIN_DENNE_KC) return Response.json({ ok: false, error: `Denný rozpočet musí byť aspoň ${MIN_DENNE_KC} Kč.` }, { status: 400 });
+            if (novy > 2000 || (stary > 0 && novy > Math.max(stary * 3, stary + 300))) {
+              return Response.json({ ok: false, error: "Taký veľký skok sa z notifikácie nemení — sprav to v Ads Manageri." }, { status: 400 });
+            }
+            const z = await zmenRozpocet(n.token, kampanId, novy);
+            if (!z.ok) return Response.json({ ok: false, error: z.error }, { status: 502 });
+            await DB.prepare("UPDATE reklama_dozor SET denny_rozpocet = ?2, updated_at = ?3 WHERE kampan_id = ?1").bind(kampanId, novy, now).run();
+            rozpocetPo = novy;
+            veta = `rozpočet ${Math.round(z.stary)} → ${novy} Kč/deň`;
+          }
+          const kto = (await currentUser(request)) || "";
+          await DB.prepare(
+            `INSERT INTO reklama_vyhodnotenia (kampan_id, kedy, rozhodnutie, minute_kc, dopyty, dm, rozpocet_pred, rozpocet_po, poznamka, kto)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
+          ).bind(kampanId, now, rozhodnutie, cislo(b.minuteKc), cislo(b.dopyty), cislo(b.dm), riadok.denny_rozpocet, rozpocetPo, String(b.poznamka || "").slice(0, 500), kto).run();
+          await audit(DB, { action: "reklama", predmet: `rozhodnutie ${kampanId}`, neu: `${riadok.nazov}: ${veta}${cislo(b.dm) !== null ? ` · DM ${cislo(b.dm)}` : ""}`, actor: kto || undefined });
+          return Response.json({ ok: true, veta });
+        }
+
+        /** Mesačný strop a cieľová cena za dopyt — prázdne = bez nich. */
+        if (akcia === "dozor-nastavenie") {
+          const cislo = (v: unknown) => (v === null || v === undefined || v === "" || !(Number(v) > 0) ? "" : String(Math.round(Number(v))));
+          await uloz("reklama_strop_mesiac", cislo(b.stropMesiac));
+          await uloz("reklama_ciel_dopyt", cislo(b.cielDopyt));
+          return Response.json({ ok: true });
         }
 
         if (akcia === "mesta") {

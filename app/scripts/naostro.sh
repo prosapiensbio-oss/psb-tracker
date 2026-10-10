@@ -55,5 +55,10 @@ stiahni zavery       "SELECT id, datum, tema, zaver, overit, overit_do, stav FRO
 stiahni poplatky     "SELECT id,datum,client_name,popis,suma_czk FROM poplatky"
 stiahni kal_udalosti "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zaciatok >= date('now','-40 days')"
 stiahni kal_zmeny    "SELECT id,kedy,trener,druh,nazov,klient,pred,po,vysvetlene,poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300"
+# Dozor reklám (10. 10. 2026) — vstupuje do registra, preto musí byť aj tu.
+stiahni reklama_dozor "SELECT * FROM reklama_dozor"
+stiahni reklama_dni   "SELECT kampan_id,den,spend,kliky,na_stranke FROM reklama_dni WHERE den >= date('now','-62 days')"
+stiahni reklama_vyh   "SELECT * FROM reklama_vyhodnotenia ORDER BY kedy DESC LIMIT 200"
+stiahni reklama_nast  "SELECT key,value FROM vzas_settings WHERE key IN ('reklama_strop_mesiac','reklama_ciel_dopyt','reklama_dozor_at')"
 
 bun run scripts/naostro.ts

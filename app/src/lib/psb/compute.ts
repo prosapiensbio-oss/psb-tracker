@@ -12,6 +12,7 @@ import { sedeniaMimoKalendara } from "./mimoKalendara";
 import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
+import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import type {
   Lead,
   PackageRow,
@@ -2828,6 +2829,8 @@ export type RegisterItem = {
    * `balicek` je nepovinný: možnosť bez neho iba zapíše odpoveď („prepadlo"),
    * s ním sa klientovi najprv dopíšu hodiny.
    */
+  /** Dozor nad reklamou — čísla, návrh a tlačidlá rozhodnutia (reklamaDozor.ts). */
+  reklama?: ReklamaPolozka;
   akcie?: {
     popis: string;
     /** Čo sa zapíše ako odpoveď na upozornenie. */
@@ -3019,7 +3022,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string; platneOd?: string },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string; platneOd?: string; reklama?: RegisterItem["reklama"] },
   ) =>
     items.push({
       key,
@@ -3034,6 +3037,7 @@ export function deriveRegister(
       navrh: kto?.navrh,
       akcie: kto?.akcie,
       telefon: kto?.telefon || undefined,
+      reklama: kto?.reklama,
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
@@ -3349,6 +3353,17 @@ export function deriveRegister(
     // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
     add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client,
       undefined, a.akcie || a.platneOd ? { akcie: a.akcie, platneOd: a.platneOd } : undefined);
+  }
+
+  /**
+   * Dozor nad reklamou (10. 10. 2026) — z dôvodu, s číslami a s návrhom.
+   * Tu, nie v App.tsx: ranný push číta `deriveRegister` (pravidlo z 21. 9.).
+   * Reklama je Jerryho — Terezke sa nezobrazuje.
+   */
+  if (data.reklamaDozor) {
+    for (const p of polozkyDozoru(data.reklamaDozor, data.leads || [], ack, dnesPraha())) {
+      add(p.key, p.category, p.tone, p.title, p.detail, p.priority, "marketing|naklady", p.rodina, { trener: "Jerry", reklama: p.reklama });
+    }
   }
 
   return items.sort((a, b) => {

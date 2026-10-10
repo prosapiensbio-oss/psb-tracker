@@ -48,6 +48,7 @@ import { bezDiakritiky, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
+import { ReklamaRozhodnutie } from "./ReklamaDozor";
 import { Card, Donut, Empty, H3, Info, Select, ValueBars, ZoneBars } from "./ui";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
@@ -2907,6 +2908,11 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           </button>
           {dopytChyba && <span style={{ fontSize: 12, color: C.red }}>{dopytChyba}</span>}
         </div>
+      )}
+
+      {/* Dozor reklám: rozhodnutie priamo tu, nie „choď to vybaviť inam". */}
+      {item.reklama && !item.acked && (
+        <ReklamaRozhodnutie item={item} onHotovo={(poznamka) => actions.ackAnomaly(item.key, poznamka, true)} />
       )}
 
       {smsOtvorene && item.sms && !item.acked && (

@@ -49,6 +49,7 @@ import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik } from "./MarketingLievik";
 import { PripravitKampan } from "./KampanForm";
 import { Reklama } from "./Reklama";
+import { DozorReklamKarta } from "./ReklamaDozor";
 import { Kanaly } from "./Kanaly";
 import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { hodnotenie, type PsRiadok } from "../../lib/psb/pagespeed";
@@ -1201,6 +1202,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           Podľa nich sa pritom rozhodovalo o rozpočte (18. 8. 2026). */}
       {sub === "naklady" && (
         <>
+          <DozorReklamKarta data={data} />
           <Reklama data={data} clients={clients} />
           <AkoMeratReklamu />
           <PripravitKampan />

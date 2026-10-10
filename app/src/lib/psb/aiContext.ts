@@ -53,6 +53,7 @@ import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
 import { dnesPraha } from "./cas";
+import { suhrnDozoru } from "./reklamaDozor";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
@@ -910,6 +911,15 @@ export function buildAiContext(
       akceptovane: r.acked,
       poznamka: r.note || null,
     })),
+    /**
+     * Dozor reklám (10. 10. 2026) — bežiace kampane od posledného rozhodnutia.
+     * Tie isté čísla ako notifikácia a karta Marketing → Náklady → Dozor reklám.
+     */
+    reklamaDozor: data.reklamaDozor ? {
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Hotové čísla dozoru reklám (lib/psb/reklamaDozor.ts), tie isté ako v notifikácii a v karte Marketing → Náklady → Dozor reklám. Obdobie je od spustenia alebo od posledného rozhodnutia (nechať/vypnúť/rozpočet). Dopyty s odkazom = utm_term z reklamy patrí sade tejto kampane; dopyty z reklamy bez odkazu sa nedajú pripísať žiadnej kampani — netvrď, že sú z konkrétnej. Pri interakčných kampaniach Meta dopyty nemeria, počet DM povie len Jerry. Zmeniť rozpočet alebo vypnúť sa dá tlačidlami priamo v notifikácii.",
+      nastavenie: data.reklamaDozor.nastavenie,
+      kampane: suhrnDozoru(data.reklamaDozor, data.leads || [], data.anomalyAck || {}, dnesPraha()),
+    } : null,
     /**
      * Čo Jarvis vie zvonku — rešerše a príručky uložené natrvalo.
      *

@@ -28,6 +28,8 @@ import { oblastiZJson } from "./pocitovka";
 import { dnesPraha } from "./cas";
 import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
+import { nacitajDozor } from "./reklamaDozor.server";
+
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
@@ -388,6 +390,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
     }));
   }
+
+  // Dozor nad reklamou (10. 10. 2026) — vstup pre register, kartu aj Jarvisa.
+  data.reklamaDozor = await nacitajDozor(DB);
 
   return data;
 }

@@ -43,7 +43,9 @@ export type Oblast =
   /** Kartotéka fotiek a čo do nej uloží editor → kartotéka v profile aj v anamnéze. */
   | "fotky"
   /** Odoslaná SMS klientovi → notifikácia „posledná hodina / mínus" zmizne. */
-  | "sms";
+  | "sms"
+  /** Dozor reklám: stiahnutie, rozhodnutie, nastavenie → `/api/data` (register). */
+  | "reklama";
 
 type Poslucháč = () => void;
 const poslucháči = new Map<Oblast, Set<Poslucháč>>();

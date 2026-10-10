@@ -205,6 +205,8 @@ export type PSBData = {
    * zlučujú s platbami z PTmindera — tá istá platba v oboch je raz.
    */
   platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
+  /** Dozor nad reklamou — bežiace kampane, dni, rozhodnutia (lib/psb/reklamaDozor.ts). */
+  reklamaDozor?: import("./reklamaDozor").DozorData;
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;

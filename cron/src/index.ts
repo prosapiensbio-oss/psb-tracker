@@ -33,7 +33,7 @@ const rannePush = (env: Env) =>
  * Dve akcie, nie jedna: `kampane` sú súhrny, `reklamy` jednotlivé kusy.
  * Obe appka aj tak potrebuje.
  */
-const metaReklamy = (env: Env, akcia: "kampane" | "reklamy") =>
+const metaReklamy = (env: Env, akcia: "kampane" | "reklamy" | "dozor") =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/meta", {
       method: "POST",
@@ -250,7 +250,10 @@ export default {
     // dopyt patrí do vlastnej požiadavky (limit CPU, 29. 8. 2026).
     if (event.cron === "20 4 * * *") {
       ctx.waitUntil((async () => {
-        for (const akcia of ["kampane", "reklamy"] as const) {
+        // `dozor` (10. 10. 2026): bežiace kampane, dni a problémy pre
+        // notifikácie dozoru — pred rannou dávkou o 4:30, aby čísla v nej
+        // boli z rána, nie zo včera.
+        for (const akcia of ["kampane", "reklamy", "dozor"] as const) {
           try {
             const r = await metaReklamy(env, akcia);
             console.log(`meta ${akcia}: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);

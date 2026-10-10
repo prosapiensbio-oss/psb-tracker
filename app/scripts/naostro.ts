@@ -47,7 +47,7 @@ const base: PSBData = {
     .map((r: any) => ({
       id: r.id, date: r.date, name: r.name, source: r.source, referrer: r.referrer,
       status: r.status, note: r.note, dovod: r.dovod, createdAt: r.created_at || "",
-      odpovedaneAt: r.odpovedane_at || "", druh: r.druh || "dopyt" })),
+      odpovedaneAt: r.odpovedane_at || "", druh: r.druh || "dopyt", kampan: r.kampan || "", utm: r.utm || "" })),
   // Závery z debát s Jarvisom. Bez nich kontrola nevidí, že Jerry o klientovi
   // už rozhodol — a hlásila by ako otvorené to, čo je vyriešené.
   zavery: nacitaj("zavery").map((r: any) => ({
@@ -56,6 +56,25 @@ const base: PSBData = {
   poplatky: nacitaj("poplatky").map((r: any) => ({
     id: String(r.id), datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: r.suma_czk })),
   clientOverrides: {}, anomalyAck: {},
+  // Dozor reklám — to isté mapovanie ako `nacitajDozor` (reklamaDozor.server.ts).
+  reklamaDozor: (() => {
+    const nacitajTicho = (n: string) => { try { return nacitaj(n); } catch { return []; } };
+    const js = (x: unknown, inak: unknown) => { try { return JSON.parse(String(x ?? "")); } catch { return inak; } };
+    const nast: Record<string, string> = {};
+    for (const r of nacitajTicho("reklama_nast")) nast[r.key] = String(js(r.value, r.value) ?? "");
+    const cislo = (x?: string) => (Number(x) > 0 ? Number(x) : null);
+    return {
+      kampane: nacitajTicho("reklama_dozor").map((r: any) => ({
+        id: String(r.kampan_id), nazov: r.nazov || "", ciel: r.ciel || "", stav: r.stav || "", zaciatok: r.zaciatok || "",
+        dennyRozpocet: r.denny_rozpocet ?? null, sady: js(r.sady, []), problemy: js(r.problemy, []), updatedAt: r.updated_at || "" })),
+      dni: nacitajTicho("reklama_dni").map((r: any) => ({ kampanId: String(r.kampan_id), den: r.den, spend: Number(r.spend) || 0, kliky: Number(r.kliky) || 0, naStranke: Number(r.na_stranke) || 0 })),
+      vyhodnotenia: nacitajTicho("reklama_vyh").map((r: any) => ({
+        kampanId: String(r.kampan_id), kedy: r.kedy, rozhodnutie: r.rozhodnutie, minuteKc: r.minute_kc ?? null, dopyty: r.dopyty ?? null,
+        dm: r.dm ?? null, rozpocetPo: r.rozpocet_po ?? null, poznamka: r.poznamka || "" })),
+      nastavenie: { stropMesiac: cislo(nast.reklama_strop_mesiac), cielDopyt: cislo(nast.reklama_ciel_dopyt) },
+      aktualizovane: nast.reklama_dozor_at || "",
+    };
+  })(),
 };
 for (const r of nacitaj("overrides")) base.clientOverrides[r.name] = {
   status: r.status, specialRate: !!r.special_rate, specialRateNote: r.special_rate_note || "",
@@ -335,6 +354,19 @@ H("D · DUPLICITY A ZAPLAVENIE");
   // človeku sú hranica, za ktorou sa zoznam prestáva čítať.
   const vela = Object.entries(podla).filter(([, v]) => v.length >= 3);
   console.log(`  ${vela.length ? "⚠" : "·"}  ľudia s 3+ notifikáciami: ${vela.length ? vela.map(([m, v]) => `${m} (${v.join(", ")})`).join(" · ") : "žiadni"}`);
+}
+
+H("E · DOZOR REKLÁM");
+{
+  // Každá položka dozoru musí niesť dôvod a čísla — holé „skontroluj reklamy"
+  // je presne to, čo sa nemalo postaviť (10. 10. 2026).
+  const rk = vs.filter((x) => x.key.startsWith("reklama|"));
+  const d = base.reklamaDozor;
+  console.log(`  bežiacich kampaní v dozore: ${(d?.kampane || []).filter((k) => k.id !== "ucet").length} · dní: ${(d?.dni || []).length} · stiahnuté ${d?.aktualizovane || "nikdy"}`);
+  for (const x of rk) console.log(`  ${x.acked ? "·" : "!"} ${x.key.slice(0, 60)}\n      ${x.detail.slice(0, 220)}`);
+  ok(rk.every((x) => !!x.reklama), "každá položka dozoru nesie tlačidlá a prompt");
+  ok(rk.every((x) => x.trener === "Jerry"), "dozor reklám ide len Jerrymu");
+  ok(new Set(rk.map((x) => x.key)).size === rk.length, "žiadna položka dozoru dvakrát");
 }
 
 H(zlyhani === 0 ? "VŠETKO PREŠLO" : `ZLYHANÍ: ${zlyhani}`);
