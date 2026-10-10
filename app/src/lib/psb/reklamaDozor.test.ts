@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { kampanDopytu, navrhni, polozkyDozoru, stavKampane, type DozorData, type DozorKampan, type DozorDen } from "./reklamaDozor";
+import { kampanDopytu, metrikyDozoru, navrhni, polozkyDozoru, stavKampane, type DozorData, type DozorKampan, type DozorDen } from "./reklamaDozor";
 
 const kamp = (id: string, o: Partial<DozorKampan> = {}): DozorKampan => ({
   id, nazov: `K${id}`, ciel: "OUTCOME_TRAFFIC", stav: "ACTIVE", zaciatok: "2026-09-08T10:00:00+0200",
@@ -122,5 +122,26 @@ describe("problémy a strop", () => {
   it("starý dozor sa prizná", () => {
     const d = data([kamp("1")], dni("1", "2026-10-01", 3, 10), { aktualizovane: "2026-10-05T04:20:00Z" });
     expect(polozkyDozoru(d, [{ date: DNES, source: "reklama" }], {}, DNES).some((x) => x.key.startsWith("reklama|stary|"))).toBe(true);
+  });
+});
+
+describe("metriky pravého stĺpca", () => {
+  it("cena za dopyt, dohodnutý úvodný, dorazilo a od posledného dopytu", () => {
+    const d = data([kamp("1"), kamp("2", { ciel: "OUTCOME_ENGAGEMENT" })], [...dni("1", "2026-10-01", 10, 100, 50, 30), ...dni("2", "2026-10-01", 10, 50, 40, 0)]);
+    const m = metrikyDozoru(d, [
+      { date: "2026-10-05", source: "reklama", status: "dohodnuty", utm: "term=10" },
+      { date: "2026-10-08", source: "reklama", status: "novy" },
+      { date: "2026-10-08", source: "web" },
+    ], DNES);
+    expect(m.minute30).toBe(1500);
+    expect(m.dopyty30).toBe(2);
+    expect(m.dohodnute30).toBe(1);
+    expect(m.cenaZaDopyt30).toBe(750);
+    expect(m.cenaZaDohodnuty30).toBe(1500);
+    // dorazilo len z kampaní, ktoré vedú na web (interakcie by riedili)
+    expect(m.dorazilo7).toBe(60);
+    expect(m.minuteOdPoslednehoDopytu).toBe(300); // 9. a 10. 10. × 150
+    expect(m.dniPo).toHaveLength(30);
+    expect(m.denneRozpocty).toBe(240);
   });
 });

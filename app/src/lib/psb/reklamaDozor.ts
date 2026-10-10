@@ -71,7 +71,7 @@ export type DozorData = {
   aktualizovane: string;
 };
 
-export type DopytPreDozor = { date: string; source: string; kampan?: string; utm?: string };
+export type DopytPreDozor = { date: string; source: string; kampan?: string; utm?: string; status?: string };
 
 export const PRAHY = {
   /** Prvé vyhodnotenie po spustení. */
@@ -356,7 +356,7 @@ export function polozkyDozoru(
       category: "Anomália",
       tone: "orange",
       title: `Dozor reklám sa nestiahol od ${denKratko(d.aktualizovane)}`,
-      detail: `Čísla o reklame sú z ${denKratko(d.aktualizovane)}. Kým sa nestiahnu nové, Kokpit nevie, či kampane bežia a koľko minuli. Skús „Stiahnuť teraz“ v Marketing → Náklady; keď to zlyhá, je problém s tokenom Mety.`,
+      detail: `Čísla o reklame sú z ${denKratko(d.aktualizovane)}. Kým sa nestiahnu nové, Kokpit nevie, či kampane bežia a koľko minuli. Skús „Stiahnuť teraz“ v Marketing → Dozor reklám; keď to zlyhá, je problém s tokenom Mety.`,
       priority: 20,
       reklama: { druh: "stary", bezia, prompt: `Denný dozor reklám v Kokpite (/api/meta akcia "dozor") sa nestiahol od ${d.aktualizovane}. Zisti prečo (token, práva, chyba Graph API) a oprav to.` },
     });
@@ -459,3 +459,61 @@ export function suhrnDozoru(d: DozorData, dopyty: DopytPreDozor[], ack: Record<s
     };
   });
 }
+
+/**
+ * Metriky do pravého stĺpca Dozoru reklám (10. 10. 2026) — tie, na ktoré sa
+ * pri rozhodovaní o reklame naozaj pozerá: koľko odchádza, koľko ľudí
+ * dorazí na stránku, čo stojí dopyt a hlavne DOHODNUTÝ ÚVODNÝ (meradlo
+ * dohodnuté 30. 9. v debate FB Reklama), a koľko odišlo od posledného dopytu.
+ * Okno 30 dní pre peniaze a dopyty, 7 dní pre „dorazilo" (mení sa rýchlo).
+ */
+export function metrikyDozoru(d: DozorData, dopyty: DopytPreDozor[], dnes: string) {
+  const od30 = posunDenLokal(dnes, -29), od7 = posunDenLokal(dnes, -6);
+  const kampane = d.kampane.filter((k) => k.id !== "ucet");
+  const engagement = new Set(kampane.filter((k) => meriaSaDm(k.ciel)).map((k) => k.id));
+  const dni30 = d.dni.filter((x) => x.den >= od30 && x.den <= dnes);
+  const dni7 = d.dni.filter((x) => x.den >= od7 && x.den <= dnes && !engagement.has(x.kampanId));
+  const minute30 = dni30.reduce((s, x) => s + x.spend, 0);
+  const mesiac = dnes.slice(0, 7);
+  const minuteMesiac = d.dni.filter((x) => x.den.startsWith(mesiac)).reduce((s, x) => s + x.spend, 0);
+  const kliky7 = dni7.reduce((s, x) => s + x.kliky, 0);
+  const naStranke7 = dni7.reduce((s, x) => s + x.naStranke, 0);
+  const spendWeb7 = dni7.reduce((s, x) => s + x.spend, 0);
+  const reklamne30 = dopyty.filter((x) => jeDopytZReklamy(x) && x.date.slice(0, 10) >= od30 && x.date.slice(0, 10) <= dnes);
+  const sOdkazom30 = reklamne30.filter((x) => !!kampanDopytu(x, kampane)).length;
+  const dohodnute30 = reklamne30.filter((x) => x.status === "dohodnuty").length;
+  const bezia = kampane.filter((k) => (k.stav || "").toUpperCase() === "ACTIVE");
+  const denne = bezia.reduce((s, k) => s + (k.dennyRozpocet || 0), 0);
+  const posledny = dopyty.filter(jeDopytZReklamy).map((x) => x.date.slice(0, 10)).filter((x) => x <= dnes).sort().pop() || "";
+  const odPosledneho = posledny ? d.dni.filter((x) => x.den > posledny).reduce((s, x) => s + x.spend, 0) : null;
+  const dniPo: { den: string; spend: number; dopyty: number }[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const den = posunDenLokal(dnes, -i);
+    dniPo.push({
+      den,
+      spend: d.dni.filter((x) => x.den === den).reduce((s, x) => s + x.spend, 0),
+      dopyty: dopyty.filter((x) => jeDopytZReklamy(x) && x.date.slice(0, 10) === den).length,
+    });
+  }
+  return {
+    denneRozpocty: denne,
+    mesacnePriTomtoTempe: denne * 30,
+    minuteMesiac: Math.round(minuteMesiac),
+    minute30: Math.round(minute30),
+    dopyty30: reklamne30.length,
+    dopytySOdkazom30: sOdkazom30,
+    dohodnute30,
+    cenaZaDopyt30: reklamne30.length ? Math.round(minute30 / reklamne30.length) : null,
+    cenaZaDohodnuty30: dohodnute30 ? Math.round(minute30 / dohodnute30) : null,
+    kliky7, naStranke7,
+    dorazilo7: kliky7 ? Math.round((naStranke7 / kliky7) * 100) : null,
+    cenaZaNavstevu7: naStranke7 ? Math.round((spendWeb7 / naStranke7) * 10) / 10 : null,
+    poslednyDopyt: posledny || null,
+    dniOdPoslednehoDopytu: posledny ? dniMedzi(posledny, dnes) : null,
+    minuteOdPoslednehoDopytu: odPosledneho === null ? null : Math.round(odPosledneho),
+    dniPo,
+  };
+}
+
+const posunDenLokal = (den: string, n: number): string =>
+  new Date(Date.parse(`${den.slice(0, 10)}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);

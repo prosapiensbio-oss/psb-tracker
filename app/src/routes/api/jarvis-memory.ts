@@ -32,6 +32,8 @@ export const Route = createFileRoute("/api/jarvis-memory")({
         if (!DB) return Response.json({ ok: false, chats: [], zavery: [] });
         try {
           // 60 chatov stačí — staršie sú archív, nie pracovný materiál.
+          // Pevná debata reklamného agenta je v zozname VŽDY: keby vypadla z
+          // posledných 60, panel by ju nenačítal a prvá otázka by ju prepísala.
           //
           // KÓD A DATABÁZA SA MÔŽU NA CHVÍĽU ROZÍSŤ
           //
@@ -41,8 +43,8 @@ export const Route = createFileRoute("/api/jarvis-memory")({
           // vymazaná. To je horšie než chýbajúci príznak, tak sa pri chybe
           // skúsi raz bez neho.
           const chaty = async () => {
-            const zoStlpcom = "SELECT id, title, messages, archived, kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
-            const bezNeho = "SELECT id, title, messages, archived, '' AS kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
+            const zoStlpcom = "SELECT id, title, messages, archived, kategoria, updated_at FROM jarvis_chats ORDER BY (id = 'reklama-agent') DESC, updated_at DESC LIMIT 60";
+            const bezNeho = "SELECT id, title, messages, archived, '' AS kategoria, updated_at FROM jarvis_chats ORDER BY (id = 'reklama-agent') DESC, updated_at DESC LIMIT 60";
             try { return await DB.prepare(zoStlpcom).all(); }
             catch { /* stĺpec ešte nie je — skús ho doplniť */ }
 

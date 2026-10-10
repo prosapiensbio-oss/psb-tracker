@@ -4,7 +4,7 @@ import type { RegisterItem } from "../../lib/psb/compute";
 import { adsManagerOdkaz } from "../../lib/psb/kampanPlan";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { kc, meriaSaDm, suhrnDozoru, type ReklamaPolozka } from "../../lib/psb/reklamaDozor";
+import { kc, meriaSaDm, metrikyDozoru, suhrnDozoru, type ReklamaPolozka } from "../../lib/psb/reklamaDozor";
 import { dnesPraha } from "../../lib/psb/cas";
 import { C, S, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -127,9 +127,9 @@ export function ReklamaRozhodnutie({ item, onHotovo, onNavigate }: { item: Regis
             <a href={adsManagerOdkaz(r.kampanId)} target="_blank" rel="noreferrer" style={{ ...linkBtn, color: C.textMuted }}>Ads Manager ↗</a>
             {onNavigate && (
               <button
-                onClick={() => { posliAgentovi(`${r.prompt}\n\nPozri sa na túto kampaň do Mety (meta_citaj) — výkon podľa veku a pohlavia a texty reklám — a povedz mi, čo by si zmenil a prečo. Ak navrhneš zmenu, daj ju ako tlačidlo.`, `Preberme kampaň „${r.nazov}“`); onNavigate("marketing", "naklady"); }}
+                onClick={() => { posliAgentovi(`${r.prompt}\n\nPozri sa na túto kampaň do Mety (meta_citaj) — výkon podľa veku a pohlavia a texty reklám — a povedz mi, čo by si zmenil a prečo. Ak navrhneš zmenu, daj ju ako tlačidlo.`, `Preberme kampaň „${r.nazov}“`); onNavigate("marketing", "dozor"); }}
                 style={{ ...linkBtn, color: C.accentLight }}
-                title="Otvorí reklamného Jarvisa v Marketing → Čo to stálo s touto kampaňou"
+                title="Otvorí reklamného Jarvisa v Marketing → Dozor reklám s touto kampaňou"
               >
                 Prebrať s Jarvisom →
               </button>
@@ -186,7 +186,7 @@ export function ReklamaRozhodnutie({ item, onHotovo, onNavigate }: { item: Regis
 }
 
 /**
- * Karta „Dozor reklám" v Marketing → Náklady — to isté, čo notifikácie,
+ * Karta „Dozor reklám" v Marketing → Dozor reklám — to isté, čo notifikácie,
  * ale aj vtedy, keď sa práve nič nepýta: čo beží, koľko minulo od posledného
  * rozhodnutia, kedy príde ďalšie vyhodnotenie, a nastavenie stropu a cieľa.
  */
@@ -329,13 +329,96 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
   );
 }
 
-/** Dozor vľavo, agent vpravo; na telefóne pod sebou. */
+/** Je obrazovka dosť široká na tri stĺpce? Hranica ako matchMedia, nie innerWidth (zoom). */
+function useSiroka(min = 1280): boolean {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${min}px)`);
+    const f = () => setOk(mq.matches);
+    f();
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
+  }, [min]);
+  return ok;
+}
+
+/**
+ * Metriky vedľa dozoru — to, na čo sa pri rozhodovaní o reklame pozerá.
+ * Počíta `metrikyDozoru` (lib), tie isté čísla má Jarvis v kontexte.
+ */
+export function MetrikyReklamy({ data }: { data: PSBData }) {
+  const d = data.reklamaDozor;
+  const m = useMemo(() => (d ? metrikyDozoru(d, data.leads || [], dnesPraha()) : null), [d, data.leads]);
+  if (!m) return null;
+  const ciel = d?.nastavenie.cielDopyt || null;
+  const riadok = (label: string, hodnota: string, pod?: string, farba?: string) => (
+    <div style={{ padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 11.5, color: C.textMuted }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: farba || C.text, lineHeight: 1.25 }}>{hodnota}</div>
+      {pod && <div style={{ fontSize: 11, color: C.textMuted }}>{pod}</div>}
+    </div>
+  );
+  const maxSpend = Math.max(1, ...m.dniPo.map((x) => x.spend));
+  const dorFarba = m.dorazilo7 === null ? undefined : m.dorazilo7 >= 65 ? C.green : m.dorazilo7 >= 45 ? C.orange : C.red;
+  const dopytFarba = !ciel || m.cenaZaDopyt30 === null ? undefined : m.cenaZaDopyt30 <= ciel ? C.green : m.cenaZaDopyt30 <= ciel * 1.5 ? C.orange : C.red;
+  const tichoFarba = m.minuteOdPoslednehoDopytu === null ? undefined : m.minuteOdPoslednehoDopytu >= 2000 ? C.red : m.minuteOdPoslednehoDopytu >= 1000 ? C.orange : undefined;
+  return (
+    <Card>
+      <H3>Metriky reklamy</H3>
+      {riadok("Cena za dohodnutý úvodný (30 dní)", m.cenaZaDohodnuty30 !== null ? kc(m.cenaZaDohodnuty30) : "—",
+        `${m.dohodnute30} dohodnutých z ${m.dopyty30} dopytov z reklamy · toto je hlavné meradlo`)}
+      {riadok("Cena za dopyt (30 dní)", m.cenaZaDopyt30 !== null ? kc(m.cenaZaDopyt30) : "—",
+        `${kc(m.minute30)} ÷ ${m.dopyty30} dopytov (${m.dopytySOdkazom30} s odkazom z reklamy)${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)}
+      {riadok("Dorazilo na stránku (7 dní)", m.dorazilo7 !== null ? `${m.dorazilo7} %` : "—",
+        `${m.naStranke7} z ${m.kliky7} klikov${m.cenaZaNavstevu7 !== null ? ` · ${String(m.cenaZaNavstevu7).replace(".", ",")} Kč za návštevu` : ""}`, dorFarba)}
+      {riadok("Od posledného dopytu z reklamy", m.minuteOdPoslednehoDopytu !== null ? kc(m.minuteOdPoslednehoDopytu) : "—",
+        m.poslednyDopyt ? `${m.dniOdPoslednehoDopytu} dní (${Number(m.poslednyDopyt.slice(8, 10))}. ${Number(m.poslednyDopyt.slice(5, 7))}.)` : "zatiaľ žiadny", tichoFarba)}
+      {riadok("Tento mesiac", kc(m.minuteMesiac), `${kc(m.denneRozpocty)} denne → ~${kc(m.mesacnePriTomtoTempe)} za 30 dní${d?.nastavenie.stropMesiac ? ` · strop ${kc(d.nastavenie.stropMesiac)}` : ""}`)}
+      <div style={{ marginTop: 10, fontSize: 11.5, color: C.textMuted }}>Výdavok po dňoch (30 dní) · ● dopyt z reklamy</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 54, marginTop: 4 }}>
+        {m.dniPo.map((x) => (
+          <div key={x.den} title={`${x.den}: ${kc(x.spend)}${x.dopyty ? ` · ${x.dopyty} dopyt` : ""}`} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+            {x.dopyty > 0 && <div style={{ width: 6, height: 6, borderRadius: 3, background: C.green, marginBottom: 2 }} />}
+            <div style={{ width: "100%", height: `${Math.max(2, (x.spend / maxSpend) * 40)}px`, background: C.accent, opacity: 0.75, borderRadius: 2 }} />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Samostatná záložka Marketing → Dozor reklám (10. 10. 2026):
+ * dozor + metriky + reklamný Jarvis. Široko tri stĺpce (dozor · Jarvis ·
+ * metriky), užšie dva (metriky pod dozorom), na telefóne pod sebou.
+ */
 export function ReklamaPracovisko({ data, chat, onNavigate }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
   const uzke = useUzke();
-  if (!chat) return <DozorReklamKarta data={data} />;
+  const siroke = useSiroka();
+  if (uzke || !chat) {
+    return (
+      <>
+        <DozorReklamKarta data={data} />
+        <MetrikyReklamy data={data} />
+        {chat && <ReklamnyAgent chat={chat} onNavigate={onNavigate} />}
+      </>
+    );
+  }
+  if (siroke) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.25fr) minmax(250px, 0.6fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
+        <DozorReklamKarta data={data} />
+        <ReklamnyAgent chat={chat} onNavigate={onNavigate} />
+        <MetrikyReklamy data={data} />
+      </div>
+    );
+  }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: uzke ? "1fr" : "minmax(0, 1fr) minmax(0, 1.1fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
-      <DozorReklamKarta data={data} />
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
+      <div>
+        <DozorReklamKarta data={data} />
+        <MetrikyReklamy data={data} />
+      </div>
       <ReklamnyAgent chat={chat} onNavigate={onNavigate} />
     </div>
   );

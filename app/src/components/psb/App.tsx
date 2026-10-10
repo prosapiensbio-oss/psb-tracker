@@ -3049,7 +3049,7 @@ function skupinaFaktur(
   const chat = useAssistantChat(aiContext, actions, (mesiac, faza, napadId) =>
     setNavratDoMapy({ mesiac, faza, napadId }));
   // Reklamný agent (10. 10. 2026) — druhá, pevná konverzácia vedľa dozoru
-  // v Marketing → Čo to stálo. Nemieša sa s hlavným Jarvisom.
+  // v Marketing → Dozor reklám. Nemieša sa s hlavným Jarvisom.
   const chatReklama = useAssistantChat(aiContext, actions, undefined, REKLAMA_AGENT);
   // Clicking a client name in a bot reply → open that client in Klienti + pop the
   // floating chat open (so the conversation follows you onto the new tab).

@@ -3362,7 +3362,7 @@ export function deriveRegister(
    */
   if (data.reklamaDozor) {
     for (const p of polozkyDozoru(data.reklamaDozor, data.leads || [], ack, dnesPraha())) {
-      add(p.key, p.category, p.tone, p.title, p.detail, p.priority, "marketing|naklady", p.rodina, { trener: "Jerry", reklama: p.reklama });
+      add(p.key, p.category, p.tone, p.title, p.detail, p.priority, "marketing|dozor", p.rodina, { trener: "Jerry", reklama: p.reklama });
     }
   }
 

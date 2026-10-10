@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY, jeMesiac } from "../../lib/psb/format";
 import { navrhZTokenu } from "../../lib/psb/kampanPlan";
@@ -17,7 +18,7 @@ import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav" | "prompt-claude";
   label: string;
   done?: boolean;
   key?: string;
@@ -169,6 +170,10 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "reklama-nova", label, data: o });
         } else if (o?.type === "reklama-stav" && /^[0-9]{5,}$/.test(String(o.objektId)) && (o.stav === "ACTIVE" || o.stav === "PAUSED")) {
           actions.push({ type: "reklama-stav", label, data: o });
+        // Zadanie pre Claude Code — veci, ktoré Kokpit sám nespraví (kód,
+        // WordPress, prehliadač). Klik ho len skopíruje; nič sa nevykoná.
+        } else if (o?.type === "prompt-claude" && String(o.text || "").trim().length >= 20) {
+          actions.push({ type: "prompt-claude", label: label || "Skopírovať zadanie pre Claude Code", data: o });
         } else if (o?.type === "mkt-znacka" && typeof o.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.datum))) {
           actions.push({ type: "mkt-znacka", label, data: o });
         }
@@ -731,6 +736,10 @@ export function useAssistantChat(
             else oznamVysledok(`Prepnutie kampane neprešlo: ${j.error || "bez dôvodu"}`);
           })
           .catch(() => oznamVysledok("Prepnutie kampane zlyhalo — spojenie."));
+      } else if (a.type === "prompt-claude" && a.data) {
+        void doSchranky(String(a.data.text)).then((ok) => oznamVysledok(ok
+          ? "Zadanie pre Claude Code je v schránke — vlož ho do Clauda."
+          : "Schránka odmietla — zadanie je v bloku vyššie, označ ho a skopíruj ručne."));
       } else if ((a.type === "reklama-rozpocet" || a.type === "reklama-cielenie" || a.type === "reklama-nova" || a.type === "reklama-stav") && a.data) {
         // Reklamný agent: klik = jeden zásah do Mety. Výsledok ide späť do
         // rozhovoru, aby Jarvis vedel, čo sa naozaj stalo.

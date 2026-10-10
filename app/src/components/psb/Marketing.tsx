@@ -1132,6 +1132,9 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },
           { id: "lievik", label: "Odkiaľ prišli klienti", skupina: "Výsledok" },
           { id: "naklady", label: "Čo to stálo", skupina: "Výsledok" },
+          // Dozor reklám (10. 10. 2026): bežiace kampane, metriky a reklamný
+          // Jarvis na jednej obrazovke — miesto, kde sa o reklame rozhoduje.
+          { id: "dozor", label: "Dozor reklám", skupina: "Výsledok" },
           // „Dosah a obsah" bola jedna záložka zlepená z dvoch obrazoviek:
           // Instagram a vyhľadávanie. Hýbu sa inou rýchlosťou — reel žije dni,
           // pozícia v Googli mesiace — a v jednom okne sa jedno z nich vždy
@@ -1200,9 +1203,9 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           (výdavok ÷ všetci noví), „Platená cesta" a „Kampane" — každá
           s vlastným výpočtom, vlastným prepínačom obdobia a iným výsledkom.
           Podľa nich sa pritom rozhodovalo o rozpočte (18. 8. 2026). */}
+      {sub === "dozor" && <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate} />}
       {sub === "naklady" && (
         <>
-          <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate} />
           <Reklama data={data} clients={clients} />
           <AkoMeratReklamu />
           <PripravitKampan />

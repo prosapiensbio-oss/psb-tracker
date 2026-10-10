@@ -1061,7 +1061,7 @@ export const Route = createFileRoute("/api/meta")({
          *
          * Bežiace kampane, ich sady a reklamy, stav účtu a výdavok po dňoch
          * za 60 dní. Spúšťa ho plánovač o 4:20 UTC (pred rannou správou)
-         * a tlačidlo „Stiahnuť teraz" v Marketing → Náklady.
+         * a tlačidlo „Stiahnuť teraz" v Marketing → Dozor reklám.
          *
          * Ukladá sa SNÍMKA bežiacich kampaní (`reklama_dozor`) a KNIHA dní
          * (`reklama_dni`). Keď zoznam kampaní zlyhá, nič sa nemaže — prázdna
