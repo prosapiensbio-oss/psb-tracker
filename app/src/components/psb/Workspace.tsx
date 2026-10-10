@@ -81,7 +81,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit, btcUzavierky }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, stavy, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -115,6 +115,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   actions?: Actions;
   chat?: AssistantChat;
   register?: RegisterItem[];
+  /** Ku ktorému dňu appka pozná zostatok účtu a hotovosti (mesačná kontrola). */
+  stavy?: { ucet?: { datum: string } | null; hotovost?: { datum: string } | null };
   pohybSplits?: PohybSplits;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
@@ -1596,6 +1598,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 <KrokKontroly
                   kontroly={kontrolyMesiaca(mk)}
                   acks={data.anomalyAck || {}} onNavigate={onNavigate}
+                  vstup={{
+                    dnes: dnesPraha(),
+                    importy: Object.fromEntries(
+                      (data.uploadLog || []).reduce((m, u) => {
+                        const d = String(u.date || "").slice(0, 10);
+                        if (d && d > (m.get(u.type) || "")) m.set(u.type, d);
+                        return m;
+                      }, new Map<string, string>()),
+                    ),
+                    otvoreneUpozornenia: upozornenia.length,
+                    stavUctu: stavy?.ucet || null,
+                    stavHotovosti: stavy?.hotovost || null,
+                  }}
                   onZmena={() => { oznam("klienti"); void actions?.refresh(); }}
                 />
               ),

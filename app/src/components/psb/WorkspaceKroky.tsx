@@ -27,6 +27,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
+import { oblastKontroly, stavSpolu, vysledkyKontroly, type StavVysledku, type VstupKontroly } from "../../lib/psb/kontrolaVysledky";
 
 export type BalicekRiadokKroku = {
   id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
@@ -1246,49 +1247,116 @@ export type KontrolaKarta = { id: string; nadpis: string; detail: string; splatn
  * zapíše ten istý kľúč ako register na Dnes (`zapis|<id>`), takže karta
  * a pripomienka sa nemôžu rozísť.
  */
-export function KrokKontroly({ kontroly, acks, onNavigate, onZmena }: {
+/** Ktorú kontrolu Jerry naposledy otvoril — prežije odchod zo stránky. */
+const POSLEDNA_KONTROLA = "psb-kontrola-otvorena";
+
+export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onZmena }: {
   kontroly: KontrolaKarta[];
   acks: Record<string, unknown>;
+  /** Čo si appka overí sama — vek importov, stav účtu, otvorené upozornenia. */
+  vstup: VstupKontroly;
   onNavigate?: (tab: string, sub?: string) => void;
   onZmena: () => void;
 }) {
   const [bezi, setBezi] = useState("");
   const [chyba, setChyba] = useState("");
   const [hotove, setHotove] = useState<Set<string>>(new Set());
+  const [nalezy, setNalezy] = useState<Record<string, string>>({});
+  /**
+   * Ktorú kontrolu si naposledy otvoril.
+   *
+   * Jerry, 10. 10. 2026: „pozri sa, čo sa stane, keď dám otvoriť." Prepne to
+   * na inú záložku a nič viac — kontrola zostane neodškrtnutá a po návrate
+   * musí človek medzi štyrmi riadkami hľadať, pri ktorom bol. Kľúč prežije
+   * odchod zo stránky, takže po návrate je ten riadok zvýraznený a políčko
+   * na nález čaká otvorené.
+   */
+  const [otvorena, setOtvorena] = useState<string>(() => {
+    try { return localStorage.getItem(POSLEDNA_KONTROLA) || ""; } catch { return ""; }
+  });
   // „Odložené" nie je skontrolované — tá istá podmienka ako pri zámku mesiaca.
   const jeHotova = (k: KontrolaKarta) => {
     const a = acks[`zapis|${k.id}`] as { note?: string } | undefined;
     return (!!a && !(a.note || "").startsWith("odlozene|")) || hotove.has(k.id);
   };
+  const poznamkaHotovej = (k: KontrolaKarta) =>
+    ((acks[`zapis|${k.id}`] as { note?: string } | undefined)?.note || "").replace(/^nález: /, "");
 
   const odskrtni = async (k: KontrolaKarta) => {
     setBezi(k.id); setChyba("");
-    const j = await posli("/api/anomaly", { key: `zapis|${k.id}`, ack: true, note: "skontrolované z Workspace" });
+    /**
+     * Odškrtnutie nesie, ČO SI NAŠIEL.
+     *
+     * Jerry, 10. 10. 2026: „odškrtnutie má niesť, čo si našiel." Dovtedy tam
+     * stála fráza „skontrolované z Workspace" a o mesiac sa z nej nedalo
+     * zistiť, či kontrola niečo odhalila. Prázdne políčko znamená „sedelo" —
+     * to je tiež výsledok, len ten dobrý.
+     */
+    const nalez = (nalezy[k.id] || "").trim();
+    const j = await posli("/api/anomaly", { key: `zapis|${k.id}`, ack: true, note: nalez ? `nález: ${nalez}` : "sedelo" });
     setBezi("");
     if (!j.ok) { setChyba(j.error || "Nezapísalo sa."); return; }
     setHotove((s) => new Set([...s, k.id]));
+    if (otvorena === k.id) { setOtvorena(""); try { localStorage.removeItem(POSLEDNA_KONTROLA); } catch { /* bez úložiska */ } }
     onZmena();
   };
+
+  const otvor = (k: KontrolaKarta) => {
+    setOtvorena(k.id);
+    try { localStorage.setItem(POSLEDNA_KONTROLA, k.id); } catch { /* bez úložiska sa po návrate len nezvýrazní */ }
+    onNavigate?.(k.ciel.tab, k.ciel.sub);
+  };
+
+  const farbaStavu = (st: StavVysledku) => (st === "pozor" ? C.orange : st === "nevie" ? C.textDim : C.green);
 
   return (
     <>
       {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
       {kontroly.map((k, i) => {
         const hotova = jeHotova(k);
+        const vysledky = vysledkyKontroly(oblastKontroly(k.id), vstup);
+        const spolu = stavSpolu(vysledky);
+        const vratil = otvorena === k.id && !hotova;
         return (
-          <div key={k.id} style={{ ...riadok, alignItems: "flex-start", opacity: hotova ? 0.6 : 1 }}>
-            <span style={{ width: 20, fontSize: 14, color: hotova ? C.green : k.splatne ? C.orange : C.textDim }}>{hotova ? "✓" : "○"}</span>
+          <div key={k.id} style={{ ...riadok, alignItems: "flex-start", opacity: hotova ? 0.6 : 1, background: vratil ? mix(C.accent, 7) : undefined }}>
+            <span style={{ width: 20, fontSize: 14, color: hotova ? C.green : spolu === "pozor" ? C.orange : C.textDim }}>{hotova ? "✓" : "○"}</span>
             <div style={{ flex: "1 1 340px" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
                 {k.nadpis.replace(/^Mesačná kontrola: /, "")}
-                <span style={{ fontSize: 11, fontWeight: 500, color: k.splatne && !hotova ? C.orange : C.textDim, marginLeft: 8 }}>
-                  {i + 1}. týždeň mesiaca{k.splatne && !hotova ? " — teraz" : ""}
-                </span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: C.textDim, marginLeft: 8 }}>{i + 1}. týždeň mesiaca</span>
               </div>
-              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 2 }}>{k.detail}</div>
+
+              {/* ČO OVERILA APPKA — výsledok, nie zadanie. */}
+              {vysledky.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", marginTop: 3 }}>
+                  {vysledky.map((v, j) => (
+                    <span key={j} style={{ fontSize: 11.5, color: farbaStavu(v.stav) }}>
+                      {v.stav === "ok" ? "✓" : v.stav === "pozor" ? "!" : "?"} {v.text}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* ČO MUSÍŠ TY — to, čo stroj nespraví. */}
+              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 3 }}>{k.detail}</div>
+
+              {hotova ? (
+                poznamkaHotovej(k) && poznamkaHotovej(k) !== "sedelo" && (
+                  <div style={{ fontSize: 11.5, color: C.orange, marginTop: 3 }}>nález: {poznamkaHotovej(k)}</div>
+                )
+              ) : (
+                <input
+                  value={nalezy[k.id] || ""}
+                  autoFocus={vratil}
+                  onChange={(e) => setNalezy((x) => ({ ...x, [k.id]: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === "Enter") void odskrtni(k); }}
+                  placeholder={vratil ? "čo si našiel? (prázdne = sedelo)" : "čo si našiel? (nepovinné)"}
+                  style={{ marginTop: 5, width: "100%", maxWidth: 420, padding: "5px 9px", borderRadius: 7, border: `1px solid ${vratil ? C.accent : C.border}`, background: "transparent", color: C.text, fontSize: 12, fontFamily: "inherit" }}
+                />
+              )}
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {onNavigate && <button style={vedlajsie} onClick={() => onNavigate(k.ciel.tab, k.ciel.sub)}>otvoriť</button>}
+              {onNavigate && <button style={vedlajsie} onClick={() => otvor(k)}>otvoriť</button>}
               {!hotova && (
                 <button disabled={bezi === k.id} style={hlavne(bezi !== k.id)} onClick={() => void odskrtni(k)}>
                   {bezi === k.id ? "…" : "Skontrolované"}
