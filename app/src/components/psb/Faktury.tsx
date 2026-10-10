@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { sediSucet, type Faktura } from "../../lib/psb/faktura";
 import { platbaKDokladu, type PlatbaBtc } from "../../lib/psb/btcKFakture";
-import { RYCHLE } from "../../lib/psb/kategorieRychle";
+import { rychleVolby } from "../../lib/psb/kategorieRychle";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
 import { VyberKategorie } from "./VyberKategorie";
@@ -305,7 +305,7 @@ export function FakturyNahlad({
                       </td>
                       <td style={{ ...S.td, padding: "3px 6px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                          {RYCHLE.map((r) => {
+                          {rychleVolby().map((r) => {
                             const zvolene = p.kategoria === r.kat;
                             return (
                               <button

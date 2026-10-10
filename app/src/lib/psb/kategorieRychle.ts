@@ -8,6 +8,7 @@ import { VYPLATY_JERRY, VYPLATY_TEREZKA } from "./fio";
  * bolo spoločné." 10. 10. 2026 pribudlo NÁRADIE — pomôcky na cvičenie
  * (`variabilne.prevadzka2.pomocky`). To je jediná z piatich, ktorá je
  * skutočný náklad PSB; ostatné sú peniaze trénerov alebo domácnosti.
+ * Naostro od 10. 10. 2026.
  *
  * VÝPLATA SÚ DVE TLAČIDLÁ S MENAMI, nie prepínač. Prvá verzia mala jedno
  * tlačidlo „výplata" a nad zoznamom prepínač, čia je; Jerry, 10. 10. 2026:
@@ -28,11 +29,4 @@ export const rychleVolby = (): { kat: string; text: string }[] => [
   { kat: "spolocne.Ahsoka", text: "Ahsoka" },
   { kat: "spolocne.Domácnosť", text: "domácnosť" },
   { kat: NARADIE, text: "náradie" },
-];
-
-/** Pôvodná trojica — kým sa rozšírená ponuka skúša v bete (10. 10. 2026). */
-export const RYCHLE: { kat: string; text: string }[] = [
-  { kat: VYPLATY_JERRY, text: "výplata Jerry" },
-  { kat: "spolocne.Ahsoka", text: "Ahsoka" },
-  { kat: "spolocne.Domácnosť", text: "domácnosť" },
 ];

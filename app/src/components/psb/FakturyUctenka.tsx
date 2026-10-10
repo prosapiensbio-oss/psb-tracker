@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeNehmotny, popisNehmotnych, rozdelDoklad } from "../../lib/psb/fakturaRiadky";
-import { RYCHLE, rychleVolby } from "../../lib/psb/kategorieRychle";
+import { rychleVolby } from "../../lib/psb/kategorieRychle";
 import { C, mix } from "../../lib/psb/theme";
 import { VyberKategorie } from "./VyberKategorie";
 
@@ -35,18 +35,16 @@ export type DokladUctenky = {
 };
 
 export function FakturyUctenka({
-  doklady, uklada, onKategoria, onZmaz, naradie,
+  doklady, uklada, onKategoria, onZmaz,
 }: {
   doklady: DokladUctenky[];
   /** id položky, ktorá sa práve ukladá — tlačidlá sa na ten čas zamknú. */
   uklada: string;
   onKategoria: (p: PolozkaDokladu, kategoria: string) => void;
   onZmaz: (ids: string[]) => void;
-  /** Rozšírená ponuka skratiek (Jerry · Terezka · Ahsoka · domácnosť · náradie) — zatiaľ len v bete. */
-  naradie?: boolean;
 }) {
   const [rozbalene, setRozbalene] = useState<Set<string>>(new Set());
-  const volby = naradie ? rychleVolby() : RYCHLE;
+  const volby = rychleVolby();
   const prepni = (cislo: string) =>
     setRozbalene((p) => {
       const n = new Set(p);

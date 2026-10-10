@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { NARADIE, RYCHLE, rychleVolby } from "./kategorieRychle";
+import { NARADIE, rychleVolby } from "./kategorieRychle";
 import { VYPLATY_JERRY, VYPLATY_TEREZKA } from "./fio";
 
 describe("rychleVolby", () => {
@@ -26,11 +26,5 @@ describe("rychleVolby", () => {
   it("žiadne dve skratky nevedú do tej istej kategórie", () => {
     const katy = rychleVolby().map((x) => x.kat);
     expect(new Set(katy).size).toBe(katy.length);
-  });
-
-  it("naostro zostáva pôvodná trojica", () => {
-    expect(RYCHLE).toHaveLength(3);
-    expect(RYCHLE.map((x) => x.kat)).not.toContain(NARADIE);
-    expect(RYCHLE.map((x) => x.kat)).not.toContain(VYPLATY_TEREZKA);
   });
 });
