@@ -1,3 +1,4 @@
+import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import type { SporneKonanie } from "../../lib/psb/sporneKonanie";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1512,7 +1513,10 @@ function skupinaFaktur(
           const poMesiacoch: Record<string, Set<string>> = {};
           for (const p of fa) {
             const m = String(p.datum).slice(0, 7);
-            if (!p.kategoria) nez[m] = (nez[m] || 0) + 1;
+            // Doprava a zľavy („Nehmotný produkt …") sa v kroku Alza zbalia
+            // a kategóriu nikdy nedostanú — keby sa počítali, číslo by sa
+            // nikdy nedostalo na nulu a krok uzávierky by sa nedal zavrieť.
+            if (!p.kategoria && !jeNehmotny(p.nazov || "")) nez[m] = (nez[m] || 0) + 1;
             (poMesiacoch[m] ||= new Set()).add(p.faktura);
           }
           setFakturyNezaradene(nez);

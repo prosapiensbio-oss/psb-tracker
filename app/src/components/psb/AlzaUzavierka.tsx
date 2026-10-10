@@ -229,7 +229,18 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
            Pôvodný plochý zoznam je preč — dve obrazovky na to isté sa
            rozídu a človek potom nevie, ktorá hovorí pravdu. */
         <div style={{ display: "grid", gap: 8 }}>
-          {nezaradeneTovar > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradeneTovar} {nezaradeneTovar === 1 ? "vec nemá" : "vecí nemá"} kategóriu — bez nej v P&L chýba.</div>}
+          {/* Jerry, 10. 10. 2026: „kde to dám potvrdiť/zapísať?" Nikde — klik
+              na skratku ide rovno do databázy. Obrazovka bez tlačidla „Uložiť"
+              musí povedať, že nič také netreba; inak človek čaká na krok,
+              ktorý neexistuje, a nevie, či je hotovo. */}
+          {nezaradeneTovar > 0 ? (
+            <div style={{ fontSize: 12, color: C.orange }}>
+              {nezaradeneTovar} {nezaradeneTovar === 1 ? "vec nemá" : "vecí nemá"} kategóriu — bez nej v P&L chýba.
+              <span style={{ color: C.textDim }}> Zapisuje sa hneď pri kliku, potvrdzovať netreba.</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: C.green }}>Všetko zaradené a zapísané — potvrdzovať netreba.</div>
+          )}
           <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} />
         </div>
       )}
