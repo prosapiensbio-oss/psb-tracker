@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BtcNakup } from "../../lib/psb/client";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
+import { jeBeta } from "../../lib/psb/beta";
 import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { platbaKDokladu } from "../../lib/psb/btcKFakture";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
@@ -230,7 +231,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
            rozídu a človek potom nevie, ktorá hovorí pravdu. */
         <div style={{ display: "grid", gap: 8 }}>
           {nezaradeneTovar > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradeneTovar} {nezaradeneTovar === 1 ? "vec nemá" : "vecí nemá"} kategóriu — bez nej v P&L chýba.</div>}
-          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} />
+          <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} naradie={jeBeta()} />
         </div>
       )}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}

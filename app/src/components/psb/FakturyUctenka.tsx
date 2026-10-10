@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeNehmotny, popisNehmotnych, rozdelDoklad } from "../../lib/psb/fakturaRiadky";
-import { RYCHLE } from "../../lib/psb/kategorieRychle";
+import { rychleVolby, type KomuVyplata } from "../../lib/psb/kategorieRychle";
 import { C, mix } from "../../lib/psb/theme";
 import { VyberKategorie } from "./VyberKategorie";
 
@@ -35,15 +35,25 @@ export type DokladUctenky = {
 };
 
 export function FakturyUctenka({
-  doklady, uklada, onKategoria, onZmaz,
+  doklady, uklada, onKategoria, onZmaz, naradie,
 }: {
   doklady: DokladUctenky[];
   /** id položky, ktorá sa práve ukladá — tlačidlá sa na ten čas zamknú. */
   uklada: string;
   onKategoria: (p: PolozkaDokladu, kategoria: string) => void;
   onZmaz: (ids: string[]) => void;
+  /** Štvrtá skratka (náradie) a prepínač výplaty — zatiaľ len v bete. */
+  naradie?: boolean;
 }) {
   const [rozbalene, setRozbalene] = useState<Set<string>>(new Set());
+  /**
+   * Komu patrí výplata — stav sa ZÁMERNE NEPAMÄTÁ cez obnovenie stránky.
+   * Prepnuté na Terezku a zabudnuté by znamenalo mesiac Jerryho nákupov
+   * zapísaných na ňu. Po načítaní je to vždy Jerry; drvivá väčšina nákupov
+   * na Alze je jeho.
+   */
+  const [komu, setKomu] = useState<KomuVyplata>("jerry");
+  const volby = naradie ? rychleVolby(komu) : rychleVolby("jerry").slice(0, 3);
   const prepni = (cislo: string) =>
     setRozbalene((p) => {
       const n = new Set(p);
@@ -67,6 +77,19 @@ export function FakturyUctenka({
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
+      {naradie && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: C.textMuted }}>
+          <span>skratka „výplata" zapisuje na:</span>
+          {(["jerry", "terezka"] as KomuVyplata[]).map((k) => (
+            <button key={k} onClick={() => setKomu(k)}
+              style={{ padding: "3px 11px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                border: `1px solid ${komu === k ? C.accent : C.border}`, background: komu === k ? C.accentBg : "transparent",
+                color: komu === k ? C.accentLight : C.textMuted }}>
+              {k === "jerry" ? "Jerry" : "Terezka"}
+            </button>
+          ))}
+        </div>
+      )}
       {doklady.map((d) => {
         const r = rozdelDoklad(d.polozky);
         const otvorene = rozbalene.has(d.cislo);
@@ -87,7 +110,7 @@ export function FakturyUctenka({
               <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "4px 0", borderTop: `1px solid ${mix(C.border, 45)}` }}>
                 <span style={{ fontSize: 12, color: C.text, flex: "1 1 220px", minWidth: 0 }}>{p.nazov}</span>
                 <span style={{ fontSize: 12, color: C.text, minWidth: 74, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.cena)}</span>
-                {RYCHLE.map((x) => (
+                {volby.map((x) => (
                   <button key={x.kat} disabled={uklada === p.id} onClick={() => onKategoria(p, x.kat)}
                     style={{ padding: "3px 9px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
                       border: `1px solid ${p.kategoria === x.kat ? C.accent : C.border}`, background: p.kategoria === x.kat ? C.accentBg : "transparent",
