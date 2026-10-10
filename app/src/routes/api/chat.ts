@@ -313,7 +313,7 @@ Keď je fakt MARKETINGOVÝ (spustená/vypnutá kampaň, nový formát obsahu, pa
 \`\`\`
 Veľké firemné míľniky (zmena majiteľa priestoru, zdraženie) patria do kroniky; marketingové udalosti do značiek. Keď si nie si istý, spýtaj sa jednou vetou. Keď to z rozhovoru nie je jasné, spýtaj sa na mesiac — zle datovaný fakt je horší než nezapísaný. Fakt formuluj tak, aby dával zmysel človeku, ktorý o tomto rozhovore nikdy nepočul: celé meno, čoho sa to týka, aký to má dôsledok. Jedna–dve vety. Nezapisuj to, čo appka počíta sama.
 
-MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho meno do francúzskych úvodzoviek «takto» a NAPÍŠ HO V PÁDE, KTORÝ VETA ŽIADA. Tvar je «čo sa zobrazí|meno z dát»: «Veronikou Stoklaskovou|Veronika Stoklaskova», «Richardom Matlom|Richard Matl», «Jakuba Štiguta|Jakub Štigut». Vpravo za zvislicou je meno PRESNE ako v klientiDetail — podľa neho appka nájde klienta a spraví odkaz; vľavo je tvar, ktorý číta človek. Zvislicu vynechaj LEN vtedy, keď veta žiada prvý pád a oba tvary sú rovnaké: «Veronika Stoklaskova je 29 dní bez tréningu.» Nikdy nenechaj v texte nesklonený tvar. ZLE: „Začni s «Veronika Stoklaskova»." DOBRE: „Začni s «Veronikou Stoklaskovou|Veronika Stoklaskova»." Keď si pádom nie si istý, preformuluj vetu tak, aby meno stálo v prvom páde — radšej iná veta než zlé skloňovanie. «» POUŽI LEN NA MENO KLIENTA — nikdy na názov článku, stránky, kategórie, balíčka ani na nič iné. Appka z toho robí odkaz na kartu klienta; keď do «» obalíš názov článku, odkaz vedie na neexistujúceho klienta. NÁVRH KAMPANE — keď sa bavíme o tom, čo pustiť za reklamu, a máš konkrétny návrh, ukonči ho riadkom ⟦kampan|cieľ|adresa|rozpočet|názov|strop|dni⟧. Strop a dni sú NEPOVINNÉ — doplň ich, keď z debaty vyplynuli (strop v korunách, aspoň 2 000; dni = ako dlho má kampaň bežať). Keď nevyplynuli, nechaj tie dve políčka prázdne, ale zvislice tam nechaj. Cieľ je „navstevnost" alebo „dopyty", adresa je stránka na prosapiens.cz, rozpočet je denne v korunách (minimum 22), názov je to, čo uvidí Jerry v Mete. Príklad: ⟦kampan|navstevnost|https://www.prosapiens.cz/uvodni-trenink/|150|PSB 2026-09 — úvodní trénink|6000|28⟧. Appka z toho spraví tlačidlo, ktoré otvorí formulár už vyplnený; kampaň sa tým NEZALOŽÍ a keď sa založí, bude POZASTAVENÁ. Appka zakladá kampaň, sadu AJ kreatívu s reklamou (od 19. 8. 2026): pri novej kampani z textu + nahratého média, pri propagácii z obrázka/videa a textu príspevku. NEHOVOR, že kreatívu nerobí. Píš ten riadok len keď je návrh naozaj konkrétny — nie „mohli by sme skúsiť reklamu". Cieľ „dopyty" navrhuj s vysvetlením: udalosť Lead od 18. 8. 2026 meria skutočné odoslania formulára (CAPI), ale na učenie kampane jej je málo (Meta chce ~50/týždeň, PSB má 3–4/mesiac) — kampaň sa optimalizuje na zobrazenia stránky a Lead slúži na meranie ceny za dopyt. Kampane vznikajú vždy v účte ProSapiens Biomechanic (172897726151288); iný reklamný účet appka nesleduje. SPUSTENIE A VYPNUTIE KAMPANE (od 20. 8. 2026) — keď Jerry povie, že chce existujúcu POZASTAVENÚ kampaň spustiť (alebo bežiacu vypnúť), pridaj psb-action blok: {"type":"spusti-kampan","kampanId":"<id z mkt_kampane>","label":"Spustiť kampaň <názov>"} alebo {"type":"zastav-kampan",...}. Server pred spustením prejde kontrolórom (účet, sada, reklama s kreatívou, rozpočet nad minimom, reklama nezamietnutá) a zapne VŠETKY TRI úrovne naraz — kampaň, sadu aj reklamu; polovičato zapnutá kampaň sa tak nemôže stať. Pred navrhnutím spustenia over v mkt_kampane, že kampaň existuje a KOĽKO by denne míňala, a povedz to nahlas. Nenavrhuj spustenie sám od seba — len keď oň Jerry požiada. ODKAZY — keď menuješ konkrétny kus obsahu, daj naň preklik. Appka z holej adresy spraví klikateľný odkaz.
+MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho meno do francúzskych úvodzoviek «takto» a NAPÍŠ HO V PÁDE, KTORÝ VETA ŽIADA. Tvar je «čo sa zobrazí|meno z dát»: «Veronikou Stoklaskovou|Veronika Stoklaskova», «Richardom Matlom|Richard Matl», «Jakuba Štiguta|Jakub Štigut». Vpravo za zvislicou je meno PRESNE ako v klientiDetail — podľa neho appka nájde klienta a spraví odkaz; vľavo je tvar, ktorý číta človek. Zvislicu vynechaj LEN vtedy, keď veta žiada prvý pád a oba tvary sú rovnaké: «Veronika Stoklaskova je 29 dní bez tréningu.» Nikdy nenechaj v texte nesklonený tvar. ZLE: „Začni s «Veronika Stoklaskova»." DOBRE: „Začni s «Veronikou Stoklaskovou|Veronika Stoklaskova»." Keď si pádom nie si istý, preformuluj vetu tak, aby meno stálo v prvom páde — radšej iná veta než zlé skloňovanie. «» POUŽI LEN NA MENO KLIENTA — nikdy na názov článku, stránky, kategórie, balíčka ani na nič iné. Appka z toho robí odkaz na kartu klienta; keď do «» obalíš názov článku, odkaz vedie na neexistujúceho klienta. NÁVRH KAMPANE — keď sa bavíme o tom, čo pustiť za reklamu, a máš konkrétny návrh, ukonči ho riadkom ⟦kampan|cieľ|adresa|rozpočet|názov|strop|dni⟧. Strop a dni sú NEPOVINNÉ — doplň ich, keď z debaty vyplynuli (strop v korunách, aspoň 2 000; dni = ako dlho má kampaň bežať). Keď nevyplynuli, nechaj tie dve políčka prázdne, ale zvislice tam nechaj. Cieľ je „navstevnost" alebo „dopyty", adresa je stránka na prosapiens.cz, rozpočet je denne v korunách (minimum 22), názov je to, čo uvidí Jerry v Mete. Príklad: ⟦kampan|navstevnost|https://www.prosapiens.cz/uvodni-trenink/|150|PSB 2026-09 — úvodní trénink|6000|28⟧. Appka z toho spraví tlačidlo, ktoré otvorí formulár už vyplnený; kampaň sa tým NEZALOŽÍ a keď sa založí, bude POZASTAVENÁ. Appka zakladá kampaň, sadu AJ kreatívu s reklamou (od 19. 8. 2026): pri novej kampani z textu + nahratého média, pri propagácii z obrázka/videa a textu príspevku. NEHOVOR, že kreatívu nerobí. Píš ten riadok len keď je návrh naozaj konkrétny — nie „mohli by sme skúsiť reklamu". Cieľ „dopyty" navrhuj s vysvetlením: udalosť Lead od 18. 8. 2026 meria skutočné odoslania formulára (CAPI), ale na učenie kampane jej je málo (Meta chce ~50/týždeň, PSB má 3–4/mesiac) — kampaň sa optimalizuje na zobrazenia stránky a Lead slúži na meranie ceny za dopyt. Kampane vznikajú vždy v účte ProSapiens Biomechanic (172897726151288); iný reklamný účet appka nesleduje. SPUSTENIE A VYPNUTIE KAMPANE (od 20. 8. 2026) — keď Jerry povie, že chce existujúcu POZASTAVENÚ kampaň spustiť (alebo bežiacu vypnúť), pridaj psb-action blok: {"type":"spusti-kampan","kampanId":"<id z mkt_kampane>","label":"Spustiť kampaň <názov>"} alebo {"type":"zastav-kampan",...}. Server pred spustením prejde kontrolórom (účet, sada, reklama s kreatívou, rozpočet nad minimom, reklama nezamietnutá) a zapne VŠETKY TRI úrovne naraz — kampaň, sadu aj reklamu; polovičato zapnutá kampaň sa tak nemôže stať. Pred navrhnutím spustenia over v mkt_kampane, že kampaň existuje a KOĽKO by denne míňala, a povedz to nahlas. Nenavrhuj spustenie sám od seba — len keď oň Jerry požiada. ZÁSAHY DO BEŽIACICH REKLÁM (od 10. 10. 2026, reklamný agent) — do Mety sa vieš pozrieť sám nástrojom meta_citaj (len čítanie: výkon podľa veku a pohlavia, texty reklám, cielenie sád, publiká). Zmeny navrhuješ psb-action blokom, Jerry ich odklikne; nič sa nestane bez kliknutia. Typy: (1) {"type":"reklama-rozpocet","kampanId":"<id>","novyDenny":180,"label":"Rozpočet <kampaň> 120 → 180 Kč/deň"} — nový DENNÝ rozpočet kampane v Kč; server pustí najviac 2 000 Kč/deň a najviac trojnásobok (+300 Kč); v texte vždy povedz aj sumu na mesiac (×30). (2) {"type":"reklama-cielenie","sadaId":"<id>","vekOd":35,"vekDo":60,"vylucitPublika":["<id publika>"],"zrusitVylucenie":[],"zahrnutPublika":[],"zrusitZahrnutie":[],"label":"…"} — mení LEN vek a vlastné publiká sady, zvyšok cielenia ostáva; ID publík zisti cez meta_citaj (act_172897726151288/customaudiences). (3) {"type":"reklama-nova","sadaId":"<id sady>","mediaZReklamy":"<id existujúcej reklamy, z ktorej sa prevezme obrázok/video>","nazov":"A3 - …","text":"<celý text reklamy po česky>","nadpis":"…","odkaz":"https://www.prosapiens.cz/uvodni-trenink/","cta":"LEARN_MORE|BOOK_NOW|SIGN_UP|CONTACT_US","utmContent":"kratky-kod-v3","spustit":true,"label":"Založiť reklamu A3 v sade …"} — nová reklama s novým textom do existujúcej sady; obrázok ani video z chatu nahrať nevieš, berie sa z inej reklamy (boost príspevku sa ako zdroj nedá); utm_term dostane ID sady, takže dozor dopyt priradí kampani; celý text reklamy NAPÍŠ do odpovede pred blokom, aby ho Jerry čítal skôr, než klikne. (4) {"type":"reklama-stav","objektId":"<id reklamy alebo sady>","stav":"PAUSED","label":"Vypnúť reklamu …"} — zapnúť/vypnúť jednu reklamu alebo sadu (celú kampaň ide cez zastav-kampan). Pri každej zmene povedz, KTORÉ číslo ju vyvolalo a kedy sa pozrieme, či zabrala; po zmene sa Meta učí 2–3 dni, nevyhodnocuj skôr. Meň vždy jednu premennú naraz, nie päť. ODKAZY — keď menuješ konkrétny kus obsahu, daj naň preklik. Appka z holej adresy spraví klikateľný odkaz.
 - Stránka alebo článok na webe: adresa je v web_stranky.url.
 - Instagramový príspevok: adresa je v ig_prispevky.permalink (má ju všetkých 265 kusov). Keď hovoríš o konkrétnom príspevku — najlepší, najhorší, ten s najviac uloženiami — vytiahni k nemu permalink tým istým dopytom a napíš ho.
 - ADRESU SI NIKDY NEVYMÝŠĽAJ a neskladaj ju z názvu. Musí prísť z dát; keď ju v dátach nemáš, radšej žiadny odkaz.
@@ -612,6 +612,30 @@ const TOOLS = [
     max_uses: 6,
     max_content_tokens: 30000,
   },
+  /**
+   * Reklamný agent (10. 10. 2026): Jarvis sa pozrie do Mety sám — LEN GET.
+   * Cesta je ohraničená na reklamný účet ProSapiens a jeho objekty; token sa
+   * do odpovede nikdy nedostane. Zmeny idú psb-action blokom s kliknutím.
+   */
+  {
+    name: "meta_citaj",
+    description:
+      `Prečítaj živé dáta z Meta Marketing API (len čítanie, Graph v21.0) pre reklamný účet act_172897726151288. ` +
+      `Použi, keď nestačia denné tabuľky (mkt_kampane, mkt_reklamy, reklama_dni): rozpis podľa veku/pohlavia/umiestnenia, texty a odkazy reklám, cielenie sád, publiká. ` +
+      `Cesta = to, čo ide za graph.facebook.com/v21.0/, vrátane ?parametrov (JSON v parametroch píš normálne, zakódujem ho). Povolené: act_172897726151288/(insights|campaigns|adsets|ads|customaudiences|adcreatives) alebo <číselné ID kampane/sady/reklamy/publika>[/insights|/ads|/adsets]. ` +
+      `Príklady: act_172897726151288/insights?level=adset&fields=adset_name,spend,actions&breakdowns=age,gender&time_range={"since":"2026-09-30","until":"2026-10-06"} · ` +
+      `act_172897726151288/ads?fields=name,effective_status,adset_id,creative{body,title,object_story_spec}&filtering=[{"field":"campaign.id","operator":"IN","value":["<id>"]}] · ` +
+      `<idSady>?fields=name,effective_status,daily_budget,targeting · act_172897726151288/customaudiences?fields=id,name,approximate_count_lower_bound. ` +
+      `Kliky na odkaz = actions.link_click, dorazilo na stránku = actions.landing_page_view (omni_landing_page_view je to isté, nesčítavaj). Peniaze sú v Kč (spend), rozpočty (daily_budget) v halieroch — vydeľ 100.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        cesta: { type: "string", description: "Cesta za /v21.0/ aj s parametrami." },
+        preco: { type: "string", description: "Jedna veta, čo zisťuješ — ukáže sa používateľovi." },
+      },
+      required: ["cesta"],
+    },
+  },
   {
     name: "otvor_knihu",
     description:
@@ -643,6 +667,54 @@ function bezpecnySql(raw: string): { sql: string } | { chyba: string } {
 }
 
 async function spustiNastroj(name: string, input: Record<string, unknown>): Promise<string> {
+  if (name === "meta_citaj") {
+    const { DB } = bindings();
+    if (!DB) return "Databáza nie je dostupná.";
+    const cesta = String(input.cesta || "").trim().replace(/^\/+/, "").replace(/^v\d+\.\d+\//, "");
+    if (/access_token/i.test(cesta)) return "Token sa do cesty nedáva — doplním ho sám.";
+    const m = /^(act_172897726151288|\d{6,})(\/(insights|campaigns|adsets|ads|customaudiences|adcreatives))?(\?.*)?$/s.exec(cesta);
+    if (!m) return "Táto cesta nie je povolená. Len act_172897726151288/(insights|campaigns|adsets|ads|customaudiences|adcreatives) alebo <ID objektu>[/insights|/ads|/adsets].";
+    const tokRiadok = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'meta_token'").first<{ value: string }>().catch(() => null);
+    let token = String(tokRiadok?.value || "");
+    try { token = String(JSON.parse(token)); } catch { /* holý reťazec */ }
+    if (!token) return "Meta token v Kokpite chýba (Údaje → Napojenia → Meta).";
+    const zaznam = (ok: boolean) => DB.prepare(
+      "INSERT INTO meta_volania (den, volani, chyb) VALUES (?1, 1, ?2) ON CONFLICT(den) DO UPDATE SET volani = volani + 1, chyb = chyb + ?2",
+    ).bind(dnesPraha(), ok ? 0 : 1).run().catch(() => {});
+    const ziskaj = async (c: string) => {
+      const u = new URL(`https://graph.facebook.com/v21.0/${c}`);
+      u.searchParams.set("access_token", token);
+      const r = await fetch(u.toString());
+      const t = await r.text();
+      let j: Record<string, unknown> = {};
+      try { j = JSON.parse(t) as Record<string, unknown>; } catch { return { ok: false, text: `Meta neodpovedala JSON-om (HTTP ${r.status}): ${t.slice(0, 300)}` }; }
+      if (!r.ok || j.error) {
+        const e = (j.error || {}) as Record<string, unknown>;
+        return { ok: false, text: `Meta odmietla: ${e.message || `HTTP ${r.status}`}`, j };
+      }
+      return { ok: true, text: "", j };
+    };
+    try {
+      // Číselný objekt musí patriť účtu ProSapiens — inak by sa token dal použiť na cudzie veci.
+      if (m[1] !== "act_172897726151288") {
+        const o = await ziskaj(`${m[1]}?fields=account_id`);
+        void zaznam(o.ok);
+        if (!o.ok) return o.text;
+        if (String(o.j?.account_id || "") !== "172897726151288") return "Tento objekt nepatrí reklamnému účtu ProSapiens — nečítam ho.";
+      }
+      const v = await ziskaj(cesta);
+      void zaznam(v.ok);
+      if (!v.ok) return v.text;
+      // Stránkovacie kurzory sú dlhé a modelu nič nepovedia — len či je ďalšia strana.
+      const j = { ...(v.j || {}) };
+      const p = j.paging as { next?: string } | undefined;
+      if (p) j.paging = { dalsiaStrana: !!p.next };
+      const out = JSON.stringify(j);
+      return out.length > 16000 ? `${out.slice(0, 16000)}… [skrátené z ${out.length} znakov — zúž polia, obdobie alebo pridaj limit]` : out;
+    } catch (e) {
+      return `Spojenie s Metou zlyhalo: ${String(e).slice(0, 200)}`;
+    }
+  }
   if (name === "otvor_knihu") {
     const id = String(input.id || "");
     const text = textKnihy(id);

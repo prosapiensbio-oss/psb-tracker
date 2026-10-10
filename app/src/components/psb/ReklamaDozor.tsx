@@ -9,6 +9,23 @@ import { dnesPraha } from "../../lib/psb/cas";
 import { C, S, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3 } from "./ui";
+import { ChatConversation, type AssistantChat } from "./Assistant";
+import { useUzke } from "./useUzke";
+
+/** Pevná konverzácia reklamného agenta — jedno stále vlákno so zameraním Kampaň. */
+export const REKLAMA_AGENT = { id: "reklama-agent", kategoria: "kampan", nazov: "Reklama · Jarvis" } as const;
+
+/**
+ * Otázka čakajúca na reklamného agenta. Notifikácia dozoru žije v registri
+ * (Dashboard) a agent v Marketingu — medzi nimi niet spoločného rodiča,
+ * tak otázka počká tu, kým sa panel nepripojí a nevyzdvihne si ju.
+ */
+let cakajucaOtazka: { text: string; zobrazit: string } | null = null;
+const posluchaci = new Set<() => void>();
+export function posliAgentovi(text: string, zobrazit: string) {
+  cakajucaOtazka = { text, zobrazit };
+  for (const f of posluchaci) f();
+}
 
 const linkBtn = { background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 12, padding: 0 } as const;
 
@@ -46,7 +63,7 @@ function PromptPreClauda({ text }: { text: string }) {
  * najprv ukáže suma na mesiac a čaká sa na druhé potvrdenie. Každé
  * rozhodnutie sa zapíše aj s číslami, na ktorých stálo, a uzavrie notifikáciu.
  */
-export function ReklamaRozhodnutie({ item, onHotovo }: { item: RegisterItem; onHotovo: (poznamka: string) => void }) {
+export function ReklamaRozhodnutie({ item, onHotovo, onNavigate }: { item: RegisterItem; onHotovo: (poznamka: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   const r = item.reklama as ReklamaPolozka;
   const [dm, setDm] = useState("");
   const [rozpocetOtvoreny, setRozpocetOtvoreny] = useState(false);
@@ -108,6 +125,15 @@ export function ReklamaRozhodnutie({ item, onHotovo }: { item: RegisterItem; onH
               {rozpocetOtvoreny ? "Zavrieť rozpočet" : "Zmeniť rozpočet"}
             </button>
             <a href={adsManagerOdkaz(r.kampanId)} target="_blank" rel="noreferrer" style={{ ...linkBtn, color: C.textMuted }}>Ads Manager ↗</a>
+            {onNavigate && (
+              <button
+                onClick={() => { posliAgentovi(`${r.prompt}\n\nPozri sa na túto kampaň do Mety (meta_citaj) — výkon podľa veku a pohlavia a texty reklám — a povedz mi, čo by si zmenil a prečo. Ak navrhneš zmenu, daj ju ako tlačidlo.`, `Preberme kampaň „${r.nazov}“`); onNavigate("marketing", "naklady"); }}
+                style={{ ...linkBtn, color: C.accentLight }}
+                title="Otvorí reklamného Jarvisa v Marketing → Čo to stálo s touto kampaňou"
+              >
+                Prebrať s Jarvisom →
+              </button>
+            )}
             <PromptPreClauda text={r.prompt} />
           </div>
           {rozpocetOtvoreny && (
@@ -249,5 +275,68 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
         </details>
       )}
     </Card>
+  );
+}
+
+/**
+ * Reklamný agent — Jarvis so zameraním Kampaň v jednom stálom vlákne,
+ * vedľa dozoru (10. 10. 2026). Číta Metu sám (`meta_citaj`), zmeny navrhuje
+ * tlačidlami (rozpočet, cielenie, nová reklama, zapnúť/vypnúť). Kód
+ * Kokpitu, WordPress a prehliadač ostávajú na Claude Code.
+ */
+export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
+  // Otázka z notifikácie: vyzdvihne sa pri pripojení aj keď príde, kým panel beží.
+  useEffect(() => {
+    const vyzdvihni = () => {
+      if (!cakajucaOtazka || chat.busy || !chat.pripraveny) return;
+      const q = cakajucaOtazka;
+      cakajucaOtazka = null;
+      void chat.ask(q.text, q.zobrazit);
+    };
+    vyzdvihni();
+    posluchaci.add(vyzdvihni);
+    return () => { posluchaci.delete(vyzdvihni); };
+  }, [chat]);
+  const prazdny = !chat.msgs.length;
+  const RYCHLE = [
+    "Ako sú na tom bežiace kampane? Pozri sa do Mety aj na dopyty a povedz, čo by si zmenil.",
+    "Rozpíš výkon za posledný týždeň podľa veku a pohlavia — kde peniaze dorazia na stránku a kde nie?",
+    "Prečítaj texty bežiacich reklám a navrhni jednu novú verziu na otestovanie.",
+  ];
+  return (
+    <Card style={{ display: "flex", flexDirection: "column", height: 640, padding: 0, overflow: "hidden" }}>
+      <div style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <b style={{ color: C.text, fontSize: 15 }}>Reklama · Jarvis</b>
+        <span style={{ fontSize: 11.5, color: C.textMuted }}>jedna stála debata o reklame · vidí do Mety · každú zmenu potvrdíš tlačidlom</span>
+        <label style={{ marginLeft: "auto", fontSize: 11.5, color: C.textMuted, display: "flex", gap: 5, alignItems: "center" }} title="Opus premýšľa dlhšie — na rozbory a rozhodnutia">
+          <input type="checkbox" checked={chat.deep} onChange={(e) => chat.setDeep(e.target.checked)} /> hlboko
+        </label>
+      </div>
+      {prazdny && (
+        <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+          {RYCHLE.map((q) => (
+            <button key={q} onClick={() => void chat.ask(q)} disabled={chat.busy}
+              style={{ textAlign: "left", background: C.track, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", color: C.text, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <ChatConversation chat={chat} onNavigate={onNavigate} />
+      </div>
+    </Card>
+  );
+}
+
+/** Dozor vľavo, agent vpravo; na telefóne pod sebou. */
+export function ReklamaPracovisko({ data, chat, onNavigate }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
+  const uzke = useUzke();
+  if (!chat) return <DozorReklamKarta data={data} />;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: uzke ? "1fr" : "minmax(0, 1fr) minmax(0, 1.1fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
+      <DozorReklamKarta data={data} />
+      <ReklamnyAgent chat={chat} onNavigate={onNavigate} />
+    </div>
   );
 }

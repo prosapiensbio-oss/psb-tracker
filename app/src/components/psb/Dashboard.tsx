@@ -2912,7 +2912,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
 
       {/* Dozor reklám: rozhodnutie priamo tu, nie „choď to vybaviť inam". */}
       {item.reklama && !item.acked && (
-        <ReklamaRozhodnutie item={item} onHotovo={(poznamka) => actions.ackAnomaly(item.key, poznamka, true)} />
+        <ReklamaRozhodnutie item={item} onHotovo={(poznamka) => actions.ackAnomaly(item.key, poznamka, true)} onNavigate={onNavigate} />
       )}
 
       {smsOtvorene && item.sms && !item.acked && (

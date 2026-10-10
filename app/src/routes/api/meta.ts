@@ -1220,6 +1220,135 @@ export const Route = createFileRoute("/api/meta")({
           return Response.json({ ok: true, veta });
         }
 
+        /**
+         * REKLAMNÝ AGENT (10. 10. 2026) — zásahy, ktoré Jarvis navrhne a Jerry
+         * odklikne. Doteraz ich robil Claude Code ručne cez Graph API (FB
+         * Reklama, 30. 9.: vek 35–60, vylúčenie teplých publík, tri nové
+         * reklamy s novým textom, vypnutie starých).
+         *
+         * Každý zásah najprv overí, že objekt patrí účtu ProSapiens
+         * (`UCET_REKLAM`) — Jarvis smie navrhnúť len to, čo Kokpit vidí.
+         */
+        const patriUctu = async (objektId: string, polia = "account_id,name") => {
+          if (!/^[0-9]{5,}$/.test(objektId)) return { ok: false as const, error: "chyba_id" };
+          const r = await graph(`${objektId}?fields=${polia}`, n.token);
+          if (!r.ok) return { ok: false as const, error: r.chyba || "Objekt sa nedal načítať." };
+          const d = r.data as Record<string, unknown>;
+          if (String(d.account_id || "") !== UCET_REKLAM) return { ok: false as const, error: "Objekt nepatrí reklamnému účtu ProSapiens — Kokpit ho nemení." };
+          return { ok: true as const, d };
+        };
+
+        // Vek a vylúčené / zahrnuté publiká jednej sady. Zvyšok cielenia ostáva.
+        if (akcia === "reklama-cielenie") {
+          const sadaId = String(b.sadaId || "").trim();
+          const o = await patriUctu(sadaId, "account_id,name,targeting");
+          if (!o.ok) return Response.json({ ok: false, error: o.error }, { status: 400 });
+          const t = { ...((o.d.targeting as Record<string, unknown>) || {}) };
+          const zmeny: string[] = [];
+          const vekOd = b.vekOd == null || b.vekOd === "" ? null : Math.round(Number(b.vekOd));
+          const vekDo = b.vekDo == null || b.vekDo === "" ? null : Math.round(Number(b.vekDo));
+          if (vekOd !== null || vekDo !== null) {
+            const od = vekOd ?? Number(t.age_min || 18);
+            const dO = vekDo ?? Number(t.age_max || 65);
+            if (!(od >= 18 && dO <= 65 && od < dO)) return Response.json({ ok: false, error: "Vek musí byť 18–65 a od < do." }, { status: 400 });
+            zmeny.push(`vek ${t.age_min || 18}–${t.age_max || 65} → ${od}–${dO}`);
+            t.age_min = od; t.age_max = dO;
+          }
+          const idsZ = (v: unknown) => (Array.isArray(v) ? v.map(String).filter((x) => /^[0-9]{5,}$/.test(x)) : []);
+          const pridajVyl = idsZ(b.vylucitPublika), zrusVyl = idsZ(b.zrusitVylucenie);
+          if (pridajVyl.length || zrusVyl.length) {
+            const teraz = ((t.excluded_custom_audiences as { id: string }[]) || []).map((x) => String(x.id));
+            const nove = [...new Set([...teraz.filter((x) => !zrusVyl.includes(x)), ...pridajVyl])];
+            t.excluded_custom_audiences = nove.map((id) => ({ id }));
+            zmeny.push(`vylúčené publiká ${teraz.length} → ${nove.length}`);
+          }
+          const pridajZah = idsZ(b.zahrnutPublika), zrusZah = idsZ(b.zrusitZahrnutie);
+          if (pridajZah.length || zrusZah.length) {
+            const teraz = ((t.custom_audiences as { id: string }[]) || []).map((x) => String(x.id));
+            const nove = [...new Set([...teraz.filter((x) => !zrusZah.includes(x)), ...pridajZah])];
+            t.custom_audiences = nove.map((id) => ({ id }));
+            zmeny.push(`zahrnuté publiká ${teraz.length} → ${nove.length}`);
+          }
+          if (!zmeny.length) return Response.json({ ok: false, error: "Nič na zmenu." }, { status: 400 });
+          const r = await graphPost(sadaId, { targeting: t }, n.token);
+          if (!r.ok) return Response.json({ ok: false, error: r.chyba }, { status: 502 });
+          await audit(DB, { action: "reklama", predmet: `cielenie ${sadaId}`, neu: `${o.d.name}: ${zmeny.join(" · ")}`, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, veta: `${o.d.name}: ${zmeny.join(" · ")}` });
+        }
+
+        // Zapnúť / vypnúť JEDNU reklamu alebo sadu (celá kampaň ide cez spusti/zastav-kampan).
+        if (akcia === "reklama-stav") {
+          const objektId = String(b.objektId || "").trim();
+          const stav = String(b.stav || "");
+          if (stav !== "ACTIVE" && stav !== "PAUSED") return Response.json({ ok: false, error: "stav ACTIVE alebo PAUSED" }, { status: 400 });
+          const o = await patriUctu(objektId);
+          if (!o.ok) return Response.json({ ok: false, error: o.error }, { status: 400 });
+          const r = await graphPost(objektId, { status: stav }, n.token);
+          if (!r.ok) return Response.json({ ok: false, error: r.chyba }, { status: 502 });
+          await audit(DB, { action: "reklama", predmet: `stav ${objektId}`, neu: `${o.d.name} → ${stav}`, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, veta: `„${o.d.name}“ ${stav === "ACTIVE" ? "zapnutá" : "vypnutá"}` });
+        }
+
+        /**
+         * Nová reklama s novým textom do BEŽIACEJ sady — obrázok alebo video
+         * sa prevezme z existujúcej reklamy (Kokpit médiá z chatu nenahráva).
+         * Odkaz ide s UTM, kde `utm_term` = ID sady — podľa neho dozor priradí
+         * dopyt kampani (reklamaDozor.ts `kampanDopytu`).
+         */
+        if (akcia === "reklama-nova") {
+          const sadaId = String(b.sadaId || "").trim();
+          const zdroj = String(b.mediaZReklamy || "").trim();
+          const text = String(b.text || "").trim();
+          const nadpis = String(b.nadpis || "").trim().slice(0, 120);
+          const nazov = String(b.nazov || "").trim().slice(0, 120);
+          const odkaz = String(b.odkaz || "").trim();
+          const utmContent = String(b.utmContent || "").trim().replace(/[^a-z0-9-]/gi, "").slice(0, 40);
+          const CTA = new Set(["LEARN_MORE", "BOOK_NOW", "SIGN_UP", "CONTACT_US"]);
+          const cta = CTA.has(String(b.cta || "")) ? String(b.cta) : "LEARN_MORE";
+          if (text.length < 20) return Response.json({ ok: false, error: "Text reklamy chýba alebo je prikrátky." }, { status: 400 });
+          if (!nazov) return Response.json({ ok: false, error: "Chýba názov reklamy." }, { status: 400 });
+          if (!/^https:\/\/(www\.)?prosapiens\.cz\//.test(odkaz)) return Response.json({ ok: false, error: "Odkaz musí viesť na prosapiens.cz." }, { status: 400 });
+          const sada = await patriUctu(sadaId, "account_id,name,campaign_id,campaign{name}");
+          if (!sada.ok) return Response.json({ ok: false, error: `Sada: ${sada.error}` }, { status: 400 });
+          const src = await patriUctu(zdroj, "account_id,name,creative{object_story_spec,thumbnail_url}");
+          if (!src.ok) return Response.json({ ok: false, error: `Zdrojová reklama: ${src.error}` }, { status: 400 });
+          const oss = ((src.d.creative as { object_story_spec?: Record<string, unknown>; thumbnail_url?: string } | undefined) || {});
+          const spec = oss.object_story_spec || {};
+          const ld = (spec.link_data as Record<string, unknown> | undefined) || {};
+          const vd = (spec.video_data as Record<string, unknown> | undefined) || {};
+          const pageId = String(spec.page_id || "");
+          if (!pageId) return Response.json({ ok: false, error: "Zdrojová reklama nemá stránku (asi boost príspevku) — vyber reklamu s vlastnou kreatívou." }, { status: 400 });
+          const kampanNazov = String(((sada.d.campaign as { name?: string } | undefined)?.name) || "");
+          const utmCampaign = /uvodni-trenink-brno-\d{4}-\d{2}/.exec(String(ld.link || (vd.call_to_action as { value?: { link?: string } } | undefined)?.value?.link || ""))?.[0]
+            || kampanNazov.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+          const u = new URL(odkaz);
+          u.searchParams.set("utm_source", "meta"); u.searchParams.set("utm_medium", "paid_social");
+          u.searchParams.set("utm_campaign", utmCampaign);
+          if (utmContent) u.searchParams.set("utm_content", utmContent);
+          u.searchParams.set("utm_term", sadaId);
+          const link = u.toString();
+          const ctaObj = { type: cta, value: { link } };
+          const ig = spec.instagram_user_id ? { instagram_user_id: spec.instagram_user_id } : {};
+          let storySpec: Record<string, unknown>;
+          if (vd.video_id) {
+            storySpec = { page_id: pageId, ...ig, video_data: { video_id: vd.video_id, image_url: vd.image_url || oss.thumbnail_url, message: text, ...(nadpis ? { title: nadpis } : {}), call_to_action: ctaObj } };
+          } else if (ld.image_hash || ld.picture) {
+            storySpec = { page_id: pageId, ...ig, link_data: { link, message: text, ...(ld.image_hash ? { image_hash: ld.image_hash } : { picture: ld.picture }), ...(nadpis ? { name: nadpis } : {}), call_to_action: ctaObj } };
+          } else {
+            return Response.json({ ok: false, error: "Zo zdrojovej reklamy sa nedá prevziať obrázok ani video." }, { status: 400 });
+          }
+          const ucet = `act_${UCET_REKLAM}`;
+          const kreativa = await graphPost(`${ucet}/adcreatives`, { name: `${nazov} — kreatíva`, object_story_spec: storySpec }, n.token);
+          if (!kreativa.ok) return Response.json({ ok: false, error: `Kreatíva neprešla: ${kreativa.chyba}` }, { status: 502 });
+          const kreativaId = String((kreativa.data as { id?: string }).id || "");
+          const spustit = b.spustit === true;
+          const reklama = await graphPost(`${ucet}/ads`, { name: nazov, adset_id: sadaId, creative: { creative_id: kreativaId }, status: spustit ? "ACTIVE" : "PAUSED" }, n.token);
+          if (!reklama.ok) return Response.json({ ok: false, error: `Reklama neprešla: ${reklama.chyba}` }, { status: 502 });
+          const reklamaId = String((reklama.data as { id?: string }).id || "");
+          await audit(DB, { action: "reklama", predmet: `nova ${reklamaId}`, neu: `${nazov} v sade ${sada.d.name} (${spustit ? "ZAPNUTÁ" : "pozastavená"}), médium z ${zdroj}, ${link}`, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, reklamaId, veta: `Reklama „${nazov}“ založená v sade „${sada.d.name}“ — ${spustit ? "zapnutá, Meta ju schvaľuje" : "pozastavená"}. Odkaz: ${link}`, odkaz: adsManagerOdkaz(String(sada.d.campaign_id || "")) });
+        }
+
         /** Mesačný strop a cieľová cena za dopyt — prázdne = bez nich. */
         if (akcia === "dozor-nastavenie") {
           const cislo = (v: unknown) => (v === null || v === undefined || v === "" || !(Number(v) > 0) ? "" : String(Math.round(Number(v))));

@@ -76,6 +76,7 @@ type BalicekRiadok = {
 type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null };
 import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
+import { REKLAMA_AGENT } from "./ReklamaDozor";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -3047,6 +3048,9 @@ function skupinaFaktur(
   // otvorilo prázdny slot tej bunky a Jerry by si nový návrh hľadal sám.
   const chat = useAssistantChat(aiContext, actions, (mesiac, faza, napadId) =>
     setNavratDoMapy({ mesiac, faza, napadId }));
+  // Reklamný agent (10. 10. 2026) — druhá, pevná konverzácia vedľa dozoru
+  // v Marketing → Čo to stálo. Nemieša sa s hlavným Jarvisom.
+  const chatReklama = useAssistantChat(aiContext, actions, undefined, REKLAMA_AGENT);
   // Clicking a client name in a bot reply → open that client in Klienti + pop the
   // floating chat open (so the conversation follows you onto the new tab).
   const onClientClick = (name: string) => {
@@ -3310,7 +3314,7 @@ function skupinaFaktur(
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} chatReklama={chatReklama} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && btcNenacitane && (
           <div role="alert" style={{ margin: "0 0 12px", padding: "11px 14px", borderRadius: 10, background: mix(C.orange, 14), border: `1px solid ${mix(C.orange, 55)}`, color: C.text, fontSize: 13, lineHeight: 1.55 }}>
             <b>Bitcoinová kniha sa nenačítala</b> — náklady z faktúr zaplatených bitcoinom a výplaty v BTC v týchto číslach chýbajú,

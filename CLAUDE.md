@@ -2965,3 +2965,28 @@ zamietnutie/účet, strop), nesie čísla a navrhne rozhodnutie.
 - **Plánovač je samostatný worker** (`cron/`) — nasadzuje sa zvlášť:
   `cd cron && ../app/node_modules/.bin/wrangler deploy`.
 
+## Reklamný agent — Jarvis, ktorý vidí do Mety (10. 10. 2026)
+
+Jerry chcel „vedľa reklám okno pripojené na jednu konverzáciu, ako v Claude
+Code". Živú Claude Code konverzáciu vložiť nejde; Jarvis je ale postavený
+rovnako (Claude, nástroje, pamäť) — doplnilo sa, čo mu chýbalo na prácu
+z konverzácie „FB Reklama" (30. 9. – 8. 10.):
+
+- **`meta_citaj`** (chat.ts) — LEN GET do Graph v21.0, cesta ohraničená na
+  `act_172897726151288/(insights|campaigns|adsets|ads|customaudiences|adcreatives)`
+  alebo číselný objekt, ktorého `account_id` sa NAJPRV overí. Token do
+  odpovede nejde; volania sa rátajú do `meta_volania` (Full Access).
+- **Zásahy ako psb-action** (Assistant.tsx → `/api/meta`): `reklama-rozpocet`
+  (cez `rozhodni-kampan`, tie isté limity a zápis rozhodnutia),
+  `reklama-cielenie` (len vek a vlastné publiká), `reklama-nova` (nový text,
+  médium z existujúcej reklamy, `utm_term` = ID sady), `reklama-stav`
+  (jedna reklama/sada). Každý overí účet cez `patriUctu`.
+- **Panel „Reklama · Jarvis"** v Marketing → Čo to stálo vedľa dozoru:
+  druhá inštancia `useAssistantChat` s `pevny` (id `reklama-agent`,
+  zameranie `kampan`, Opus predvolene). Pevná inštancia NESMIE písať
+  do localStorage hlavného Jarvisa a prvú otázku pustí až keď je
+  `pripraveny` (história z D1) — inak by prepísala vlákno.
+- **Notifikácia dozoru → „Prebrať s Jarvisom"**: otázka čaká v
+  `posliAgentovi` (ReklamaDozor.tsx), kým sa panel nepripojí.
+- **Ostáva na Claude Code:** kód Kokpitu, WordPress, prehliadač, workflowy.
+

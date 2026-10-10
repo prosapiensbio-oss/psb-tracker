@@ -17,7 +17,7 @@ import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav";
   label: string;
   done?: boolean;
   key?: string;
@@ -159,6 +159,16 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "naplanuj-obsah", label, data: o });
         } else if ((o?.type === "spusti-kampan" || o?.type === "zastav-kampan") && /^[0-9]{5,}$/.test(String(o.kampanId))) {
           actions.push({ type: o.type, data: { kampanId: String(o.kampanId) }, label });
+        // Reklamný agent (10. 10. 2026) — zásahy do bežiacich reklám. Server
+        // ich ešte raz overí (účet ProSapiens, limity rozpočtu).
+        } else if (o?.type === "reklama-rozpocet" && /^[0-9]{5,}$/.test(String(o.kampanId)) && Number(o.novyDenny) >= 22) {
+          actions.push({ type: "reklama-rozpocet", label, data: o });
+        } else if (o?.type === "reklama-cielenie" && /^[0-9]{5,}$/.test(String(o.sadaId))) {
+          actions.push({ type: "reklama-cielenie", label, data: o });
+        } else if (o?.type === "reklama-nova" && /^[0-9]{5,}$/.test(String(o.sadaId)) && /^[0-9]{5,}$/.test(String(o.mediaZReklamy)) && String(o.text || "").trim().length >= 20) {
+          actions.push({ type: "reklama-nova", label, data: o });
+        } else if (o?.type === "reklama-stav" && /^[0-9]{5,}$/.test(String(o.objektId)) && (o.stav === "ACTIVE" || o.stav === "PAUSED")) {
+          actions.push({ type: "reklama-stav", label, data: o });
         } else if (o?.type === "mkt-znacka" && typeof o.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.datum))) {
           actions.push({ type: "mkt-znacka", label, data: o });
         }
@@ -298,6 +308,13 @@ export function useAssistantChat(
   actions: Actions,
   /** Ohlási, že Jarvis práve založil príspevok — aby bolo kam sa vrátiť. */
   onNaplanovane?: (mesiac: string, faza: number, id?: string) => void,
+  /**
+   * Pevná konverzácia (reklamný agent, 10. 10. 2026): jedno stále vlákno
+   * s vlastným zameraním, ktoré sa otvára vždy to isté. Druhá inštancia
+   * hooku nesmie siahať na spoločné nastavenia hlavného Jarvisa
+   * (localStorage panela, hĺbky ani zoznamu rozhovorov).
+   */
+  pevny?: { id: string; kategoria: string; nazov: string },
 ) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -306,16 +323,18 @@ export function useAssistantChat(
   const [attach, setAttach] = useState<string[]>([]);
   // "Hlboká debata" — sends the turn to Opus instead of Sonnet. Off by default
   // (Opus is slower); on for strategy talks, where the thinking is the point.
-  const [deep, setDeep] = useState(false);
+  const [deep, setDeep] = useState(!!pevny);
   // Čo práve robí — "Pozerám do dát…", dôvod dopytu, "Otváram knihu…".
   // Bez toho vyzerá nástrojové kolo ako zamrznutá appka.
   const [stav, setStav] = useState("");
   useEffect(() => {
+    if (pevny) return;
     try { if (localStorage.getItem("psb-ai-deep") === "1") setDeep(true); } catch { /* ignore */ }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (pevny) return;
     try { localStorage.setItem("psb-ai-deep", deep ? "1" : "0"); } catch { /* ignore */ }
-  }, [deep]);
+  }, [deep]); // eslint-disable-line react-hooks/exhaustive-deps
   // Whether the floating bottom-right panel is open (shared so a client-name click
   // from the inline widget can pop it open on the next tab). Persisted.
   const [floatingOpen, setFloatingOpen] = useState(false);
@@ -326,7 +345,7 @@ export function useAssistantChat(
    * obrazovky: keď sa vrátiš k starej debate o peniazoch, má sa otvoriť ako
    * debata o peniazoch. Preto sa ukládá spolu so správami.
    */
-  const [kategoria, setKategoria] = useState("");
+  const [kategoria, setKategoria] = useState(pevny?.kategoria || "");
   /**
    * Prerušenie rozpísanej odpovede.
    *
@@ -374,15 +393,19 @@ export function useAssistantChat(
    */
   const [zvyraznit, setZvyraznit] = useState("");
   useEffect(() => {
+    if (pevny) return;
     try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (pevny) return;
     try { localStorage.setItem("psb-ai-open", floatingOpen ? "1" : "0"); } catch { /* ignore */ }
-  }, [floatingOpen]);
+  }, [floatingOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chat history (saved in localStorage; archive/delete) ──
   const [chats, setChats] = useState<SavedChat[]>([]);
-  const [chatId, setChatId] = useState<string>(newId);
+  /** Pevná konverzácia: história z databázy je načítaná (inak by prvá otázka prepísala vlákno). */
+  const [pripraveny, setPripraveny] = useState(!pevny);
+  const [chatId, setChatId] = useState<string>(() => pevny?.id || newId());
   // Najprv localStorage (história je hneď po ruke), potom D1 (pravda naprieč
   // zariadeniami). Databáza vyhráva — je to jediná kópia, ktorú vidí aj mobil.
   //
@@ -393,18 +416,28 @@ export function useAssistantChat(
   // starý rozhovor je na jeden klik v histórii a nič sa nestráca.
   useEffect(() => {
     let zivy = true;
-    try {
-      const raw = JSON.parse(localStorage.getItem(CHATS_KEY) || "null");
-      if (Array.isArray(raw) && raw.length) setChats(raw);
-    } catch { /* ignore */ }
+    if (!pevny) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(CHATS_KEY) || "null");
+        if (Array.isArray(raw) && raw.length) setChats(raw);
+      } catch { /* ignore */ }
+    }
     void fetchJarvisMemory().then(({ chats: db }) => {
+      if (zivy && pevny) setPripraveny(true);
       if (!zivy || !Array.isArray(db) || !db.length) return;
       const zoz = db as SavedChat[];
       setChats(zoz);
+      // Pevná konverzácia sa otvára so svojou históriou — to je jej zmysel.
+      // Len keď sa do nej medzitým nezačalo písať.
+      if (pevny) {
+        const c = zoz.find((x) => x.id === pevny.id);
+        if (c?.messages?.length) setMsgs((m) => (m.length ? m : opravStratene(c.messages)));
+        return;
+      }
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(zoz.slice(0, 50))); } catch { /* ignore */ }
-    });
+    }).catch(() => { if (zivy) setPripraveny(true); });
     return () => { zivy = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Auto-save: localStorage okamžite, databáza s odstupom. Počas streamovania
   // sa msgs mení niekoľkokrát za sekundu — ukladať do D1 pri každej delte by
   // znamenalo POST s celou históriou (vrátane base64 obrázkov) desiatky ráz na
@@ -415,10 +448,10 @@ export function useAssistantChat(
     let zaznam: SavedChat | null = null;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
-      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived, kategoria, vetva: existing?.vetva ?? vetvaRef.current };
+      zaznam = { id: chatId, title: pevny && chatId === pevny.id ? pevny.nazov : chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived, kategoria, vetva: existing?.vetva ?? vetvaRef.current };
       vetvaRef.current = false;
       const next = [zaznam, ...prev.filter((c) => c.id !== chatId)];
-      try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
+      if (!pevny) { try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ } }
       return next;
     });
     const t = setTimeout(() => {
@@ -429,6 +462,7 @@ export function useAssistantChat(
 
   const persistChats = (next: SavedChat[]) => {
     setChats(next);
+    if (pevny) return;
     try { localStorage.setItem(CHATS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   };
     /**
@@ -697,6 +731,25 @@ export function useAssistantChat(
             else oznamVysledok(`Prepnutie kampane neprešlo: ${j.error || "bez dôvodu"}`);
           })
           .catch(() => oznamVysledok("Prepnutie kampane zlyhalo — spojenie."));
+      } else if ((a.type === "reklama-rozpocet" || a.type === "reklama-cielenie" || a.type === "reklama-nova" || a.type === "reklama-stav") && a.data) {
+        // Reklamný agent: klik = jeden zásah do Mety. Výsledok ide späť do
+        // rozhovoru, aby Jarvis vedel, čo sa naozaj stalo.
+        const d = a.data;
+        const telo: Record<string, unknown> = a.type === "reklama-rozpocet"
+          ? { akcia: "rozhodni-kampan", kampanId: String(d.kampanId), rozhodnutie: "rozpocet", novyDenny: Number(d.novyDenny), poznamka: "z rozhovoru s Jarvisom" }
+          : { ...d, akcia: a.type };
+        delete telo.type; delete telo.label;
+        void fetch("/api/meta", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(telo),
+        })
+          .then(async (r) => { const t = await r.text(); try { return JSON.parse(t) as { ok?: boolean; veta?: string; error?: string }; } catch { return { ok: false, error: `HTTP ${r.status}: ${t.slice(0, 200)}` }; } })
+          .then((j) => {
+            if (j.ok) { oznamVysledok(`Hotovo v Mete: ${j.veta || a.label}`); oznam("reklama"); }
+            else oznamVysledok(`V Mete to NEPREŠLO: ${j.error || "bez dôvodu"}`);
+          })
+          .catch(() => oznamVysledok("Zásah do Mety zlyhal — spojenie."));
       } else if (a.type === "uloz-plan" && a.data) {
         // Zápis dohody z rozhovoru do plánu. Ide do TEJ ISTEJ tabuľky, ktorú
         // píše obrazovka — plán z debaty a plán z formulára musia byť jedna vec.
@@ -941,7 +994,7 @@ export function useAssistantChat(
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, otvorPrazdny, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, zachovajOkno, spotrebujZachovaj, deleteChat, archiveChat, spracujDennik };
+  return { pripraveny, msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, otvorPrazdny, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, zachovajOkno, spotrebujZachovaj, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and

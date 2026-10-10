@@ -49,7 +49,7 @@ import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik } from "./MarketingLievik";
 import { PripravitKampan } from "./KampanForm";
 import { Reklama } from "./Reklama";
-import { DozorReklamKarta } from "./ReklamaDozor";
+import { ReklamaPracovisko } from "./ReklamaDozor";
 import { Kanaly } from "./Kanaly";
 import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { hodnotenie, type PsRiadok } from "../../lib/psb/pagespeed";
@@ -1077,7 +1077,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
  * Marketing dlhovať niečo, tak zhrnutie, ktoré odpovie bez preklikávania —
  * to je záložka „Prehľad".
  */
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
+export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; chatReklama?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
   // potrebovala vlastné tri propy a jedna by ich časom nedostala.
@@ -1202,7 +1202,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           Podľa nich sa pritom rozhodovalo o rozpočte (18. 8. 2026). */}
       {sub === "naklady" && (
         <>
-          <DozorReklamKarta data={data} />
+          <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate} />
           <Reklama data={data} clients={clients} />
           <AkoMeratReklamu />
           <PripravitKampan />
