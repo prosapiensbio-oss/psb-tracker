@@ -2,18 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BtcNakup } from "../../lib/psb/client";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
-import { jeBeta } from "../../lib/psb/beta";
 import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { platbaKDokladu } from "../../lib/psb/btcKFakture";
-import { RYCHLE } from "../../lib/psb/kategorieRychle";
-import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
 import { C, mix } from "../../lib/psb/theme";
 import { BtcParovanie } from "./BtcParovanie";
 import { FakturyNahlad } from "./Faktury";
 import { FakturyUctenka } from "./FakturyUctenka";
-import { VyberKategorie } from "./VyberKategorie";
 
 /**
  * ALZA A NÁKUPY BITCOINOM — krok mesačnej uzávierky (9. 10. 2026).
@@ -195,7 +191,6 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       })
       .sort((a, b) => a.datum.localeCompare(b.datum));
   }, [polozky, btc]);
-  const nezaradene = (polozky || []).filter((p) => !p.kategoria).length;
   const nezaradeneTovar = (polozky || []).filter((p) => !p.kategoria && !jeNehmotny(p.nazov)).length;
   const platbyMesiaca = useMemo(() => (btc?.platby || []).filter((p) => String(p.datum).slice(0, 7) === mesiac), [btc, mesiac]);
 
@@ -228,45 +223,14 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
         <div style={{ fontSize: 12, color: C.textDim }}>načítavam faktúry…</div>
       ) : !doklady.length ? (
         <div style={{ fontSize: 12, color: C.textDim }}>Za tento mesiac nie je zapísaná žiadna faktúra.</div>
-      ) : jeBeta() ? (
-        /* NÁVRH A — ÚČTENKA, zatiaľ len v bete (Jerry, 10. 10. 2026).
-           Naostro zostáva pôvodný zoznam, kým si to Jerry neodklepne. */
+      ) : (
+        /* ÚČTENKA (návrh A, naostro od 10. 10. 2026). Na obrazovke je TOVAR;
+           doprava a zľavy sú zbalené pod jedným riadkom a dajú sa zmazať.
+           Pôvodný plochý zoznam je preč — dve obrazovky na to isté sa
+           rozídu a človek potom nevie, ktorá hovorí pravdu. */
         <div style={{ display: "grid", gap: 8 }}>
           {nezaradeneTovar > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradeneTovar} {nezaradeneTovar === 1 ? "vec nemá" : "vecí nemá"} kategóriu — bez nej v P&L chýba.</div>}
           <FakturyUctenka doklady={doklady} uklada={uklada} onKategoria={(p, k) => void zmenKategoriu(p as Polozka, k)} onZmaz={(ids) => void zmazPolozky(ids)} />
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {nezaradene > 0 && <div style={{ fontSize: 12, color: C.orange }}>{nezaradene} {nezaradene === 1 ? "položka nemá" : "položiek nemá"} kategóriu — bez nej v P&L chýba.</div>}
-          {doklady.map((d) => (
-            <div key={d.cislo} style={{ border: `1px solid ${mix(C.border, 70)}`, borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 4 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{fmtDMY(d.datum)} · {d.dodavatel || "faktúra"}</span>
-                <span style={{ fontSize: 11, color: C.textDim }}>{d.cislo}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{fmtCZK(d.celkom)}</span>
-                <span style={{ fontSize: 11, color: d.sparovana ? C.green : d.platba ? C.orange : C.textDim, marginLeft: "auto" }}>
-                  {d.platba
-                    ? `${d.sparovana ? "✓ spárovaná" : "₿ zrejme"} · platba ${fmtDMY(d.platba.platba.datum)} ${fmtCZK(Math.round(d.platba.platba.czk))}${d.platba.isto ? "" : " (viac platieb sedí)"}`
-                    : d.sparovana ? "✓ spárovaná s platbou bitcoinom" : "bez platby bitcoinom — z účtu alebo kartou"}
-                </span>
-              </div>
-              {d.polozky.map((p) => (
-                <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "4px 0", borderTop: `1px solid ${mix(C.border, 45)}` }}>
-                  <span style={{ fontSize: 12, color: C.text, flex: "1 1 220px", minWidth: 0 }}>{p.nazov}</span>
-                  <span style={{ fontSize: 12, color: C.text, minWidth: 74, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.cena)}</span>
-                  {RYCHLE.map((r) => (
-                    <button key={r.kat} disabled={uklada === p.id} onClick={() => void zmenKategoriu(p, r.kat)}
-                      style={{ padding: "3px 9px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
-                        border: `1px solid ${p.kategoria === r.kat ? C.accent : C.border}`, background: p.kategoria === r.kat ? C.accentBg : "transparent",
-                        color: p.kategoria === r.kat ? C.accentLight : C.textMuted }}>
-                      {r.text}
-                    </button>
-                  ))}
-                  <VyberKategorie hodnota={p.kategoria} sirka={230} onZmena={(k) => void zmenKategoriu(p, k)} />
-                </div>
-              ))}
-            </div>
-          ))}
         </div>
       )}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}
