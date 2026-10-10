@@ -1250,12 +1250,14 @@ export type KontrolaKarta = { id: string; nadpis: string; detail: string; splatn
 /** Ktorú kontrolu Jerry naposledy otvoril — prežije odchod zo stránky. */
 const POSLEDNA_KONTROLA = "psb-kontrola-otvorena";
 
-export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onZmena }: {
+export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onOtazkaJarvisovi, onZmena }: {
   kontroly: KontrolaKarta[];
   acks: Record<string, unknown>;
   /** Čo si appka overí sama — vek importov, stav účtu, otvorené upozornenia. */
   vstup: VstupKontroly;
   onNavigate?: (tab: string, sub?: string) => void;
+  /** Pošle Jarvisovi otázku k tejto oblasti — druhý zdroj na to, čo sa inak overiť nedá. */
+  onOtazkaJarvisovi?: (oblast: string, mesiac: string) => void;
   onZmena: () => void;
 }) {
   const [bezi, setBezi] = useState("");
@@ -1328,11 +1330,20 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onZmena }: {
 
               {/* ČO OVERILA APPKA — výsledok, nie zadanie. */}
               {vysledky.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", marginTop: 3 }}>
+                <div style={{ marginTop: 4, display: "grid", gap: 1 }}>
                   {vysledky.map((v, j) => (
-                    <span key={j} style={{ fontSize: 11.5, color: farbaStavu(v.stav) }}>
-                      {v.stav === "ok" ? "✓" : v.stav === "pozor" ? "!" : "?"} {v.text}
-                    </span>
+                    <div key={j} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5, color: farbaStavu(v.stav) }}>
+                      <span style={{ width: 10 }}>{v.stav === "ok" ? "✓" : v.stav === "pozor" ? "!" : "?"}</span>
+                      <span style={{ flex: "1 1 160px", minWidth: 0, color: v.stav === "ok" ? C.textMuted : undefined }}>{v.text}</span>
+                      {v.kokpit !== undefined && (
+                        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {v.kokpit}
+                          {v.druhy !== undefined && (
+                            <span style={{ color: C.textDim }}> · {v.zdroj || "druhý zdroj"} {v.druhy}</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -1356,6 +1367,11 @@ export function KrokKontroly({ kontroly, acks, vstup, onNavigate, onZmena }: {
               )}
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {onOtazkaJarvisovi && (
+                <button style={vedlajsie} onClick={() => onOtazkaJarvisovi(oblastKontroly(k.id), (k.id.match(/(\d{4}-\d{2})$/) || [])[1] || "")}>
+                  spýtať sa Jarvisa
+                </button>
+              )}
               {onNavigate && <button style={vedlajsie} onClick={() => otvor(k)}>otvoriť</button>}
               {!hotova && (
                 <button disabled={bezi === k.id} style={hlavne(bezi !== k.id)} onClick={() => void odskrtni(k)}>

@@ -70,6 +70,56 @@ describe("vysledkyKontroly", () => {
   });
 });
 
+describe("tržby z dvoch zdrojov", () => {
+  const s = (kokpit: number, ptminder: number) =>
+    vysledkyKontroly("peniaze", { ...ZAKLAD, trzby: { kokpit, ptminder } })[0];
+
+  it("zhoda do tolerancie je v poriadku a ukáže obe čísla", () => {
+    const r = s(324849, 324849);
+    expect(r.stav).toBe("ok");
+    // toLocaleString("sk-SK") oddeľuje tisíce PEVNOU medzerou (U+00A0),
+    // nie obyčajnou — porovnanie na znak by padlo na neviditeľnom rozdiele.
+    const cisla = (x?: string) => (x || "").replace(/\s/g, " ");
+    expect(cisla(r.kokpit)).toBe("324 849 Kč");
+    expect(cisla(r.druhy)).toBe("324 849 Kč");
+    expect(r.zdroj).toBe("PTminder");
+  });
+
+  it("tolerancia je 200 Kč alebo 1 %, čo je viac — ako pri prepínači peňazí", () => {
+    expect(s(100150, 100000).stav).toBe("ok");      // 150 Kč pri 100 tis.
+    expect(s(100900, 100000).stav).toBe("ok");      // 900 Kč = pod 1 %
+    expect(s(102000, 100000).stav).toBe("pozor");   // 2 %
+    expect(s(5190, 5000).stav).toBe("ok");          // 190 Kč pri malom mesiaci
+    expect(s(5400, 5000).stav).toBe("pozor");       // 400 Kč
+  });
+
+  it("rozdiel je v texte aj so znamienkom", () => {
+    expect(s(102000, 100000).text).toContain("+2000");
+    expect(s(98000, 100000).text).toContain("-2000");
+  });
+
+  it("nula proti nule NIE JE zhoda", () => {
+    const r = s(0, 0);
+    expect(r.stav).toBe("nevie");
+    expect(r.druhy).toBe("nemá platby");
+  });
+
+  it("bez vstupu sa riadok nekreslí — netvárime sa, že porovnanie prebehlo", () => {
+    const bez = vysledkyKontroly("peniaze", { ...ZAKLAD, trzby: null });
+    expect(bez.some((x) => x.text.startsWith("Tržby"))).toBe(false);
+  });
+});
+
+describe("dopyty bez zdroja", () => {
+  it("všetky so zdrojom je v poriadku, čo i len jeden bez neho je nález", () => {
+    const r = (bezZdroja: number) =>
+      vysledkyKontroly("marketing", { ...ZAKLAD, dopyty: { spolu: 8, bezZdroja } }).find((x) => x.text.includes("Dopyty"));
+    expect(r(0)?.stav).toBe("ok");
+    expect(r(1)?.stav).toBe("pozor");
+    expect(r(3)?.kokpit).toBe("3 z 8");
+  });
+});
+
 describe("stavSpolu", () => {
   it("nález prebije neznáme aj v poriadku", () => {
     expect(stavSpolu([{ text: "", stav: "ok" }, { text: "", stav: "nevie" }, { text: "", stav: "pozor" }])).toBe("pozor");
