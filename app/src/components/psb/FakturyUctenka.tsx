@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeNehmotny, popisNehmotnych, rozdelDoklad } from "../../lib/psb/fakturaRiadky";
-import { rychleVolby, type KomuVyplata } from "../../lib/psb/kategorieRychle";
+import { RYCHLE, rychleVolby } from "../../lib/psb/kategorieRychle";
 import { C, mix } from "../../lib/psb/theme";
 import { VyberKategorie } from "./VyberKategorie";
 
@@ -42,18 +42,11 @@ export function FakturyUctenka({
   uklada: string;
   onKategoria: (p: PolozkaDokladu, kategoria: string) => void;
   onZmaz: (ids: string[]) => void;
-  /** Štvrtá skratka (náradie) a prepínač výplaty — zatiaľ len v bete. */
+  /** Rozšírená ponuka skratiek (Jerry · Terezka · Ahsoka · domácnosť · náradie) — zatiaľ len v bete. */
   naradie?: boolean;
 }) {
   const [rozbalene, setRozbalene] = useState<Set<string>>(new Set());
-  /**
-   * Komu patrí výplata — stav sa ZÁMERNE NEPAMÄTÁ cez obnovenie stránky.
-   * Prepnuté na Terezku a zabudnuté by znamenalo mesiac Jerryho nákupov
-   * zapísaných na ňu. Po načítaní je to vždy Jerry; drvivá väčšina nákupov
-   * na Alze je jeho.
-   */
-  const [komu, setKomu] = useState<KomuVyplata>("jerry");
-  const volby = naradie ? rychleVolby(komu) : rychleVolby("jerry").slice(0, 3);
+  const volby = naradie ? rychleVolby() : RYCHLE;
   const prepni = (cislo: string) =>
     setRozbalene((p) => {
       const n = new Set(p);
@@ -77,19 +70,6 @@ export function FakturyUctenka({
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      {naradie && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: C.textMuted }}>
-          <span>skratka „výplata" zapisuje na:</span>
-          {(["jerry", "terezka"] as KomuVyplata[]).map((k) => (
-            <button key={k} onClick={() => setKomu(k)}
-              style={{ padding: "3px 11px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
-                border: `1px solid ${komu === k ? C.accent : C.border}`, background: komu === k ? C.accentBg : "transparent",
-                color: komu === k ? C.accentLight : C.textMuted }}>
-              {k === "jerry" ? "Jerry" : "Terezka"}
-            </button>
-          ))}
-        </div>
-      )}
       {doklady.map((d) => {
         const r = rozdelDoklad(d.polozky);
         const otvorene = rozbalene.has(d.cislo);

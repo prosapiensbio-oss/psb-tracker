@@ -4,38 +4,33 @@ import { NARADIE, RYCHLE, rychleVolby } from "./kategorieRychle";
 import { VYPLATY_JERRY, VYPLATY_TEREZKA } from "./fio";
 
 describe("rychleVolby", () => {
-  it("dáva štyri skratky a výplata je prvá", () => {
+  it("výplata sú dve tlačidlá s menami, nie prepínač", () => {
     const v = rychleVolby();
-    expect(v).toHaveLength(4);
-    expect(v[0].kat).toBe(VYPLATY_JERRY);
-    expect(v.map((x) => x.kat)).toContain(NARADIE);
+    expect(v[0]).toEqual({ kat: VYPLATY_JERRY, text: "Jerry" });
+    expect(v[1]).toEqual({ kat: VYPLATY_TEREZKA, text: "Terezka" });
+    // Žiadne tlačidlo nesmie znamenať raz jedno a raz druhé.
+    expect(v.map((x) => x.text)).not.toContain("výplata");
   });
 
-  it("prepínač mení iba výplatu, zvyšok zostáva", () => {
-    const j = rychleVolby("jerry");
-    const t = rychleVolby("terezka");
-    expect(t[0].kat).toBe(VYPLATY_TEREZKA);
-    expect(t[0].text).toBe("výplata Terezka");
-    // Ahsoka, domácnosť a náradie sa prepnutím nesmú pohnúť.
-    expect(t.slice(1)).toEqual(j.slice(1));
+  it("dáva päť skratiek", () => {
+    expect(rychleVolby()).toHaveLength(5);
+    expect(rychleVolby().map((x) => x.kat)).toContain(NARADIE);
   });
 
-  it("náradie je náklad PSB, nie Jerryho peniaze", () => {
+  it("náradie je náklad PSB, nie peniaze trénera", () => {
     expect(NARADIE).toBe("variabilne.prevadzka2.pomocky");
     expect(NARADIE.startsWith("spolocne.")).toBe(false);
     expect(NARADIE.startsWith("vyplaty")).toBe(false);
   });
 
-  it("naostro zostáva pôvodná trojica bez náradia", () => {
-    expect(RYCHLE).toHaveLength(3);
-    expect(RYCHLE.map((x) => x.kat)).not.toContain(NARADIE);
-    expect(RYCHLE[0].kat).toBe(VYPLATY_JERRY);
+  it("žiadne dve skratky nevedú do tej istej kategórie", () => {
+    const katy = rychleVolby().map((x) => x.kat);
+    expect(new Set(katy).size).toBe(katy.length);
   });
 
-  it("žiadne dve skratky nevedú do tej istej kategórie", () => {
-    for (const komu of ["jerry", "terezka"] as const) {
-      const katy = rychleVolby(komu).map((x) => x.kat);
-      expect(new Set(katy).size).toBe(katy.length);
-    }
+  it("naostro zostáva pôvodná trojica", () => {
+    expect(RYCHLE).toHaveLength(3);
+    expect(RYCHLE.map((x) => x.kat)).not.toContain(NARADIE);
+    expect(RYCHLE.map((x) => x.kat)).not.toContain(VYPLATY_TEREZKA);
   });
 });
