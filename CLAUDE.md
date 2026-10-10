@@ -2988,5 +2988,16 @@ z konverzácie „FB Reklama" (30. 9. – 8. 10.):
   `pripraveny` (história z D1) — inak by prepísala vlákno.
 - **Notifikácia dozoru → „Prebrať s Jarvisom"**: otázka čaká v
   `posliAgentovi` (ReklamaDozor.tsx), kým sa panel nepripojí.
-- **Ostáva na Claude Code:** kód Kokpitu, WordPress, prehliadač, workflowy.
+- **Ostáva na Claude Code:** kód Kokpitu, WordPress, prehliadač, workflowy —
+  ale Jarvis k tomu napíše hotové zadanie (psb-action `prompt-claude`, klik ho
+  len skopíruje).
+- **Od 10. 10. večer je to samostatná záložka Marketing → Dozor reklám**
+  (`sub: "dozor"`): dozor · Reklama · Jarvis · metriky (`metrikyDozoru` v lib,
+  aj v Jarvisovom kontexte). Široko tri stĺpce (matchMedia ≥ 1280 px), užšie
+  metriky pod dozorom, telefón pod sebou. Notifikácie dozoru vedú sem.
+- **Pevná debata `reklama-agent` je v `/api/jarvis-memory` VŽDY** (ORDER BY
+  `id = 'reklama-agent'` DESC) — mimo posledných 60 by ju panel nenačítal
+  a prvá otázka by ju prepísala. Založená 10. 10. so súhrnom konverzácie
+  „FB Reklama". Dopyty v dozore sú bez `druh = magnet` (stiahnutý protokol
+  nie je dopyt) — loadData ich vyraďuje.
 
