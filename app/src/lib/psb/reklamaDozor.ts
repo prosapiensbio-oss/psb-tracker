@@ -365,7 +365,11 @@ export function polozkyDozoru(
   for (const s of stavy) {
     if (!s.splatne) continue;
     const k = s.kampan;
-    const pomerTxt = s.klikyOd ? ` (${Math.round((s.naStrankeOd / s.klikyOd) * 100)} %)` : "";
+    const cislo = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    // Pri interakciách sa na stránku nechodí — „0 na stránke (0 %)" by klamalo.
+    const navstevyTxt = meriaSaDm(k.ciel)
+      ? `${cislo(s.klikyOd)} klikov`
+      : `${cislo(s.klikyOd)} klikov, ${cislo(s.naStrankeOd)} na stránke${s.klikyOd ? ` (${Math.round((s.naStrankeOd / s.klikyOd) * 100)} %)` : ""}`;
     const dopytyTxt = meriaSaDm(k.ciel) && s.dopytyOd === 0
       ? `dopyty Meta pri tomto cieli nemeria`
       : `dopyty s odkazom z tejto kampane: ${s.dopytyOd}${s.bezOdkazuOd ? ` · z reklamy bez odkazu: ${s.bezOdkazuOd}` : ""}${s.cenaZaDopyt ? ` → ${kc(s.cenaZaDopyt)} za dopyt` : ""}`;
@@ -375,7 +379,7 @@ export function polozkyDozoru(
       category: "Rozhodnutie",
       tone: s.navrh.akcia === "vypnut" ? "red" : "orange",
       title: `Reklama: čas vyhodnotiť — ${k.nazov}`,
-      detail: `Reklama „${k.nazov}“ (${nazovCiela(k.ciel) || "kampaň"}) — čas vyhodnotiť. Od ${denKratko(s.od)} (${s.dniOd} dní): ${kc(s.minuteOd)}, ${s.klikyOd} klikov, ${s.naStrankeOd} na stránke${pomerTxt}; ${dopytyTxt}. Návrh: ${s.navrh.veta}`,
+      detail: `Reklama „${k.nazov}“ (${nazovCiela(k.ciel) || "kampaň"}) — čas vyhodnotiť. Od ${denKratko(s.od)} (${s.dniOd} dní): ${kc(s.minuteOd)}, ${navstevyTxt}; ${dopytyTxt}. Návrh: ${s.navrh.veta}`,
       priority: 8,
       reklama: {
         druh: "vyhodnot", kampanId: k.id, nazov: k.nazov, ciel: k.ciel, dennyRozpocet: k.dennyRozpocet,

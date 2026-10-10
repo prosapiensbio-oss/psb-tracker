@@ -2937,3 +2937,31 @@ Odpoveď v `anomaly_ack` je trvalá a viaže sa na KĽÚČ. Stály kľúč nad n
 
 Pri novej položke registra sa pýtaj: čo sa stane s odpoveďou, keď pribudne
 nová vec rovnakého druhu, a keď sa tá istá vec zopakuje o mesiac?
+
+## Dozor reklám — ozve sa z dôvodu, nie z kalendára (10. 10. 2026)
+
+Jerry: „Kokpit vie, že je reklama spustená — mohla by ma notifikácia
+upozorniť?" Kampane z 8. 9. sa mali vyhodnotiť okolo 21. 9.; nepripomenulo
+to nič a do 10. 10. za ne odišlo ~9 400 Kč. Holé „skontroluj reklamy" by sa
+stalo riadkom na odklepnutie — dozor sa preto ozve len z DÔVODU (7/14 dní
+alebo 1 500 Kč od rozhodnutia, každých 1 000 Kč bez dopytu z reklamy,
+zamietnutie/účet, strop), nesie čísla a navrhne rozhodnutie.
+
+- **Pravidlá sú v `lib/psb/reklamaDozor.ts`** (čisté, testy) a čítajú ich
+  `deriveRegister` (→ aj ranný push), karta v Marketing → Náklady aj Jarvis
+  (`reklamaDozor` v aiContext). Dáta sťahuje `/api/meta` akcia `dozor`
+  (plánovač 4:20 UTC): snímka bežiacich kampaní `reklama_dozor`, kniha dní
+  `reklama_dni`, rozhodnutia `reklama_vyhodnotenia`.
+- **Kolo vyhodnotenia sa viaže na deň `od`** (`reklama|vyhodnot|<id>|<od>`).
+  Rozhodnutie ho posunie. Holé „Vybavené" sa počíta ako „nechať" — inak by
+  odklepnutý kľúč zamrazil dozor kampane navždy; odloženie sa nepočíta.
+- **Dopyt patrí kampani podľa `utm_term` = ID sady.** `utm_campaign` je pri
+  všetkých septembrových kampaniach rovnaký. Dopyt bez utm sa nepripíše
+  nikomu a návrh to povie nahlas namiesto hádania.
+- **Vypnúť ide hneď, rozpočet až po druhom potvrdení so sumou na mesiac**;
+  server ho ešte ohraničí (≤ 2 000 Kč/deň, ≤ 3× / +300 Kč). Prepnutie kampane
+  je jedno miesto `prepniKampan` v `api/meta.ts` (aj pre Jarvisove
+  spusti/zastav-kampan).
+- **Plánovač je samostatný worker** (`cron/`) — nasadzuje sa zvlášť:
+  `cd cron && ../app/node_modules/.bin/wrangler deploy`.
+
