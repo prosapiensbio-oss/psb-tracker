@@ -20,16 +20,53 @@ export function prekryva(a: { zaciatok: string; koniec: string }, b: { zaciatok:
   return minuta(a.zaciatok) < minuta(b.koniec) && minuta(b.zaciatok) < minuta(a.koniec);
 }
 
+/** Tréning, ktorý si klient z ponuky vyberá, trvá hodinu. */
+export const DLZKA_TRENINGU = 60;
+const naMin = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+const zMin = (den: string, m: number) => `${den}T${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+/** Je ponúknutý čas ROZMEDZIE (dlhší než tréning), v ktorom si klient vyberá začiatok? */
+export const jeRozmedzie = (c: { zaciatok: string; koniec: string }): boolean => naMin(c.koniec) - naMin(c.zaciatok) > DLZKA_TRENINGU;
+
 /**
- * Ktoré ponúknuté časy sú ešte voľné: nesmú sa prekrývať s udalosťou toho
- * istého trénera (živou — zmiznutú volajúci vynechá) ani s termínom, ktorý si
- * už vybral niekto z inej ponuky. A nesmú byť v minulosti — ponuka na dnes
- * ráno o 8:00 o desiatej už nie je ponuka.
+ * Kedy môže tréning v ponúknutom čase začať (Jerry, 11. 10. 2026: „nastavím
+ * si, že mám čas odvtedy dovtedy, a človek si len vyberie, kedy by v tom
+ * rozmedzí mohol byť").
+ *
+ * Krok 15 minút, celá hodina musí byť vnútri rozmedzia, nie v minulosti
+ * a bez udalosti toho istého trénera. Na výber ide celá a pol hodina —
+ * štvrťhodiny by z rozmedzia 14–18 spravili trinásť tlačidiel — PLUS prvý
+ * voľný začiatok po obsadenom úseku (tréning do 15:15 → ponúkne sa 15:15),
+ * inak by riedenie zjedlo jediný voľný čas. Hodinový čas (starý tvar
+ * ponuky) má presne jeden začiatok.
+ */
+export function zaciatkyVRozmedzi(c: CasPonuky, obsadene: Obsadene[], teraz: string, dlzka = DLZKA_TRENINGU): string[] {
+  const den = c.zaciatok.slice(0, 10);
+  const od = naMin(c.zaciatok), doM = naMin(c.koniec);
+  const volne: number[] = [];
+  for (let m = od; m + dlzka <= doM; m += 15) {
+    const z = zMin(den, m), k = zMin(den, m + dlzka);
+    if (z <= minuta(teraz)) continue;
+    if (obsadene.some((o) => o.trener === c.trener && prekryva({ zaciatok: z, koniec: k }, o))) continue;
+    volne.push(m);
+  }
+  return volne.filter((m, i) => m % 30 === 0 || i === 0 || volne[i - 1] !== m - 15).map((m) => zMin(den, m));
+}
+
+/** Vybraný úsek: v rozmedzí od zvoleného začiatku hodinu, inak celý ponúknutý čas. */
+export function vybranyUsek(c: CasPonuky, vybranyZaciatok: string | null | undefined): CasPonuky {
+  if (!vybranyZaciatok) return c;
+  const z = minuta(vybranyZaciatok);
+  return { ...c, zaciatok: z, koniec: zMin(z.slice(0, 10), naMin(z) + DLZKA_TRENINGU) };
+}
+
+/**
+ * Ktoré ponúknuté časy sú ešte voľné: majú aspoň jeden možný začiatok —
+ * bez udalosti toho istého trénera (živej — zmiznutú volajúci vynechá),
+ * bez termínu, ktorý si už vybral niekto z inej ponuky, a nie v minulosti.
  */
 export function volneCasy(casy: CasPonuky[], obsadene: Obsadene[], teraz: string): CasPonuky[] {
-  return casy.filter((c) =>
-    minuta(c.zaciatok) > minuta(teraz)
-    && !obsadene.some((o) => o.trener === c.trener && prekryva(c, o)));
+  return casy.filter((c) => zaciatkyVRozmedzi(c, obsadene, teraz).length > 0);
 }
 
 /** Nedeľa týždňa, v ktorom je deň (RRRR-MM-DD). */

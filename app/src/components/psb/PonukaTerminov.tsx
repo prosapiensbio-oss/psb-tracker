@@ -28,7 +28,7 @@ import { VyberMena } from "./VyberMena";
 type Udalost = { uid: string; trener: string; zaciatok: string; koniec: string | null; nazov: string | null; klient: string | null; zmizla_at: string | null };
 type Navrh = { id: number; trener: string; den: string; od: number; minut: number };
 type Ponuka = {
-  token: string; klient: string; telefon: string | null; typ: string; platiDo: string; vybranyId: string | null;
+  token: string; klient: string; telefon: string | null; typ: string; platiDo: string; vybranyId: string | null; vybranyZaciatok?: string | null;
   zruseneAt: string | null; createdAt: string; casy: { id: string; trener: string; zaciatok: string; koniec: string }[];
   volnych: number; stav: "vybrane" | "zrusene" | "vyprsala" | "obsadene" | "caka"; url: string;
 };
@@ -149,6 +149,42 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
     window.addEventListener("pointercancel", koniec);
   };
 
+  /**
+   * ROZMEDZIE (Jerry, 11. 10. 2026): „nastavím si, že mám čas odvtedy
+   * dovtedy, a človek si len vyberie, kedy by v tom rozmedzí mohol byť."
+   * Spodný okraj bloku sa chytí a potiahne — po 15 minútach, najmenej
+   * hodina, nie do obsadeného času. Blok dlhší než hodina = klient si
+   * na stránke vyberie začiatok hodinového tréningu.
+   */
+  const [natahovany, setNatahovany] = useState<number | null>(null);
+  const zacniNatahovanie = (e: React.PointerEvent<HTMLDivElement>, n: Navrh) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const y0 = e.clientY, minut0 = n.minut;
+    setNatahovany(n.id);
+    const pohyb = (ev: PointerEvent) => {
+      const nove = Math.max(60, Math.round((minut0 + ((ev.clientY - y0) / PX) * 60) / 15) * 15);
+      setNavrhy((xs) => {
+        const x = xs.find((q) => q.id === n.id);
+        if (!x || x.minut === nove) return xs;
+        if (x.od + nove > DO_H * 60) return xs;
+        if (nove > x.minut && obsadeneV(xs, x.den, x.trener, x.od, x.od + nove, x.id)) return xs;
+        return xs.map((q) => (q.id === n.id ? { ...q, minut: nove } : q));
+      });
+    };
+    const koniec = () => {
+      window.removeEventListener("pointermove", pohyb);
+      window.removeEventListener("pointerup", koniec);
+      window.removeEventListener("pointercancel", koniec);
+      ignorujKlikDo.current = Date.now() + 300;
+      setNatahovany(null);
+    };
+    window.addEventListener("pointermove", pohyb);
+    window.addEventListener("pointerup", koniec);
+    window.addEventListener("pointercancel", koniec);
+  };
+
   const pridaj = (den: string, tr: string, od: number) => {
     if (Date.now() < ignorujKlikDo.current) return;
     const k = `${den}|${tr}`;
@@ -250,6 +286,18 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                           <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
                           <button type="button" title="Zmazať termín" onClick={() => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))} style={{ padding: "0 4px", border: 0, borderRadius: 3, background: "rgba(0,0,0,.35)", color: "inherit", font: "inherit", fontSize: 10, cursor: "pointer", lineHeight: 1.4 }}>×</button>
                         </span>
+                        {n.minut > 60 && !uzke && <span style={{ fontWeight: 600, opacity: 0.85 }}>klient si vyberie</span>}
+                        {/* Úchyt na natiahnutie — rozmedzie, v ktorom si klient vyberie začiatok. */}
+                        <div
+                          onPointerDown={(e) => zacniNatahovanie(e, n)}
+                          title="Potiahni — rozmedzie, v ktorom si klient vyberie začiatok"
+                          style={{
+                            position: "absolute", left: 0, right: 0, bottom: -4, height: 12, cursor: "ns-resize", touchAction: "none",
+                            display: "flex", justifyContent: "center", alignItems: "center",
+                          }}
+                        >
+                          <span style={{ width: 22, height: 4, borderRadius: 2, background: farba(tr), opacity: natahovany === n.id ? 1 : 0.7 }} />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -272,11 +320,11 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           </div>
         )}
         <div style={{ ...stitok, marginTop: 4 }}>Ponúkané termíny {zoradene.length ? `(${zoradene.length})` : ""}</div>
-        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Blok chytíš a posunieš, krížikom ho zmažeš.</div>}
+        {!zoradene.length && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>Ťukni do voľného miesta v týždni — pribudne termín na 60 min. Blok chytíš a posunieš, za spodný okraj ho natiahneš na rozmedzie (klient si v ňom vyberie, kedy začne) a krížikom ho zmažeš.</div>}
         {zoradene.map((n) => (
           <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${mix(C.border, 100)}`, fontSize: 12.5 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: farba(n.trener) }} />
-            {DNI[(new Date(`${n.den}T12:00:00Z`).getUTCDay() + 6) % 7]} {dm(n.den)} · <b>{hhmm(n.od)}</b> · {n.minut} min{trener ? "" : ` · ${n.trener}`}
+            {DNI[(new Date(`${n.den}T12:00:00Z`).getUTCDay() + 6) % 7]} {dm(n.den)} · <b>{n.minut > 60 ? `${hhmm(n.od)}–${hhmm(n.od + n.minut)}` : hhmm(n.od)}</b> · {n.minut > 60 ? "vyberie si začiatok" : "60 min"}{trener ? "" : ` · ${n.trener}`}
             <button type="button" onClick={() => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))} style={{ marginLeft: "auto", background: "none", border: 0, color: C.textDim, cursor: "pointer" }}>✕</button>
           </div>
         ))}
@@ -303,7 +351,8 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={stitok}>Poslané ponuky</div>
             {ponuky.filter((p) => !trener || p.casy.some((c) => c.trener === trener)).slice(0, 12).map((p) => {
-              const vybrany = p.casy.find((c) => c.id === p.vybranyId);
+              const vybranyRozsah = p.casy.find((c) => c.id === p.vybranyId);
+              const vybrany = vybranyRozsah && p.vybranyZaciatok ? { ...vybranyRozsah, zaciatok: p.vybranyZaciatok } : vybranyRozsah;
               return (
                 <div key={p.token} style={{ padding: "7px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${mix(C.border, 100)}`, fontSize: 12.5, display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>

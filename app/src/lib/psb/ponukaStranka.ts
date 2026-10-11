@@ -12,7 +12,7 @@ import { casHHMM, denCz, type CasPonuky } from "./ponukaTerminov";
  */
 
 export type StavStranky =
-  | { druh: "vyber"; volne: CasPonuky[]; platiDo: string; chyba?: string }
+  | { druh: "vyber"; volne: CasPonuky[]; moznosti?: { c: CasPonuky; zaciatky: string[] }[]; platiDo: string; chyba?: string }
   | { druh: "vybrane"; cas: CasPonuky }
   | { druh: "neplati"; preco: "vyprsala" | "zrusene" | "obsadene" };
 
@@ -28,16 +28,27 @@ export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener:
   let telo = "";
 
   if (v.stav.druh === "vyber") {
-    const dni = [...new Set(v.stav.volne.map((c) => c.zaciatok.slice(0, 10)))];
+    // Začiatky po dňoch: z rozmedzia ich je viac, z hodinového jeden. Ten istý
+    // čas z dvoch ponúknutých úsekov (dva pruhy trénerov) sa ukáže raz.
+    const moznosti = v.stav.moznosti || v.stav.volne.map((c) => ({ c, zaciatky: [c.zaciatok] }));
+    const volby: { den: string; cas: string; hodnota: string }[] = [];
+    for (const m of moznosti) {
+      for (const z of m.zaciatky) {
+        if (volby.some((x) => x.den === z.slice(0, 10) && x.cas === z.slice(11, 16))) continue;
+        volby.push({ den: z.slice(0, 10), cas: z.slice(11, 16), hodnota: `${m.c.id}|${z.slice(11, 16)}` });
+      }
+    }
+    volby.sort((a, b) => (a.den + a.cas).localeCompare(b.den + b.cas));
+    const dni = [...new Set(volby.map((x) => x.den))];
     const [, m, d] = v.stav.platiDo.split("-").map(Number);
     telo = `
 <h1>${esc(nadpisUvod)}</h1>
-<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yberte si jeden z termínů. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
+<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yberte si, kdy můžete začít — trénink trvá hodinu. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
 ${v.stav.chyba ? `<p class="chyba">${esc(v.stav.chyba)}</p>` : ""}
 <form method="post">
 ${dni.map((den) => `
 <div class="den"><div class="d">${esc(denCz(den))}</div><div class="casy">
-${v.stav.druh === "vyber" ? v.stav.volne.filter((c) => c.zaciatok.slice(0, 10) === den).map((c) => `<label><input type="radio" name="cas" value="${esc(c.id)}" required><span>${esc(casHHMM(c.zaciatok))}</span></label>`).join("") : ""}
+${volby.filter((x) => x.den === den).map((x) => `<label><input type="radio" name="cas" value="${esc(x.hodnota)}" required><span>${esc(casHHMM(`${x.den}T${x.cas}`))}</span></label>`).join("")}
 </div></div>`).join("")}
 <div class="spodok">
 <button type="submit">Potvrdit termín</button>

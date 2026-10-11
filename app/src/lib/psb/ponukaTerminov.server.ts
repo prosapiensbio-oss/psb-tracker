@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { posli as posliPush, type Odber } from "./push.server";
-import type { CasPonuky, Obsadene } from "./ponukaTerminov";
+import { vybranyUsek, type CasPonuky, type Obsadene } from "./ponukaTerminov";
 
 /**
  * PONUKA TERMÍNOV — čo potrebuje server (API pre Kokpit aj stránka /t/).
@@ -11,6 +11,8 @@ import type { CasPonuky, Obsadene } from "./ponukaTerminov";
 export type RiadokPonuky = {
   token: string; klient: string; telefon: string | null; typ: string; plati_do: string;
   vybrany_id: string | null; vybrane_at: string | null; udalost_uid: string | null;
+  /** Začiatok zvolený v rozmedzí (migrácia 0110); NULL = celý ponúknutý čas. */
+  vybrany_zaciatok?: string | null;
   zrusene_at: string | null; kto: string | null; created_at: string;
 };
 
@@ -34,11 +36,15 @@ export async function obsadeneVOkne(DB: D1Database, od: string, doDna: string, o
       `SELECT trener, zaciatok, COALESCE(koniec, zaciatok) AS koniec FROM kal_udalosti
         WHERE zmizla_at IS NULL AND zaciatok >= ?1 AND zaciatok < ?2`,
     ).bind(od, doDna).all().then((x) => (x.results || []) as unknown as Obsadene[]).catch(() => [] as Obsadene[]),
+    // Vybraté v rozmedzí obsadí len zvolenú hodinu, nie celé rozmedzie.
     DB.prepare(
-      `SELECT c.trener, c.zaciatok, c.koniec FROM ponuky_terminov p
+      `SELECT c.id, c.trener, c.zaciatok, c.koniec, p.vybrany_zaciatok FROM ponuky_terminov p
          JOIN ponuky_terminov_casy c ON c.id = p.vybrany_id
         WHERE p.token != ?1 AND c.zaciatok >= ?2 AND c.zaciatok < ?3`,
-    ).bind(okremTokenu, od, doDna).all().then((x) => (x.results || []) as unknown as Obsadene[]).catch(() => [] as Obsadene[]),
+    ).bind(okremTokenu, od, doDna).all()
+      .then((x) => ((x.results || []) as unknown as (CasPonuky & { vybrany_zaciatok: string | null })[])
+        .map((r) => vybranyUsek(r, r.vybrany_zaciatok)) as Obsadene[])
+      .catch(() => [] as Obsadene[]),
   ]);
   return [...udalosti, ...vybrane];
 }

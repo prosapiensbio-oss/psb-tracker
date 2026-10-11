@@ -4,7 +4,7 @@ import { bindings } from "../lib/bindings.server";
 import { dnesPraha, terazPraha } from "../lib/psb/cas";
 import { zapisTrening } from "../lib/psb/nahodTrening.server";
 import { ponukaStrankaHtml, type StavStranky } from "../lib/psb/ponukaStranka";
-import { casHHMM, denCz, icsTerminu, prekryva, stavPonuky, volneCasy } from "../lib/psb/ponukaTerminov";
+import { DLZKA_TRENINGU, casHHMM, denCz, icsTerminu, prekryva, stavPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi } from "../lib/psb/ponukaTerminov";
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, pushTrenerovi } from "../lib/psb/ponukaTerminov.server";
 import { audit } from "../lib/psb/audit.server";
 
@@ -34,15 +34,19 @@ async function stav(DB: NonNullable<ReturnType<typeof bindings>["DB"]>, token: s
   const trener = casy[0]?.trener || "Jerry";
   if (p.vybrany_id) {
     const c = casy.find((x) => x.id === p.vybrany_id);
-    if (c) return { p, casy, trener: c.trener, s: { druh: "vybrane", cas: c } as StavStranky };
+    if (c) return { p, casy, trener: c.trener, s: { druh: "vybrane", cas: vybranyUsek(c, p.vybrany_zaciatok) } as StavStranky };
   }
   const o = oknoCasov(casy);
-  const volne = volneCasy(casy, await obsadeneVOkne(DB, o.od, o.do, token), terazPraha());
+  const obsadene = await obsadeneVOkne(DB, o.od, o.do, token);
+  const teraz = terazPraha();
+  const volne = volneCasy(casy, obsadene, teraz);
+  // Každý ponúknutý čas so začiatkami, ktoré sa dajú vybrať (rozmedzie aj hodina).
+  const moznosti = volne.map((c) => ({ c, zaciatky: zaciatkyVRozmedzi(c, obsadene, teraz) }));
   const st = stavPonuky(p, dnesPraha(), volne.length);
   const s: StavStranky = st === "caka"
-    ? { druh: "vyber", volne, platiDo: p.plati_do, chyba }
+    ? { druh: "vyber", volne, moznosti, platiDo: p.plati_do, chyba }
     : { druh: "neplati", preco: st === "zrusene" ? "zrusene" : st === "obsadene" ? "obsadene" : "vyprsala" };
-  return { p, casy, trener, s, volne };
+  return { p, casy, trener, s, volne, moznosti };
 }
 
 export const Route = createFileRoute("/t/$token")({
@@ -80,24 +84,31 @@ export const Route = createFileRoute("/t/$token")({
         const x = await stav(DB, token).catch(() => null);
         if (!x) return zle("Tento odkaz neplatí.");
         if (x.s.druh !== "vyber") return spat();
-        const id = String((await request.formData()).get("cas") || "");
-        const c = x.casy.find((k) => k.id === id);
-        if (!c) return spat();
-        if (!(x.volne || []).some((k) => k.id === id)) return spat("?chyba=obsazeno");
+        // Hodnota je „id|HH:MM" (začiatok v rozmedzí); staré stránky posielajú len id.
+        const [id, hhmmVstup = ""] = String((await request.formData()).get("cas") || "").split("|");
+        const rozsah = x.casy.find((k) => k.id === id);
+        if (!rozsah) return spat();
+        const zaciatok = /^\d{2}:\d{2}$/.test(hhmmVstup) ? `${rozsah.zaciatok.slice(0, 10)}T${hhmmVstup}` : rozsah.zaciatok;
+        const moze = (x.moznosti || []).find((m) => m.c.id === id)?.zaciatky || [];
+        if (!moze.includes(zaciatok)) return spat("?chyba=obsazeno");
+        // Pri rozmedzí sa zapisuje hodina od zvoleného začiatku, nie celé rozmedzie.
+        const c = vybranyUsek(rozsah, zaciatok);
 
         // Zámok: ponuka sa vyberá raz. Druhé klepnutie (alebo druhé okno) neprejde.
         const kedy = new Date().toISOString();
-        const zamok = await DB.prepare("UPDATE ponuky_terminov SET vybrany_id = ?2, vybrane_at = ?3 WHERE token = ?1 AND vybrany_id IS NULL AND zrusene_at IS NULL")
-          .bind(token, id, kedy).run();
+        const zamok = await DB.prepare("UPDATE ponuky_terminov SET vybrany_id = ?2, vybrane_at = ?3, vybrany_zaciatok = ?4 WHERE token = ?1 AND vybrany_id IS NULL AND zrusene_at IS NULL")
+          .bind(token, id, kedy, zaciatok).run();
         if (!zamok.meta.changes) return spat();
-        const uvolni = () => DB.prepare("UPDATE ponuky_terminov SET vybrany_id = NULL, vybrane_at = NULL WHERE token = ?1 AND vybrany_id = ?2").bind(token, id).run();
+        const uvolni = () => DB.prepare("UPDATE ponuky_terminov SET vybrany_id = NULL, vybrane_at = NULL, vybrany_zaciatok = NULL WHERE token = ?1 AND vybrany_id = ?2").bind(token, id).run();
 
         // Iná ponuka mohla ten istý čas vybrať v tej istej sekunde.
         const o = oknoCasov([c]);
         const inde = await obsadeneVOkne(DB, o.od, o.do, token);
         if (inde.some((k) => k.trener === c.trener && prekryva(c, k))) { await uvolni(); return spat("?chyba=obsazeno"); }
 
-        const minut = (Number(c.koniec.slice(11, 13)) * 60 + Number(c.koniec.slice(14, 16))) - (Number(c.zaciatok.slice(11, 13)) * 60 + Number(c.zaciatok.slice(14, 16)));
+        const minut = c === rozsah
+          ? (Number(c.koniec.slice(11, 13)) * 60 + Number(c.koniec.slice(14, 16))) - (Number(c.zaciatok.slice(11, 13)) * 60 + Number(c.zaciatok.slice(14, 16)))
+          : DLZKA_TRENINGU;
         const r = await zapisTrening(DB, GCAL_SA_KLUC, {
           klient: x.p.klient, den: c.zaciatok.slice(0, 10), cas: c.zaciatok.slice(11, 16), minut, trener: c.trener, typ: x.p.typ,
         }, `${x.p.klient} (ponuka termínov)`, "trening-z-ponuky").catch((e) => ({ ok: false as const, chyba: String(e), status: 500 }));

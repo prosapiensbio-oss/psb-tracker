@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { denCz, icsTerminu, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, stavPonuky, textSmsPonuky, volneCasy } from "./ponukaTerminov";
+import { denCz, icsTerminu, jeRozmedzie, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, stavPonuky, textSmsPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi } from "./ponukaTerminov";
 
 // Jerry, 7. 10. 2026: „vytukal by som si všetky termíny, ktoré ponúkam,
 // poslal by som mu odkaz… klikol by na ten, ktorý chce."
@@ -62,5 +62,36 @@ describe("termín do kalendára (.ics)", () => {
     expect(s).toContain("DTSTART:20261013T080000Z");
     expect(s).toContain("DTEND:20261013T090000Z");
     expect(s).toContain("SUMMARY:Trénink ProSapiens");
+  });
+});
+
+// Jerry, 11. 10. 2026: „nastavím si, že mám čas odvtedy dovtedy, a človek si
+// len vyberie, kedy by v tom rozmedzí mohol byť."
+describe("ponuka v rozmedzí", () => {
+  const r = { id: "r", trener: "Jerry", zaciatok: "2026-10-13T14:00", koniec: "2026-10-13T18:00" };
+  it("celé a pol hodiny, posledný začiatok hodinu pred koncom", () => {
+    expect(jeRozmedzie(r)).toBe(true);
+    expect(zaciatkyVRozmedzi(r, [], "2026-10-12T12:00").map((x) => x.slice(11))).toEqual(["14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"]);
+  });
+  it("obsadený úsek vypadne a ponúkne sa prvý voľný začiatok po ňom", () => {
+    const obs = [{ trener: "Jerry", zaciatok: "2026-10-13T15:00", koniec: "2026-10-13T16:15" }];
+    expect(zaciatkyVRozmedzi(r, obs, "2026-10-12T12:00").map((x) => x.slice(11))).toEqual(["14:00", "16:15", "16:30", "17:00"]);
+  });
+  it("udalosť iného trénera rozmedzie neruší; minulosť áno", () => {
+    const obs = [{ trener: "Terezka", zaciatok: "2026-10-13T15:00", koniec: "2026-10-13T16:00" }];
+    expect(zaciatkyVRozmedzi(r, obs, "2026-10-13T16:10").map((x) => x.slice(11))).toEqual(["16:15", "16:30", "17:00"]);
+  });
+  it("hodinový termín (starý tvar) má jeden začiatok, aj o štvrť", () => {
+    const h = { id: "h", trener: "Jerry", zaciatok: "2026-10-13T08:15", koniec: "2026-10-13T09:15" };
+    expect(jeRozmedzie(h)).toBe(false);
+    expect(zaciatkyVRozmedzi(h, [], "2026-10-12T12:00")).toEqual(["2026-10-13T08:15"]);
+  });
+  it("vybraný úsek je hodina od zvoleného začiatku", () => {
+    expect(vybranyUsek(r, "2026-10-13T15:30")).toMatchObject({ zaciatok: "2026-10-13T15:30", koniec: "2026-10-13T16:30" });
+    expect(vybranyUsek(r, null)).toBe(r);
+  });
+  it("plne obsadené rozmedzie nie je voľné", () => {
+    const obs = [{ trener: "Jerry", zaciatok: "2026-10-13T14:00", koniec: "2026-10-13T17:30" }];
+    expect(volneCasy([r], obs, "2026-10-12T12:00")).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { KALENDAR_TRENERA, pripravCas } from "../../lib/psb/nahodTrening";
-import { platiDo, prekryva, prekryvVPonuke, stavPonuky, volneCasy } from "../../lib/psb/ponukaTerminov";
+import { DLZKA_TRENINGU, platiDo, prekryva, prekryvVPonuke, stavPonuky, volneCasy } from "../../lib/psb/ponukaTerminov";
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, type RiadokPonuky } from "../../lib/psb/ponukaTerminov.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/ponuky")({
           const volne = volneCasy(casy, await obsadeneVOkne(DB, o.od, o.do, p.token), teraz);
           von.push({
             token: p.token, klient: p.klient, telefon: p.telefon, typ: p.typ, platiDo: p.plati_do,
-            vybranyId: p.vybrany_id, vybraneAt: p.vybrane_at, zruseneAt: p.zrusene_at, kto: p.kto, createdAt: p.created_at,
+            vybranyId: p.vybrany_id, vybranyZaciatok: p.vybrany_zaciatok || null, vybraneAt: p.vybrane_at, zruseneAt: p.zrusene_at, kto: p.kto, createdAt: p.created_at,
             casy, volnych: volne.length, stav: stavPonuky(p, dnes, volne.length),
             url: verejnyOdkaz(`/t/${p.token}`, origin),
           });
@@ -84,7 +84,11 @@ export const Route = createFileRoute("/api/ponuky")({
         for (const x of vstup) {
           const trener = String(x.trener || "");
           if (!KALENDAR_TRENERA[trener]) return chyba(`Neznámy tréner „${trener}“.`);
-          const c = pripravCas(String(x.den || ""), String(x.cas || ""), x.minut == null ? undefined : Number(x.minut));
+          // Rozmedzie (11. 10. 2026): ponúknutý čas smie byť až 12 h, klient si
+          // v ňom vyberie začiatok hodinového tréningu. Kratší než tréning nie.
+          const minut = x.minut == null ? DLZKA_TRENINGU : Number(x.minut);
+          if (minut < DLZKA_TRENINGU) return chyba(`Ponúknutý čas musí mať aspoň ${DLZKA_TRENINGU} minút.`);
+          const c = pripravCas(String(x.den || ""), String(x.cas || ""), minut, 720);
           if (!c.ok) return chyba(c.chyba);
           casy.push({ id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, trener, zaciatok: c.zaciatok, koniec: c.koniec });
         }

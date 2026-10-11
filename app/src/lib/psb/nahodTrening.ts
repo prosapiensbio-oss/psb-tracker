@@ -21,11 +21,12 @@ export type PripravenyTrening = {
 };
 
 /** Overí deň, čas a dĺžku — spoločné pre nahodenie aj presun udalosti. */
-export function pripravCas(den: string, cas: string, minutVstup?: number): { ok: true; zaciatok: string; koniec: string } | { ok: false; chyba: string } {
+/** `maxMinut`: ponuka termínov v rozmedzí smie byť dlhšia než tréning (11. 10. 2026). */
+export function pripravCas(den: string, cas: string, minutVstup?: number, maxMinut = 240): { ok: true; zaciatok: string; koniec: string } | { ok: false; chyba: string } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(den)) return { ok: false, chyba: "Deň musí byť v tvare RRRR-MM-DD." };
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cas)) return { ok: false, chyba: "Čas musí byť v tvare HH:MM." };
   const minut = minutVstup ?? 60;
-  if (!Number.isInteger(minut) || minut < 15 || minut > 240) return { ok: false, chyba: "Dĺžka musí byť 15 až 240 minút." };
+  if (!Number.isInteger(minut) || minut < 15 || minut > maxMinut) return { ok: false, chyba: `Dĺžka musí byť 15 až ${maxMinut} minút.` };
 
   const [h, m] = cas.split(":").map(Number);
   const spolu = h * 60 + m + minut;
