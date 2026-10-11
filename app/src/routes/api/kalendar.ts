@@ -956,6 +956,23 @@ export const Route = createFileRoute("/api/kalendar")({
                   AND substr(zaciatok, 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
             ).bind(klient, typ, nazov, trener, nazov, trener).run();
           }
+          /**
+           * To isté aj v ZMENÁCH (11. 10. 2026). „Luky Kriz" sa 28. 9. ešte
+           * hádal na Lukáša Kríža; 3. 10. ho Jerry priradil na Lukyho Kríža
+           * a udalosti sa opravili — ale presun z 28. 9. ostal pod Lukášom
+           * a Workspace ho ukazoval pri cudzom človeku („to sú dve odlišné
+           * osoby"). Zmena nesie meno z chvíle zápisu, tak sa opraví tu.
+           */
+          if (cas) {
+            await DB.prepare("UPDATE kal_zmeny SET klient = ? WHERE nazov = ? AND trener = ? AND substr(COALESCE(po, pred), 12, 5) = ?")
+              .bind(klient, nazov, trener, cas).run().catch(() => undefined);
+          } else {
+            await DB.prepare(
+              `UPDATE kal_zmeny SET klient = ?
+                WHERE nazov = ? AND trener = ?
+                  AND substr(COALESCE(po, pred), 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
+            ).bind(klient, nazov, trener, nazov, trener).run().catch(() => undefined);
+          }
           return Response.json({ ok: true });
         }
 
