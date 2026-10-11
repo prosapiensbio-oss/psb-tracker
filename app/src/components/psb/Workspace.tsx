@@ -31,6 +31,7 @@ import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { kontrolyMesiaca } from "../../lib/psb/rituals";
 import { AlzaUzavierka } from "./AlzaUzavierka";
 import { useMobilRozlozenie } from "./useMobilRozlozenie";
+import { ZdravieKokpitu } from "./ZdravieKokpitu";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
@@ -96,7 +97,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, stavy, pohybSplits, nastavPohybSplit, btcUzavierky }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, stavy, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -139,6 +140,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     /** Od ktorého mesiaca sa vlastná evidencia platieb vôbec súdi. */
     platbyOd?: string;
   };
+  /** Porovnania dvoch zdrojov pre kartu „Zdravie Kokpitu". */
+  rozpory?: { nazov: string; pocet: number | null; detail?: string }[];
   pohybSplits?: PohybSplits;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
@@ -1617,7 +1620,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               // samostatná karta (Jerry, 9. 10. 2026).
               alza: <AlzaUzavierka mesiac={mk} btc={btcUzavierky} />,
               kontroly: (
-                <KrokKontroly
+                <>
+                  {/* Jerry, 10. 10. 2026: „kontrolu si predstavujem ako
+                      kontrolu appky." Zdravie Kokpitu je navrchu, mesačné
+                      kontroly dát pod ním. */}
+                  <ZdravieKokpitu rozpory={rozpory || []} />
+                  <div style={{ height: 14 }} />
+                  <KrokKontroly
                   kontroly={kontrolyMesiaca(mk)}
                   acks={data.anomalyAck || {}} onNavigate={onNavigate}
                   vstup={{
@@ -1661,7 +1670,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     onNavigate?.("jarvis");
                   }}
                   onZmena={() => { oznam("klienti"); void actions?.refresh(); }}
-                />
+                  />
+                </>
               ),
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,

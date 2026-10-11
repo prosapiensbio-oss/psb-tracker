@@ -90,6 +90,7 @@ import { Route as ApiChybaPrehliadacaRouteImport } from './routes/api/chyba-preh
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiBalickyRouteImport } from './routes/api/balicky'
+import { Route as ApiAutomatBehRouteImport } from './routes/api/automat-beh'
 import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
 import { Route as ApiAnamnezaRouteImport } from './routes/api/anamneza'
 import { Route as ApiAlgoRouteImport } from './routes/api/algo'
@@ -501,6 +502,11 @@ const ApiBalickyRoute = ApiBalickyRouteImport.update({
   path: '/api/balicky',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAutomatBehRoute = ApiAutomatBehRouteImport.update({
+  id: '/api/automat-beh',
+  path: '/api/automat-beh',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnomalyRoute = ApiAnomalyRouteImport.update({
   id: '/api/anomaly',
   path: '/api/anomaly',
@@ -537,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/api/algo': typeof ApiAlgoRoute
   '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -625,6 +632,7 @@ export interface FileRoutesByTo {
   '/api/algo': typeof ApiAlgoRoute
   '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -714,6 +722,7 @@ export interface FileRoutesById {
   '/api/algo': typeof ApiAlgoRoute
   '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -804,6 +813,7 @@ export interface FileRouteTypes {
     | '/api/algo'
     | '/api/anamneza'
     | '/api/anomaly'
+    | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -892,6 +902,7 @@ export interface FileRouteTypes {
     | '/api/algo'
     | '/api/anamneza'
     | '/api/anomaly'
+    | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -980,6 +991,7 @@ export interface FileRouteTypes {
     | '/api/algo'
     | '/api/anamneza'
     | '/api/anomaly'
+    | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -1069,6 +1081,7 @@ export interface RootRouteChildren {
   ApiAlgoRoute: typeof ApiAlgoRoute
   ApiAnamnezaRoute: typeof ApiAnamnezaRoute
   ApiAnomalyRoute: typeof ApiAnomalyRoute
+  ApiAutomatBehRoute: typeof ApiAutomatBehRoute
   ApiBalickyRoute: typeof ApiBalickyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -1716,6 +1729,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBalickyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/automat-beh': {
+      id: '/api/automat-beh'
+      path: '/api/automat-beh'
+      fullPath: '/api/automat-beh'
+      preLoaderRoute: typeof ApiAutomatBehRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/anomaly': {
       id: '/api/anomaly'
       path: '/api/anomaly'
@@ -1775,6 +1795,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlgoRoute: ApiAlgoRoute,
   ApiAnamnezaRoute: ApiAnamnezaRoute,
   ApiAnomalyRoute: ApiAnomalyRoute,
+  ApiAutomatBehRoute: ApiAutomatBehRoute,
   ApiBalickyRoute: ApiBalickyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,

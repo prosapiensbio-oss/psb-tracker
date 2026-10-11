@@ -215,6 +215,45 @@ const mesiacPraha = (n = 0) => {
 };
 const denPraha = () => Number(new Date().toLocaleString("en-US", { timeZone: "Europe/Prague", day: "numeric" }));
 
+/**
+ * OHLÁSENIE BEHU — do konzoly aj do databázy.
+ *
+ * Jerry, 10. 10. 2026: „kontrolu si predstavujem ako kontrolu appky — či
+ * všetko funguje." Pri hľadaní, z čoho ju postaviť, vyšlo najavo, že z
+ * desiatich automatov si stav zapisovali DVA (kalendár a pošta). Ostatné
+ * písali len do konzoly workera, kam sa z appky nedá pozrieť — mohli mlčky
+ * nebežať týždne.
+ *
+ * Zapisuje sa KAŽDÝ pokus, nielen úspech: chýbajúci riadok potom znamená
+ * „nespustilo sa", čo je iná porucha než „spustilo sa a spadlo". Samotný
+ * zápis nesmie zhodiť automat, preto je celý v catch.
+ */
+const zapisBeh = async (env: Env, automat: string, ok: boolean, detail: string, chyba?: string) => {
+  try {
+    await env.KOKPIT.fetch(
+      new Request("https://kokpit.prosapiensbio.workers.dev/api/automat-beh", {
+        method: "POST",
+        headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+        body: JSON.stringify({ automat, ok, detail: detail.slice(0, 200), chyba: (chyba || "").slice(0, 200) }),
+      }),
+    );
+  } catch { /* stav behu nie je dôležitejší než samotný beh */ }
+};
+
+/** Obalí volanie automatu: zapíše výsledok a nechá správu aj v konzole. */
+const ohlas = (env: Env, automat: string, p: Promise<Response>): Promise<void> =>
+  p.then(
+    async (r) => {
+      const t = (await r.text()).slice(0, 300);
+      await zapisBeh(env, automat, r.ok, t, r.ok ? undefined : `HTTP ${r.status}: ${t}`);
+      console.log(`${automat}: HTTP ${r.status} ${t}`);
+    },
+    async (e) => {
+      await zapisBeh(env, automat, false, "", String(e).slice(0, 200));
+      console.error(`${automat} zlyhal:`, e);
+    },
+  );
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     if (event.cron === "40 4 * * *") {  // 06:40 lokál v lete — po kontrole webu a reklamách
@@ -222,8 +261,7 @@ export default {
         const mesiace = denPraha() <= 7 ? [mesiacPraha(-1), mesiacPraha()] : [mesiacPraha()];
         for (const m of mesiace) {
           try {
-            const r = await metricoolMesiac(env, m);
-            console.log(`metricool ${m}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
+            await ohlas(env, "metricool", metricoolMesiac(env, m));
           } catch (e) {
             console.error(`metricool ${m} zlyhal:`, e);
           }
@@ -237,10 +275,7 @@ export default {
     // do jednej požiadavky (limit CPU, 29. 8.), preto vlastný plán.
     if (event.cron === "30 4 * * *") {  // 06:30 lokál — ranná dávka
       ctx.waitUntil(
-        rannePush(env).then(
-          async (r) => console.log(`ranné push: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`),
-          (e) => console.error("ranné push zlyhalo:", e),
-        ),
+        ohlas(env, "ranne-push", rannePush(env)),
       );
       return;
     }
@@ -255,8 +290,7 @@ export default {
         // boli z rána, nie zo včera.
         for (const akcia of ["kampane", "reklamy", "dozor"] as const) {
           try {
-            const r = await metaReklamy(env, akcia);
-            console.log(`meta ${akcia}: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+            await ohlas(env, `meta-${akcia}`, metaReklamy(env, akcia));
           } catch (e) {
             console.error(`meta ${akcia} zlyhalo:`, e);
           }
@@ -281,55 +315,43 @@ export default {
       const cast = casti[event.cron];
       if (cast) {
         ctx.waitUntil(
-          kontrolaWebu(env, cast).then(
-            async (r) => console.log(`kontrola webu (${cast}): HTTP ${r.status} ${(await r.text()).slice(0, 400)}`),
-            (e) => console.error(`kontrola webu (${cast}) zlyhala:`, e),
-          ),
+          ohlas(env, `kontrola-webu-${cast}`, kontrolaWebu(env, cast)),
         );
         return;
       }
     }
     if (event.cron === "30 3 * * *") {
       ctx.waitUntil(
-        novinky(env).then(
-          async (r) => console.log(`novinky v algoritmoch: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
-          (e) => console.error("novinky v algoritmoch zlyhali:", e),
-        ),
+        ohlas(env, "novinky-algoritmy", novinky(env)),
       );
       // Text webu ide v tom istom nočnom behu. Beží PO novinkách a nezávisle:
       // keď jedno spadne, druhé sa aj tak spraví.
       ctx.waitUntil(
         textWebu(env).then(
-          (v) => console.log(v.chyba
-            ? `text webu ZLYHAL po ${v.kol} kolách (načítaných ${v.nacitane}): ${v.chyba}`
-            : `text webu: ${v.nacitane} stránok v ${v.kol} kolách`),
-          (e) => console.error("text webu zlyhal:", e),
+          async (v) => {
+            await zapisBeh(env, "text-webu", !v.chyba, `${v.nacitane} stránok v ${v.kol} kolách`, v.chyba ? String(v.chyba) : undefined);
+            console.log(v.chyba
+              ? `text webu ZLYHAL po ${v.kol} kolách (načítaných ${v.nacitane}): ${v.chyba}`
+              : `text webu: ${v.nacitane} stránok v ${v.kol} kolách`);
+          },
+          async (e) => { await zapisBeh(env, "text-webu", false, "", String(e).slice(0, 200)); console.error("text webu zlyhal:", e); },
         ),
       );
       return;
     }
     ctx.waitUntil(
-      zavolaj(env).then(
-        async (r) => console.log(`snímka kalendára: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
-        (e) => console.error("snímka kalendára zlyhala:", e),
-      ),
+      ohlas(env, "kalendar", zavolaj(env)),
     );
     // Notifikácie na telefón. Zámerne VLASTNÉ volanie, nie prílepok ku snímke
     // kalendára: 29. 8. 2026 pridaná práca v jednom endpointe prekročila limit
     // CPU a appka vracala 503 na všetko. Keď spadne toto, spadne len toto.
     ctx.waitUntil(
-      push(env).then(
-        async (r) => console.log(`push na telefón: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
-        (e) => console.error("push na telefón zlyhal:", e),
-      ),
+      ohlas(env, "push", push(env)),
     );
     // Schránka. Tiež vlastné volanie — keď je poštový server nedostupný,
     // nesmie to zhodiť ani kalendár, ani notifikácie.
     ctx.waitUntil(
-      mailDopyty(env).then(
-        async (r) => console.log(`dopyty z mailu: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`),
-        (e) => console.error("dopyty z mailu zlyhali:", e),
-      ),
+      ohlas(env, "mail-dopyty", mailDopyty(env)),
     );
   },
   // Ručné spustenie na overenie, že plánovač na Kokpit naozaj dosiahne.
