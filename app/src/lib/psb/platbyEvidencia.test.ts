@@ -424,3 +424,13 @@ describe("text platby sa nepíše dvakrát", () => {
     expect(textPlatby(r("MIŘEJOVSKÝ JIŘÍ", null))).toBe("MIŘEJOVSKÝ JIŘÍ");
   });
 });
+
+describe("spôsob platby z typu pohybu", () => {
+  it("Bezhotovostní příjem je banka, nie hotovosť (Vaško, 9. 10. 2026)", async () => {
+    const { sposobZRiadku } = await import("./platbyEvidencia");
+    expect(sposobZRiadku({ typ: "Bezhotovostní příjem" })).toBe("banka");
+    expect(sposobZRiadku({ typ: "Okamžitá příchozí platba" })).toBe("banka");
+    expect(sposobZRiadku({ typ: "hotovosť" })).toBe("hotovost");
+    expect(sposobZRiadku({ typ: "Vklad hotovosti" })).toBe("hotovost");
+  });
+});

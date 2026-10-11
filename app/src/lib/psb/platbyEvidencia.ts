@@ -210,8 +210,15 @@ export function smieSaZapamatat(vzor: string, klient: string): boolean {
  * Spôsob platby podľa riadku: zápis zo zošita hotovosti (typ „hotovosť")
  * nie je banka. Do 5. 10. 2026 sa každé priradenie zapisovalo ako „banka".
  */
+/**
+ * Hotovosť, alebo banka — podľa typu pohybu.
+ *
+ * Fio volá prevod „Bezhotovostní příjem" a holé /hotovos/ to chytilo ako
+ * hotovosť: Vaškova platba z 9. 10. 2026 (faktúra, prevodom) stála v Kokpite
+ * ako hotovosť a nesedela s PTminderom. „Bez-hotovostný" je banka.
+ */
 export const sposobZRiadku = (r: { typ?: string | null }): "hotovost" | "banka" =>
-  /hotovos/i.test(r.typ || "") ? "hotovost" : "banka";
+  /hotovos/i.test(r.typ || "") && !/bezhotovos/i.test(r.typ || "") ? "hotovost" : "banka";
 
 export type NepriradenaPlatba = {
   fioId: string;
