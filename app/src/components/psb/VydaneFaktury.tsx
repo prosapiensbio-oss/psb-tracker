@@ -190,6 +190,41 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     return j as { ok: true; cislo?: string; id?: string; duplicita?: undefined };
   };
 
+  /**
+   * PDF SA STIAHNE ZO SERVERA (11. 10. 2026).
+   *
+   * Tlačidlo dovtedy otváralo tlač zo skrytého rámu. Na iPade Safari pri
+   * tlači pridá vlastné okraje a presnú A4 posunie — Danova faktúra s dvoma
+   * klientmi tak vyšla s druhou, prázdnou stranou a stiahnuť sa nedala.
+   * Server sádže tú istú šablónu cez prehliadač na presnú A4 (ako prílohu
+   * mailu) a súbor sa stiahne. Tlač ostáva len ako záloha.
+   */
+  const [pdfBezi, setPdfBezi] = useState("");
+  const stiahniPdf = async (r: Riadok) => {
+    setPdfBezi(r.id); setChyba("");
+    try {
+      const res = await fetch("/api/vydane-faktury", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "pdf", id: r.id }),
+      });
+      if (!res.ok || !(res.headers.get("content-type") || "").includes("pdf")) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}${t ? `: ${t.slice(0, 160)}` : ""}`);
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url; a.download = `Faktura ${r.cislo}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setChyba(`PDF zo servera nevyšlo (${String((e as Error).message || e).slice(0, 180)}) — otváram tlač.`);
+      vytlacFakturu(naFakturu(r));
+    } finally {
+      setPdfBezi("");
+    }
+  };
+
   /** Odoslať sa dá, keď je aspoň jeden adresát a ani jeden pokazený. */
   const adresati = useMemo(() => adresyMailu(mail?.komu || ""), [mail]);
   const mozeOdist = adresati.adresy.length > 0 && adresati.zle.length === 0;
@@ -671,7 +706,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     </span>
                     : null}
                 </span>
-                <button type="button" onClick={() => vytlacFakturu(naFakturu(r))} style={odkazStyl}>PDF</button>
+                <button type="button" onClick={() => void stiahniPdf(r)} disabled={pdfBezi === r.id} style={odkazStyl}>{pdfBezi === r.id ? "pripravujem PDF…" : "PDF"}</button>
                 {!r.storno_at && (
                   <button
                     type="button"
