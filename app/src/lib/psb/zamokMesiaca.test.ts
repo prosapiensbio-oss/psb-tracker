@@ -25,11 +25,12 @@ describe("čo zámok mesiaca blokuje", () => {
     }
   });
 
-  it("príjmy bez klienta NIE SÚ prekážkou zamknutia", () => {
-    const app = subor("components/psb/App.tsx");
-    const i = app.indexOf("OTÁZKY Z MESIACA SÚ INFORMÁCIA");
-    expect(i).toBeGreaterThan(0);
-    // V tom bloku musí stáť hotovo: true — inak by mesiac držal.
-    expect(app.slice(i, i + 2400)).toContain("hotovo: true");
+  it("príjmy bez klienta sa uzávierky netýkajú vôbec", () => {
+    // Jerry, 11. 10. 2026: „toto daj úplne preč, to tam nedáva žiadny
+    // zmysel." Najprv to bola podmienka zámku, potom informatívny riadok —
+    // a ani to nie: nepriradený príjem mesačné číslo nemení (tržby idú
+    // z `payments`) a priradiť sa dá aj po uzamknutí. V krokoch uzávierky
+    // teda nemá čo robiť.
+    expect(subor("components/psb/App.tsx")).not.toContain("prijmyBezKlienta.filter");
   });
 });

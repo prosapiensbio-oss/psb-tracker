@@ -1161,7 +1161,6 @@ export function PSBApp() {
   const [balickyPorovnanie, setBalickyPorovnanie] = useState<{ spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null>(null);
   // Tretia tretina: platby. Bez nej by Jarvis na „môžeme vypnúť PTminder?"
   // odpovedal z dvoch tretín obrazu.
-  const [prijmyBezKlienta, setPrijmyBezKlienta] = useState<{ datum: string; suma: number }[]>([]);
   const [platbyOd, setPlatbyOd] = useState("");
   const [platbyPorovnanie, setPlatbyPorovnanie] = useState<{ mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null>(null);
   const [platbyCakaju, setPlatbyCakaju] = useState(0);
@@ -1260,13 +1259,10 @@ export function PSBApp() {
       .catch(() => undefined);
     void fetch("/api/platby", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; porovnanie?: typeof platbyPorovnanie; nepriradene?: { datum: string; suma: number; klientsky?: boolean }[]; odMesiaca?: string }) => {
+      .then((j: { ok?: boolean; porovnanie?: typeof platbyPorovnanie; nepriradene?: unknown[]; odMesiaca?: string }) => {
         if (!j.ok) return;
         if (j.porovnanie) setPlatbyPorovnanie(j.porovnanie);
         setPlatbyCakaju((j.nepriradene || []).length);
-        // Mesačná kontrola potrebuje aj DEŇ a SUMU, nielen počet — „8 príjmov
-        // za 91 882 Kč čaká na priradenie" je práca, „8" je číslo bez akcie.
-        setPrijmyBezKlienta((j.nepriradene || []).filter((x) => x.klientsky !== false).map((x) => ({ datum: String(x.datum), suma: Number(x.suma) || 0 })));
         if (typeof j.odMesiaca === "string") setPlatbyOd(j.odMesiaca);
       })
       .catch(() => undefined);
@@ -2514,39 +2510,6 @@ function skupinaFaktur(
         tab: "vzas",
         sub: "cashflow",
       },
-      ...(() => {
-        /**
-         * OTÁZKY Z MESIACA SÚ INFORMÁCIA, NIE PREKÁŽKA (Jerry, 11. 10. 2026).
-         *
-         * Najprv som ich dal ako podmienku zámku — Jerry: „toto nemôže byť
-         * súčasťou uzávierky, dlžoby sa môžu preniesť do ďalšieho mesiaca."
-         * Mal pravdu a dá sa to doložiť z kódu: zámok mesiaca stráži len
-         * IMPORTY (`db.server.ts`) a POLOŽKY FAKTÚR (`api/faktury.ts`).
-         * Priradenie platby (`api/platby.ts`) ani odpoveď „bol tam?"
-         * (`api/anomaly.ts`, `api/kalendar.ts`) zámok nekontrolujú vôbec —
-         * dajú sa dorobiť aj po uzávierke a nič sa tým nepokazí.
-         *
-         * PRAVIDLO: zamknutie smie brániť len to, čo sa po ňom už nedá
-         * opraviť. Všetko ostatné je riadok, ktorý povie, koľko toho zostalo,
-         * a nechá človeka zavrieť mesiac.
-         *
-         * Nepriradený príjem navyše mesačné číslo NEMENÍ — tržby idú
-         * z `payments`, nie z toho, komu sa pohyb pripísal. Mení záznam
-         * klienta, a ten nemá uzávierku.
-         */
-        const otazky = sporneKonanie.filter((x) => String(x.zaciatok).slice(0, 7) === mk).length;
-        const prijmy = prijmyBezKlienta.filter((x) => String(x.datum).slice(0, 7) === mk).length;
-        const spolu = otazky + prijmy;
-        if (spolu === 0) return [];
-        return [{
-          id: "kroky",
-          label: "Zostáva z mesiaca",
-          hotovo: true,                 // informácia, nie prekážka
-          detail: `${[otazky ? `${otazky}× „bol tam?"` : "", prijmy ? `${prijmy} ${prijmy === 1 ? "príjem" : prijmy < 5 ? "príjmy" : "príjmov"} bez klienta` : ""].filter(Boolean).join(" · ")} — prenáša sa do ďalšieho mesiaca, uzávierke to nebráni`,
-          tab: "workspace",
-          sub: otazky ? "kalendar" : "platby",
-        }];
-      })(),
       {
         id: "upozornenia",
         label: "Upozornenia mesiaca",
@@ -2565,7 +2528,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane, sporneKonanie, prijmyBezKlienta]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.
@@ -3354,7 +3317,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} stavy={{ ucet: ucetStav, hotovost: hotovostStav, prijmyBezKlienta, platbyOd }} rozpory={[
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} rozpory={[
             // Porovnania, ktoré appka počíta inde — karta zdravia ich len číta.
             // Vlastný prepočet by znamenal, že dve obrazovky povedia iné číslo.
             { nazov: "Balíčky: Kokpit vs PTminder", pocet: balickyPorovnanie ? balickyPorovnanie.rozdiel : null, detail: balickyPorovnanie ? `${balickyPorovnanie.sedi} sedí, ${balickyPorovnanie.mlci} sa nedá porovnať (export z ${balickyPorovnanie.poExport})` : undefined },

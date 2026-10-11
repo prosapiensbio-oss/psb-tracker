@@ -96,7 +96,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, stavy, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -131,14 +131,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   chat?: AssistantChat;
   register?: RegisterItem[];
   /** Ku ktorému dňu appka pozná zostatok účtu a hotovosti (mesačná kontrola). */
-  stavy?: {
-    ucet?: { datum: string } | null;
-    hotovost?: { datum: string } | null;
-    /** Príjmy z banky, ktoré ešte nemajú klienta — práca kroku Platby. */
-    prijmyBezKlienta?: { datum: string; suma: number }[];
-    /** Od ktorého mesiaca sa vlastná evidencia platieb vôbec súdi. */
-    platbyOd?: string;
-  };
   /** Porovnania dvoch zdrojov pre kartu „Zdravie Kokpitu". */
   rozpory?: { nazov: string; pocet: number | null; detail?: string }[];
   pohybSplits?: PohybSplits;
