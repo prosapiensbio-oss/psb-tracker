@@ -38,6 +38,22 @@ const kus = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").tr
 const riadkyKus = (v: unknown, max: number) =>
   String(v ?? "").split(/\n/).map((r) => r.trim()).filter(Boolean).join("\n").slice(0, max);
 
+/**
+ * Stav príspevku zo Strižne: JSON objekt ako reťazec (alebo "" = vymazať).
+ * Vráti uloženú podobu, alebo false, keď sa nedá prečítať.
+ */
+function platnaStrizna(v: unknown): string | false {
+  const raw = typeof v === "string" ? v : JSON.stringify(v ?? "");
+  if (raw === "" || raw === '""') return "";
+  if (raw.length > 20000) return false;
+  try {
+    const o = JSON.parse(raw);
+    return o && typeof o === "object" && !Array.isArray(o) ? raw : false;
+  } catch {
+    return false;
+  }
+}
+
 /** Mesiac plánu je „YYYY-MM"; prázdny reťazec vracia slot do zásobníka. */
 const jeMesiac = (v: unknown) => v === "" || platnyMesiac(v);
 
@@ -49,7 +65,7 @@ export const Route = createFileRoute("/api/napady")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
-          const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
+          const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba, strizna FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
           const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie, vetvy FROM mkt_mapy ORDER BY poradie, created_at").all();
           // BEZ KEŠE. Nápady sa čítajú hneď po zápise (mapa, mapa cyklu,
           // Jarvis) a odpoveď bez `cache-control` si prehliadač smie nechať
@@ -397,12 +413,18 @@ export const Route = createFileRoute("/api/napady")({
             const farba = b.farba === undefined ? null : kus(b.farba, 20);
             const posX = b.posX === undefined ? null : suradnica(b.posX);
             const posY = b.posY === undefined ? null : suradnica(b.posY);
+            // Stav príspevku zo Strižne – JSON objekt, ktorý píše len Strižňa.
+            // Nerozoberateľný sa ODMIETNE (nie ticho uloží), inak by ho Strižňa
+            // pri najbližšom načítaní nevedela prečítať a príspevok by „spadol“
+            // späť na nápad.
+            const strizna = b.strizna === undefined ? null : platnaStrizna(b.strizna);
+            if (strizna === false) return Response.json({ ok: false, error: "Stav zo Strižne sa nedá prečítať." }, { status: 400 });
             if (novyText === null && stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
                 && hotovy === null && zaber === null && sekvencia === null && inspiracia === null
                 && scenar === null && hashtagy === null && titulka === null && uvodneVety === null
                 && rodic === null && vetva === null && poradie === null && zbalene === null
-                && mapaId === null && posX === null && posY === null && farba === null) {
+                && mapaId === null && posX === null && posY === null && farba === null && strizna === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -424,12 +446,13 @@ export const Route = createFileRoute("/api/napady")({
                  rodic = COALESCE(?18, rodic), vetva = COALESCE(?19, vetva),
                  poradie = COALESCE(?20, poradie), zbalene = COALESCE(?21, zbalene),
                  mapa_id = COALESCE(?22, mapa_id), farba = COALESCE(?26, farba),
+                 strizna = COALESCE(?27, strizna),
                  pos_x = CASE WHEN ?24 IS NULL THEN pos_x WHEN ?24 < 0 THEN NULL ELSE ?24 END,
                  pos_y = CASE WHEN ?25 IS NULL THEN pos_y WHEN ?25 < 0 THEN NULL ELSE ?25 END
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
                    scenar, hashtagy, inspiracia, titulka, uvodneVety, rodic, vetva, poradie, zbalene, mapaId,
-                   novyText, posX, posY, farba).run().then((r) => {
+                   novyText, posX, posY, farba, strizna).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -519,6 +542,9 @@ export const Route = createFileRoute("/api/napady")({
           const nScenar = String(b.scenar ?? "").trim().slice(0, 6000);
           const nHashtagy = String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
           const nInspiracia = kus(b.inspiracia, 500);
+          const nStriznaRaw = b.strizna === undefined ? "" : platnaStrizna(b.strizna);
+          if (nStriznaRaw === false) return Response.json({ ok: false, error: "Stav zo Strižne sa nedá prečítať." }, { status: 400 });
+          const nStrizna = nStriznaRaw;
 
           const vlozenie = DB.prepare(
             // VŠETKY polia, ktoré obrazovka pri zakladaní posiela. Chýbajúci
@@ -528,17 +554,17 @@ export const Route = createFileRoute("/api/napady")({
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
                                      faza, planovane_na, kto, koncept, zaber, hotovy_text,
                                      sekvencia, scenar, hashtagy, inspiracia, titulka, uvodne_vety,
-                                     rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba)
+                                     rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba, strizna)
              -- zbalene je natvrdo 0: nový uzol nemá deti, takže sa nemá čo
              -- zbaliť. Stĺpec tu stojí preto, aby stráž zo zapisy.test.ts
              -- videla, že sa naň nezabudlo.
              -- pos_x/pos_y sú NULL: nový uzol si miesto nechá spočítať.
-             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19, ?20, ?21, ?22, 0, ?23, NULL, NULL, '')`,
+             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19, ?20, ?21, ?22, 0, ?23, NULL, NULL, '', ?24)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
                  nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600),
                  kus(b.titulka, 4000), riadkyKus(b.uvodneVety, 1500),
-                 nRodic, nVetva, nPoradie, nMapa);
+                 nRodic, nVetva, nPoradie, nMapa, nStrizna);
           // Nový nápad aj posun súrodencov naraz — polovica by rad rozhádzala.
           await DB.batch([vlozenie, ...posunySurodencov]);
 

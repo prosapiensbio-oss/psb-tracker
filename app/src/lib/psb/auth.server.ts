@@ -102,6 +102,12 @@ function readCookie(request: Request, name: string): string | null {
 /** Meno prihláseného, alebo null. Cookie má tvar "meno|token"; starý tvar bez
  *  zvislej čiary je stále platný a hlási sa ako „app". */
 export async function currentUser(request: Request): Promise<string | null> {
+  // Strižňa (Mac appka na výrobu obsahu) sa hlási tokenom, nie cookie – beží mimo
+  // prehliadača. Rovnaký princíp ako most BTC knihy: tajomstvo len v Cloudflare
+  // a v ~/Strizna/kokpit.json na Jerryho Macu. Audit ju vidí ako „Strižňa“.
+  const strizna = request.headers.get("x-strizna-token");
+  const ocakavany = (bindings() as unknown as { STRIZNA_TOKEN?: string }).STRIZNA_TOKEN;
+  if (strizna && ocakavany && ocakavany.length >= 32 && timingSafeEqual(strizna, ocakavany)) return "Strižňa";
   const raw = readCookie(request, COOKIE);
   if (!raw) return null;
   const i = raw.lastIndexOf("|");
