@@ -2863,6 +2863,13 @@ jediné miesto, kde sa robí" — jeho rozhodnutie) a „tie +/- 15 preč"
 - Po výbere ide push trénerovi („X si vybral(a) …"); SMS s odkazom posiela
   tréner sám cez `SmsKlientovi` s `ponuka` → audit `sms-ponuka` (nie
   `sms-odoslana`, inak by klient zmizol zo zoznamu kroku 2 · SMS).
+- **Rozmedzie (od 11. 10. 2026):** blok sa za spodný okraj natiahne (po
+  15 min, aspoň hodina, nie do obsadeného). Klient vyberá začiatok hodinového
+  tréningu — `zaciatkyVRozmedzi` (celá a pol hodina + prvý voľný po obsadenom
+  úseku), hodnota formulára `id|HH:MM`, uloží sa `vybrany_zaciatok`
+  (migrácia 0110) a VŠADE, kde sa číta vybraný čas, ide cez `vybranyUsek`
+  (stránka, obsadené v iných ponukách, zoznam v Kokpite). Overené naostro
+  na „AATest Rozmedzie" (stránka 8:00–10:00 z 8–11), zmazané.
 - **Odkaz ide cez prosapiens.cz** (od 9. 10. 2026 — snippet id 26 presmerúva
   aj `/t/` a `/k/`, Jerry súhlasil). Formulár výberu odosiela na adresu
   workera, kam klient po 302 dorazil.
