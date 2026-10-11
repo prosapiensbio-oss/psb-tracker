@@ -27,19 +27,15 @@ const KLIENTI = {
 const komu = (r: Parameters<typeof patriTrenerovi>[0]) =>
   (["Jerry", "Terezka"] as const).filter((t) => patriTrenerovi(r, KLIENTI, t));
 
-describe("mesačné kontroly patria Jerrymu", () => {
-  // 4. týždeň v mesiaci = splatná kontrola „Jarvis & dáta".
-  const DNES = new Date("2026-08-26T09:00:00Z");
-  const kontroly = ritualy(DNES, {}, {}, { chybaju: [] }).filter((r) => r.druh === "kontrola");
-
-  it("všetky štyri majú trénera Jerry", () => {
-    expect(kontroly.length).toBe(4);
-    expect(kontroly.every((k) => k.trener === "Jerry")).toBe(true);
-  });
-
-  it("Terezka nevidí ani jednu", () => {
-    for (const k of kontroly) {
-      expect(komu({ category: "Zápis", title: k.nadpis, trener: k.trener })).toEqual(["Jerry"]);
+describe("mesačné kontroly už neexistujú", () => {
+  // Jerry, 11. 10. 2026: „mesačná kontrola ako zoznam úloh nemá existovať
+  // vôbec." Prácu robí Workspace priebežne; kontrola bola tretie miesto na to
+  // isté a odklepnúť sa dala bez toho, aby sa čokoľvek spravilo. Zostali len
+  // PROMPTY pre Clauda — tie nie sú rituál, visia na karte Zdravie Kokpitu.
+  it("ritualy() nevyrába ani jednu pripomienku druhu „kontrola“", () => {
+    for (const den of ["2026-08-05", "2026-08-12", "2026-08-19", "2026-08-26"]) {
+      const r = ritualy(new Date(`${den}T09:00:00Z`), {}, {}, { chybaju: [] });
+      expect(r.filter((x) => x.druh === "kontrola")).toHaveLength(0);
     }
   });
 });

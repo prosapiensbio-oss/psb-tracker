@@ -291,37 +291,23 @@ export function ritualy(
     hotove: false,
   });
 
-  // ── Mesačné kontroly po oblastiach ──────────────────────────────────────
-  //
-  // Revízia 27. 8. 2026 našla chyby, ktoré vznikali mesiace (lievik ukazoval
-  // 100 % namiesto 79 %) — a Jerry sa spýtal, ako často také kontroly robiť
-  // a či mu ich appka nemá pripomínať sama. Toto je odpoveď: každá oblasť
-  // RAZ MESAČNE, rozložené po týždňoch, aby nesvietili štyri naraz.
-  //
-  // Zhasína sa cez register (kľúč nesie mesiac, ďalší mesiac sa vráti sama).
-  // Detail je rovno kontrolný zoznam — nie odkaz na dokument, ktorý by si
-  // človek musel hľadať. Plné prompty pre hlbšiu kontrolu s Claudom sú
-  // v repe: docs/kontrolne-prompty.md; kvartálna úplná revízia
-  // docs/revizny-prompt.md.
-  const tyzdenVMesiaci = Math.min(4, Math.ceil(denVMesiaci / 7));
-  //
-  // KOMU PATRIA: Jerrymu, všetky štyri. Jerry, 31. 8. 2026: „tieto kontroly
-  // mám na starosti ja, tak tie sa nemusia Terezke zobrazovať v jej
-  // notifikáciách, nech ju nerozptyľujú." Je to audit appky, nie práca
-  // s klientom — Terezka na ňom nemá čo robiť a štyri modré riadky mesačne
-  // sú presne ten šum, cez ktorý sa prestane čítať aj to ostatné.
-  for (const k of KONTROLY) {
-    out.push({
-      id: `kontrola-${k.id}-${dD.slice(0, 7)}`,
-      druh: "kontrola",
-      trener: "Jerry",
-      nadpis: k.nadpis,
-      detail: k.detail,
-      ciel: k.ciel,
-      splatne: tyzdenVMesiaci === k.tyzden,
-      hotove: false,
-    });
-  }
+  /**
+   * ŠTYRI MESAČNÉ KONTROLY SÚ ZRUŠENÉ (Jerry, 11. 10. 2026).
+   *
+   * „Mesačná kontrola ako zoznam úloh nemá existovať vôbec." Mal pravdu:
+   * prácu, na ktorú sa pýtali, robí Workspace priebežne celý mesiac (krok 1
+   * „bol tam?", krok 3 priradenie príjmov), takže kontrola bola TRETIE
+   * miesto na to isté — a odklepnúť sa dala bez toho, aby sa čokoľvek
+   * spravilo. Odklepnutá bola aj 10. 10., keď v tom istom mesiaci čakalo
+   * sedem nepriradených príjmov za 54 810 Kč.
+   *
+   * Čo z nich zostalo: `PROMPTY_KONTROL` v `kontrolnePrompty.ts`. Tie neboli
+   * úloha pre Jerryho, ale zadanie pre Clauda — appku overiť vie len ten,
+   * kto má prístup do kódu a do databázy. Visia teraz na jednom mieste
+   * (karta „Zdravie Kokpitu" v kroku uzávierky) a nesú mesiac aj to, čo
+   * appka našla sama. `kontrolyMesiaca()` zostáva kvôli starým kľúčom
+   * `zapis|kontrola-*` v `anomaly_ack` — tie sa nemažú, je to história.
+   */
 
   return out;
 }

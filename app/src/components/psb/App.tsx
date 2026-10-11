@@ -102,7 +102,7 @@ import { HladanieKlienta } from "./Hladanie";
 import { pocetCakajucich, ZapisButton } from "./Zapis";
 import { MobilNavigacia } from "./MobilNavigacia";
 import { useMobilRozlozenie } from "./useMobilRozlozenie";
-import { kontrolyMesiaca, mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
+import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
@@ -2515,18 +2515,31 @@ function skupinaFaktur(
         sub: "cashflow",
       },
       ...(() => {
-        // Mesačné kontroly sú krok uzávierky (Jerry, 9. 10. 2026) — bez nich
-        // sa mesiac nezamkne. Odpoveď „odložené" kontrolu nesplní.
-        const ack = data.anomalyAck || {};
-        const kontroly = kontrolyMesiaca(mk);
-        const chyba = kontroly.filter((k) => { const a = ack[`zapis|${k.id}`]; return !a || (a.note || "").startsWith("odlozene|"); });
+        /**
+         * ZÁMOK VISÍ NA PRÁCI, NIE NA ODKLEPNUTÍ (Jerry, 11. 10. 2026).
+         *
+         * Dovtedy to boli štyri „mesačné kontroly" — zoznam domácich úloh,
+         * ktorý sa odklepával. Jerry: „mesačná kontrola ako zoznam úloh nemá
+         * existovať vôbec." Mal pravdu dvakrát: tú prácu robí Workspace
+         * priebežne celý mesiac (krok 1 „bol tam?", krok 3 priradenie
+         * príjmov), takže kontrola bola TRETIE miesto na to isté — a odklepnuť
+         * sa dalo bez toho, aby sa čokoľvek spravilo.
+         *
+         * Zamkne sa teda vtedy, keď za ten mesiac nezostala otázka, na ktorú
+         * vie odpovedať len človek: bol tam, a komu patrí ten príjem.
+         */
+        const otazky = sporneKonanie.filter((x) => String(x.zaciatok).slice(0, 7) === mk).length;
+        const prijmy = prijmyBezKlienta.filter((x) => String(x.datum).slice(0, 7) === mk).length;
+        const spolu = otazky + prijmy;
         return [{
-          id: "kontroly",
-          label: "Mesačné kontroly",
-          hotovo: chyba.length === 0,
-          detail: chyba.length
-            ? `${kontroly.length - chyba.length} zo ${kontroly.length} — chýba ${chyba.map((k) => k.nadpis.replace(/^Mesačná kontrola: /, "")).join(", ")}`
-            : "všetky štyri skontrolované",
+          id: "kroky",
+          label: "Otázky z mesiaca",
+          hotovo: spolu === 0,
+          detail: spolu === 0
+            ? "nič nečaká na odpoveď"
+            : [otazky ? `${otazky}× „bol tam?" (krok 1)` : "", prijmy ? `${prijmy} ${prijmy === 1 ? "príjem" : prijmy < 5 ? "príjmy" : "príjmov"} bez klienta (krok 3)` : ""].filter(Boolean).join(" · "),
+          tab: "workspace",
+          sub: otazky ? "kalendar" : "platby",
         }];
       })(),
       {
@@ -2547,7 +2560,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane, sporneKonanie, prijmyBezKlienta]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.

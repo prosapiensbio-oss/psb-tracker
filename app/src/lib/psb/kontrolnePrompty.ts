@@ -121,3 +121,30 @@ export function promptKontroly(id: string): string | null {
   if (!p) return null;
   return `${p.nadpis}\n\n${p.telo}\n\n${PROTOKOL}`;
 }
+
+/**
+ * PROMPT S KONTEXTOM — mesiac, čo appka sama našla, a kedy sa to kontrolovalo
+ * naposledy (Jerry, 11. 10. 2026: „to, čo by mi malo vypľuť prompty pre teba,
+ * aby si prekontroloval program… chcel by som to zjednotiť na tomto mieste").
+ *
+ * Holý prompt pošle Clauda na náhodnú prechádzku po databáze. Prompt, ktorý
+ * nesie mesiac a konkrétne nálezy, začína tam, kde už niečo škrípe — a vie,
+ * čo sa minule našlo, takže to isté nehľadá druhýkrát.
+ */
+export function promptSKontextom(
+  id: string,
+  ctx: { mesiac: string; nalezy?: string[]; minule?: { kedy: string; zistenie: string } | null },
+): string | null {
+  const zaklad = promptKontroly(id);
+  if (!zaklad) return null;
+  const casti = [`KONTROLOVANÝ MESIAC: ${ctx.mesiac}`];
+  if (ctx.nalezy?.length) {
+    casti.push(`ČO UŽ APPKA SAMA NAŠLA (začni tu, nie od nuly):\n${ctx.nalezy.map((n) => `- ${n}`).join("\n")}`);
+  } else {
+    casti.push("Appka sama nenašla nič — hľadaj to, na čo sa nepýta.");
+  }
+  casti.push(ctx.minule
+    ? `MINULÁ KONTROLA (${ctx.minule.kedy}): ${ctx.minule.zistenie}\nOver, či to platí ešte dnes; to isté nehľadaj druhýkrát.`
+    : "Táto oblasť sa takto ešte nekontrolovala.");
+  return `${zaklad}\n\n── KONTEXT Z APPKY ──\n${casti.join("\n\n")}`;
+}

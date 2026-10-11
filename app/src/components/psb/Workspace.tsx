@@ -28,11 +28,10 @@ import type { Actions } from "./App";
 import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
-import { kontrolyMesiaca } from "../../lib/psb/rituals";
 import { AlzaUzavierka } from "./AlzaUzavierka";
 import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { ZdravieKokpitu } from "./ZdravieKokpitu";
-import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
+import { KrokDopyty, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
@@ -1619,60 +1618,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               // Mesačné kontroly uzatváraného mesiaca — krok uzávierky, nie
               // samostatná karta (Jerry, 9. 10. 2026).
               alza: <AlzaUzavierka mesiac={mk} btc={btcUzavierky} />,
-              kontroly: (
-                <>
-                  {/* Jerry, 10. 10. 2026: „kontrolu si predstavujem ako
-                      kontrolu appky." Zdravie Kokpitu je navrchu, mesačné
-                      kontroly dát pod ním. */}
-                  <ZdravieKokpitu rozpory={rozpory || []} />
-                  <div style={{ height: 14 }} />
-                  <KrokKontroly
-                  kontroly={kontrolyMesiaca(mk)}
-                  acks={data.anomalyAck || {}} onNavigate={onNavigate}
-                  vstup={{
-                    dnes: dnesPraha(),
-                    importy: Object.fromEntries(
-                      (data.uploadLog || []).reduce((m, u) => {
-                        const d = String(u.date || "").slice(0, 10);
-                        if (d && d > (m.get(u.type) || "")) m.set(u.type, d);
-                        return m;
-                      }, new Map<string, string>()),
-                    ),
-                    otvoreneUpozornenia: upozornenia.length,
-                    stavUctu: stavy?.ucet || null,
-                    stavHotovosti: stavy?.hotovost || null,
-                    // Tržby z DVOCH zdrojov: vlastná evidencia Kokpitu proti
-                    // exportu PTmindera. Zhodu počíta appka, nie klik.
-                    trzby: {
-                      kokpit: (data.platbyKokpit || []).filter((p) => String(p.datum).slice(0, 7) === mk).reduce((a, p) => a + p.suma, 0),
-                      ptminder: (data.paymentsPtminder || []).filter((p) => String(p.date).slice(0, 7) === mk).reduce((a, p) => a + (p.amount || 0), 0),
-                      mesiac: mk,
-                      platbyOd: stavy?.platbyOd,
-                    },
-                    prijmyBezKlienta: (() => {
-                      const v = (stavy?.prijmyBezKlienta || []).filter((x) => String(x.datum).slice(0, 7) === mk);
-                      return { pocet: v.length, suma: v.reduce((a, x) => a + x.suma, 0) };
-                    })(),
-                    dopyty: (() => {
-                      const l = (data.leads || []).filter((x) => String(x.date || "").slice(0, 7) === mk);
-                      return l.length ? { spolu: l.length, bezZdroja: l.filter((x) => !String(x.source || "").trim()).length } : null;
-                    })(),
-                  }}
-                  onOtazkaJarvisovi={(oblast, mesiac) => {
-                    /**
-                     * Jarvis má VLASTNÚ kópiu čísel, nie tú, ktorú kreslí
-                     * obrazovka — preto je použiteľný ako druhý zdroj práve
-                     * tam, kde iný nie je. Otázka je konkrétna a pýta si
-                     * čísla, nie úvahu; na aritmetiku sa nespolieha (to už
-                     * raz dopadlo dvoma rôznymi odpoveďami na tú istú vec).
-                     */
-                    void chat?.ask(OTAZKY_KONTROLY(oblast, mesiac));
-                    onNavigate?.("jarvis");
-                  }}
-                  onZmena={() => { oznam("klienti"); void actions?.refresh(); }}
-                  />
-                </>
-              ),
+              /**
+               * Štyri mesačné kontroly sú ZRUŠENÉ (Jerry, 11. 10. 2026:
+               * „mesačná kontrola ako zoznam úloh nemá existovať vôbec").
+               * Tú prácu robí Workspace priebežne — krok 1 „bol tam?" a krok 3
+               * priradenie príjmov; kontrola bola tretie miesto na to isté.
+               * Zostalo hlásenie: beží appke všetko? Nič sa v ňom neodklepáva.
+               */
+              kontroly: <ZdravieKokpitu rozpory={rozpory || []} mesiac={mk} />,
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,
               // 8. 10. 2026) — okno na CSV Jerry v ten istý deň zrušil.
