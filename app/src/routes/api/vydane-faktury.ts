@@ -413,6 +413,25 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const splatnost = denISO(b.splatnost) || splatnostZ(vystavene, dni);
             if (splatnost < vystavene) return Response.json({ ok: false, error: "Splatnosť je pred vystavením." }, { status: 400 });
 
+            /**
+             * Tá istá faktúra dvakrát (11. 10. 2026): Danovi Kouřilovi vznikli
+             * 20261007 a 20261008 — rovnaký klient, popis aj suma, 39 sekúnd
+             * po sebe. Druhé vystavenie je skoro vždy omyl (hláška o úspechu
+             * nebola vidno a klik sa zopakoval); keď nie je, stačí potvrdiť.
+             */
+            if (!b.potvrdDuplicitu) {
+              const dup = await DB.prepare(
+                `SELECT cislo FROM vydane_faktury WHERE klient = ?1 AND celkom_czk = ?2 AND popis = ?3
+                   AND storno_at IS NULL AND created_at >= ?4 ORDER BY created_at DESC LIMIT 1`,
+              ).bind(klient, celkom, popis, new Date(Date.now() - 7 * 86400000).toISOString()).first<{ cislo: string }>();
+              if (dup) {
+                return Response.json({
+                  ok: false, duplicita: dup.cislo,
+                  error: `Rovnaká faktúra pre ${klient} na ${Math.round(celkom)} Kč už existuje — ${dup.cislo}. Druhú nevystavujem, kým to nepotvrdíš.`,
+                }, { status: 409 });
+              }
+            }
+
             // Odtlačok odberateľa. Berie sa z karty klienta, keď ho volajúci
             // neposlal — ale UKLADÁ sa do faktúry, nie ako odkaz.
             const u = (await DB.prepare("SELECT * FROM klient_fakturacia WHERE klient = ?1").bind(klient).first()) as Record<string, string> | null;

@@ -1,3 +1,4 @@
+import { VyberMena } from "./VyberMena";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -179,10 +180,14 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       body: JSON.stringify(telo),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem("");
-    if (!j?.ok) { setChyba(j?.error || "Nepodarilo sa uložiť."); return null; }
+    if (!j?.ok) {
+      // Duplicita sa nehlási ako chyba — volajúci sa spýta a pošle znova.
+      if (j?.duplicita) return { ok: false as const, duplicita: String(j.duplicita), error: String(j.error || "") };
+      setChyba(j?.error || "Nepodarilo sa uložiť."); return null;
+    }
     await nacitaj();
     oznam("peniaze");
-    return j as { ok: true; cislo?: string; id?: string };
+    return j as { ok: true; cislo?: string; id?: string; duplicita?: undefined };
   };
 
   /** Odoslať sa dá, keď je aspoň jeden adresát a ani jeden pokazený. */
@@ -210,8 +215,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   const tentoRok = zive.filter((r) => r.vystavene.startsWith(String(new Date().getFullYear())));
   const celkomRok = tentoRok.reduce((a, r) => a + r.celkom_czk, 0);
 
-  const vystav = async () => {
+  const vystav = async (potvrdDuplicitu = false) => {
     const j = await posli({
+      potvrdDuplicitu,
       akcia: "vystav", klient: f.klient, popis: f.popis, ks: Number(f.ks) || 1,
       cena: Number(f.cena) || 0, vystavene: f.vystavene,
       splatnostDni: Number(f.splatnostDni) || SPLATNOST_DNI,
@@ -219,6 +225,11 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0 })),
     }, "vystav");
     if (!j) return;
+    if (!j.ok) {
+      if (window.confirm(`${j.error}\n\nVystaviť aj tak druhú?`)) await vystav(true);
+      else setChyba(`Nevystavené — ${j.duplicita} už existuje. Nájdeš ju v zozname nižšie.`);
+      return;
+    }
     setDalsie([]);
     setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
     setOtvorenaNova(false);
@@ -316,8 +327,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             <div style={{ flex: "2 1 200px" }}>
               <span style={popisStyl}>Klient</span>
-              <input list="faktura-klienti" value={f.klient} onChange={(e) => setF((s) => ({ ...s, klient: e.target.value }))} style={poleStyl} placeholder="meno klienta" />
-              <datalist id="faktura-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
+              {/* Vlastná roleta, nie <datalist> — ten si prehliadač kreslí sám
+                  a pri druhom klientovi sa neotvoril vôbec (11. 10. 2026). */}
+              <VyberMena hodnota={f.klient} mena={mena} onZmen={(v) => setF((s) => ({ ...s, klient: v }))} placeholder="meno klienta" style={poleStyl} varovanie={!!f.klient && !mena.includes(f.klient.trim())} />
             </div>
             <Pole label="Vystavené" hodnota={f.vystavene} nastav={(v) => setF((s) => ({ ...s, vystavene: v }))} typ="date" />
             <Pole label="Splatnosť (dní)" hodnota={f.splatnostDni} nastav={(v) => setF((s) => ({ ...s, splatnostDni: v }))} typ="number" />
@@ -391,13 +403,32 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
                   <div style={{ flex: "2 1 200px" }}>
                     <span style={popisStyl}>Ďalší klient na tejto faktúre</span>
-                    <input list="faktura-klienti" value={d.klient} onChange={(e) => nastav({ klient: e.target.value })} style={{ ...poleStyl, borderColor: d.klient && !mena.includes(d.klient.trim()) ? C.orange : C.border }} placeholder="meno klienta" />
+                    <VyberMena hodnota={d.klient} mena={mena} onZmen={(v) => nastav({ klient: v })} placeholder="meno klienta" style={poleStyl} varovanie={!!d.klient && !mena.includes(d.klient.trim())} />
                   </div>
                   <Pole label="Počet m. j." hodnota={d.ks} nastav={(v) => nastav({ ks: v })} typ="number" />
                   <Pole label="Cena za m. j. (Kč)" hodnota={d.cena} nastav={(v) => nastav({ cena: v })} typ="number" />
                   <button type="button" onClick={() => setDalsie((s) => s.filter((_, j) => j !== i))} style={{ alignSelf: "flex-end", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, cursor: "pointer", fontSize: 12 }}>odobrať</button>
                 </div>
-                <input value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} placeholder="popis položky" style={poleStyl} />
+                <span style={popisStyl}>Popis položky za {d.klient || "tohto klienta"} — vyber alebo napíš vlastný</span>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
+                  {POPISY.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => nastav({ popis: p.text, cena: d.cena || String(p.cena) })}
+                      title={`${p.text} — ${p.cena} Kč`}
+                      style={{
+                        padding: "5px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer",
+                        border: `1px solid ${d.popis === p.text ? C.accent : C.border}`,
+                        background: d.popis === p.text ? mix(C.accent, 14) : "transparent",
+                        color: d.popis === p.text ? C.accentLight : C.textMuted, fontFamily: "inherit",
+                      }}
+                    >
+                      {p.text.length > 42 ? `${p.text.slice(0, 40)}…` : p.text}
+                    </button>
+                  ))}
+                </div>
+                <textarea value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} rows={2} placeholder="čo sa fakturuje za tohto klienta — uvidí to na doklade" style={{ ...poleStyl, resize: "vertical" }} />
               </div>
             );
           })}
@@ -447,6 +478,11 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
           >
             {pracujem === "vystav" ? "vystavujem…" : "Vystaviť faktúru"}
           </button>
+          {/* Hláška priamo pri tlačidle — hore nad dlhým formulárom ju nebolo
+              vidno a klik sa zopakoval (dve rovnaké faktúry Danovi, 11. 10.). */}
+          {(chyba || hlaska) && (
+            <div style={{ marginTop: 8, fontSize: 12.5, color: chyba ? C.red : C.green }}>{chyba || hlaska}</div>
+          )}
         </div>
       )}
 
