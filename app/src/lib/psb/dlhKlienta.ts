@@ -83,8 +83,22 @@ export function nezaplateneZKokpitu(balicky: BalicekDlh[], platby: PlatbaDlh[]):
  * Balíček je zaplatený podľa PTmindera, keď:
  *  1. PTminder má platbu toho klienta na rovnakú sumu (± 1 Kč) od dvoch
  *     týždňov pred začiatkom po 45 dní po ňom — každá platba len raz, alebo
- *  2. PTminder má členstvo, ktoré začína do troch dní od toho istého dňa,
+ *  2. v tom istom okne má DVE alebo TRI platby, ktoré sa na cenu zložia
+ *     (tolerancia 50 Kč alebo 1 %), alebo
+ *  3. PTminder má členstvo, ktoré začína do troch dní od toho istého dňa,
  *     a nemá k nemu otvorený poplatok.
+ *
+ * BOD 2 PRIBUDOL 11. 10. 2026 A STÁL PENIAZE PRED KLIENTOM.
+ *
+ * Peter Gažo dostal SMS s odkazom na platbu a QR kód znel na ~42 000 Kč
+ * namiesto 20 093 — dvojnásobok. Jeho júlové členstvo (24. 7., 20 093 Kč)
+ * zaplatil NA DVAKRÁT: 8 000 Kč 7. 8. a 12 081 Kč 17. 8. Pravidlo hľadalo
+ * jedinú platbu na celú sumu, žiadnu nenašlo, a tak zrátalo ako dlh aj
+ * dávno zaplatené členstvo k tomu, ktoré naozaj otvorené je.
+ *
+ * Splátka nie je výnimka — Jerry ju od klientov bežne berie. Tolerancia je
+ * zámerne malá (50 Kč / 1 %): poistka má zachytiť zaplatené, nie zahladiť
+ * polovičnú platbu. Keď klient zaplatil len časť, dlh má svietiť ďalej.
  */
 export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
   nezaplatene: T[],
@@ -98,10 +112,28 @@ export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
   return nezaplatene.filter((b) => {
     const k = meno(b.klient);
     const cena = Math.round(b.cena || 0);
-    const i = ptPlatby.findIndex((p, j) => !pouzite.has(j) && meno(p.klient) === k
-      && Math.abs(Math.round(p.suma) - cena) <= 1
-      && dni(b.platnostOd, p.datum) >= -14 && dni(b.platnostOd, p.datum) <= 45);
+    const vOkne = (j: number) => {
+      const p = ptPlatby[j];
+      return !pouzite.has(j) && meno(p.klient) === k
+        && dni(b.platnostOd, p.datum) >= -14 && dni(b.platnostOd, p.datum) <= 45;
+    };
+    const i = ptPlatby.findIndex((p, j) => vOkne(j) && Math.abs(Math.round(p.suma) - cena) <= 1);
     if (i >= 0) { pouzite.add(i); return false; }
+
+    // Splátky: dva alebo tri pohyby, ktoré sa na cenu zložia. Viac než tri
+    // sa zámerne nehľadá — z piatich čísel sa dá poskladať skoro čokoľvek
+    // a z poistky by sa stalo zahládzanie.
+    const kand = ptPlatby.map((_, j) => j).filter(vOkne);
+    const tol = Math.max(50, cena * 0.01);
+    const sedi = (idx: number[]) => Math.abs(idx.reduce((a, j) => a + Math.round(ptPlatby[j].suma), 0) - cena) <= tol;
+    for (let a = 0; a < kand.length; a++) {
+      for (let c = a + 1; c < kand.length; c++) {
+        if (sedi([kand[a], kand[c]])) { pouzite.add(kand[a]); pouzite.add(kand[c]); return false; }
+        for (let d = c + 1; d < kand.length; d++) {
+          if (sedi([kand[a], kand[c], kand[d]])) { pouzite.add(kand[a]); pouzite.add(kand[c]); pouzite.add(kand[d]); return false; }
+        }
+      }
+    }
     const vHistorii = ptHistoria.some((h) => meno(h.klient) === k && Math.abs(dni(b.platnostOd, h.od)) <= 3);
     const otvoreny = ptOtvorene.some((o) => meno(o.klient) === k && Math.abs(dni(b.platnostOd, o.datum)) <= 3);
     return !(vHistorii && !otvoreny);

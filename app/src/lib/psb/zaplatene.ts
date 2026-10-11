@@ -83,6 +83,18 @@ const dni = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Da
  * predaj; o týždeň neskôr už je to druhý (předplatné ide každý mesiac za tú
  * istú sumu). Každý balíček zoberie najviac jeden poplatok; presný deň má
  * prednosť pred blízkym.
+ *
+ * ZĽAVA ZNAMENÁ, ŽE CENY SA NEROVNAJÚ — a to ma 11. 10. 2026 stálo zle
+ * poslaný QR kód. Peter Gažo si 9. 10. kúpil jeden 18-hodinový balíček.
+ * PTminder ho vedie za cenníkových 21 150 Kč, Kokpit si ho založil sám za
+ * 20 093 Kč, lebo Gažo platí bitcoinom a má 5 % zľavu. Dva zápisy toho
+ * istého predaja, dve rôzne sumy — pravidlo „rovnaká cena" ich nespojilo
+ * a QR v SMS znel na 41 243 Kč namiesto 20 093.
+ *
+ * Preto sa ceny porovnávajú so zľavou: balíček smie byť LACNEJŠÍ než
+ * poplatok, najviac však o tretinu. Drahší byť nesmie — to už nie je zľava,
+ * to je iný predaj. A rozdiel nad tretinu tiež nie: polovičná suma v ten
+ * istý deň je skôr doplatok než zľava a tie sa spájať nemajú.
  */
 export function bezZdvojenych<T extends { datum: string; suma: number }>(
   poplatky: T[],
@@ -95,8 +107,10 @@ export function bezZdvojenych<T extends { datum: string; suma: number }>(
   return poplatky.filter((p) => {
     const d = den(p.datum);
     const c = Math.round(p.suma || 0);
-    const presne = nase.find((b) => !b.pouzity && b.cena === c && b.den === d);
-    const blizko = presne || nase.find((b) => !b.pouzity && b.cena === c && dni(b.den, d) <= 3);
+    // Zľava: balíček smie byť lacnejší, najviac o tretinu; drahší nie.
+    const sediCena = (cena: number) => cena === c || (cena < c && cena >= c * (2 / 3));
+    const presne = nase.find((b) => !b.pouzity && sediCena(b.cena) && b.den === d);
+    const blizko = presne || nase.find((b) => !b.pouzity && sediCena(b.cena) && dni(b.den, d) <= 3);
     if (!blizko) return true;
     blizko.pouzity = true;
     return false;

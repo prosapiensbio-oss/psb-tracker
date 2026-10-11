@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { dlhJednehoKlienta, dlznici } from "./dlznici";
-import { dlhyKlientov, type VstupDlhov } from "./zaplatene";
+import { bezZdvojenych, dlhyKlientov, type VstupDlhov } from "./zaplatene";
 
 const DNES = "2026-09-28";
 const pop = (klient: string, datum: string, suma: number, popis = "OFF - 6h") => ({ klient, datum, suma, popis });
@@ -107,5 +107,44 @@ describe("hodiny čítajú to isté pravidlo", () => {
     // Bez `id` v SELECTe by otázka „suma nesedí" nevznikla nikdy (nález 5. 10. 2026).
     expect(zdroj).toMatch(/SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky/);
     expect(zdroj).toContain("data.bezHodin = [...polozky.map(");
+  });
+});
+
+describe("ten istý predaj so zľavou — Peter Gažo, 11. 10. 2026", () => {
+  // Gažo si 9. 10. kúpil jeden 18h balíček. PTminder ho vedie za cenníkových
+  // 21 150 Kč, Kokpit si ho založil sám za 20 093 (5 % zľava za bitcoin).
+  // Pravidlo „rovnaká cena" ich nespojilo a QR v SMS znel na 41 243 Kč.
+  const poplatok = (suma: number, datum = "2026-10-09") => [{ datum, suma }];
+  const balicek = (cena: number, platnostOd = "2026-10-09") =>
+    [{ cena, platnostOd, zdroj: "rucne" }];
+
+  it("zľavnený balíček pohltí cenníkový poplatok", () => {
+    expect(bezZdvojenych(poplatok(21150), balicek(20093))).toHaveLength(0);
+  });
+
+  it("rovnaká cena funguje ďalej", () => {
+    expect(bezZdvojenych(poplatok(6990), balicek(6990))).toHaveLength(0);
+  });
+
+  it("drahší balíček NIE JE ten istý predaj — zľava cenu neskladá nahor", () => {
+    expect(bezZdvojenych(poplatok(20093), balicek(21150))).toHaveLength(1);
+  });
+
+  it("polovičná suma je doplatok, nie zľava", () => {
+    expect(bezZdvojenych(poplatok(21150), balicek(10000))).toHaveLength(1);
+  });
+
+  it("tretina dole je hranica", () => {
+    expect(bezZdvojenych(poplatok(21000), balicek(14000))).toHaveLength(0);
+    expect(bezZdvojenych(poplatok(21000), balicek(13900))).toHaveLength(1);
+  });
+
+  it("jeden balíček pohltí najviac jeden poplatok", () => {
+    const dva = [{ datum: "2026-10-09", suma: 21150 }, { datum: "2026-10-09", suma: 21150 }];
+    expect(bezZdvojenych(dva, balicek(20093))).toHaveLength(1);
+  });
+
+  it("týždeň od seba je iný predaj aj so zľavou", () => {
+    expect(bezZdvojenych(poplatok(21150, "2026-10-01"), balicek(20093, "2026-10-09"))).toHaveLength(1);
   });
 });

@@ -54,3 +54,49 @@ describe("poistka z PTmindera počas prechodu", () => {
     expect(zaplateneVPtminderi([papiez], [], [], [], normName)).toHaveLength(1);
   });
 });
+
+describe("splátky — balíček zaplatený na dvakrát", () => {
+  const meno = (x: string) => x.toLowerCase();
+  const bal = (cena: number, platnostOd = "2026-07-24") =>
+    [{ klient: "Peter Gažo", cena, platnostOd, doplatit: cena }] as never;
+
+  it("Peter Gažo: 8 000 + 12 081 pokryje členstvo za 20 093", () => {
+    // Skutočný prípad z 11. 10. 2026: QR v SMS znel na dvojnásobok, lebo
+    // pravidlo hľadalo jedinú platbu na celú sumu a splátky nepoznalo.
+    expect(zaplateneVPtminderi(bal(20093), [
+      { klient: "Peter Gažo", datum: "2026-08-07", suma: 8000 },
+      { klient: "Peter Gažo", datum: "2026-08-17", suma: 12081 },
+    ], [], [], meno)).toHaveLength(0);
+  });
+
+  it("polovičná platba dlh NEZAHLADÍ — poistka nie je odpustenie", () => {
+    expect(zaplateneVPtminderi(bal(20093), [
+      { klient: "Peter Gažo", datum: "2026-08-07", suma: 8000 },
+    ], [], [], meno)).toHaveLength(1);
+  });
+
+  it("tri splátky áno, štyri už nie", () => {
+    const platby = (sumy: number[]) => sumy.map((suma, i) => ({ klient: "Peter Gažo", datum: `2026-08-0${i + 1}`, suma }));
+    expect(zaplateneVPtminderi(bal(9000), platby([3000, 3000, 3000]), [], [], meno)).toHaveLength(0);
+    // Z piatich čísel sa poskladá skoro čokoľvek — poistka by sa zmenila na zahládzanie.
+    expect(zaplateneVPtminderi(bal(12000), platby([3000, 3000, 3000, 3000]), [], [], meno)).toHaveLength(1);
+  });
+
+  it("platby mimo okna sa nepočítajú", () => {
+    expect(zaplateneVPtminderi(bal(20093), [
+      { klient: "Peter Gažo", datum: "2026-05-01", suma: 8000 },
+      { klient: "Peter Gažo", datum: "2026-12-01", suma: 12081 },
+    ], [], [], meno)).toHaveLength(1);
+  });
+
+  it("tá istá dvojica splátok nepokryje dva balíčky", () => {
+    const dva = [
+      { klient: "Peter Gažo", cena: 20093, platnostOd: "2026-07-24", doplatit: 20093 },
+      { klient: "Peter Gažo", cena: 20093, platnostOd: "2026-08-01", doplatit: 20093 },
+    ] as never;
+    expect(zaplateneVPtminderi(dva, [
+      { klient: "Peter Gažo", datum: "2026-08-07", suma: 8000 },
+      { klient: "Peter Gažo", datum: "2026-08-17", suma: 12081 },
+    ], [], [], meno)).toHaveLength(1);
+  });
+});
