@@ -2516,28 +2516,33 @@ function skupinaFaktur(
       },
       ...(() => {
         /**
-         * ZÁMOK VISÍ NA PRÁCI, NIE NA ODKLEPNUTÍ (Jerry, 11. 10. 2026).
+         * OTÁZKY Z MESIACA SÚ INFORMÁCIA, NIE PREKÁŽKA (Jerry, 11. 10. 2026).
          *
-         * Dovtedy to boli štyri „mesačné kontroly" — zoznam domácich úloh,
-         * ktorý sa odklepával. Jerry: „mesačná kontrola ako zoznam úloh nemá
-         * existovať vôbec." Mal pravdu dvakrát: tú prácu robí Workspace
-         * priebežne celý mesiac (krok 1 „bol tam?", krok 3 priradenie
-         * príjmov), takže kontrola bola TRETIE miesto na to isté — a odklepnuť
-         * sa dalo bez toho, aby sa čokoľvek spravilo.
+         * Najprv som ich dal ako podmienku zámku — Jerry: „toto nemôže byť
+         * súčasťou uzávierky, dlžoby sa môžu preniesť do ďalšieho mesiaca."
+         * Mal pravdu a dá sa to doložiť z kódu: zámok mesiaca stráži len
+         * IMPORTY (`db.server.ts`) a POLOŽKY FAKTÚR (`api/faktury.ts`).
+         * Priradenie platby (`api/platby.ts`) ani odpoveď „bol tam?"
+         * (`api/anomaly.ts`, `api/kalendar.ts`) zámok nekontrolujú vôbec —
+         * dajú sa dorobiť aj po uzávierke a nič sa tým nepokazí.
          *
-         * Zamkne sa teda vtedy, keď za ten mesiac nezostala otázka, na ktorú
-         * vie odpovedať len človek: bol tam, a komu patrí ten príjem.
+         * PRAVIDLO: zamknutie smie brániť len to, čo sa po ňom už nedá
+         * opraviť. Všetko ostatné je riadok, ktorý povie, koľko toho zostalo,
+         * a nechá človeka zavrieť mesiac.
+         *
+         * Nepriradený príjem navyše mesačné číslo NEMENÍ — tržby idú
+         * z `payments`, nie z toho, komu sa pohyb pripísal. Mení záznam
+         * klienta, a ten nemá uzávierku.
          */
         const otazky = sporneKonanie.filter((x) => String(x.zaciatok).slice(0, 7) === mk).length;
         const prijmy = prijmyBezKlienta.filter((x) => String(x.datum).slice(0, 7) === mk).length;
         const spolu = otazky + prijmy;
+        if (spolu === 0) return [];
         return [{
           id: "kroky",
-          label: "Otázky z mesiaca",
-          hotovo: spolu === 0,
-          detail: spolu === 0
-            ? "nič nečaká na odpoveď"
-            : [otazky ? `${otazky}× „bol tam?" (krok 1)` : "", prijmy ? `${prijmy} ${prijmy === 1 ? "príjem" : prijmy < 5 ? "príjmy" : "príjmov"} bez klienta (krok 3)` : ""].filter(Boolean).join(" · "),
+          label: "Zostáva z mesiaca",
+          hotovo: true,                 // informácia, nie prekážka
+          detail: `${[otazky ? `${otazky}× „bol tam?"` : "", prijmy ? `${prijmy} ${prijmy === 1 ? "príjem" : prijmy < 5 ? "príjmy" : "príjmov"} bez klienta` : ""].filter(Boolean).join(" · ")} — prenáša sa do ďalšieho mesiaca, uzávierke to nebráni`,
           tab: "workspace",
           sub: otazky ? "kalendar" : "platby",
         }];
