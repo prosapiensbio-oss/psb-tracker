@@ -2420,7 +2420,23 @@ function skupinaFaktur(
         id: "alza",
         label: "Alza a nákupy bitcoinom",
         ...(() => {
-          const bez = btcBezDokladu.filter((p) => String(p.datum).slice(0, 7) === mk).length;
+          /**
+           * „BEZ FAKTÚRY" SA MUSÍ PÝTAŤ TO ISTÉ, ČO KARTA POD KROKOM.
+           *
+           * Jerry, 11. 10. 2026: „prečo Alza ukazuje, že nie je hotová?" —
+           * krok hlásil 4 platby bez faktúry a karta o pár centimetrov nižšie
+           * tvrdila „každá platba z peňaženky má svoj doklad". Dve protichodné
+           * tvrdenia o tej istej veci, lebo každé stálo na inej definícii:
+           * karta sa pýta, či má platba záznam v `btc_parovanie` (ručný pár
+           * alebo „súkromné"), krok sa pozeral len na výsledok automatiky.
+           *
+           * Odteraz obe: bez faktúry je tá, ktorú automat nespároval A ktorá
+           * nemá ani ručné rozhodnutie. Pri rozpore je vždy lepšie pýtať sa
+           * raz než zmierovať dve odpovede.
+           */
+          const bez = btcBezDokladu.filter(
+            (p) => String(p.datum).slice(0, 7) === mk && !(btcParovanie[String(p.id)] || []).length,
+          ).length;
           const nez = fakturyNezaradene[mk] || 0;
           /**
            * ČO NEVIEM, NEHLÁSIM AKO HOTOVÉ (Jerry, 9. 10. 2026: „nahral som
@@ -2528,7 +2544,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane]);
+  }, [data, clients, bankaSumy, bankaNaPotvrdenie, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti, btcBezDokladu, fakturyNezaradene, fakturyMesiaca, fakturyNepotvrdene, btcNakupy, btcNenacitane, btcParovanie]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.
