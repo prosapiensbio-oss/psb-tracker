@@ -349,6 +349,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         balicky: (balickyK.results as any[]).map((r) => ({
           id: r.id, klient: r.klient, nazov: r.nazov, cena: r.cena_czk == null ? null : Number(r.cena_czk),
           platnostOd: String(r.platnost_od || "").slice(0, 10), zdroj: r.zdroj, zruseneAt: r.zrusene_at || null,
+          poznamka: r.poznamka || null,
         })),
         ptPlatby: (payments.results as any[]).map((r) => ({ klient: String(r.client_name || ""), datum: String(r.date || "").slice(0, 10), suma: Number(r.amount_czk) || 0 })),
         ptHistoria: (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),

@@ -17,8 +17,15 @@
  *  1. Otvorené poplatky z PTmindera, z ktorých sa odratajú platby zapísané
  *     v Kokpite — suma na korunu, −10 až +60 dní, jedna platba na jeden
  *     poplatok (`poplatkyPoOdrataniPlatieb`).
- *  2. Balíčky nahodené v Kokpite, na ktoré sa platby z Kokpitu kladú od
+ *  2. VŠETKY balíčky v Kokpite, na ktoré sa platby z Kokpitu kladú od
  *     najstaršieho; čiastočne zaplatený je nezaplatený (`nezaplateneZKokpitu`).
+ *     Do 12. 10. 2026 rozhodovali len riadky nahodené rukou (`zdroj = rucne`)
+ *     — preto keď Jerry prepísal Dominike veľkosť balíčka naliateho
+ *     z PTmindera zo 6 h na 18 h, nová cena nevstúpila nikam a karta ďalej
+ *     hlásila starý poplatok 6 622 Kč. Jerry: „zdrojom dlhu bude Kokpit
+ *     a PTminder bude len kontrola — ak sa v Kokpite zmenilo na 18 h, tak by
+ *     sa to malo zmeniť." Výnimka je otvárací zostatok z naliatia
+ *     (`jeOtvaraciZostatok`): prevzaté hodiny nie sú predaj.
  *  3. Poistka na čas súbežného chodu: balíček z Kokpitu, ktorý PTminder pozná
  *     ako zaplatený, dlhom nie je (`zaplateneVPtminderi`).
  *  4. Ten istý predaj zapísaný v oboch systémoch je JEDEN: poplatok
@@ -41,7 +48,7 @@
  * nie medzi tých, čo si majú kúpiť nový).
  */
 
-import { nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
+import { jeOtvaraciZostatok, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
 import { poplatkyPoOdrataniPlatieb, type Platba } from "./platbyEvidencia";
 
@@ -66,7 +73,7 @@ export type VstupDlhov = {
   /** Platby zapísané v Kokpite (tabuľka `platby`). */
   platby: { id?: string; klient: string; datum: string; suma: number; zruseneAt?: string | null; vopred?: boolean | number | null; sposob?: string; fioId?: string | null }[];
   /** Balíčky v Kokpite (tabuľka `balicky`) — rozhodujú len ručne nahodené. */
-  balicky: { id?: string; klient: string; nazov: string; cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null }[];
+  balicky: { id?: string; klient: string; nazov: string; cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; poznamka?: string | null }[];
   /** Platby z PTmindera — len pre poistku (krok 3). */
   ptPlatby: { klient: string; datum: string; suma: number }[];
   /** Začiatky členstiev z histórie PTmindera — len pre poistku (krok 3). */
@@ -98,10 +105,10 @@ const dni = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Da
  */
 export function bezZdvojenych<T extends { datum: string; suma: number }>(
   poplatky: T[],
-  balicky: { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null }[],
+  balicky: { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; poznamka?: string | null }[],
 ): T[] {
   const nase = balicky
-    .filter((b) => !b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0)
+    .filter((b) => !b.zruseneAt && (b.cena || 0) > 0 && !jeOtvaraciZostatok(b))
     .map((b) => ({ den: den(b.platnostOd), cena: Math.round(b.cena || 0), pouzity: false }));
   if (!nase.length) return poplatky;
   return poplatky.filter((p) => {
@@ -109,7 +116,13 @@ export function bezZdvojenych<T extends { datum: string; suma: number }>(
     const c = Math.round(p.suma || 0);
     // Zľava: balíček smie byť lacnejší, najviac o tretinu; drahší nie.
     const sediCena = (cena: number) => cena === c || (cena < c && cena >= c * (2 / 3));
-    const presne = nase.find((b) => !b.pouzity && sediCena(b.cena) && b.den === d);
+    // Ten istý deň: aj DRAHŠÍ balíček — to je zväčšenie, nie iný predaj.
+    // Dominika si 12. 10. 2026 namiesto 6 h zobrala 18 h; v Kokpite je teda
+    // 17 978 Kč a v PTminderi stále poplatok za 6 622. Je to jeden predaj,
+    // len PTminder drží jeho starú podobu. Viac než o tretinu lacnejší
+    // zostáva zakázaný — to je doplatok vedľa poplatku.
+    const sediVDen = (cena: number) => sediCena(cena) || cena > c;
+    const presne = nase.find((b) => !b.pouzity && sediVDen(b.cena) && b.den === d);
     const blizko = presne || nase.find((b) => !b.pouzity && sediCena(b.cena) && dni(b.den, d) <= 3);
     if (!blizko) return true;
     blizko.pouzity = true;
@@ -149,7 +162,7 @@ export function dlhyKlientov(v: VstupDlhov): {
     const k = normName(b.klient);
     if (!meno.has(k)) meno.set(k, b.klient);
     const xs = bal.get(k) || [];
-    xs.push({ id: b.id, cena: b.cena, platnostOd: den(b.platnostOd), zdroj: b.zdroj, zruseneAt: b.zruseneAt ?? null, nazov: b.nazov });
+    xs.push({ id: b.id, cena: b.cena, platnostOd: den(b.platnostOd), zdroj: b.zdroj, zruseneAt: b.zruseneAt ?? null, nazov: b.nazov, poznamka: b.poznamka ?? null });
     bal.set(k, xs);
   }
   const pl = new Map<string, PlatbaDlh[]>();

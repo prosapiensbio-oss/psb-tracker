@@ -4,7 +4,7 @@ import { describe, expect, it } from "bun:test";
 import { nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
 
-const b = (od: string, cena: number, zdroj = "rucne"): BalicekDlh => ({ platnostOd: od, cena, zdroj, nazov: "OFF - 6h BEZ viazanosti" });
+const b = (od: string, cena: number, zdroj = "rucne", poznamka: string | null = null): BalicekDlh => ({ platnostOd: od, cena, zdroj, poznamka, nazov: "OFF - 6h BEZ viazanosti" });
 const p = (datum: string, suma: number, vopred = false): PlatbaDlh => ({ datum, suma, vopred });
 
 describe("nezaplateneZKokpitu", () => {
@@ -27,8 +27,14 @@ describe("nezaplateneZKokpitu", () => {
   it("platba vopred pokryje balíček, ktorý vznikol až prvým tréningom", () => {
     expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-11-01", 7790, true)])).toEqual([]);
   });
-  it("balíčky z PTmindera sa do toho nemiešajú", () => {
-    expect(nezaplateneZKokpitu([b("2026-09-02", 7790, "ptminder")], [])).toEqual([]);
+  // Jerry, 12. 10. 2026: „zdrojom dlhu bude Kokpit a PTminder bude len
+  // kontrola." Dovtedy rozhodovali len riadky nahodené rukou.
+  it("balíček naliaty z PTmindera dlh ROBÍ — zdroj už nerozhoduje", () => {
+    expect(nezaplateneZKokpitu([b("2026-09-02", 7790, "ptminder")], []).map((x) => x.platnostOd)).toEqual(["2026-09-02"]);
+  });
+  it("otvárací zostatok z naliatia dlh nerobí — nie je to predaj", () => {
+    const zostatok = b("2026-09-20", 77240, "ptminder", "zostatok prevzatý z PTmindera k 2026-09-20 — pokračuje");
+    expect(nezaplateneZKokpitu([zostatok], [])).toEqual([]);
   });
   it("platba vopred pokryje aj balíček, ktorý vznikne neskôr", () => {
     const bal = [b("2026-09-02", 7790), b("2026-10-28", 7790)];

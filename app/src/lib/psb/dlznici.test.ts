@@ -5,7 +5,7 @@ import { bezZdvojenych, dlhyKlientov, type VstupDlhov } from "./zaplatene";
 
 const DNES = "2026-09-28";
 const pop = (klient: string, datum: string, suma: number, popis = "OFF - 6h") => ({ klient, datum, suma, popis });
-const bal = (klient: string, platnostOd: string, cena: number, zdroj = "rucne") => ({ klient, nazov: "6h Balíček", cena, platnostOd, zdroj, zruseneAt: null });
+const bal = (klient: string, platnostOd: string, cena: number, zdroj = "rucne", poznamka: string | null = null) => ({ klient, nazov: "6h Balíček", cena, platnostOd, zdroj, zruseneAt: null, poznamka });
 /** Celé pravidlo „zaplatený" nad vymyslenými dátami — tak, ako ho volá `loadData`. */
 const dlhy = (v: Partial<VstupDlhov>) => dlhyKlientov({ poplatky: [], platby: [], balicky: [], ptPlatby: [], ptHistoria: [], ...v }).polozky;
 
@@ -32,10 +32,26 @@ describe("dlznici", () => {
     expect(v).toHaveLength(0);
   });
 
-  it("balíček naliaty z PTmindera sa do dlhu neráta", () => {
-    // Stará história bola zaplatená v starom svete; platby k nej v Kokpite
-    // nie sú a appka by každému dlhoročnému klientovi vyrobila dlh.
+  it("balíček naliaty z PTmindera sa do dlhu RÁTA — Kokpit je zdroj", () => {
+    // Jerry, 12. 10. 2026. Dovtedy rozhodoval `zdroj = rucne`, a tak zmena
+    // veľkosti balíčka naliateho z PTmindera nevstúpila do peňazí nikam.
     const v = dlznici(dlhy({ balicky: [bal("Peter Gažo", "2026-05-18", 9400, "ptminder")] }), {}, DNES);
+    expect(v).toHaveLength(1);
+    expect(v[0].spolu).toBe(9400);
+  });
+
+  it("ale PTminder ho odpustí, keď o platbe vie — zostal kontrolou", () => {
+    const v = dlznici(dlhy({
+      balicky: [bal("Peter Gažo", "2026-05-18", 9400, "ptminder")],
+      ptPlatby: [{ klient: "Peter Gažo", datum: "2026-05-20", suma: 9400 }],
+    }), {}, DNES);
+    expect(v).toHaveLength(0);
+  });
+
+  it("otvárací zostatok z naliatia dlh nerobí — prevzaté hodiny nie sú predaj", () => {
+    const v = dlznici(dlhy({
+      balicky: [bal("Tomaš Krčmar", "2026-09-20", 77240, "ptminder", "zostatok prevzatý z PTmindera k 2026-09-20 — pokračuje")],
+    }), {}, DNES);
     expect(v).toHaveLength(0);
   });
 
@@ -126,8 +142,16 @@ describe("ten istý predaj so zľavou — Peter Gažo, 11. 10. 2026", () => {
     expect(bezZdvojenych(poplatok(6990), balicek(6990))).toHaveLength(0);
   });
 
-  it("drahší balíček NIE JE ten istý predaj — zľava cenu neskladá nahor", () => {
-    expect(bezZdvojenych(poplatok(20093), balicek(21150))).toHaveLength(1);
+  it("drahší balíček V TEN ISTÝ DEŇ je zväčšenie, nie iný predaj", () => {
+    // Dominika Križová, 12. 10. 2026: namiesto 6 h si zobrala 18 h. V Kokpite
+    // je 17 978 Kč, v PTminderi stále poplatok za 6 622 — jeden predaj,
+    // len PTminder drží jeho starú podobu.
+    expect(bezZdvojenych(poplatok(6622), balicek(17978))).toHaveLength(0);
+    expect(bezZdvojenych(poplatok(20093), balicek(21150))).toHaveLength(0);
+  });
+
+  it("o iný deň drahší balíček ten istý predaj nie je", () => {
+    expect(bezZdvojenych(poplatok(6622, "2026-10-01"), balicek(17978, "2026-10-09"))).toHaveLength(1);
   });
 
   it("polovičná suma je doplatok, nie zľava", () => {

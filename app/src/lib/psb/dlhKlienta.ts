@@ -18,7 +18,19 @@
  * nie je, a umazala by dlh, ktorý naozaj je.
  */
 
-export type BalicekDlh = { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; nazov?: string };
+export type BalicekDlh = { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; nazov?: string; poznamka?: string | null };
+
+/**
+ * OTVÁRACÍ ZOSTATOK NIE JE PREDAJ.
+ *
+ * Naliatie z PTmindera (27 riadkov k 20. 9. 2026) prevzalo, koľko komu
+ * zostávalo hodín — nie to, že si v ten deň niečo kúpil. Tie riadky nesú
+ * katalógovú cenu starých produktov (ONE YEAR 77 240, DYNAMIKA, MFR), hoci
+ * sú dávno zaplatené. Keby tvorili dlh, pribudlo by 99 378 Kč, ktoré nikto
+ * nedlhuje (zmerané 12. 10. 2026 nad ostrými dátami).
+ */
+export const jeOtvaraciZostatok = (b: { poznamka?: string | null }): boolean =>
+  /^\s*zostatok prevzatý/i.test(String(b.poznamka || ""));
 export type PlatbaDlh = {
   suma: number; datum: string; zruseneAt?: string | null;
   /**
@@ -29,9 +41,22 @@ export type PlatbaDlh = {
 };
 
 
-/** Balíčky, ktoré tvoria dlh: z Kokpitu, nezrušené, s cenou. Od najstaršieho. */
+/**
+ * Balíčky, ktoré tvoria dlh: nezrušené, s cenou. Od najstaršieho.
+ *
+ * ZDROJ UŽ NEROZHODUJE (Jerry, 12. 10. 2026: „zdrojom dlhu bude Kokpit
+ * a PTminder bude len kontrola — ak sa v Kokpite zmenilo na 18 h, tak by sa
+ * to malo zmeniť"). Do toho dňa sa počítali len riadky nahodené rukou
+ * (`zdroj = rucne`), takže keď Jerry prepísal Dominike veľkosť balíčka
+ * naliateho z PTmindera, nová cena nevstúpila nikam a karta ďalej hlásila
+ * starý poplatok z PTmindera.
+ *
+ * PTminder zostáva poistkou: `zaplateneVPtminderi` ďalej odpúšťa balíčky,
+ * ktoré on pozná ako zaplatené — bez toho by sa do dlhu vrátili všetky
+ * naliate členstvá, ktoré klienti dávno zaplatili ešte pred Kokpitom.
+ */
 const balickyKokpitu = (balicky: BalicekDlh[]): BalicekDlh[] => balicky
-  .filter((b) => !b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0)
+  .filter((b) => !b.zruseneAt && (b.cena || 0) > 0 && !jeOtvaraciZostatok(b))
   .sort((a, b) => a.platnostOd.localeCompare(b.platnostOd));
 
 /** Platby, ktoré sa na balíčky z Kokpitu počítajú: od prvého z nich, alebo vopred. */
