@@ -1403,6 +1403,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {pisem ? "Zavrieť" : "+ Nahodiť balíček alebo členstvo"}
           </button>
         )}
+        {/* ÚPRAVA BALÍČKA SA DÁ NÁJSŤ LEN VTEDY, KEĎ JE NA ŇU VIDIEŤ.
+            Jerry, 12. 10. 2026 nad Dominikou: „nakoniec si zoberie 18 h
+            a v profile všetko ani v Balíčkoch sa to nedá zmeniť." Dalo —
+            ale len pod záložkou „balíčky", kde ju nehľadal. Odkaz vedie
+            priamo tam a hovorí, koľko balíčkov tam na neho čaká. */}
+        {filter === "vsetko" && !!mojeBalicky.length && (
+          <button onClick={() => setFilter("balicky")} style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start" }}>
+            {mojeBalicky.length === 1 ? "1 balíček" : `${mojeBalicky.length} balíčky`} · zmeniť veľkosť, cenu alebo platnosť →
+          </button>
+        )}
         {/* Bitcoin je pod Peniazmi vlastná záložka (Jerry, 23. 9. 2026).
             Do zoznamu platieb sa miešať nedá: v knihe je to satoshi, nie
             koruny, a jedna suma tam má dve hodnoty — vtedajšiu a dnešnú. */}
@@ -1581,7 +1591,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   </button>
                 </div>
               )}
-              <div style={hlavicka}>NAHODENÉ V KOKPITE</div>
+              <div style={hlavicka}>BALÍČKY KLIENTA — TU SA UPRAVUJÚ</div>
               {mojeBalicky.map((b, iB) => {
                 /**
                  * Tréningy nahodeného balíčka. Na osi času nestojí — tá číta
@@ -1602,6 +1612,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       <span style={{ color: C.textDim }}>
                         {b.hodiny ? ` · ${b.hodiny} h` : ""}
                         {b.platnost_do ? ` · do ${fmtDMY(b.platnost_do)}` : ""}
+                        {b.zdroj !== "rucne" ? ` · z ${b.zdroj === "ptminder" ? "PTmindera" : b.zdroj}` : ""}
                         {b.poznamka ? ` · ${b.poznamka}` : ""}
                       </span>
                     </span>

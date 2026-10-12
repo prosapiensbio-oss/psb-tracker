@@ -42,8 +42,14 @@ async function posli(telo: Record<string, unknown>) {
   return (await r.json()) as { ok: boolean; error?: string; id?: string; pridanych?: number; preskocenych?: number; preskocene?: string[] };
 }
 
-export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
+export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
   mena: string[];
+  /**
+   * Otvoriť profil klienta. Veľkosť balíčka sa mení TAM a nikde inde —
+   * Jerry ju 12. 10. 2026 hľadal v tejto karte a nenašiel, lebo tu je len
+   * porovnanie s PTminderom. Meno je preto odkaz na miesto, kde sa to dá.
+   */
+  onKlient?: (meno: string) => void;
   /** Ponuka „vystaviť faktúru" po zapísaní balíčka; bez nej sa neukáže. */
   onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
   /**
@@ -166,7 +172,15 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
               {(detail ? p.riadky : p.riadky.filter((r) => r.stav === "rozdiel" || r.stav === "lenPtminder")).map((r) => (
                 <tr key={r.klient} style={{ borderTop: `1px solid ${mix(C.border, 55)}` }}>
                   <td style={{ padding: "5px 6px 5px 0", color: C.text }}>
-                    {r.klient}
+                    {onKlient ? (
+                      <button
+                        onClick={() => onKlient(r.klient)}
+                        title="Otvoriť profil — tam sa balíček upravuje"
+                        style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: "inherit", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
+                      >
+                        {r.klient}
+                      </button>
+                    ) : r.klient}
                     {r.balicky.length > 1 && <span style={{ color: C.textDim, fontSize: 11 }}> · {r.balicky.length} balíčky</span>}
                   </td>
                   <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{r.predane ?? "—"}</td>
@@ -185,6 +199,11 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
               ))}
             </tbody>
           </table>
+          {onKlient && (
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
+              Veľkosť balíčka, cena aj platnosť sa menia v profile klienta → záložka balíčky. Klikni na meno.
+            </div>
+          )}
           {!detail && p.rozdiel === 0 && (
             <div style={{ fontSize: 12.5, color: C.green, marginTop: 8 }}>
               Všetkých {p.sedi} porovnateľných klientov sedí do hodiny.

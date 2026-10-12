@@ -25,12 +25,14 @@ import { Card, H3 } from "./ui";
  * sa mazala ťažšie: prerástla by do neho.
  */
 
-export function Prechod({ mena, onFaktura , onVypis}: {
+export function Prechod({ mena, onFaktura, onVypis, onKlient }: {
   mena: string[];
   /** Ponuka faktúry po zapísaní balíčka; Prechod ju len podáva ďalej. */
   onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
   /** Poslať klientovi výpis s QR namiesto faktúry. */
   onVypis?: (meno: string) => void;
+  /** Otvoriť profil klienta — tam sa upravuje balíček. */
+  onKlient?: (meno: string) => void;
 }) {
   const [porovnanie, setPorovnanie] = useState<Porovnanie | null>(null);
   const [nacitane, setNacitane] = useState(false);
@@ -66,7 +68,7 @@ export function Prechod({ mena, onFaktura , onVypis}: {
       )}
       {porovnanie && <div id="prechod-dochadzka"><SubeznyChod p={porovnanie} /></div>}
       <div id="prechod-mesiace"><KalendarHistoria /></div>
-      <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} onVypis={onVypis} /></div>
+      <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} onVypis={onVypis} onKlient={onKlient} /></div>
       <div id="prechod-kontakty"><ParovacKontaktov mena={mena} /></div>
       <div id="prechod-davka"><DavkovePlatby mena={mena} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
