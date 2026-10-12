@@ -1606,6 +1606,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   </button>
                 </div>
               )}
+              {/* ZDROJ SA PRI RIADKU NEPÍŠE. Skúsil som to 12. 10. 2026
+                  („· z PTmindera") a Jerry si to prečítal ako „toto je
+                  export, nesiahaj naň" — hoci je to presne ten riadok,
+                  ktorý sa upravuje. Odkiaľ balíček prišiel, je otázka na
+                  kartu Balíčky v Prechode, nie na profil. */}
               <div style={hlavicka}>BALÍČKY KLIENTA — TU SA UPRAVUJÚ</div>
               {mojeBalicky.map((b, iB) => {
                 /**
@@ -1627,7 +1632,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       <span style={{ color: C.textDim }}>
                         {b.hodiny ? ` · ${b.hodiny} h` : ""}
                         {b.platnost_do ? ` · do ${fmtDMY(b.platnost_do)}` : ""}
-                        {b.zdroj !== "rucne" ? ` · z ${b.zdroj === "ptminder" ? "PTmindera" : b.zdroj}` : ""}
                         {b.poznamka ? ` · ${b.poznamka}` : ""}
                       </span>
                     </span>
@@ -1662,7 +1666,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       naZrusenie={() => void zrusBalicek(b.id)}
                       pracujem={pracujem}
                       comu="balíček"
-                      slovom="zmeniť veľkosť alebo cenu"
+                      slovom="zmeniť"
                     />
                   </div>
                   {otvorene && (
