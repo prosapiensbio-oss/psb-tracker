@@ -733,6 +733,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
     setPisem(false);
     await nacitajBalicky();
+    // Zostatok hodín, dlh aj P&L žijú mimo tejto obrazovky (`/api/data`
+    // a peňažné kópie v App). Bez oznámenia by karta vľavo po zmene
+    // 6 h na 18 h ďalej hlásila „−3 h zostáva · 6h Balíček" až do obnovenia
+    // stránky — pravidlo z obnovaSignal.ts: kto zapísal, oznámi oblasť.
+    oznam("peniaze"); oznam("klienti");
   };
 
   /**
@@ -853,6 +858,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setUpravaBalicka(""); setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
     await nacitajBalicky();
+    // Zostatok hodín, dlh aj P&L žijú mimo tejto obrazovky (`/api/data`
+    // a peňažné kópie v App). Bez oznámenia by karta vľavo po zmene
+    // 6 h na 18 h ďalej hlásila „−3 h zostáva · 6h Balíček" až do obnovenia
+    // stránky — pravidlo z obnovaSignal.ts: kto zapísal, oznámi oblasť.
+    oznam("peniaze"); oznam("klienti");
   };
 
   const zrusBalicek = async (id: string) => {
@@ -864,6 +874,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa zrušiť"); return; }
     await nacitajBalicky();
+    // Zostatok hodín, dlh aj P&L žijú mimo tejto obrazovky (`/api/data`
+    // a peňažné kópie v App). Bez oznámenia by karta vľavo po zmene
+    // 6 h na 18 h ďalej hlásila „−3 h zostáva · 6h Balíček" až do obnovenia
+    // stránky — pravidlo z obnovaSignal.ts: kto zapísal, oznámi oblasť.
+    oznam("peniaze"); oznam("klienti");
   };
 
   if (!meno) {
@@ -1647,6 +1662,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       naZrusenie={() => void zrusBalicek(b.id)}
                       pracujem={pracujem}
                       comu="balíček"
+                      slovom="zmeniť veľkosť alebo cenu"
                     />
                   </div>
                   {otvorene && (
@@ -2892,12 +2908,22 @@ const hlavicka: React.CSSProperties = {
  * Otázka žije TU, nie v rodičovi: dve miesta, ktoré to používajú, tak
  * dostanú to isté správanie a netreba im pridávať stav.
  */
-const Upravit = ({ naUpravu, naZrusenie, pracujem, comu = "toto" }: {
+const Upravit = ({ naUpravu, naZrusenie, pracujem, comu = "toto", slovom = "" }: {
   naUpravu: () => void;
   naZrusenie: () => void;
   pracujem: boolean;
   /** Čo sa ruší — do otázky, aby bolo jasné, čoho sa klik týka. */
   comu?: string;
+  /**
+   * Namiesto ceruzky napísané slovo.
+   *
+   * Jerry, 12. 10. 2026: priniesol som mu odkaz na záložku balíčkov aj
+   * poctivý nadpis a napísal „ja tam tu zmenu nevidím" — stál nad riadkom,
+   * kde úprava bola, lenže ako bledé `✎` v `textDim`. Ceruzka je v hustej
+   * tabuľke v poriadku; na riadku, kde je jediná vec, ktorú tam človek
+   * prišiel urobiť, musí byť napísané, čo robí.
+   */
+  slovom?: string;
 }) => {
   const [pyta, setPyta] = useState(false);
 
@@ -2919,13 +2945,17 @@ const Upravit = ({ naUpravu, naZrusenie, pracujem, comu = "toto" }: {
   }
 
   return (
-    <span style={{ display: "flex", gap: 4, width: 46, justifyContent: "flex-end" }}>
-      {([["✎", naUpravu, "upraviť"], ["✕", () => setPyta(true), "zrušiť"]] as const).map(([z, fn, t]) => (
-        <button key={z} onClick={fn} disabled={pracujem} title={t} style={{
-          border: "none", background: "transparent", color: C.textDim,
-          fontSize: 12, cursor: pracujem ? "not-allowed" : "pointer", padding: "0 2px", lineHeight: 1,
-        }}>{z}</button>
-      ))}
+    <span style={{ display: "flex", gap: slovom ? 8 : 4, width: slovom ? undefined : 46, justifyContent: "flex-end", alignItems: "center" }}>
+      <button onClick={naUpravu} disabled={pracujem} title="upraviť" style={{
+        border: "none", background: "transparent", padding: slovom ? 0 : "0 2px", lineHeight: 1, fontFamily: "inherit",
+        color: slovom ? C.accentLight : C.textDim, fontSize: slovom ? 11.5 : 12,
+        textDecoration: slovom ? "underline" : "none", textUnderlineOffset: 2,
+        cursor: pracujem ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+      }}>{slovom || "✎"}</button>
+      <button onClick={() => setPyta(true)} disabled={pracujem} title="zrušiť" style={{
+        border: "none", background: "transparent", color: C.textDim,
+        fontSize: 12, cursor: pracujem ? "not-allowed" : "pointer", padding: "0 2px", lineHeight: 1,
+      }}>✕</button>
     </span>
   );
 };
