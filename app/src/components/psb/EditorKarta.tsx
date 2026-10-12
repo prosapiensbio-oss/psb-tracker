@@ -140,25 +140,18 @@ export function EditorKarta({ mena }: { mena: string[] }) {
      * Rámik s editorom sa presunúť nesmie (načítal by sa znova a zahodil
      * rozrobenú prácu), tak sa na chvíľu „vypnú" tie vlastnosti rodičom.
      */
-    const vratit: { el: HTMLElement; css: string }[] = [];
+    // Rodičia sa OZNAČIA a pravidlo zo štýlu (!important) im vlastnosti vypne —
+    // vyhrá aj nad tým, čo im animácia karty nastaví neskôr (inline bez !important).
+    if (!document.getElementById("editor-cela-css")) {
+      const st = document.createElement("style");
+      st.id = "editor-cela-css";
+      st.textContent = "[data-editor-cela-predok]{transform:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;perspective:none!important;will-change:auto!important;contain:none!important;transition:none!important;z-index:2147483000!important}";
+      document.head.appendChild(st);
+    }
+    const predkovia: HTMLElement[] = [];
     for (let el = obal.current?.parentElement; el && el !== document.body; el = el.parentElement) {
-      const cs = getComputedStyle(el);
-      const tvori = cs.transform !== "none" || cs.filter !== "none" || (cs as CSSStyleDeclaration & { backdropFilter?: string }).backdropFilter !== "none"
-        || cs.perspective !== "none" || /transform|filter/.test(cs.willChange) || /paint|layout|strict|content/.test(cs.contain || "");
-      const vrstva = cs.position !== "static" && cs.zIndex !== "auto";
-      if (!tvori && !vrstva) continue;
-      vratit.push({ el, css: el.style.cssText });
-      if (tvori) {
-        el.style.setProperty("transform", "none", "important");
-        el.style.setProperty("filter", "none", "important");
-        el.style.setProperty("backdrop-filter", "none", "important");
-        el.style.setProperty("-webkit-backdrop-filter", "none", "important");
-        el.style.setProperty("perspective", "none", "important");
-        el.style.setProperty("will-change", "auto", "important");
-        el.style.setProperty("contain", "none", "important");
-      }
-      // Vrstva rodiča by editor držala pod hornou lištou Kokpitu.
-      if (vrstva) el.style.setProperty("z-index", "2147483000", "important");
+      el.setAttribute("data-editor-cela-predok", "");
+      predkovia.push(el);
     }
     const zmena = () => {
       const d = document as Document & { webkitFullscreenElement?: Element };
@@ -170,7 +163,7 @@ export function EditorKarta({ mena }: { mena: string[] }) {
     addEventListener("keydown", esc);
     return () => {
       html.style.overflow = predtym;
-      for (const { el, css } of vratit) el.style.cssText = css;
+      for (const el of predkovia) el.removeAttribute("data-editor-cela-predok");
       document.removeEventListener("fullscreenchange", zmena);
       document.removeEventListener("webkitfullscreenchange", zmena);
       removeEventListener("keydown", esc);
