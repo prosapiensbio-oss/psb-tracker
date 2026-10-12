@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { dalej, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
@@ -43,6 +43,9 @@ const SEM: Record<Semafor, { farba: string; slovo: string }> = {
 const W = 1600;
 const H = 900;
 const OKRAJ = 96;
+/** Plocha pre obsah slajdu. Pod ňou je ešte pätka (pinned na bottom: 36). */
+const OBSAH_W = W - 2 * OKRAJ;
+const OBSAH_H = H - 2 * OKRAJ;
 
 /** Blok, ktorý sa objaví až vo svojom kroku. Miesto si drží vždy — inak by sa rozloženie pri odkrývaní hýbalo. */
 function Blok({ ukaz, children, style }: { ukaz: boolean; children: React.ReactNode; style?: React.CSSProperties }) {
@@ -77,7 +80,7 @@ function Stlpce({ seria, popis, farba, vyska = 230 }: { seria: number[]; popis: 
 
 function Titulka({ s, krok }: { s: SlajdTitulka; krok: number }) {
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: ZELENA }}>ProSapiens Bio · uzávierka</div>
       <div>
         <h1 style={{ margin: 0, fontSize: 132, lineHeight: 1, fontWeight: 800, letterSpacing: "-.03em", color: TEXT }}>{s.nadpis}</h1>
@@ -99,25 +102,25 @@ function Titulka({ s, krok }: { s: SlajdTitulka; krok: number }) {
 
 function SemaforSlajd({ s, krok }: { s: SlajdSemafor; krok: number }) {
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 32 }}>
+    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 28 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22, flex: 1, alignContent: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignContent: "start" }}>
         {s.karty.map((k, i) => {
           const sem = SEM[k.semafor];
           return (
             <Blok key={k.id} ukaz={krok >= 1 + i}>
-              <div style={{ background: POZADIE2, border: `1px solid ${LINKA}`, borderRadius: 18, padding: "22px 26px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 9, background: sem.farba, flex: "0 0 auto" }} />
-                  <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: sem.farba }}>{sem.slovo}</span>
+              <div style={{ background: POZADIE2, border: `1px solid ${LINKA}`, borderRadius: 18, padding: "16px 22px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 7, background: sem.farba, flex: "0 0 auto" }} />
+                  <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: sem.farba }}>{sem.slovo}</span>
                 </div>
-                <div style={{ fontSize: 26, fontWeight: 600, color: TEXT, margin: "10px 0 8px" }}>{k.otazka}</div>
+                <div style={{ fontSize: 23, fontWeight: 600, color: TEXT, margin: "8px 0 6px" }}>{k.otazka}</div>
                 {/* Jednotka niektorých otázok je celá veta („% tržieb od najväčšieho
                     klienta“) — dlhá hodnota sa zmenší, nech karta nemá tri riadky. */}
-                <div style={{ fontSize: k.hodnota.length > 18 ? 26 : k.hodnota.length > 11 ? 32 : 38, fontWeight: 800, color: k.bezDat ? SLABA : sem.farba, letterSpacing: "-.02em", lineHeight: 1.15 }}>
+                <div style={{ fontSize: k.hodnota.length > 18 ? 25 : k.hodnota.length > 11 ? 29 : 34, fontWeight: 800, color: k.bezDat ? SLABA : sem.farba, letterSpacing: "-.02em", lineHeight: 1.15 }}>
                   {k.hodnota}
                 </div>
-                <div style={{ fontSize: 20, color: SLABA, marginTop: 6 }}>{k.zmena}</div>
+                <div style={{ fontSize: 18, color: SLABA, marginTop: 4 }}>{k.zmena}</div>
               </div>
             </Blok>
           );
@@ -130,7 +133,7 @@ function SemaforSlajd({ s, krok }: { s: SlajdSemafor; krok: number }) {
 function OtazkaSlajd({ s, krok }: { s: SlajdOtazka; krok: number }) {
   const sem = SEM[s.semafor];
   return (
-    <div style={{ height: "100%", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 56, alignContent: "start" }}>
+    <div style={{ minHeight: OBSAH_H, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 56, alignContent: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 26, minWidth: 0 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
@@ -194,7 +197,7 @@ function ZaverSlajd({ s, krok }: { s: SlajdZaver; krok: number }) {
     </Blok>
   );
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 44 }}>
+    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 44 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignContent: "start" }}>
         {s.dobre.length > 0 && stlpec("Čo šlo dobre", ZELENA, s.dobre, krok >= 1)}
@@ -213,7 +216,7 @@ function ZaverSlajd({ s, krok }: { s: SlajdZaver; krok: number }) {
 
 function AkcieSlajd({ s, krok }: { s: SlajdAkcie; krok: number }) {
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 36 }}>
+    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 36 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
       {s.akcie.length === 0 ? (
         <Blok ukaz={krok >= 1}>
@@ -249,6 +252,41 @@ function Obsah({ s, krok }: { s: Slajd; krok: number }) {
 export const PLATNO = { sirka: W, vyska: H };
 
 /**
+ * Poistka proti pretečeniu. Obsah slajdu sa skladá z reportu, takže jeho dĺžku
+ * nepoznám dopredu — „67 % obnovilo balíček" je dvojriadková hodnota tam, kde
+ * som čakal jednoriadkovú, a karty potom 12. 10. preliezli cez pätku. Keď je
+ * obsah vyšší než plocha, zmenší sa CELÝ naraz. Nikdy sa nič neoreže.
+ *
+ * Meria sa `offsetHeight`, ktorý o transforme nevie — zmenšenie teda meranie
+ * neovplyvní a nevznikne kyvadlo. Šírka je pevná v pixeloch z toho istého
+ * dôvodu.
+ */
+function Zmesti({ children }: { children: React.ReactNode }) {
+  const obsah = useRef<HTMLDivElement | null>(null);
+  const [f, setF] = useState(1);
+  useLayoutEffect(() => {
+    const el = obsah.current;
+    if (!el) return;
+    const zmeraj = () => {
+      const h = el.offsetHeight;
+      const novy = h > OBSAH_H ? Math.max(0.55, OBSAH_H / h) : 1;
+      setF((stary) => (Math.abs(stary - novy) > 0.002 ? novy : stary));
+    };
+    zmeraj();
+    const po = new ResizeObserver(zmeraj);
+    po.observe(el);
+    return () => po.disconnect();
+  }, [children]);
+  return (
+    <div style={{ height: OBSAH_H, position: "relative" }}>
+      <div style={{ width: OBSAH_W, transform: f < 1 ? `scale(${f})` : undefined, transformOrigin: "top center" }}>
+        <div ref={obsah}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Jeden slajd na plátne 1600×900. Vyčlenené z prezentácie, aby sa ten istý
  * slajd dal vykresliť aj bez nej — náhľad pri stavaní, neskôr tlač.
  */
@@ -260,9 +298,9 @@ export function Platno({ s, krok, pata, strana, zoSlajdov, onKlik }: {
       style={{ width: W, height: H, flex: "0 0 auto", background: POZADIE, color: TEXT, cursor: onKlik ? "pointer" : "default",
         fontFamily: '"Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         padding: OKRAJ, boxSizing: "border-box", position: "relative" }}>
-      <div style={{ height: "100%", position: "relative" }}>
+      <Zmesti>
         <Obsah s={s} krok={krok} />
-      </div>
+      </Zmesti>
       <div style={{ position: "absolute", left: OKRAJ, bottom: 36, fontSize: 18, color: SLABA }}>{pata}</div>
       {strana !== undefined && zoSlajdov !== undefined && (
         <div style={{ position: "absolute", right: OKRAJ, bottom: 36, display: "flex", gap: 8, alignItems: "center" }}>
