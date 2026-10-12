@@ -64,10 +64,12 @@ export function EditorKarta({ mena }: { mena: string[] }) {
       if (e.origin !== location.origin) return;
       if (e.data?.typ === "psb-ulozene") oznam("fotky");
       if (e.data?.typ === "psb-kto-je-klient") posliKlienta();
+      // Otvorený rozrobený návrh patrí klientovi — prepne sa aj tu hore.
+      if (e.data?.typ === "psb-nastav-klienta" && typeof e.data.meno === "string" && mena.includes(e.data.meno)) setKlient(e.data.meno);
     };
     addEventListener("message", na);
     return () => removeEventListener("message", na);
-  }, [posliKlienta]);
+  }, [posliKlienta, mena]);
   const otvor = (d: Druh) => {
     setOtvoreny(d);
     setNacitane((n) => (n.includes(d) ? n : [...n, d]));

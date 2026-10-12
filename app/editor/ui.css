@@ -63,3 +63,15 @@
     .telo { flex-direction: column; height: auto; }
     .panel { width: 100%; border-left: 0; border-top: 1px solid var(--line); }
   }
+  /* Krok späť / znova a stav ukladania — vždy navrchu panelu. */
+  .kroky { display: flex; align-items: center; gap: 6px; padding: 10px 14px 4px; }
+  .kroky .tl { padding: 6px 11px; }
+  .kroky .tl:disabled { opacity: .4; cursor: default; }
+  .kroky .ulozene { margin-left: auto; font-size: 11.5px; color: var(--dim); }
+  .rohy { display: grid; grid-template-columns: 38px 38px; gap: 4px; margin-left: auto; }
+  .rohy button { height: 32px; border-radius: 7px; border: 1px solid var(--line2); background: var(--card); color: var(--muted); font-size: 16px; cursor: pointer; }
+  .rohy button.on { background: rgba(232,137,58,.22); color: var(--accentLight); border-color: var(--accent); }
+  .dizajny { flex-wrap: wrap; }
+  .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+  .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
+  .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

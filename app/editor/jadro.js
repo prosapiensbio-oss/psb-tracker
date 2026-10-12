@@ -8,6 +8,9 @@
     return { sirka, vyska, vlavo: ow / 2 + v.x * ow - sirka / 2, hore: oh / 2 + v.y * oh - vyska / 2 };
   };
   const obmedz = (v, fw, fh, ow, oh) => {
+    // Skrytý editor (karta v Kokpite bez rozmerov) má okná 0 × 0 — delenie
+    // nulou by dalo NaN a fotka by zmizla z obrazovky aj z exportu.
+    if (!(ow > 0 && oh > 0 && fw > 0 && fh > 0)) return v;
     const zoom = Math.min(MAX_ZOOM, Math.max(1, v.zoom));
     const s = Math.max(ow / fw, oh / fh) * zoom;
     const mx = Math.max(0, (fw * s - ow) / 2 / ow), my = Math.max(0, (fh * s - oh) / 2 / oh);
@@ -27,6 +30,16 @@
   let rozdelenie = "vedla";
   let priehladnost = 0.5;
   const mriezka = { druh: "ziadna", hustota: 10, farba: "rgba(255,255,255,.75)" };
+  /** Rozmery obrázka podľa adresy — po kroku späť či otvorení návrhu sa fotka nemusí čakať na načítanie, aby sedel výrez. */
+  const rozmery = new Map(); // src → { fw, fh }
+  /**
+   * ŠTÍTOK PŘEDTÍM / POTOM s dátumom (Jerry, 12. 10. 2026: „chcel by som ho
+   * zapnúť aj vypnúť, presunúť do iného rohu alebo dať rôzne dizajny").
+   * Obrazovka aj stiahnutá fotka ho kreslia z tých istých rozmerov
+   * (rozmerStitku) — predtým bol na obrazovke tmavý vľavo dole a v exporte
+   * biely vľavo hore.
+   */
+  const stitok = { zap: true, roh: "lh", dizajn: "biely", velkost: "m" };
   /** Čiary mriežky v jednotkách 0–1 celého štvorca — rovnaké pre obrazovku aj export. */
   const ciaryMriezky = () => {
     if (mriezka.druh === "ziadna") return { zvisle: [], vodorovne: [] };
@@ -44,6 +57,7 @@
       ...vodorovne.map((t) => `<line x1="0" y1="${t * 1000}" x2="1000" y2="${t * 1000}"/>`),
     ].join("");
     svg.querySelectorAll("line").forEach((l) => { l.setAttribute("stroke", mriezka.farba); l.setAttribute("stroke-width", "1"); l.setAttribute("vector-effect", "non-scaling-stroke"); });
+    zmena();
   }
   const stvorec = document.getElementById("stvorec");
 
@@ -55,24 +69,6 @@
   let vybrana = null;
   let farbaCiar = "#ff8a1f";
   let dalsieId = 1;
-  /**
-   * KROK SPÄŤ (Jerry, 12. 10. 2026: „dal som to zle a potrebujem krok späť
-   * a ten tam nie je"). Pred každou zmenou čiar sa odloží ich celý stav;
-   * ↶ / ⌘Z ho vráti. Ťah, ktorý nič nezmenil (klik bez posunu), sa
-   * z histórie vyhodí, aby krok späť nebol „naprázdno".
-   */
-  const historia = [];
-  const zapamataj = () => {
-    historia.push(JSON.stringify(ciary));
-    if (historia.length > 100) historia.shift();
-  };
-  const zabudniAkNic = () => { if (historia.at(-1) === JSON.stringify(ciary)) historia.pop(); };
-  const krokSpat = () => {
-    if (!historia.length) return;
-    ciary = JSON.parse(historia.pop());
-    vybrana = null;
-    kresliCiary();
-  };
   const svgCiary = document.getElementById("ciary");
   const desatinne = (n) => n.toFixed(1).replace(".", ",");
   /** Obdĺžniky okien na obrazovke (px od rohu štvorca). */
@@ -163,9 +159,8 @@
     svgCiary.innerHTML = html.join("");
     document.getElementById("zmazVybranu").disabled = vybrana == null;
     document.getElementById("zmazVsetky").disabled = !ciary.length;
-    const spat = document.getElementById("krokSpat");
-    if (spat) spat.disabled = !historia.length;
     window.poZmene?.();
+    zmena();
   }
 
   /** Kreslenie na plátno pri exporte — tie isté tvary. */
@@ -230,7 +225,6 @@
       if (najblizsi && najblizsi.c.id === vybrana) {
         const bod = najblizsi.c[najblizsi.kl];
         const spojene = ciary.flatMap((c) => ["a", "b"].filter((kl) => c.okno === najblizsi.c.okno && rovnakyBod(c[kl], bod)).map((kl) => [c, kl]));
-        zapamataj();
         tah = { druh: "koniec", kluce: spojene, okno: najblizsi.c.okno };
       } else {
         const naCiare = !najblizsi && ciary.find((c) => stav[c.okno]?.src && vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R)) < 7);
@@ -239,7 +233,6 @@
         let zaciatok = bodZOkna(okno, P.x, P.y, R);
         if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
         const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar };
-        zapamataj();
         ciary.push(c);
         vybrana = c.id;
         tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
@@ -280,7 +273,6 @@
         vybrana = null;
       }
       tah = null;
-      zabudniAkNic();
       kresliCiary();
     };
     svgCiary.addEventListener("pointerup", pusti);
@@ -314,7 +306,7 @@
     }
     return { sklon, uhly, farba: c.farba };
   }
-  const zmazVybranu = () => { zapamataj(); ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
+  const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
 
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
   // Po česky: hotová fotka ide klientovi alebo na sociálne siete (Jerry vybral
@@ -326,7 +318,6 @@
   const rozmerOkna = (el) => ({ ow: el.clientWidth, oh: el.clientHeight });
 
   function kresli() {
-    const pop = popisky();
     okna.forEach((el, i) => {
       const s = stav[i];
       el.classList.toggle("aktivne", i === aktivne);
@@ -339,20 +330,33 @@
         el.innerHTML = `<img alt=""><div class="popiska"></div>`;
         img = el.querySelector("img");
         img.dataset.src = s.src;
-        img.onload = () => { s.fw = img.naturalWidth; s.fh = img.naturalHeight; kresli(); };
+        const src = s.src;
+        img.onload = () => {
+          rozmery.set(src, { fw: img.naturalWidth, fh: img.naturalHeight });
+          for (const t of stav) if (t.src === src) { t.fw = img.naturalWidth; t.fh = img.naturalHeight; }
+          kresli();
+        };
         img.src = s.src;
       }
       const { ow, oh } = rozmerOkna(el);
-      s.v = obmedz(s.v, s.fw, s.fh, ow, oh);
+      // Kým nie sú známe rozmery fotky, výrez sa neorezáva — inak by sa
+      // posun z kroku späť alebo z návrhu stratil ešte pred načítaním.
+      if (rozmery.has(s.src)) s.v = obmedz(s.v, s.fw, s.fh, ow, oh);
       const r = rozlozenie(s.v, s.fw, s.fh, ow, oh);
       img.style.width = `${r.sirka}px`;
       img.style.height = `${r.vyska}px`;
       img.style.transform = s.zrkadlo
         ? `translate(${r.vlavo + r.sirka}px, ${r.hore}px) scaleX(-1)`
         : `translate(${r.vlavo}px, ${r.hore}px)`;
-      el.querySelector(".popiska").innerHTML = `${pop[i]}<small>${denCz(s.den)}</small>`;
+      kresliStitok(el.querySelector(".popiska"), i, ow, oh);
       img.style.opacity = rozdelenie === "cez" && i === 1 ? String(priehladnost) : "1";
     });
+    // Vodoznak ako v exporte: 70/2000 strany, 60/2000 od pravého dolného rohu.
+    const vz = document.getElementById("vodoznak");
+    if (vz) {
+      const k = stvorec.clientWidth / 2000;
+      Object.assign(vz.style, { width: `${70 * k}px`, right: `${60 * k}px`, bottom: `${60 * k}px` });
+    }
     kresliMriezku();
     kresliCiary();
     // panel
@@ -372,6 +376,7 @@
       if (src && img.getAttribute("src") !== src) img.src = src;
     });
     window.poZmene?.();
+    zmena();
   }
 
   // ── ŤAHANIE A ŠTIPNUTIE (pointer events: myš, prst, pero) ──
@@ -451,12 +456,11 @@
   /** Vloží obrázok (adresu) do polovice i. Fotka zo súboru aj snímka z videa. */
   function vlozObrazok(i, src, den, vlastny) {
     const s = stav[i];
-    if (s.src && s.src.startsWith("blob:") && s.vlastny) URL.revokeObjectURL(s.src);
-    Object.assign(s, { src, vlastny: !!vlastny, v: { zoom: 1, x: 0, y: 0 }, zrkadlo: false });
+    // Starý obrázok sa NEuvoľňuje (revokeObjectURL) — krok späť ho môže vrátiť.
+    const r = rozmery.get(src);
+    Object.assign(s, { src, vlastny: !!vlastny, v: { zoom: 1, x: 0, y: 0 }, zrkadlo: false, fw: r?.fw || 1, fh: r?.fh || 1 });
     if (den) s.den = den;
     ciary = ciary.filter((c) => c.okno !== i); // čiary patrili starej fotke
-    // …aj v odložených krokoch — krok späť nesmie vrátiť čiary na novú fotku.
-    for (let k = 0; k < historia.length; k++) historia[k] = JSON.stringify(JSON.parse(historia[k]).filter((c) => c.okno !== i));
     aktivne = i;
     kresli();
   }
@@ -534,21 +538,35 @@
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
   document.getElementById("vymenit").onclick = () => {
-    // Aj odložené kroky idú s fotkami na druhú stranu — inak by krok späť vrátil čiary na cudziu fotku.
-    for (let k = 0; k < historia.length; k++) historia[k] = JSON.stringify(JSON.parse(historia[k]).map((c) => ({ ...c, okno: 1 - c.okno })));
     stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
-  document.getElementById("popisky").onchange = (e) => stvorec.classList.toggle("skryte-popisky", !e.target.checked);
-  document.getElementById("medzera").oninput = (e) => stvorec.style.setProperty("--medzera", `${e.target.value}px`);
-  document.querySelectorAll("#rozdelenie button").forEach((b) => b.onclick = () => {
-    rozdelenie = b.dataset.v;
-    document.querySelectorAll("#rozdelenie button").forEach((x) => x.classList.toggle("on", x === b));
+  // Medzera mení okná — čiary aj štítky sa musia prekresliť s nimi.
+  document.getElementById("medzera").oninput = (e) => { stvorec.style.setProperty("--medzera", `${e.target.value}px`); kresli(); };
+  /** Rozloženie do tried a ovládačov — pri kliknutí aj pri kroku späť. */
+  function pouziRozdelenie() {
+    document.querySelectorAll("#rozdelenie button").forEach((x) => x.classList.toggle("on", x.dataset.v === rozdelenie));
     stvorec.classList.toggle("pod", rozdelenie === "pod");
     stvorec.classList.toggle("cez", rozdelenie === "cez");
     document.getElementById("riadokMedzera").hidden = rozdelenie === "cez";
     document.getElementById("riadokPriehladnost").hidden = rozdelenie !== "cez";
     document.getElementById("napovedaCez").hidden = rozdelenie !== "cez";
+  }
+  document.querySelectorAll("#rozdelenie button").forEach((b) => b.onclick = () => {
+    rozdelenie = b.dataset.v;
+    pouziRozdelenie();
     requestAnimationFrame(kresli);
   });
+  // Štítok: zapnúť, roh, dizajn, veľkosť.
+  document.getElementById("stitokZap").onchange = (e) => { stitok.zap = e.target.checked; pouziStitok(); kresli(); };
+  for (const [id, kluc] of [["stitokRoh", "roh"], ["stitokDizajn", "dizajn"], ["stitokVelkost", "velkost"]]) {
+    document.querySelectorAll(`#${id} button`).forEach((b) => b.onclick = () => { stitok[kluc] = b.dataset.v; pouziStitok(); kresli(); });
+  }
+  function pouziStitok() {
+    document.getElementById("stitokZap").checked = stitok.zap;
+    for (const [id, kluc] of [["stitokRoh", "roh"], ["stitokDizajn", "dizajn"], ["stitokVelkost", "velkost"]]) {
+      document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle("on", x.dataset.v === stitok[kluc]));
+    }
+    document.getElementById("stitokVolby").hidden = !stitok.zap;
+  }
   document.getElementById("priehladnost").oninput = (e) => {
     priehladnost = Number(e.target.value) / 100;
     document.getElementById("priehladnostH").textContent = `${e.target.value} %`;
@@ -569,21 +587,21 @@
   document.getElementById("kreslit").onclick = () => nastavRezim(!rezimCiar);
   document.getElementById("zmazVybranu").onclick = zmazVybranu;
   // Krok späť vie vrátiť aj „zmazať všetky" — preto sa už nepýta.
-  document.getElementById("zmazVsetky").onclick = () => { zapamataj(); ciary = []; vybrana = null; kresliCiary(); };
-  document.getElementById("krokSpat").onclick = krokSpat;
+  document.getElementById("zmazVsetky").onclick = () => { ciary = []; vybrana = null; kresliCiary(); };
   document.getElementById("sklon").onchange = kresliCiary;
   document.querySelectorAll("#farbaCiar button").forEach((b) => b.onclick = () => {
     document.querySelectorAll("#farbaCiar button").forEach((x) => x.classList.toggle("on", x === b));
     farbaCiar = b.dataset.v;
     const c = ciary.find((q) => q.id === vybrana);
-    if (c && c.farba !== farbaCiar) { zapamataj(); c.farba = farbaCiar; } // farba sa dá zmeniť aj vybranej čiare
+    if (c) c.farba = farbaCiar; // farba sa dá zmeniť aj vybranej čiare
     kresliCiary();
   });
   addEventListener("keydown", (e) => {
     if (e.target.closest?.("input")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); krokSpat(); }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); krokDopredu(); }
   });
   addEventListener("resize", kresli);
 
@@ -598,6 +616,59 @@
     ZNACKA.napis = await obrazok("/znacka-napis-zelena.svg");
   })();
   const pismo = (vaha, px) => `${vaha} ${px}px ${ZNACKA.pismo ? "Agrandir, " : ""}-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  // Keď dorazí Agrandir, štítky na obrazovke sa premerajú jeho písmom.
+  znackaHotova.then(() => kresli());
+
+  // ── ŠTÍTOK: rozmery spoločné pre obrazovku aj export ──
+  const VELKOST_STITKU = { s: 0.75, m: 1, l: 1.35 };
+  const DIZAJNY_STITKU = {
+    biely: { pozadie: "rgba(251,250,246,.94)", t1: "#141513", t2: "#8A8C85", tien: false },
+    tmavy: { pozadie: "rgba(20,20,20,.66)", t1: "#ffffff", t2: "rgba(255,255,255,.78)", tien: false },
+    zeleny: { pozadie: "#16483A", t1: "#ffffff", t2: "#BFD8CC", tien: false },
+    text: { pozadie: null, t1: "#ffffff", t2: "#ffffff", tien: true },
+  };
+  let meradlo = null;
+  /**
+   * Kde je štítok polovice i v jej okne (ow × oh) pri mierke k = strana
+   * štvorca / 2000. `rohCelku` = okno siaha do pravého dolného rohu štvorca —
+   * tam stojí postavička (vodoznak), štítok v tom rohu ide nad ňu.
+   */
+  function rozmerStitku(i, ow, oh, k, rohCelku) {
+    const m = k * VELKOST_STITKU[stitok.velkost];
+    const t1 = popisky()[i].toUpperCase(), t2 = denCz(stav[i].den);
+    meradlo = meradlo || document.createElement("canvas").getContext("2d");
+    meradlo.font = pismo(600, 40 * m);
+    const w1 = meradlo.measureText(t1).width + 3 * m * t1.length;
+    meradlo.font = pismo(400, 36 * m);
+    const w2 = t2 ? meradlo.measureText(t2).width + 30 * m : 0;
+    const bw = w1 + w2 + 80 * m, bh = 84 * m;
+    let vpravo = stitok.roh[0] === "p";
+    const dole = stitok.roh[1] === "d";
+    if (rozdelenie === "cez" && i === 1) vpravo = !vpravo; // pri prekrytí sa dva štítky nesmú zakryť
+    const okraj = 50 * k;
+    const okrajDole = dole && vpravo && rohCelku ? 60 * k + 70 * k * 2.02 + 24 * k : okraj;
+    return {
+      t1, t2, w1, m, bw, bh,
+      bx: vpravo ? ow - okraj - bw : okraj,
+      by: dole ? oh - okrajDole - bh : okraj,
+      d: DIZAJNY_STITKU[stitok.dizajn] || DIZAJNY_STITKU.biely,
+    };
+  }
+  /** Štítok na obrazovke — HTML s rozmermi z rozmerStitku. */
+  function kresliStitok(el, i, ow, oh) {
+    if (!el) return;
+    if (!stitok.zap) { el.hidden = true; return; }
+    el.hidden = false;
+    const r = rozmerStitku(i, ow, oh, stvorec.clientWidth / 2000, rozdelenie === "cez" || i === 1);
+    const rodina = `${ZNACKA.pismo ? "Agrandir, " : ""}-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    Object.assign(el.style, {
+      left: `${r.bx}px`, top: `${r.by}px`, width: `${r.bw}px`, height: `${r.bh}px`, borderRadius: `${r.bh / 2}px`,
+      paddingLeft: `${40 * r.m}px`, background: r.d.pozadie || "transparent", fontFamily: rodina,
+      textShadow: r.d.tien ? "0 1px 6px rgba(0,0,0,.6)" : "none",
+    });
+    el.innerHTML = `<span style="font-size:${40 * r.m}px;font-weight:600;letter-spacing:${3 * r.m}px;color:${r.d.t1};width:${r.w1}px">${r.t1}</span>`
+      + (r.t2 ? `<span style="font-size:${36 * r.m}px;font-weight:400;color:${r.d.t2};margin-left:${30 * r.m}px">${r.t2}</span>` : "");
+  }
 
   // ── EXPORT: ten istý výrez vo veľkom rozlíšení ──
   /** Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c. */
@@ -610,8 +681,6 @@
     x.fillStyle = "#fff"; x.fillRect(0, 0, N, N);
     const vedla = rozdelenie === "vedla", cez = rozdelenie === "cez";
     const ow = cez ? N : vedla ? (N - g) / 2 : N, oh = cez ? N : vedla ? N : (N - g) / 2;
-    const pop = popisky();
-    const sPopiskami = document.getElementById("popisky").checked;
     okna.forEach((el, i) => {
       const s = stav[i];
       const ox = cez ? 0 : vedla ? i * (ow + g) : 0, oy = cez ? 0 : vedla ? 0 : i * (oh + g);
@@ -625,25 +694,20 @@
         else x.drawImage(img, ox + r.vlavo, oy + r.hore, r.sirka, r.vyska);
       } else { x.fillStyle = "#ddd"; x.fillRect(ox, oy, ow, oh); }
       x.restore();
-      if (sPopiskami && s.src) {
-        // Návrh D: biely štítok v hornom rohu polovice — PŘEDTÍM 3. 6. 2026.
-        // Pri prekrytí („cez") stojí druhý štítok vpravo, aby sa neprekryli.
-        const k = N / 2000;
-        const t1 = pop[i].toUpperCase(), t2 = denCz(s.den);
-        x.font = pismo(600, 40 * k);
-        const w1 = x.measureText(t1).width + (ZNACKA.pismo ? 3 * k * t1.length : 0);
-        x.font = pismo(400, 36 * k);
-        const w2 = t2 ? x.measureText(t2).width + 30 * k : 0;
-        const bw = w1 + w2 + 80 * k, bh = 84 * k;
-        const bx = cez && i === 1 ? ox + ow - 50 * k - bw : ox + 50 * k, by = oy + 50 * k;
-        x.fillStyle = "rgba(251,250,246,.94)";
-        x.beginPath(); x.roundRect(bx, by, bw, bh, bh / 2); x.fill();
+      if (stitok.zap && s.src) {
+        // Ten istý štítok ako na obrazovke (rozmerStitku), len vo veľkom.
+        const r = rozmerStitku(i, ow, oh, N / 2000, cez || i === 1);
+        const bx = ox + r.bx, by = oy + r.by;
+        x.save();
+        if (r.d.pozadie) { x.fillStyle = r.d.pozadie; x.beginPath(); x.roundRect(bx, by, r.bw, r.bh, r.bh / 2); x.fill(); }
+        if (r.d.tien) { x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 12 * r.m; x.shadowOffsetY = 2 * r.m; }
         x.textBaseline = "middle"; x.textAlign = "left";
-        x.fillStyle = "#141513"; x.font = pismo(600, 40 * k);
-        if ("letterSpacing" in x) x.letterSpacing = `${3 * k}px`;
-        x.fillText(t1, bx + 40 * k, by + bh / 2 + 2 * k);
+        x.fillStyle = r.d.t1; x.font = pismo(600, 40 * r.m);
+        if ("letterSpacing" in x) x.letterSpacing = `${3 * r.m}px`;
+        x.fillText(r.t1, bx + 40 * r.m, by + r.bh / 2 + 2 * r.m);
         if ("letterSpacing" in x) x.letterSpacing = "0px";
-        if (t2) { x.fillStyle = "#8A8C85"; x.font = pismo(400, 36 * k); x.fillText(t2, bx + 40 * k + w1 + 30 * k, by + bh / 2 + 2 * k); }
+        if (r.t2) { x.fillStyle = r.d.t2; x.font = pismo(400, 36 * r.m); x.fillText(r.t2, bx + 40 * r.m + r.w1 + 30 * r.m, by + r.bh / 2 + 2 * r.m); }
+        x.restore();
       }
     });
     // Postavička ako nenápadný vodoznak vpravo dole (návrh D).
@@ -713,6 +777,112 @@
   if (tlIg) tlIg.onclick = async () => stiahni(await vyrobInstagram(), "predtim-potom-instagram.jpg");
   document.getElementById("stiahnut").onclick = async () => stiahni(await vyrobJpeg(), "predtim-potom.jpg");
 
+  // ── KROK SPÄŤ PRE CELÝ EDITOR ──
+  /**
+   * Jerry, 12. 10. 2026: „krok späť by mal fungovať na všetko v tom editore."
+   * Nie zoznam jednotlivých akcií, ale celé snímky stavu: po každej zmene
+   * (kreslenie volá zmena()) sa po chvíľke ticha stav porovná s posledným
+   * a ak je iný, starý ide do histórie. Ťahanie fotky alebo čiary je jeden
+   * krok — kým drží prst/myš, nič sa nezapisuje. Výber čiary a otvorené
+   * skupiny nie sú stav, krok späť ich preskakuje.
+   */
+  let spat = [], dopredu = [], posledny = null, casovacZmeny = 0, drzi = false, obnovujem = false;
+  const zaokruhli = (_, h) => (typeof h === "number" ? Math.round(h * 1e5) / 1e5 : h);
+  const zaskrtnute = (id) => document.getElementById(id).checked;
+  function snimkaStavu() {
+    return JSON.stringify({
+      stav: stav.map((t) => ({ src: t.src, den: t.den, v: t.v, zrkadlo: t.zrkadlo, vlastny: !!t.vlastny })),
+      ciary, rozdelenie, priehladnost, mriezka, stitok,
+      medzera: Number(document.getElementById("medzera").value),
+      sklon: zaskrtnute("sklon"), ciaryExport: zaskrtnute("ciaryExport"), mriezkaExport: zaskrtnute("mriezkaExport"),
+    }, zaokruhli);
+  }
+  function zmena() {
+    if (obnovujem || posledny === null) return;
+    clearTimeout(casovacZmeny);
+    casovacZmeny = setTimeout(potvrdZmenu, 400);
+  }
+  function potvrdZmenu() {
+    clearTimeout(casovacZmeny);
+    if (drzi || posledny === null) return; // dopíše sa po pustení
+    const t = snimkaStavu();
+    if (t === posledny) return;
+    spat.push(posledny);
+    if (spat.length > 150) spat.shift();
+    dopredu = [];
+    posledny = t;
+    tlacidlaKrokov();
+    window.poZmeneStavu?.(t);
+  }
+  /** Vráti editor do stavu t (reťazec zo snimkaStavu). */
+  function obnovStav(t) {
+    const o = JSON.parse(t);
+    obnovujem = true;
+    o.stav.forEach((z, i) => {
+      const r = rozmery.get(z.src);
+      Object.assign(stav[i], z, { fw: r?.fw || 1, fh: r?.fh || 1 });
+    });
+    ciary = o.ciary || [];
+    dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1));
+    vybrana = null;
+    rozdelenie = o.rozdelenie || "vedla";
+    priehladnost = o.priehladnost ?? 0.5;
+    Object.assign(mriezka, o.mriezka || {});
+    Object.assign(stitok, o.stitok || {});
+    const medzera = document.getElementById("medzera");
+    medzera.value = String(o.medzera ?? 4);
+    stvorec.style.setProperty("--medzera", `${medzera.value}px`);
+    document.getElementById("priehladnost").value = String(Math.round(priehladnost * 100));
+    document.getElementById("priehladnostH").textContent = `${Math.round(priehladnost * 100)} %`;
+    document.getElementById("hustota").value = String(mriezka.hustota);
+    document.getElementById("hustotaH").textContent = String(mriezka.hustota);
+    for (const [id, h] of [["mriezkaDruh", mriezka.druh], ["mriezkaFarba", mriezka.farba]]) {
+      document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle("on", x.dataset.v === h));
+    }
+    for (const id of ["sklon", "ciaryExport", "mriezkaExport"]) if (typeof o[id] === "boolean") document.getElementById(id).checked = o[id];
+    pouziRozdelenie();
+    pouziStitok();
+    kresli();
+    obnovujem = false;
+    posledny = snimkaStavu();
+    tlacidlaKrokov();
+  }
+  function krokSpat() {
+    potvrdZmenu();
+    if (!spat.length) return;
+    dopredu.push(posledny);
+    obnovStav(spat.pop());
+    window.poZmeneStavu?.(posledny);
+  }
+  function krokDopredu() {
+    potvrdZmenu();
+    if (!dopredu.length) return;
+    spat.push(posledny);
+    obnovStav(dopredu.pop());
+    window.poZmeneStavu?.(posledny);
+  }
+  /** Načíta celý stav (návrh) ako jeden krok — krok späť vráti, čo bolo pred ním. */
+  function nacitajStav(t, rozmeryNavrhu) {
+    for (const [src, r] of Object.entries(rozmeryNavrhu || {})) rozmery.set(src, r);
+    potvrdZmenu();
+    spat.push(posledny);
+    dopredu = [];
+    obnovStav(t);
+  }
+  function tlacidlaKrokov() {
+    const a = document.getElementById("krokSpat"), b = document.getElementById("krokDopredu");
+    if (a) a.disabled = !spat.length;
+    if (b) b.disabled = !dopredu.length;
+  }
+  document.getElementById("krokSpat").onclick = krokSpat;
+  document.getElementById("krokDopredu").onclick = krokDopredu;
+  for (const id of ["ciaryExport", "mriezkaExport"]) document.getElementById(id).addEventListener("change", zmena);
+  // Ťah = jeden krok: počas držania sa nezapisuje, po pustení áno.
+  stvorec.addEventListener("pointerdown", () => { drzi = true; }, true);
+  const pustene = () => { if (drzi) { drzi = false; zmena(); } };
+  addEventListener("pointerup", pustene, true);
+  addEventListener("pointercancel", pustene, true);
+
   window.skladacka = {
     nastavRezim, infoVybranej, kresli, vlozObrazok, vlozSubor, vyrobJpeg, vyrobInstagram, datumExif,
     get rezimCiar() { return rezimCiar; },
@@ -720,9 +890,17 @@
     get pocetCiar() { return ciary.length; },
     get rozdelenie() { return rozdelenie; },
     get mriezka() { return { ...mriezka }; },
+    get stitok() { return { ...stitok }; },
     get aktivne() { return aktivne; },
     get stav() { return stav; },
-    denCz,
+    denCz, snimkaStavu, nacitajStav, krokSpat, krokDopredu,
+    /** Rozmery fotiek, ktoré sú teraz v polovičkách — idú s návrhom. */
+    rozmeryFotiek: () => Object.fromEntries(stav.filter((t) => t.src && rozmery.has(t.src)).map((t) => [t.src, rozmery.get(t.src)])),
+    get prazdnyStav() { return prazdny; },
   };
+  pouziStitok();
   kresli();
+  posledny = snimkaStavu();
+  const prazdny = posledny;
+  tlacidlaKrokov();
 })();

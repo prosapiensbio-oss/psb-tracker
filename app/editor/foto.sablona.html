@@ -21,11 +21,26 @@
       <div class="okno" data-i="1" tabindex="0"></div>
       <svg class="mriezka" id="mriezka" aria-hidden="true"></svg>
       <svg class="ciary" id="ciary"></svg>
+      <!-- Postavička je aj v stiahnutej fotke — tu, aby bolo vidno, kam štítok nesmie. -->
+      <img class="vodoznak" id="vodoznak" src="/znacka-figura-biela.svg" alt="" aria-hidden="true">
     </div>
   </div>
 
   <aside class="panel">
+    <div class="kroky">
+      <button class="tl" id="krokSpat" disabled title="Krok späť (⌘Z)">↶ späť</button>
+      <button class="tl" id="krokDopredu" disabled title="Znova (⌘⇧Z)">↷ znova</button>
+      <span class="ulozene" id="stavUlozenia"></span>
+    </div>
     <div class="skupiny">
+      <details data-skupina="navrhy">
+        <summary><span class="sipka">▸</span>Rozrobené<span class="stav" id="stavNavrhy"></span></summary>
+        <div class="obsah">
+          <div class="napoveda">Rozrobená práca sa ukladá sama pár sekúnd po každej zmene — aj keď zavrieš Kokpit. Je len v tomto prehliadači (iPad a Mac majú každý svoje).</div>
+          <div class="zasobnik" id="navrhyGrid"></div>
+          <button class="tl" id="novyNavrh">+ nový prázdny</button>
+        </div>
+      </details>
       <details data-skupina="kartoteka" open>
         <summary><span class="sipka">▸</span>Kartotéka klienta<span class="stav" id="stavKartoteka"></span></summary>
         <div class="obsah">
@@ -73,7 +88,31 @@
           <div class="riadok" id="riadokMedzera">medzera <input type="range" id="medzera" min="0" max="16" value="4"></div>
           <div class="riadok" id="riadokPriehladnost" hidden>horná fotka <input type="range" id="priehladnost" min="0" max="100" value="50"><span id="priehladnostH" style="width:36px;text-align:right">50 %</span></div>
           <div class="napoveda" id="napovedaCez" hidden>Obe fotky sú na sebe. Hýbe sa tá vybraná vo „Fotky"; posuvník mení, koľko presvitá spodná.</div>
-          <label class="check"><input type="checkbox" id="popisky" checked> dátumy na fotke</label>
+        </div>
+      </details>
+
+      <details data-skupina="stitok">
+        <summary><span class="sipka">▸</span>Štítok s dátumom<span class="stav" id="stavStitok"></span></summary>
+        <div class="obsah">
+          <label class="check"><input type="checkbox" id="stitokZap" checked> predtím / potom s dátumom na fotke</label>
+          <div id="stitokVolby" style="display:flex;flex-direction:column;gap:10px">
+            <div class="riadok" style="align-items:flex-start">roh
+              <div class="rohy" id="stitokRoh">
+                <button data-v="lh" title="vľavo hore">↖</button><button data-v="ph" title="vpravo hore">↗</button>
+                <button data-v="ld" title="vľavo dole">↙</button><button data-v="pd" title="vpravo dole">↘</button>
+              </div>
+            </div>
+            <div class="prepinac dizajny" id="stitokDizajn">
+              <button data-v="biely"><i style="background:#fbfaf6;color:#141513">PŘEDTÍM</i>biely</button>
+              <button data-v="tmavy"><i style="background:#2a2a2a;color:#fff">PŘEDTÍM</i>tmavý</button>
+              <button data-v="zeleny"><i style="background:#16483A;color:#fff">PŘEDTÍM</i>zelený</button>
+              <button data-v="text"><i style="background:#9a9a9a;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)">PŘEDTÍM</i>len text</button>
+            </div>
+            <div class="prepinac" id="stitokVelkost">
+              <button data-v="s">malý</button><button data-v="m">stredný</button><button data-v="l">veľký</button>
+            </div>
+          </div>
+          <div class="napoveda">Štítok v stiahnutej fotke je presne taký, ako ho vidíš tu. Pri „cez seba" je druhý na opačnej strane.</div>
         </div>
       </details>
 
@@ -107,7 +146,6 @@
           </div>
           <div id="vybranaInfo" class="napoveda" hidden style="font-size:13px;color:var(--text)"></div>
           <div class="tlacidla">
-            <button class="tl" id="krokSpat" disabled title="Vráti poslednú zmenu čiar (⌘Z)">↶ krok späť</button>
             <button class="tl" id="zmazVybranu" disabled>zmazať vybranú</button>
             <button class="tl" id="zmazVsetky" disabled>zmazať všetky</button>
           </div>
@@ -195,6 +233,7 @@
   addEventListener("message", (e) => {
     if (e.origin !== location.origin || e.data?.typ !== "psb-dvojica") return;
     const { pred, po } = e.data;
+    window.rozrobene?.novy(false); // nová dvojica z profilu = nový návrh, starý ostane v Rozrobených
     if (pred?.id) sk.vlozObrazok(0, kt.adresa(pred.id), pred.den, false);
     if (po?.id) sk.vlozObrazok(1, kt.adresa(po.id), po.den, false);
   });
@@ -247,12 +286,170 @@
   window.skladSnimok.priZmene(nacitajSnimky);
   nacitajSnimky();
 
+  // ── ROZROBENÉ: automatické ukladanie návrhov (Jerry, 12. 10. 2026) ──
+  /**
+   * „Chcel by som mať uložené návrhy / rozrobenú robotu, ktorá by sa
+   * automaticky ukladala po pár krokoch." Po každom kroku (jadro volá
+   * poZmeneStavu) sa o 1,5 s uloží celý stav do IndexedDB tohto
+   * prehliadača. Fotky z kartotéky sa ukladajú len adresou (sú zašifrované
+   * na serveri), fotky z počítača a snímky z videa ako súbor — tie by
+   * inak po zatvorení stránky zmizli. Najviac MAX_NAVRHOV, najstarší odchádza.
+   */
+  window.rozrobene = (() => {
+    const MAX_NAVRHOV = 20;
+    let dbP = null;
+    const db = () => dbP || (dbP = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open("skladacka-navrhy", 1);
+        r.onupgradeneeded = () => {
+          r.result.createObjectStore("navrhy", { keyPath: "id", autoIncrement: true });
+          r.result.createObjectStore("obrazky", { keyPath: "id", autoIncrement: true });
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    }));
+    const transakcia = async (sklady, mod, f) => {
+      const d = await db();
+      return new Promise((res, rej) => {
+        const t = d.transaction(sklady, mod);
+        const v = f(...sklady.map((x) => t.objectStore(x)));
+        t.oncomplete = () => res(v && "result" in v ? v.result : v);
+        t.onerror = () => rej(t.error);
+      });
+    };
+    let aktualny = null;           // id otvoreného návrhu
+    const obrazkyId = new Map();   // src v tejto stránke → id súboru v IndexedDB
+    let casovac = 0;
+    const stavText = (t) => { $("stavUlozenia").textContent = t; };
+    const cas = (ms) => new Date(ms).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    async function uloz(t) {
+      const o = JSON.parse(t);
+      if (!o.stav.some((x) => x.src)) return; // prázdny editor sa neukladá
+      try {
+        // Súbory, ktoré ešte uložené nie sú (z počítača, snímky z videa).
+        for (const x of o.stav) {
+          if (!x.src || x.src.startsWith("/api/") || obrazkyId.has(x.src)) continue;
+          const blob = await fetch(x.src).then((r) => r.blob());
+          const id = await transakcia(["obrazky"], "readwrite", (st) => st.add({ blob }));
+          obrazkyId.set(x.src, id);
+        }
+        const rozmery = {};
+        const vRozmeroch = sk.rozmeryFotiek();
+        for (const x of o.stav) {
+          if (!x.src) continue;
+          const kluc = obrazkyId.has(x.src) ? `idb:${obrazkyId.get(x.src)}` : x.src;
+          if (vRozmeroch[x.src]) rozmery[kluc] = vRozmeroch[x.src];
+          x.src = kluc;
+        }
+        const nahlad = await sk.vyrobJpeg(320);
+        const zaznam = { klient: kt.klient, upravene: Date.now(), stav: JSON.stringify(o), rozmery, nahlad };
+        if (aktualny != null) zaznam.id = aktualny;
+        aktualny = await transakcia(["navrhy"], "readwrite", (st) => st.put(zaznam));
+        await uprac();
+        stavText(`uložené ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
+        nacitajZoznam();
+      } catch (e) {
+        stavText("neuložilo sa");
+        console.warn("rozrobené:", e);
+      }
+    }
+    /** Najviac MAX_NAVRHOV; súbory, na ktoré už nič neodkazuje, preč. */
+    async function uprac() {
+      const vsetky = (await transakcia(["navrhy"], "readonly", (st) => st.getAll())) || [];
+      vsetky.sort((a, b) => b.upravene - a.upravene);
+      const nadbytok = vsetky.slice(MAX_NAVRHOV).filter((n) => n.id !== aktualny);
+      if (nadbytok.length) await transakcia(["navrhy"], "readwrite", (st) => nadbytok.forEach((n) => st.delete(n.id)));
+      const ostava = vsetky.filter((n) => !nadbytok.includes(n));
+      const pouzite = new Set(ostava.flatMap((n) => [...n.stav.matchAll(/"idb:(\d+)"/g)].map((m) => Number(m[1]))));
+      for (const id of obrazkyId.values()) pouzite.add(id); // súbory otvorené v editore ešte poslúžia
+      const kluce = (await transakcia(["obrazky"], "readonly", (st) => st.getAllKeys())) || [];
+      const prec = kluce.filter((k) => !pouzite.has(k));
+      if (prec.length) await transakcia(["obrazky"], "readwrite", (st) => prec.forEach((k) => st.delete(k)));
+    }
+    async function otvor(id) {
+      const n = await transakcia(["navrhy"], "readonly", (st) => st.get(id));
+      if (!n) return;
+      const o = JSON.parse(n.stav);
+      const rozmery = {};
+      for (const x of o.stav) {
+        if (!x.src) continue;
+        const stary = x.src;
+        const m = /^idb:(\d+)$/.exec(stary);
+        if (m) {
+          const z = await transakcia(["obrazky"], "readonly", (st) => st.get(Number(m[1])));
+          if (!z) { x.src = null; continue; }
+          x.src = URL.createObjectURL(z.blob);
+          obrazkyId.set(x.src, Number(m[1]));
+        }
+        if (n.rozmery?.[stary]) rozmery[x.src] = n.rozmery[stary];
+      }
+      aktualny = id;
+      clearTimeout(casovac);
+      sk.nacitajStav(JSON.stringify(o), rozmery);
+      // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
+      if (n.klient && n.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: n.klient }, location.origin);
+      stavText(`otvorené · ${cas(n.upravene)}`);
+      nacitajZoznam();
+    }
+    async function zmaz(id) {
+      if (!confirm("Zmazať tento rozrobený návrh?")) return;
+      await transakcia(["navrhy"], "readwrite", (st) => st.delete(id));
+      if (aktualny === id) aktualny = null;
+      await uprac();
+      nacitajZoznam();
+    }
+    /** Ďalšie zmeny pôjdu do nového návrhu; vycistit = aj prázdny editor. */
+    function novy(vycistit = true) {
+      clearTimeout(casovac);
+      aktualny = null;
+      if (vycistit) sk.nacitajStav(sk.prazdnyStav, {});
+      stavText("");
+      nacitajZoznam();
+    }
+    const adresy = new Map();
+    async function nacitajZoznam() {
+      let vsetky = [];
+      try { vsetky = (await transakcia(["navrhy"], "readonly", (st) => st.getAll())) || []; }
+      catch { $("navrhyGrid").innerHTML = `<div class="napoveda">Tento prehliadač nedovolil ukladať (súkromné okno?) — rozrobené sa neuchovajú.</div>`; return; }
+      vsetky.sort((a, b) => b.upravene - a.upravene);
+      $("stavNavrhy").textContent = vsetky.length ? String(vsetky.length) : "žiadne";
+      for (const u of adresy.values()) URL.revokeObjectURL(u);
+      adresy.clear();
+      $("navrhyGrid").innerHTML = vsetky.length ? vsetky.map((n) => {
+        const u = n.nahlad ? URL.createObjectURL(n.nahlad) : "";
+        if (u) adresy.set(n.id, u);
+        return `<div class="sn${n.id === aktualny ? " teraz" : ""}" data-id="${n.id}" title="Otvoriť" style="cursor:pointer">
+          <img src="${u}" alt="" style="aspect-ratio:1/1">
+          <div class="popis"><b>${n.klient || "bez klienta"}</b><br>${cas(n.upravene)}${n.id === aktualny ? " · otvorené" : ""}</div>
+          <div class="akcie"><button data-a="zmaz" title="Zmazať návrh">✕</button></div>
+        </div>`;
+      }).join("") : `<div class="napoveda">Zatiaľ nič. Prvý návrh sa uloží sám, keď vložíš fotku.</div>`;
+      $("navrhyGrid").querySelectorAll(".sn").forEach((el) => {
+        const id = Number(el.dataset.id);
+        el.onclick = (e) => { if (e.target.closest("button")) return; if (id !== aktualny) otvor(id); };
+        el.querySelector("button").onclick = () => zmaz(id);
+      });
+    }
+    window.poZmeneStavu = (t) => {
+      clearTimeout(casovac);
+      stavText("ukladám…");
+      casovac = setTimeout(() => uloz(t), 1500);
+    };
+    $("novyNavrh").onclick = () => novy(true);
+    nacitajZoznam();
+    return { novy, otvor, nacitajZoznam, get aktualny() { return aktualny; } };
+  })();
+
   const NAZVY = { vedla: "vedľa seba", pod: "pod sebou", cez: "cez seba" };
   const MRIEZKA = { ziadna: "vypnutá", stvorce: "štvorce", vodorovna: "vodorovná" };
   window.poZmene = () => {
     const s = sk.stav;
     $("stavFotky").textContent = `${sk.denCz(s[0].den) || "—"} · ${sk.denCz(s[1].den) || "—"}`;
     $("stavRozlozenie").textContent = NAZVY[sk.rozdelenie];
+    const st = sk.stitok;
+    $("stavStitok").textContent = st.zap ? `${{ lh: "↖", ph: "↗", ld: "↙", pd: "↘" }[st.roh]} ${{ biely: "biely", tmavy: "tmavý", zeleny: "zelený", text: "len text" }[st.dizajn]}` : "vypnutý";
     const m = sk.mriezka;
     $("stavMriezka").textContent = m.druh === "ziadna" ? "vypnutá" : `${MRIEZKA[m.druh]} · ${m.hustota}`;
     $("stavCiary").textContent = `${sk.rezimCiar ? "kreslím · " : ""}${sk.pocetCiar ? `${sk.pocetCiar} ${sk.pocetCiar === 1 ? "čiara" : sk.pocetCiar < 5 ? "čiary" : "čiar"}` : "žiadne"}`;
