@@ -124,12 +124,13 @@ export const Route = createFileRoute("/api/editor-navrhy")({
         const zdroje: Record<string, string> = {};
         for (let n = 0; n < 2; n++) {
           const f = subor(`obr${n}`);
-          if (!f || !edit.includes(`"obr:${n}"`)) continue;
+          // Zástupca je aj vo vnorenom reťazci stavu (\"obr:0\"), preto bez úvodzoviek.
+          if (!f || !edit.includes(`obr:${n}`)) continue;
           const tok = Math.random().toString(36).slice(2, 12).padEnd(8, "0");
           await STORAGE.put(`${predpona(id)}obr-${tok}`, await zasifrujBajty(await f.arrayBuffer(), ANAMNEZA_KLUC), { httpMetadata: { contentType: "application/octet-stream" } });
           const url = `/api/editor-navrhy?obr=${id}&tok=${tok}`;
           zdroje[`obr:${n}`] = url;
-          edit = edit.split(`"obr:${n}"`).join(JSON.stringify(url));
+          edit = edit.split(`obr:${n}`).join(url);
         }
         const nahlad = subor("nahlad");
         if (nahlad) await STORAGE.put(`${predpona(id)}nahlad`, await zasifrujBajty(await nahlad.arrayBuffer(), ANAMNEZA_KLUC), { httpMetadata: { contentType: "application/octet-stream" } });
