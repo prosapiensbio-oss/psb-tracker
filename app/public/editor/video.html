@@ -170,6 +170,10 @@
   </div>
 
   <aside class="panel">
+    <div class="kroky">
+      <button class="tl" id="krokSpat" disabled title="Krok späť (⌘Z)">↶ späť</button>
+      <button class="tl" id="krokDopredu" disabled title="Znova (⌘⇧Z)">↷ znova</button>
+    </div>
     <div class="skupiny">
       <details data-skupina="videa" open>
         <summary><span class="sipka">▸</span>Videá<span class="stav" id="stavVidea"></span></summary>
@@ -576,6 +580,7 @@ window.kartotekaKlienta = (() => {
     const info = infoVybranej();
     $("vybranaInfo").hidden = !info;
     if (info) $("vybranaInfo").innerHTML = `Vybraná: <b style="font-size:17px">${info.sklon}</b>${info.uhly.length ? ` · s nadväzujúcou <b style="font-size:17px">${info.uhly.join("°, ")}°</b>` : ""}`;
+    zmena();
   }
 
   // ── ČASOVÁ OS ──
@@ -1056,6 +1061,93 @@ window.kartotekaKlienta = (() => {
   $("stiahnutVideo").onclick = () => stiahniVideo(false);
   $("ulozitKlientovi").onclick = () => stiahniVideo(true);
 
+  // ── KROK SPÄŤ (Jerry, 12. 10. 2026: „pridaj krok späť aj do editora videa") ──
+  /**
+   * Ako v editore fotiek: celé snímky toho, čo sa upravuje (čiary, strih,
+   * označenie, deň, výrez, rýchlosť). Po chvíľke ticha sa stav porovná
+   * s posledným; ťah (čiara, výrez, bodky strihu) je jeden krok. Prehrávanie
+   * ani posun hlavy nie sú zmena. Vložené či odstránené video sa krokom späť
+   * nevracia — vrátia sa len úpravy videí, ktoré v zozname sú.
+   */
+  let spat = [], dopredu = [], posledny = null, casovacZmeny = 0, drzi = false, obnovujem = false;
+  const zaokruhli = (_, h) => (typeof h === "number" ? Math.round(h * 1e5) / 1e5 : h);
+  function snimkaStavu() {
+    return JSON.stringify({
+      rychlost,
+      videa: videa.map((v) => ({ id: v.id, oznacenie: v.oznacenie, den: v.den, strih: v.strih, ciary: v.ciary, view: v.view })),
+    }, zaokruhli);
+  }
+  function zmena() {
+    if (obnovujem || posledny === null) return;
+    clearTimeout(casovacZmeny);
+    casovacZmeny = setTimeout(potvrdZmenu, 400);
+  }
+  function potvrdZmenu() {
+    clearTimeout(casovacZmeny);
+    if (drzi || posledny === null) return;
+    const t = snimkaStavu();
+    if (t === posledny) return;
+    // Pribudlo alebo ubudlo video: nie je to úprava, ktorú by krok späť vedel
+    // vrátiť — len sa posunie východisko (inak by vznikol krok „naprázdno").
+    const idcka = (x) => JSON.parse(x).videa.map((v) => v.id).join(",");
+    if (idcka(t) !== idcka(posledny)) { posledny = t; return; }
+    spat.push(posledny);
+    if (spat.length > 150) spat.shift();
+    dopredu = [];
+    posledny = t;
+    tlacidlaKrokov();
+  }
+  function obnovStav(t) {
+    const o = JSON.parse(t);
+    obnovujem = true;
+    for (const z of o.videa || []) {
+      const v = videa.find((x) => x.id === z.id);
+      if (!v) continue;
+      Object.assign(v, { oznacenie: z.oznacenie, den: z.den, strih: z.strih, ciary: z.ciary || [], view: z.view || { zoom: 1, x: 0, y: 0 } });
+      for (const c of v.ciary) dalsiaCiara = Math.max(dalsiaCiara, c.id + 1);
+    }
+    if (typeof o.rychlost === "number") {
+      rychlost = o.rychlost;
+      video.playbackRate = rychlost;
+      rp.value = String(naPas(rychlost));
+      $("rychlostH").textContent = `${rychlost >= 1 ? rychlost.toFixed(2).replace(/\.?0+$/, "") : rychlost.toFixed(2)}×`.replace(".", ",");
+    }
+    vybrana = null;
+    kresliZoznam();
+    kresli();
+    obnovujem = false;
+    posledny = snimkaStavu();
+    tlacidlaKrokov();
+  }
+  function krokSpat() {
+    potvrdZmenu();
+    if (!spat.length) return;
+    dopredu.push(posledny);
+    obnovStav(spat.pop());
+  }
+  function krokDopredu() {
+    potvrdZmenu();
+    if (!dopredu.length) return;
+    spat.push(posledny);
+    obnovStav(dopredu.pop());
+  }
+  function tlacidlaKrokov() {
+    $("krokSpat").disabled = !spat.length;
+    $("krokDopredu").disabled = !dopredu.length;
+  }
+  $("krokSpat").onclick = krokSpat;
+  $("krokDopredu").onclick = krokDopredu;
+  addEventListener("keydown", (e) => {
+    if (e.target.closest?.("input, select, textarea")) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); krokDopredu(); }
+  });
+  // Ťah = jeden krok: počas držania sa nezapisuje.
+  for (const el of [scena, $("os")]) el.addEventListener("pointerdown", () => { drzi = true; }, true);
+  const pustene = () => { if (drzi) { drzi = false; zmena(); } };
+  addEventListener("pointerup", pustene, true);
+  addEventListener("pointercancel", pustene, true);
+
   // ── OVLÁDANIE ──
   $("play").onclick = prehraj;
   $("spat").onclick = () => krok(-1);
@@ -1083,8 +1175,10 @@ window.kartotekaKlienta = (() => {
   kt.priZmene(() => kresli()); // klient prišiel z Kokpitu → tlačidlá „ku klientovi"
 
   // na skúšanie zvonku
-  window.editorVidea = { vlozVideo, prehraj, krok, casNa, strih, ulozSnimku, stiahniVideo, nastavRezim, get video() { return video; }, get aktivne() { return akt(); }, get nahravam() { return !!nahravam; } };
+  window.editorVidea = { vlozVideo, prehraj, krok, casNa, strih, ulozSnimku, stiahniVideo, nastavRezim, krokSpat, krokDopredu, get video() { return video; }, get aktivne() { return akt(); }, get nahravam() { return !!nahravam; } };
   kresli();
+  posledny = snimkaStavu();
+  tlacidlaKrokov();
 })();
 </script>
 </body>

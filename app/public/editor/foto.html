@@ -119,6 +119,8 @@
      myš/prst ona a fotky sa nehýbu. */
   .ciary { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; touch-action: none; overflow: visible; }
   .ciary.kreslim { pointer-events: all; cursor: crosshair; }
+  .ciary .vrchol-caka { animation: vrcholCaka 1s ease-in-out infinite; }
+  @keyframes vrcholCaka { 50% { stroke-opacity: .25; } }
   .ciary text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   .okno { position: relative; z-index: 1; overflow: hidden; background: #fff; touch-action: none; cursor: grab; outline: none; }
   /* Zvyšok vybranej fotky mimo rámčeka — pod oknami, takže je vidno len to, čo presahuje. */
@@ -311,7 +313,8 @@
         <div class="obsah">
           <button class="tl" id="kreslit">✎ kresliť čiary</button>
           <div class="prepinac" id="nastroj">
-            <button data-v="ciara" class="on">／ čiara a uhol</button>
+            <button data-v="ciara" class="on">／ čiara</button>
+            <button data-v="uhol">∠ uhol</button>
             <button data-v="sipka">➚ šípka</button>
             <button data-v="kresba">〰 voľná kresba</button>
           </div>
@@ -333,7 +336,8 @@
           </div>
           <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
           <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
-          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj. <b>Koniec</b> hocijakej čiary či šípky chytíš a posunieš; <b>ťah po čiare</b> ju posunie celú. Uhol: novú čiaru dotiahni na koniec inej → prichytí sa a ukáže sa <b>uhol medzi nimi</b>. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
+          <div id="uholNapoveda" class="napoveda" hidden style="color:var(--accentLight);font-size:13px">Prvé rameno je hotové — teraz ťahaj <b>druhé rameno</b>; začne samo vo vrchole.</div>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. <b>∠ uhol</b>: potiahni prvé rameno (od konca k vrcholu), potom druhé — začne vo vrchole. <b>Koniec</b> čiary, šípky či ramena chytíš a posunieš vždy, aj keď je skupina zavretá; <b>ťah po čiare</b> posunie celý útvar. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
 
@@ -614,7 +618,9 @@ window.kartotekaKlienta = (() => {
    * súradniciach fotky — ide s ňou pri posune, zväčšení aj zrkadle, ako čiary.
    */
   let kresby = [];      // { id, okno, body: [{u,v}], farba, hrubka }
-  let nastroj = "ciara"; // "ciara" | "sipka" | "kresba"
+  let nastroj = "ciara"; // "ciara" | "sipka" | "uhol" | "kresba"
+  /** Uhol: prvé rameno je hotové, druhé začne vo vrchole. { okno, vrchol: {u,v} } */
+  let cakaUhol = null;
   let hrubkaKresby = 4;
   let rezimCiar = false;
   let vybrana = null;
@@ -738,6 +744,13 @@ window.kartotekaKlienta = (() => {
         </g>`);
       }
     }
+    // Uhol čaká na druhé rameno — vrchol svieti, aby bolo jasné, odkiaľ pôjde.
+    if (cakaUhol && stav[cakaUhol.okno]?.src) {
+      const V = bodVOkne(cakaUhol.okno, cakaUhol.vrchol, R);
+      html.push(`<circle cx="${V.x}" cy="${V.y}" r="11" fill="none" stroke="${farbaCiar}" stroke-width="2.5" class="vrchol-caka"/>`);
+    }
+    const un = document.getElementById("uholNapoveda");
+    if (un) un.hidden = !cakaUhol;
     svgCiary.innerHTML = html.join("");
     document.getElementById("zmazVybranu").disabled = vybrana == null;
     document.getElementById("zmazVsetky").disabled = !ciary.length && !kresby.length;
@@ -844,8 +857,20 @@ window.kartotekaKlienta = (() => {
   const skryLupu = () => { lupa.hidden = true; };
 
   // Ovládanie kreslenia — myš aj prst.
+  /**
+   * ÚPRAVA ČIAR, ŠÍPOK A UHLOV (Jerry, 12. 10. 2026: „keď upravujem šípky
+   * alebo uhly, moc dobre to nefunguje"). Čo bolo zle a čo platí teraz:
+   *   • upraviť sa dalo len pri otvorenej skupine „Čiary" — inak prst chytil
+   *     fotku. Teraz sa koniec aj čiara chytí VŽDY; nová čiara len pri kreslení,
+   *   • miesto na chytenie bolo 12 bodov — na prst málo. Teraz podľa toho,
+   *     čím ťukáš (prst 26, pero 16, myš 12),
+   *   • uhol sa kreslil ťahom z konca inej čiary, a ten istý ťah koniec posúva.
+   *     Teraz má uhol vlastný nástroj: ťah po prvom ramene, potom druhé
+   *     rameno začne samo vo vrchole,
+   *   • ťah po ramene uhla ho odtrhol — teraz sa posunie celý spojený útvar.
+   */
   (() => {
-    let tah = null; // { druh: "nova" | "koniec", ciara, kluce: [[ciara, "a"|"b"], …] }
+    let tah = null; // { druh: "nova" | "koniec" | "cela" | "kresba", … }
     const miesto = (e) => { const b = stvorec.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
     const oknoPodBodom = (P, R) => {
       if (rozdelenie === "cez") return aktivne;
@@ -856,72 +881,110 @@ window.kartotekaKlienta = (() => {
       const t = Math.max(0, Math.min(1, ((P.x - A.x) * dx + (P.y - A.y) * dy) / l));
       return Math.hypot(P.x - A.x - t * dx, P.y - A.y - t * dy);
     };
-    svgCiary.addEventListener("pointerdown", (e) => {
-      if (!rezimCiar) return;
-      e.preventDefault();
-      const R = oknaNaObrazovke(), P = miesto(e);
-      if (nastroj === "kresba") {
-        const okno = oknoPodBodom(P, R);
-        if (okno < 0 || !stav[okno].src) return;
-        const k = { id: dalsieId++, okno, body: [bodZOkna(okno, P.x, P.y, R)], farba: farbaCiar, hrubka: hrubkaKresby };
-        kresby.push(k);
-        vybrana = null;
-        tah = { druh: "kresba", kresba: k, okno, posledny: P };
-        try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
-        kresliCiary();
-        ukazLupu(P, okno);
-        return;
+    const polomer = (e) => (e.pointerType === "touch" ? { koniec: 26, ciara: 16 } : e.pointerType === "pen" ? { koniec: 16, ciara: 10 } : { koniec: 12, ciara: 8 });
+    /** Čiary spojené s c cez spoločné konce (uhol, lomená čiara) — posúvajú sa spolu. */
+    const spojeneCiary = (c) => {
+      const von = new Set([c]);
+      let pribudlo = true;
+      while (pribudlo) {
+        pribudlo = false;
+        for (const d of ciary) {
+          if (von.has(d) || d.okno !== c.okno) continue;
+          if ([...von].some((x) => ["a", "b"].some((k1) => ["a", "b"].some((k2) => rovnakyBod(x[k1], d[k2]))))) { von.add(d); pribudlo = true; }
+        }
       }
-      // 1) chytil koniec existujúcej čiary → ťahá ho (aj spojené konce s ním)
-      let najblizsi = null;
+      return [...von];
+    };
+    /** Čo je pod prstom: koniec čiary (najbližší) alebo čiara sama. */
+    const coPodPrstom = (P, R, e) => {
+      const r = polomer(e);
+      let koniec = null;
       for (const c of ciary) {
         if (!stav[c.okno]?.src) continue;
         for (const kl of ["a", "b"]) {
           const B = bodVOkne(c.okno, c[kl], R), d = Math.hypot(B.x - P.x, B.y - P.y);
-          if (d < 12 && (!najblizsi || d < najblizsi.d)) najblizsi = { c, kl, d };
+          if (d < r.koniec && (!koniec || d < koniec.d)) koniec = { c, kl, d };
         }
       }
-      // KONIEC KAŽDEJ ČIARY, ŠÍPKY ČI RAMENA UHLA SA DÁ VŽDY CHYTIŤ A POSUNÚŤ
-      // (Jerry, 12. 10. 2026: „všetky prvky, keď ich chytím na konci, vždy
-      // ich môžem upraviť"). Spojené konce (vrchol uhla) idú spolu. Uhol
-      // vznikne tak, že novú čiaru dotiahneš na koniec inej — prichytí sa.
-      // 2) ťah po čiare ju vyberie a posunie celú; 3) inak nová čiara.
-      const okno = oknoPodBodom(P, R);
-      if (najblizsi) {
-        const bod = najblizsi.c[najblizsi.kl];
-        const spojene = ciary.flatMap((c) => ["a", "b"].filter((kl) => c.okno === najblizsi.c.okno && rovnakyBod(c[kl], bod)).map((kl) => [c, kl]));
-        vybrana = najblizsi.c.id;
-        tah = { druh: "koniec", kluce: spojene, okno: najblizsi.c.okno };
-      } else {
-        const naCiare = ciary.find((c) => stav[c.okno]?.src && vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R)) < 8);
-        if (naCiare) {
-          vybrana = naCiare.id;
-          tah = { druh: "cela", ciara: naCiare, okno: naCiare.okno, P, A: bodVOkne(naCiare.okno, naCiare.a, R), B: bodVOkne(naCiare.okno, naCiare.b, R) };
-          try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
-          kresliCiary();
-          return;
-        }
+      if (koniec) return { koniec };
+      let ciara = null;
+      for (const c of ciary) {
+        if (!stav[c.okno]?.src) continue;
+        const d = vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R));
+        if (d < r.ciara && (!ciara || d < ciara.d)) ciara = { c, d };
+      }
+      return ciara ? { ciara } : {};
+    };
+    const zacniTah = (t, e, P) => {
+      tah = t;
+      try { stvorec.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
+      kresliCiary();
+      if (P) ukazLupu(P, t.okno);
+    };
+
+    // Zachytávanie na štvorci: čiara má prednosť pred fotkou pod ňou.
+    stvorec.addEventListener("pointerdown", (e) => {
+      if (e.target.closest?.(".roh, .otoc")) return;
+      const R = oknaNaObrazovke(), P = miesto(e);
+      const pod = coPodPrstom(P, R, e);
+      // Mimo kreslenia: len úprava toho, čo už je; inak nechať fotku.
+      if (!rezimCiar && !pod.koniec && !pod.ciara) return;
+      if (rezimCiar && nastroj === "kresba" && !pod.koniec) {
+        const okno = oknoPodBodom(P, R);
         if (okno < 0 || !stav[okno].src) return;
-        let zaciatok = bodZOkna(okno, P.x, P.y, R);
-        if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
-        const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar, ...(nastroj === "sipka" ? { sipka: true } : {}) };
+        e.preventDefault(); e.stopPropagation();
+        const k = { id: dalsieId++, okno, body: [bodZOkna(okno, P.x, P.y, R)], farba: farbaCiar, hrubka: hrubkaKresby };
+        kresby.push(k);
+        vybrana = null;
+        zacniTah({ druh: "kresba", kresba: k, okno, posledny: P }, e, P);
+        return;
+      }
+      e.preventDefault(); e.stopPropagation();
+      // Uhol: druhé rameno začína vo vrchole, kamkoľvek sa ťukne.
+      if (rezimCiar && nastroj === "uhol" && cakaUhol) {
+        const c = { id: dalsieId++, okno: cakaUhol.okno, a: { ...cakaUhol.vrchol }, b: { ...cakaUhol.vrchol }, farba: farbaCiar };
         ciary.push(c);
         vybrana = c.id;
-        tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
+        cakaUhol = null;
+        zacniTah({ druh: "nova", kluce: [[c, "b"]], okno: c.okno, ciara: c, druheRameno: true }, e, P);
+        return;
       }
-      try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
-      kresliCiary();
-      ukazLupu(P, tah.okno);
-    });
-    svgCiary.addEventListener("pointermove", (e) => {
+      if (pod.koniec) {
+        const { c: cc, kl } = pod.koniec, bod = cc[kl];
+        const spojene = ciary.flatMap((c) => ["a", "b"].filter((k) => c.okno === cc.okno && rovnakyBod(c[k], bod)).map((k) => [c, k]));
+        vybrana = cc.id;
+        zacniTah({ druh: "koniec", kluce: spojene, okno: cc.okno }, e, bodVOkne(cc.okno, bod, R));
+        return;
+      }
+      if (pod.ciara) {
+        const skupina = spojeneCiary(pod.ciara.c);
+        vybrana = pod.ciara.c.id;
+        zacniTah({
+          druh: "cela", okno: pod.ciara.c.okno, P,
+          povodne: skupina.map((c) => ({ c, A: bodVOkne(c.okno, c.a, R), B: bodVOkne(c.okno, c.b, R) })),
+        }, e);
+        return;
+      }
+      // Nová čiara / šípka / prvé rameno uhla.
+      const okno = oknoPodBodom(P, R);
+      if (okno < 0 || !stav[okno].src) return;
+      const zaciatok = bodZOkna(okno, P.x, P.y, R);
+      const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar, ...(nastroj === "sipka" ? { sipka: true } : {}) };
+      ciary.push(c);
+      vybrana = c.id;
+      zacniTah({ druh: "nova", kluce: [[c, "b"]], okno, ciara: c, prveRameno: nastroj === "uhol" }, e, P);
+    }, true);
+
+    addEventListener("pointermove", (e) => {
       if (!tah) return;
       const R = oknaNaObrazovke(), r = R[tah.okno];
       let P = miesto(e);
       if (tah.druh === "cela") {
-        // Celá čiara (šípka) sa posúva bez zmeny tvaru.
         const dx = P.x - tah.P.x, dy = P.y - tah.P.y;
-        tah.ciara.a = bodZOkna(tah.okno, tah.A.x + dx, tah.A.y + dy, R);
-        tah.ciara.b = bodZOkna(tah.okno, tah.B.x + dx, tah.B.y + dy, R);
+        for (const x of tah.povodne) {
+          x.c.a = bodZOkna(tah.okno, x.A.x + dx, x.A.y + dy, R);
+          x.c.b = bodZOkna(tah.okno, x.B.x + dx, x.B.y + dy, R);
+        }
         kresliCiary();
         return;
       }
@@ -934,13 +997,16 @@ window.kartotekaKlienta = (() => {
         return;
       }
       if (rozdelenie !== "cez") P = { x: Math.max(r.x, Math.min(r.x + r.w, P.x)), y: Math.max(r.y, Math.min(r.y + r.h, P.y)) };
-      // prichytenie ku koncu inej čiary v tej istej fotke
       let ciel = bodZOkna(tah.okno, P.x, P.y, R);
-      for (const c of ciary) {
-        if (c.okno !== tah.okno || tah.kluce.some(([cc]) => cc === c)) continue;
-        for (const kl of ["a", "b"]) {
-          const B = bodVOkne(c.okno, c[kl], R);
-          if (Math.hypot(B.x - P.x, B.y - P.y) < 10) ciel = { ...c[kl] };
+      // Prichytenie ku koncu inej čiary — len pri novej čiare (tak vzniká
+      // spoj). Pri úprave konca by prichytenie ťahalo bod tam, kam nechceš.
+      if (tah.druh === "nova") {
+        for (const c of ciary) {
+          if (c.okno !== tah.okno || tah.kluce.some(([cc]) => cc === c)) continue;
+          for (const kl of ["a", "b"]) {
+            const B = bodVOkne(c.okno, c[kl], R);
+            if (Math.hypot(B.x - P.x, B.y - P.y) < 10) ciel = { ...c[kl] };
+          }
         }
       }
       // Shift = presne vodorovne/zvisle (olovnica)
@@ -964,19 +1030,21 @@ window.kartotekaKlienta = (() => {
       }
       if (tah.druh === "nova") {
         const R = oknaNaObrazovke(), A = bodVOkne(tah.okno, tah.ciara.a, R), B = bodVOkne(tah.okno, tah.ciara.b, R);
-        if (Math.hypot(B.x - A.x, B.y - A.y) < 5) ciary = ciary.filter((c) => c !== tah.ciara);
-        // Nová čiara sa po dokreslení nevyberá — ďalší ťah z jej konca má
-        // začať novú čiaru (uhol), nie posúvať tento koniec.
+        const kratka = Math.hypot(B.x - A.x, B.y - A.y) < 5;
+        if (kratka) ciary = ciary.filter((c) => c !== tah.ciara);
+        // Prvé rameno uhla hotové → ďalší ťah začne vo vrchole (jeho konci).
+        if (tah.prveRameno && !kratka) cakaUhol = { okno: tah.okno, vrchol: { ...tah.ciara.b } };
         vybrana = null;
       }
       tah = null;
       kresliCiary();
     };
-    svgCiary.addEventListener("pointerup", pusti);
-    svgCiary.addEventListener("pointercancel", pusti);
+    addEventListener("pointerup", pusti);
+    addEventListener("pointercancel", pusti);
   })();
   const nastavRezim = (zap) => {
     rezimCiar = zap;
+    if (!zap) cakaUhol = null;
     svgCiary.classList.toggle("kreslim", zap);
     const b = document.getElementById("kreslit");
     b.classList.toggle("hlavne", zap);
@@ -1003,7 +1071,7 @@ window.kartotekaKlienta = (() => {
     }
     return { sklon, uhly, farba: c.farba };
   }
-  const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
+  const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; cakaUhol = null; kresliCiary(); };
 
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
   // Po česky: hotová fotka ide klientovi alebo na sociálne siete (Jerry vybral
@@ -1097,7 +1165,7 @@ window.kartotekaKlienta = (() => {
     el.addEventListener("pointerdown", (e) => {
       aktivne = i;
       if (!stav[i].src) { kresli(); return; }
-      el.setPointerCapture(e.pointerId);
+      try { el.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
       prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
       posledne = stredPrstov();
       el.classList.add("tahanie");
@@ -1162,6 +1230,7 @@ window.kartotekaKlienta = (() => {
     if (den) s.den = den;
     ciary = ciary.filter((c) => c.okno !== i); // čiary patrili starej fotke
     kresby = kresby.filter((k) => k.okno !== i);
+    if (cakaUhol?.okno === i) cakaUhol = null;
     aktivne = i;
     kresli();
   }
@@ -1281,6 +1350,7 @@ window.kartotekaKlienta = (() => {
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
   document.getElementById("vymenit").onclick = () => {
+    cakaUhol = null;
     stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); kresby.forEach((k) => { k.okno = 1 - k.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
   // Medzera mení okná — čiary aj štítky sa musia prekresliť s nimi.
   document.getElementById("medzera").oninput = (e) => { stvorec.style.setProperty("--medzera", `${e.target.value}px`); kresli(); };
@@ -1330,9 +1400,10 @@ window.kartotekaKlienta = (() => {
   document.getElementById("kreslit").onclick = () => nastavRezim(!rezimCiar);
   document.getElementById("zmazVybranu").onclick = zmazVybranu;
   // Krok späť vie vrátiť aj „zmazať všetky" — preto sa už nepýta.
-  document.getElementById("zmazVsetky").onclick = () => { ciary = []; kresby = []; vybrana = null; kresliCiary(); };
+  document.getElementById("zmazVsetky").onclick = () => { ciary = []; kresby = []; vybrana = null; cakaUhol = null; kresliCiary(); };
   document.querySelectorAll("#nastroj button").forEach((b) => b.onclick = () => {
     nastroj = b.dataset.v;
+    cakaUhol = null;
     document.querySelectorAll("#nastroj button").forEach((x) => x.classList.toggle("on", x === b));
     document.getElementById("riadokHrubka").hidden = nastroj !== "kresba";
     vybrana = null;
@@ -1353,6 +1424,7 @@ window.kartotekaKlienta = (() => {
   });
   addEventListener("keydown", (e) => {
     if (e.target.closest?.("input, textarea")) return;
+    if (e.key === "Escape" && cakaUhol) { cakaUhol = null; kresliCiary(); return; }
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
     // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10) — na presné zarovnanie.
@@ -1808,6 +1880,7 @@ window.kartotekaKlienta = (() => {
     });
     ciary = o.ciary || [];
     kresby = o.kresby || [];
+    cakaUhol = null;
     dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1), ...kresby.map((k) => k.id + 1));
     vybrana = null;
     rozdelenie = o.rozdelenie || "vedla";

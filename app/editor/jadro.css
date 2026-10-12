@@ -17,6 +17,8 @@
      myš/prst ona a fotky sa nehýbu. */
   .ciary { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; touch-action: none; overflow: visible; }
   .ciary.kreslim { pointer-events: all; cursor: crosshair; }
+  .ciary .vrchol-caka { animation: vrcholCaka 1s ease-in-out infinite; }
+  @keyframes vrcholCaka { 50% { stroke-opacity: .25; } }
   .ciary text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   .okno { position: relative; z-index: 1; overflow: hidden; background: #fff; touch-action: none; cursor: grab; outline: none; }
   /* Zvyšok vybranej fotky mimo rámčeka — pod oknami, takže je vidno len to, čo presahuje. */

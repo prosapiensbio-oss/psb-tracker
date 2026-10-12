@@ -179,7 +179,8 @@
         <div class="obsah">
           <button class="tl" id="kreslit">✎ kresliť čiary</button>
           <div class="prepinac" id="nastroj">
-            <button data-v="ciara" class="on">／ čiara a uhol</button>
+            <button data-v="ciara" class="on">／ čiara</button>
+            <button data-v="uhol">∠ uhol</button>
             <button data-v="sipka">➚ šípka</button>
             <button data-v="kresba">〰 voľná kresba</button>
           </div>
@@ -201,7 +202,8 @@
           </div>
           <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
           <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
-          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj. <b>Koniec</b> hocijakej čiary či šípky chytíš a posunieš; <b>ťah po čiare</b> ju posunie celú. Uhol: novú čiaru dotiahni na koniec inej → prichytí sa a ukáže sa <b>uhol medzi nimi</b>. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
+          <div id="uholNapoveda" class="napoveda" hidden style="color:var(--accentLight);font-size:13px">Prvé rameno je hotové — teraz ťahaj <b>druhé rameno</b>; začne samo vo vrchole.</div>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. <b>∠ uhol</b>: potiahni prvé rameno (od konca k vrcholu), potom druhé — začne vo vrchole. <b>Koniec</b> čiary, šípky či ramena chytíš a posunieš vždy, aj keď je skupina zavretá; <b>ťah po čiare</b> posunie celý útvar. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
 
