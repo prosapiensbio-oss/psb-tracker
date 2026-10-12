@@ -744,6 +744,27 @@ Zmena parsera sa overuje porovnaním starej a novej verzie na REÁLNYCH
 súboroch v rôznych oknách (vrátane prelomov letného času) — výstup musí
 byť zhodný do znaku. Syntetické testy sú v `ical.test.ts`.
 
+## Okno na celú obrazovku musí ísť portálom, inak ho karta Workspace uväzní
+
+Prezentácia reportu (12. 10. 2026) bola obyčajné dieťa okna reportu:
+`position: fixed; inset: 0`. Jerrymu sa otvorila orezaná sprava aj zdola a
+appka presvitala nad ňou. Príčina nie je v nej: obal kariet Workspace má
+`transform: translateX(0) scale(1)` AJ V POKOJI (`Workspace.tsx`, prechod medzi
+kartami). Netriviálny `transform` robí z prvku obsahujúci blok pre potomkov
+s `position: fixed` — „fixed" potom znamená voči KARTE, nie voči obrazovke.
+Preto bol overlay široký ako karta (980 px) a vysoký ako jej odrolovaný obsah.
+
+To isté platí pre `filter`, `backdrop-filter`, `perspective`, `will-change`
+a `contain`. Čokoľvek, čo má prekryť celú obrazovku a otvára sa zvnútra
+Workspace, patrí do `createPortal(…, document.body)`.
+
+Druhá polovica tej istej chyby: plátno sa zmenšovalo `transform: scale`
+so `transform-origin: center` a spoliehalo sa na to, že ho grid vycentruje.
+Keď je prvok ŠIRŠÍ než plocha, zarovnávanie na stred sa mení na zarovnanie na
+začiatok (tak CSS bráni strate obsahu) — a škálovanie od stredu ho potom
+posunie doprava. Obal musí mať už zmenšený rozmer (`W * mierka`) a plátno sa
+škáluje od `top left`.
+
 ## Dlaždica bez zoznamu zhodí celú appku, nielen svoju kartu
 
 20. 9. 2026: do karty reklamy pribudla dlaždica „Cena za dopyt" a zoznam

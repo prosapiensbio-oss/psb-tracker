@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { dalej, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
 import type { Report, Semafor } from "../../lib/psb/mesacnyReport";
@@ -15,6 +16,12 @@ import type { Report, Semafor } from "../../lib/psb/mesacnyReport";
  * (`reportHtml.ts`). Prezentuje sa z projektora a tmavé plochy na ňom zhasnú.
  *
  * Dáta sú hotový `Report`. Nič sa tu nepočíta (dôvod v `prezentacia.ts`).
+ *
+ * VYKRESĽUJE SA PORTÁLOM DO `document.body`. Prvá verzia bola obyčajné dieťa
+ * okna reportu a 12. 10. sa Jerrymu zjavila orezaná sprava aj zdola: niektorý
+ * z rodičov (karta Workspace) má `transform`, a ten robí z `position: fixed`
+ * polohu voči SEBE, nie voči obrazovke. Prezentácia na celú obrazovku teda
+ * nesmie visieť na mieste, kde bola zavolaná.
  */
 
 const POZADIE = "#F6F9F7";
@@ -275,6 +282,8 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   // pri rýchlom klikaní prečítali navzájom staré.
   const [kde, setKde] = useState({ i: 0, krok: 0 });
   const [mierka, setMierka] = useState(1);
+  /** Úzka obrazovka na výšku — telefón. Slajd je 16:9, takže na výšku z neho zostane pásik. */
+  const [naVysku, setNaVysku] = useState(false);
   const [celaObrazovka, setCelaObrazovka] = useState(false);
   const ram = useRef<HTMLDivElement | null>(null);
   const { i, krok } = kde;
@@ -293,7 +302,14 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   }, []);
 
   useEffect(() => {
-    const prepocitaj = () => setMierka(Math.min(window.innerWidth / W, window.innerHeight / H));
+    // 24 px po stranách a 84 px dole na lištu ovládania — inak tlačidlá ležia na slajde.
+    // `innerWidth` vie byť na prvom behu 0 (skrytý panel) — vtedy radšej klientskú šírku.
+    const prepocitaj = () => {
+      const w = window.innerWidth || document.documentElement.clientWidth || 1280;
+      const h = window.innerHeight || document.documentElement.clientHeight || 800;
+      setMierka(Math.max(0.1, Math.min((w - 24) / W, (h - 84) / H)));
+      setNaVysku(w < 700 && h > w);
+    };
     prepocitaj();
     window.addEventListener("resize", prepocitaj);
     return () => window.removeEventListener("resize", prepocitaj);
@@ -323,16 +339,31 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   const naKonci = !dalej(slajdy, i, krok);
 
   const tlacidlo: React.CSSProperties = {
-    background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.26)", color: "#EAF1EC",
+    background: "rgba(12,17,11,.88)", border: "1px solid rgba(255,255,255,.3)", color: "#EAF1EC",
     borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600,
   };
 
-  return (
+  return createPortal(
     <div ref={ram} role="dialog" aria-modal="true" aria-label={`Prezentácia ${report.nadpis}`}
-      style={{ position: "fixed", inset: 0, zIndex: 120, background: RAM, display: "grid", placeItems: "center", overflow: "hidden" }}>
-      <div style={{ transform: `scale(${mierka})`, transformOrigin: "center", boxShadow: "0 30px 90px rgba(0,0,0,.5)" }}>
-        <Platno s={s} krok={krok} pata={`${report.nadpis} · ${report.porovnanie}`} strana={i + 1} zoSlajdov={slajdy.length} onKlik={vpred} />
+      style={{ position: "fixed", inset: 0, zIndex: 120, background: RAM, display: "grid", placeItems: "center", overflow: "hidden",
+        padding: "12px 12px 72px", boxSizing: "border-box",
+        // Klik posúva slajd; bez tohto druhý klik označí text pod kurzorom.
+        userSelect: "none", WebkitUserSelect: "none" }}>
+      {/* Obal má UŽ ZMENŠENÝ rozmer a plátno sa škáluje od ľavého horného rohu.
+          Keď sa škálovalo od stredu, grid dostal box široký 1600 px, pri menšom
+          okne ho zarovnal na začiatok (tak sa rieši pretečenie) a slajd potom
+          trčal vpravo — presne to Jerry videl 12. 10. */}
+      <div style={{ width: Math.round(W * mierka), height: Math.round(H * mierka), flex: "0 0 auto", overflow: "hidden", boxShadow: "0 30px 90px rgba(0,0,0,.5)" }}>
+        <div style={{ width: W, height: H, transform: `scale(${mierka})`, transformOrigin: "top left" }}>
+          <Platno s={s} krok={krok} pata={`${report.nadpis} · ${report.porovnanie}`} strana={i + 1} zoSlajdov={slajdy.length} onKlik={vpred} />
+        </div>
       </div>
+
+      {naVysku && (
+        <div style={{ position: "fixed", top: 72, left: 0, right: 0, textAlign: "center", fontSize: 14, color: "rgba(234,241,236,.72)", zIndex: 2 }}>
+          Otoč telefón na šírku — slajd je 16 : 9.
+        </div>
+      )}
 
       {/* Ovládanie je MIMO plátna, aby sa nezmenšovalo spolu s ním. */}
       <div style={{ position: "fixed", top: 16, right: 16, display: "flex", gap: 8, zIndex: 2 }}>
@@ -342,8 +373,9 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
       <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 2, alignItems: "center" }}>
         <button onClick={vzad} disabled={i === 0 && krok === 0} style={{ ...tlacidlo, opacity: i === 0 && krok === 0 ? 0.4 : 1 }}>‹ Späť</button>
         <button onClick={vpred} disabled={naKonci} style={{ ...tlacidlo, opacity: naKonci ? 0.4 : 1 }}>Ďalej ›</button>
-        <span style={{ fontSize: 12.5, color: "rgba(234,241,236,.6)", marginLeft: 10 }}>šípky · medzerník · F = celá obrazovka</span>
+        {!naVysku && <span style={{ fontSize: 12.5, color: "rgba(234,241,236,.6)", marginLeft: 10 }}>šípky · medzerník · F = celá obrazovka</span>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
