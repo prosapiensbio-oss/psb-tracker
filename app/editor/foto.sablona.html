@@ -135,9 +135,18 @@
       </details>
 
       <details data-skupina="ciary">
-        <summary><span class="sipka">▸</span>Čiary a uhly<span class="stav" id="stavCiary"></span></summary>
+        <summary><span class="sipka">▸</span>Čiary, uhly a kresba<span class="stav" id="stavCiary"></span></summary>
         <div class="obsah">
           <button class="tl" id="kreslit">✎ kresliť čiary</button>
+          <div class="prepinac" id="nastroj">
+            <button data-v="ciara" class="on">／ čiara a uhol</button>
+            <button data-v="kresba">〰 voľná kresba</button>
+          </div>
+          <div class="prepinac" id="riadokHrubka" hidden>
+            <span id="hrubkaKresby" style="display:contents">
+              <button data-v="2">tenká</button><button data-v="4" class="on">stredná</button><button data-v="7">hrubá</button>
+            </span>
+          </div>
           <div class="prepinac" id="farbaCiar">
             <button data-v="#ff8a1f" class="on">oranžová</button>
             <button data-v="#ffffff">biela</button>
@@ -151,7 +160,7 @@
           </div>
           <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
           <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
-          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle.</div>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
     </div>
@@ -248,7 +257,8 @@
     b.disabled = true; b.textContent = "Ukladám…";
     st.hidden = false; st.style.color = ""; st.textContent = `Ukladám do kartotéky — ${kt.klient}…`;
     const blob = await sk.vyrobJpeg(2000);
-    const r = await kt.nahraj({ blob, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
+    const ciste = sk.maRozbor ? await sk.vyrobJpeg(2000, true) : null;
+    const r = await kt.nahraj({ blob, ciste, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
     b.disabled = false; b.textContent = "Uložiť ku klientovi";
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
     st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
@@ -456,7 +466,12 @@
     $("stavStitok").textContent = st.zap ? `${{ lh: "↖", ph: "↗", ld: "↙", pd: "↘" }[st.roh]} ${{ biely: "biely", tmavy: "tmavý", zeleny: "zelený", text: "len text" }[st.dizajn]}` : "vypnutý";
     const m = sk.mriezka;
     $("stavMriezka").textContent = m.druh === "ziadna" ? "vypnutá" : `${MRIEZKA[m.druh]} · ${m.hustota}`;
-    $("stavCiary").textContent = `${sk.rezimCiar ? "kreslím · " : ""}${sk.pocetCiar ? `${sk.pocetCiar} ${sk.pocetCiar === 1 ? "čiara" : sk.pocetCiar < 5 ? "čiary" : "čiar"}` : "žiadne"}`;
+    const kr = sk.pocetKresieb;
+    const casti = [
+      sk.pocetCiar ? `${sk.pocetCiar} ${sk.pocetCiar === 1 ? "čiara" : sk.pocetCiar < 5 ? "čiary" : "čiar"}` : "",
+      kr ? `${kr} ${kr === 1 ? "kresba" : kr < 5 ? "kresby" : "kresieb"}` : "",
+    ].filter(Boolean);
+    $("stavCiary").textContent = `${sk.rezimCiar ? "kreslím · " : ""}${casti.join(" · ") || "žiadne"}`;
     const info = sk.infoVybranej();
     $("vybranaInfo").hidden = !info;
     if (info) $("vybranaInfo").innerHTML = `Vybraná: <b style="font-size:17px">${info.sklon.znak} ${info.sklon.hodnota}°</b> ${info.sklon.od}${info.uhly.length ? ` · s nadväzujúcou <b style="font-size:17px">${info.uhly.join("°, ")}°</b>` : ""}`;

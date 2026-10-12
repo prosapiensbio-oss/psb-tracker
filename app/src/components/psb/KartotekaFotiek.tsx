@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
 import { posliDoEditora } from "../../lib/psb/doEditora";
+import { PoslaneKlientovi, PoslatKlientovi, type OdkazFotiek, type OdpovedFotky } from "./FotkyKlientovi";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
@@ -26,6 +27,7 @@ import { C, mix } from "../../lib/psb/theme";
 type Odpoved = {
   ok: boolean; error?: string;
   fotky?: Fotka[]; poznamky?: Record<string, string>;
+  odkazy?: OdkazFotiek[]; odpovede?: OdpovedFotky[];
   suhlas?: boolean; ulozisko?: boolean; sifra?: boolean;
 };
 
@@ -56,7 +58,7 @@ async function zmensi(subor: File): Promise<{ blob: Blob; sirka: number; vyska: 
   return { blob, sirka: w, vyska: h };
 }
 
-export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean }) {
+export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzke: boolean; trener?: string }) {
   const [d, setD] = useState<Odpoved | null>(null);
   const [chyba, setChyba] = useState("");
   const [hlaska, setHlaska] = useState("");
@@ -76,7 +78,11 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   /** Označené fotky pre editor — najviac dve; tretia vytlačí najstaršie označenie. */
   const [vyber, setVyber] = useState<string[]>([]);
   const oznac = (id: string) => setVyber((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id].slice(-2)));
-  useEffect(() => { setVyber([]); }, [meno]);
+  /** Porovnania označené na poslanie klientovi (odkaz /f/). */
+  const [naPoslanie, setNaPoslanie] = useState<string[]>([]);
+  const [skladam, setSkladam] = useState(false);
+  const oznacNaPoslanie = (id: string) => setNaPoslanie((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
+  useEffect(() => { setVyber([]); setNaPoslanie([]); setSkladam(false); }, [meno]);
 
   const nacitaj = useCallback(async () => {
     const j = (await fetch(`/api/fotky?klient=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
@@ -328,26 +334,63 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
       {/* ── Z EDITORA ── porovnania predtým/potom a videá (Workspace → Editor) */}
       {zEditora.length > 0 && (
         <div>
-          <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim, marginBottom: 8 }}>Z editora</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Z editora</span>
+            {zEditora.some((f) => f.pohlad !== VIDEO) && !skladam && (
+              <span style={{ fontSize: 11.5, color: C.textDim }}>· krúžkom označ porovnania, ktoré pošleš klientovi</span>
+            )}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 130 : 170}px, 1fr))`, gap: 8 }}>
             {zEditora.map((f) => (
-              <button
-                key={f.id} type="button"
-                onClick={() => (f.pohlad === VIDEO ? void prehraj(f) : setZvacsena(f))}
-                style={{ padding: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", background: C.card, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: C.text }}
-              >
-                {f.pohlad === VIDEO ? (
-                  <div style={{ aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, fontSize: 34, color: C.accentLight }}>▶</div>
-                ) : (
-                  <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
+              <div key={f.id} style={{ position: "relative", border: `${naPoslanie.includes(f.id) ? 2 : 1}px solid ${naPoslanie.includes(f.id) ? C.accent : C.border}`, borderRadius: 10, overflow: "hidden", background: C.card }}>
+                <button
+                  type="button"
+                  onClick={() => (f.pohlad === VIDEO ? void prehraj(f) : setZvacsena(f))}
+                  style={{ display: "block", width: "100%", padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: C.text }}
+                >
+                  {f.pohlad === VIDEO ? (
+                    <div style={{ aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, fontSize: 34, color: C.accentLight }}>▶</div>
+                  ) : (
+                    <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
+                  )}
+                  <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}{f.maCiste ? " · aj čisté" : ""}</div>
+                  {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
+                </button>
+                {f.pohlad !== VIDEO && (
+                  <button
+                    type="button" onClick={() => oznacNaPoslanie(f.id)}
+                    aria-pressed={naPoslanie.includes(f.id)}
+                    title={naPoslanie.includes(f.id) ? "Nepridávať do odkazu" : "Pridať do odkazu pre klienta"}
+                    style={rohove("left", C.accent, naPoslanie.includes(f.id))}
+                  >{naPoslanie.includes(f.id) ? "✓" : ""}</button>
                 )}
-                <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}</div>
-                {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
-              </button>
+              </div>
             ))}
           </div>
+          {naPoslanie.length > 0 && !skladam && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setSkladam(true)} style={{ padding: "8px 14px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 22), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                ✉ Poslať klientovi ({naPoslanie.length})
+              </button>
+              <button type="button" onClick={() => setNaPoslanie([])} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť výber</button>
+            </div>
+          )}
+          {skladam && (
+            <div style={{ marginTop: 10 }}>
+              <PoslatKlientovi
+                meno={meno} trener={trener}
+                fotky={naPoslanie.map((id) => zEditora.find((f) => f.id === id)).filter((f): f is Fotka => !!f)}
+                onZrus={() => { setSkladam(false); setNaPoslanie([]); }}
+                onHotovo={() => void nacitaj()}
+                onOtvorFotku={(f) => setZvacsena(f)}
+              />
+            </div>
+          )}
         </div>
       )}
+
+      {/* ── POSLANÉ KLIENTOVI ── kedy, či otvoril, súhlas a jeho odpovede */}
+      <PoslaneKlientovi odkazy={d.odkazy || []} odpovede={d.odpovede || []} onZmena={() => void nacitaj()} />
 
       {/* ── VÝBER DO EDITORA ── drží sa pri vrchu, kým sa označuje */}
       {fs.length > 1 && (

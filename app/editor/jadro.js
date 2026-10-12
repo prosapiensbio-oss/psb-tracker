@@ -65,6 +65,14 @@
   // Bod čiary je uložený v súradniciach FOTKY (u, v ∈ 0–1), nie štvorca —
   // preto ide s fotkou, keď ju posunieš, zväčšíš alebo zrkadlíš.
   let ciary = [];       // { id, okno, a: {u,v}, b: {u,v}, farba }
+  /**
+   * VOĽNÁ KRESBA (Jerry, 12. 10. 2026: „možnosť aj kreslenia, aby som mohol
+   * klientom zakresliť kyfózu alebo lordózu"). Ťah je zoznam bodov v
+   * súradniciach fotky — ide s ňou pri posune, zväčšení aj zrkadle, ako čiary.
+   */
+  let kresby = [];      // { id, okno, body: [{u,v}], farba, hrubka }
+  let nastroj = "ciara"; // "ciara" | "kresba"
+  let hrubkaKresby = 4;
   let rezimCiar = false;
   let vybrana = null;
   let farbaCiar = "#ff8a1f";
@@ -131,6 +139,18 @@
     return tvary;
   }
 
+  /** Hladká cesta cez body ťahu (krivky cez stredy úsekov) — pre SVG aj plátno (Path2D). */
+  function cestaKresby(P) {
+    if (P.length < 3) return `M ${P[0].x} ${P[0].y} L ${P[P.length - 1].x} ${P[P.length - 1].y}`;
+    let d = `M ${P[0].x} ${P[0].y}`;
+    for (let i = 1; i < P.length - 1; i++) {
+      const mx = (P[i].x + P[i + 1].x) / 2, my = (P[i].y + P[i + 1].y) / 2;
+      d += ` Q ${P[i].x} ${P[i].y} ${mx} ${my}`;
+    }
+    const z = P[P.length - 1];
+    return `${d} L ${z.x} ${z.y}`;
+  }
+
   function kresliCiary() {
     const R = oknaNaObrazovke();
     const sSklonom = document.getElementById("sklon").checked;
@@ -138,6 +158,11 @@
     const klipy = rozdelenie === "cez" ? "" : R.map((r, i) => `<clipPath id="okno${i}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/></clipPath>`).join("");
     const klip = (i) => (rozdelenie === "cez" ? "" : `clip-path="url(#okno${i})"`);
     const html = [`<defs>${klipy}</defs>`];
+    for (const k of kresby) {
+      if (!stav[k.okno]?.src || k.body.length < 2) continue;
+      const d = cestaKresby(k.body.map((b) => bodVOkne(k.okno, b, R)));
+      html.push(`<g ${klip(k.okno)}><path d="${d}" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="${k.hrubka + 2}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${k.farba}" stroke-width="${k.hrubka}" stroke-linecap="round" stroke-linejoin="round"/></g>`);
+    }
     for (const t of tvary) {
       if (t.typ === "ciara") {
         html.push(`<g ${klip(t.okno)}>
@@ -158,13 +183,23 @@
     }
     svgCiary.innerHTML = html.join("");
     document.getElementById("zmazVybranu").disabled = vybrana == null;
-    document.getElementById("zmazVsetky").disabled = !ciary.length;
+    document.getElementById("zmazVsetky").disabled = !ciary.length && !kresby.length;
     window.poZmene?.();
     zmena();
   }
 
   /** Kreslenie na plátno pri exporte — tie isté tvary. */
   function ciaryNaPlatno(x, R, k, N) {
+    for (const kr of kresby) {
+      if (!stav[kr.okno]?.src || kr.body.length < 2) continue;
+      const p = new Path2D(cestaKresby(kr.body.map((b) => bodVOkne(kr.okno, b, R))));
+      x.save();
+      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[kr.okno].x, R[kr.okno].y, R[kr.okno].w, R[kr.okno].h); x.clip(); }
+      x.lineCap = "round"; x.lineJoin = "round";
+      x.strokeStyle = "rgba(0,0,0,.4)"; x.lineWidth = (kr.hrubka + 2) * k; x.stroke(p);
+      x.strokeStyle = kr.farba; x.lineWidth = kr.hrubka * k; x.stroke(p);
+      x.restore();
+    }
     const tvary = tvaryCiar(R, k, document.getElementById("sklon").checked);
     for (const t of tvary) {
       x.save();
@@ -209,6 +244,17 @@
       if (!rezimCiar) return;
       e.preventDefault();
       const R = oknaNaObrazovke(), P = miesto(e);
+      if (nastroj === "kresba") {
+        const okno = oknoPodBodom(P, R);
+        if (okno < 0 || !stav[okno].src) return;
+        const k = { id: dalsieId++, okno, body: [bodZOkna(okno, P.x, P.y, R)], farba: farbaCiar, hrubka: hrubkaKresby };
+        kresby.push(k);
+        vybrana = null;
+        tah = { druh: "kresba", kresba: k, okno, posledny: P };
+        svgCiary.setPointerCapture(e.pointerId);
+        kresliCiary();
+        return;
+      }
       // 1) chytil koniec existujúcej čiary → ťahá ho (aj spojené konce s ním)
       let najblizsi = null;
       for (const c of ciary) {
@@ -244,6 +290,13 @@
       if (!tah) return;
       const R = oknaNaObrazovke(), r = R[tah.okno];
       let P = miesto(e);
+      if (tah.druh === "kresba") {
+        if (Math.hypot(P.x - tah.posledny.x, P.y - tah.posledny.y) < 2.5) return; // hustejšie body nič nepridajú
+        tah.posledny = P;
+        tah.kresba.body.push(bodZOkna(tah.okno, P.x, P.y, R));
+        kresliCiary();
+        return;
+      }
       if (rozdelenie !== "cez") P = { x: Math.max(r.x, Math.min(r.x + r.w, P.x)), y: Math.max(r.y, Math.min(r.y + r.h, P.y)) };
       // prichytenie ku koncu inej čiary v tej istej fotke
       let ciel = bodZOkna(tah.okno, P.x, P.y, R);
@@ -265,6 +318,12 @@
     });
     const pusti = () => {
       if (!tah) return;
+      if (tah.druh === "kresba") {
+        if (tah.kresba.body.length < 2) kresby = kresby.filter((k) => k !== tah.kresba); // ťuknutie nie je kresba
+        tah = null;
+        kresliCiary();
+        return;
+      }
       if (tah.druh === "nova") {
         const R = oknaNaObrazovke(), A = bodVOkne(tah.okno, tah.ciara.a, R), B = bodVOkne(tah.okno, tah.ciara.b, R);
         if (Math.hypot(B.x - A.x, B.y - A.y) < 5) ciary = ciary.filter((c) => c !== tah.ciara);
@@ -461,6 +520,7 @@
     Object.assign(s, { src, vlastny: !!vlastny, v: { zoom: 1, x: 0, y: 0 }, zrkadlo: false, fw: r?.fw || 1, fh: r?.fh || 1 });
     if (den) s.den = den;
     ciary = ciary.filter((c) => c.okno !== i); // čiary patrili starej fotke
+    kresby = kresby.filter((k) => k.okno !== i);
     aktivne = i;
     kresli();
   }
@@ -538,7 +598,7 @@
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
   document.getElementById("vymenit").onclick = () => {
-    stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
+    stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); kresby.forEach((k) => { k.okno = 1 - k.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
   // Medzera mení okná — čiary aj štítky sa musia prekresliť s nimi.
   document.getElementById("medzera").oninput = (e) => { stvorec.style.setProperty("--medzera", `${e.target.value}px`); kresli(); };
   /** Rozloženie do tried a ovládačov — pri kliknutí aj pri kroku späť. */
@@ -587,7 +647,19 @@
   document.getElementById("kreslit").onclick = () => nastavRezim(!rezimCiar);
   document.getElementById("zmazVybranu").onclick = zmazVybranu;
   // Krok späť vie vrátiť aj „zmazať všetky" — preto sa už nepýta.
-  document.getElementById("zmazVsetky").onclick = () => { ciary = []; vybrana = null; kresliCiary(); };
+  document.getElementById("zmazVsetky").onclick = () => { ciary = []; kresby = []; vybrana = null; kresliCiary(); };
+  document.querySelectorAll("#nastroj button").forEach((b) => b.onclick = () => {
+    nastroj = b.dataset.v;
+    document.querySelectorAll("#nastroj button").forEach((x) => x.classList.toggle("on", x === b));
+    document.getElementById("riadokHrubka").hidden = nastroj !== "kresba";
+    vybrana = null;
+    if (!rezimCiar) nastavRezim(true);
+    kresliCiary();
+  });
+  document.querySelectorAll("#hrubkaKresby button").forEach((b) => b.onclick = () => {
+    hrubkaKresby = Number(b.dataset.v);
+    document.querySelectorAll("#hrubkaKresby button").forEach((x) => x.classList.toggle("on", x === b));
+  });
   document.getElementById("sklon").onchange = kresliCiary;
   document.querySelectorAll("#farbaCiar button").forEach((b) => b.onclick = () => {
     document.querySelectorAll("#farbaCiar button").forEach((x) => x.classList.toggle("on", x === b));
@@ -671,8 +743,12 @@
   }
 
   // ── EXPORT: ten istý výrez vo veľkom rozlíšení ──
-  /** Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c. */
-  function kresliCelok(c) {
+  /**
+   * Nakreslí celý štvorec (fotky, popisky, mriežku, čiary) do plátna c.
+   * ciste = bez čiar, kresieb a mriežky — tá istá fotka „bez rozboru", aby
+   * si ju klient na stránke s fotkami mohol prepnúť (Jerry, 12. 10. 2026).
+   */
+  function kresliCelok(c, ciste = false) {
     const N = c.width;
     const medzeraObr = Number(document.getElementById("medzera").value);
     const pomer = N / stvorec.clientWidth;
@@ -715,13 +791,13 @@
       const k = N / 2000, fw = 70 * k, fh = fw * ZNACKA.figura.height / ZNACKA.figura.width;
       x.globalAlpha = 0.85; x.drawImage(ZNACKA.figura, N - 60 * k - fw, N - 60 * k - fh, fw, fh); x.globalAlpha = 1;
     }
-    if (document.getElementById("mriezkaExport").checked) {
+    if (!ciste && document.getElementById("mriezkaExport").checked) {
       const { zvisle, vodorovne } = ciaryMriezky();
       x.strokeStyle = mriezka.farba; x.lineWidth = Math.max(1, pomer);
       for (const t of zvisle) { x.beginPath(); x.moveTo(t * N, 0); x.lineTo(t * N, N); x.stroke(); }
       for (const t of vodorovne) { x.beginPath(); x.moveTo(0, t * N); x.lineTo(N, t * N); x.stroke(); }
     }
-    if (document.getElementById("ciaryExport").checked && ciary.length) {
+    if (!ciste && document.getElementById("ciaryExport").checked && (ciary.length || kresby.length)) {
       const R = [0, 1].map((i) => ({ x: cez ? 0 : vedla ? i * (ow + g) : 0, y: cez ? 0 : vedla ? 0 : i * (oh + g), w: ow, h: oh }));
       const predVyber = vybrana; vybrana = null; // vybraná (prerušovaná) čiara nemá ísť do fotky
       ciaryNaPlatno(x, R, pomer, N);
@@ -729,11 +805,11 @@
     }
   }
   /** Hotový štvorec ako JPEG — na stiahnutie aj do kartotéky klienta. */
-  async function vyrobJpeg(N = 2000) {
+  async function vyrobJpeg(N = 2000, ciste = false) {
     await znackaHotova;
     const c = document.createElement("canvas");
     c.width = N; c.height = N;
-    kresliCelok(c);
+    kresliCelok(c, ciste);
     return new Promise((res) => c.toBlob(res, "image/jpeg", 0.9));
   }
 
@@ -792,7 +868,7 @@
   function snimkaStavu() {
     return JSON.stringify({
       stav: stav.map((t) => ({ src: t.src, den: t.den, v: t.v, zrkadlo: t.zrkadlo, vlastny: !!t.vlastny })),
-      ciary, rozdelenie, priehladnost, mriezka, stitok,
+      ciary, kresby, rozdelenie, priehladnost, mriezka, stitok,
       medzera: Number(document.getElementById("medzera").value),
       sklon: zaskrtnute("sklon"), ciaryExport: zaskrtnute("ciaryExport"), mriezkaExport: zaskrtnute("mriezkaExport"),
       popis: document.getElementById("popisFotky")?.value || "",
@@ -824,7 +900,8 @@
       Object.assign(stav[i], z, { fw: r?.fw || 1, fh: r?.fh || 1 });
     });
     ciary = o.ciary || [];
-    dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1));
+    kresby = o.kresby || [];
+    dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1), ...kresby.map((k) => k.id + 1));
     vybrana = null;
     rozdelenie = o.rozdelenie || "vedla";
     priehladnost = o.priehladnost ?? 0.5;
@@ -892,6 +969,12 @@
     get rezimCiar() { return rezimCiar; },
     get vybrana() { return vybrana; },
     get pocetCiar() { return ciary.length; },
+    get pocetKresieb() { return kresby.length; },
+    /** Je v exporte niečo navyše oproti čistej fotke (čiary, kresba, mriežka)? */
+    get maRozbor() {
+      return (document.getElementById("ciaryExport").checked && (ciary.length > 0 || kresby.length > 0))
+        || (document.getElementById("mriezkaExport").checked && mriezka.druh !== "ziadna");
+    },
     get rozdelenie() { return rozdelenie; },
     get mriezka() { return { ...mriezka }; },
     get stitok() { return { ...stitok }; },

@@ -1830,7 +1830,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
           {/* Fotky držania tela aj v profile (Jerry, 6. 10. 2026) — ďalšie
               fotenie sa nahrá tu, nemusí sa kvôli nemu otvárať anamnéza. */}
-          {filter === "fotky" && <KartotekaFotiek meno={meno} uzke={uzke} />}
+          {filter === "fotky" && <KartotekaFotiek meno={meno} uzke={uzke} trener={c?.primaryTrainer || ""} />}
 
           {filter === "poznamky" && (
             <>

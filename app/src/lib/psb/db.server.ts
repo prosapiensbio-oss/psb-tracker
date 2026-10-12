@@ -29,6 +29,7 @@ import { dnesPraha } from "./cas";
 import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
 import { nacitajDozor } from "./reklamaDozor.server";
+import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
 
 const uid = () => crypto.randomUUID();
 
@@ -393,6 +394,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
 
   // Dozor nad reklamou (10. 10. 2026) — vstup pre register, kartu aj Jarvisa.
   data.reklamaDozor = await nacitajDozor(DB);
+  // Odpovede klientov na odkaz s fotkami → notifikácia trénerovi (fotkyOdkazy.ts).
+  data.fotkyKlientov = await nacitajFotkyKlientov(DB);
 
   return data;
 }

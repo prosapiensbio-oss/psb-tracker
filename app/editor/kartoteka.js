@@ -53,6 +53,8 @@ window.kartotekaKlienta = (() => {
     if (z.popis) fd.append("popis", z.popis);
     if (osobne) fd.append("suhlasOsobne", "1");
     fd.append("subor", z.blob, z.nazov || "subor");
+    // Čistá podoba toho istého porovnania (bez čiar a kresby) — klient si ju na stránke prepne.
+    if (z.ciste) fd.append("subor_ciste", z.ciste, "ciste.jpg");
     let j;
     try {
       const r = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd });

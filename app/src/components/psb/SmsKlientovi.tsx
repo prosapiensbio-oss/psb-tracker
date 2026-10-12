@@ -98,7 +98,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * v audite `sms-<druh>`. Ako `sms-odoslana` by klienta vyčistila zo
    * zoznamu kroku 2 · SMS, ktorý stojí na stave hodín.
    */
-  druhAuditu?: "ponuka" | "kalendar";
+  druhAuditu?: "ponuka" | "kalendar" | "fotky";
 }) {
   const [otvorene, setOtvorene] = useState(vlozene);
   const [telefon, setTelefon] = useState<string | null>(null);

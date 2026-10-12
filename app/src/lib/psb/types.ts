@@ -207,6 +207,8 @@ export type PSBData = {
   platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
   /** Dozor nad reklamou — bežiace kampane, dni, rozhodnutia (lib/psb/reklamaDozor.ts). */
   reklamaDozor?: import("./reklamaDozor").DozorData;
+  /** Odpovede a súhlasy klientov z odkazu s fotkami `/f/` (posledných 60 dní). */
+  fotkyKlientov?: import("./fotkyOdkazy").FotkyKlientov;
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;

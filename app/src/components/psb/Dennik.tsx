@@ -33,6 +33,8 @@ const FARBA_ZDROJA: Record<string, string> = {
   "Jarvis": C.accentLight,
   "meranie": C.bark,
   "karta klienta": C.textMuted,
+  // Odkaz s fotkami: poslané, otvorené, súhlas, odpoveď klienta (12. 10. 2026).
+  "fotky": C.accent,
 };
 
 export function Dennik({ meno, limit = 4, onNovyZapis, obnovKluc = 0 }: {

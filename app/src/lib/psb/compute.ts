@@ -13,6 +13,7 @@ import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
+import { polozkyFotiek } from "./fotkyOdkazy";
 import type {
   Lead,
   PackageRow,
@@ -3364,6 +3365,15 @@ export function deriveRegister(
     for (const p of polozkyDozoru(data.reklamaDozor, data.leads || [], ack, dnesPraha())) {
       add(p.key, p.category, p.tone, p.title, p.detail, p.priority, "marketing|dozor", p.rodina, { trener: "Jerry", reklama: p.reklama });
     }
+  }
+
+  /**
+   * Odpoveď klienta na odkaz s fotkami (12. 10. 2026) — trénerovi, ktorý
+   * odkaz poslal; keď ho odkaz nepozná, trénerovi klienta (patriTrenerovi).
+   */
+  for (const p of polozkyFotiek(data.fotkyKlientov)) {
+    add(p.key, "Zápis", p.tone, p.title, p.detail, p.tone === "orange" ? 3 : 8, p.klient, "fotky",
+      { trener: p.trener || undefined, oKom: p.klient });
   }
 
   return items.sort((a, b) => {

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { odsifruj } from "../../lib/psb/sifra.server";
 
 // Denník klienta — append-only, a JEDNO MIESTO, kde stojí všetko o ňom.
 //
@@ -90,6 +91,31 @@ export const Route = createFileRoute("/api/client-notes")({
             const kedy = String(k.updated_at || "");
             if (String(k.trainer_note || "").trim()) historia.push({ id: "karta-poznamka", kedy, odkial: "karta klienta", text: String(k.trainer_note), autor: "" });
             if (String(k.preco_neprisiel || "").trim()) historia.push({ id: "karta-preco", kedy, odkial: "karta klienta", text: `prečo neprišiel znova: ${k.preco_neprisiel}`, autor: "" });
+          }
+          /**
+           * ODKAZY S FOTKAMI (12. 10. 2026, Jerry: „mohol by vzniknúť záznam,
+           * kedy sme porovnanie poslali, a odpoveď by sa mohla uložiť do
+           * profilu"). Mimo spoločného batchu: keby tabuľky chýbali, nesmú
+           * zhodiť celú históriu.
+           */
+          const kluc = (bindings() as { ANAMNEZA_KLUC?: string }).ANAMNEZA_KLUC;
+          const [poslane, odpovedeFotky] = await Promise.all([
+            DB.prepare("SELECT token, fotky_json, kto, vytvorene_at, otvorene_at, suhlas, suhlas_at, zrusene_at FROM fotky_odkazy WHERE klient = ?1 ORDER BY vytvorene_at DESC LIMIT 20")
+              .bind(name).all().then((x) => x.results as R[]).catch(() => [] as R[]),
+            DB.prepare("SELECT id, text, vytvorene_at FROM fotky_odpovede WHERE klient = ?1 ORDER BY vytvorene_at DESC LIMIT 30")
+              .bind(name).all().then((x) => x.results as R[]).catch(() => [] as R[]),
+          ]);
+          for (const r of poslane) {
+            let pocet = 0;
+            try { pocet = (JSON.parse(String(r.fotky_json)) as unknown[]).length; } catch { /* 0 */ }
+            historia.push({ id: `fotky-${r.token}`, kedy: String(r.vytvorene_at), odkial: "fotky", text: `poslané porovnanie klientovi (${pocet} ${pocet === 1 ? "fotka" : pocet < 5 ? "fotky" : "fotiek"})${r.zrusene_at ? " — odkaz neskôr zrušený" : ""}`, autor: String(r.kto || "") });
+            if (r.otvorene_at) historia.push({ id: `fotky-otv-${r.token}`, kedy: String(r.otvorene_at), odkial: "fotky", text: "klient otvoril fotky", autor: "klient" });
+            if (r.suhlas) historia.push({ id: `fotky-suh-${r.token}`, kedy: String(r.suhlas_at), odkial: "fotky", text: r.suhlas === "ano" ? "súhlasí so zverejnením porovnania (bez tváre a mena)" : "nesúhlasí so zverejnením — fotky len pre neho", autor: "klient" });
+          }
+          for (const r of odpovedeFotky) {
+            let text = "(odpoveď sa nedá rozšifrovať)";
+            if (kluc) { try { text = await odsifruj(String(r.text), kluc); } catch { /* nechá hlášku */ } }
+            historia.push({ id: `fotky-odp-${r.id}`, kedy: String(r.vytvorene_at), odkial: "fotky", text: `odpoveď na fotky: ${text}`, autor: "klient" });
           }
           historia.sort((a, b) => String(b.kedy).localeCompare(String(a.kedy)));
 

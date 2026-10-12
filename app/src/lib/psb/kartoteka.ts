@@ -53,6 +53,8 @@ export type Fotka = {
   typ?: string | null;
   /** Popis k fotke (rozšifrovaný) — hlavne k porovnaniu, ktoré ide klientovi. */
   popis?: string;
+  /** Porovnanie má aj čistú podobu (bez čiar a kresby) — `/api/fotky?id=…&ciste=1`. */
+  maCiste?: boolean;
 };
 
 export type Fotenie = { den: string; fotky: Fotka[]; poznamka: string };

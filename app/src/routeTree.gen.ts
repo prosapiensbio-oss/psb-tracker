@@ -18,6 +18,7 @@ import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as TTokenRouteImport } from './routes/t.$token'
 import { Route as KTokenRouteImport } from './routes/k.$token'
+import { Route as FTokenRouteImport } from './routes/f.$token'
 import { Route as DTokenRouteImport } from './routes/d.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
@@ -140,6 +141,11 @@ const TTokenRoute = TTokenRouteImport.update({
 const KTokenRoute = KTokenRouteImport.update({
   id: '/k/$token',
   path: '/k/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FTokenRoute = FTokenRouteImport.update({
+  id: '/f/$token',
+  path: '/f/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DTokenRoute = DTokenRouteImport.update({
@@ -616,6 +622,7 @@ export interface FileRoutesByFullPath {
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
+  '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -705,6 +712,7 @@ export interface FileRoutesByTo {
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
+  '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -795,6 +803,7 @@ export interface FileRoutesById {
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
+  '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
@@ -886,6 +895,7 @@ export interface FileRouteTypes {
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
+    | '/f/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -975,6 +985,7 @@ export interface FileRouteTypes {
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
+    | '/f/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -1064,6 +1075,7 @@ export interface FileRouteTypes {
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
+    | '/f/$token'
     | '/k/$token'
     | '/t/$token'
     | '/u/$token'
@@ -1154,6 +1166,7 @@ export interface RootRouteChildren {
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
   DTokenRoute: typeof DTokenRoute
+  FTokenRoute: typeof FTokenRoute
   KTokenRoute: typeof KTokenRouteWithChildren
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
@@ -1223,6 +1236,13 @@ declare module '@tanstack/react-router' {
       path: '/k/$token'
       fullPath: '/k/$token'
       preLoaderRoute: typeof KTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/f/$token': {
+      id: '/f/$token'
+      path: '/f/$token'
+      fullPath: '/f/$token'
+      preLoaderRoute: typeof FTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/d/$token': {
@@ -1868,6 +1888,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
   DTokenRoute: DTokenRoute,
+  FTokenRoute: FTokenRoute,
   KTokenRoute: KTokenRouteWithChildren,
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
