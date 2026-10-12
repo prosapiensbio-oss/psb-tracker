@@ -163,10 +163,15 @@
           <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
-    </div>
-    <div class="popis-fotky">
-      <label for="popisFotky">Popis k fotke <span>uloží sa s ňou ku klientovi</span></label>
-      <textarea id="popisFotky" rows="3" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+
+      <!-- Popis k fotke ako jedna zo skupín, nie stále otvorený (Jerry, 12. 10. 2026). -->
+      <details data-skupina="popis">
+        <summary><span class="sipka">▸</span>Popis k fotke<span class="stav" id="stavPopis"></span></summary>
+        <div class="obsah popis-fotky">
+          <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+          <div class="napoveda">Uloží sa s porovnaním ku klientovi a klient ho uvidí pod fotkou v odkaze. Každé porovnanie má svoj — pri nových fotkách začína prázdny.</div>
+        </div>
+      </details>
     </div>
     <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
@@ -247,6 +252,7 @@
     if (e.origin !== location.origin || e.data?.typ !== "psb-dvojica") return;
     const { pred, po } = e.data;
     window.rozrobene?.novy(false); // nová dvojica z profilu = nový návrh, starý ostane v Rozrobených
+    vycistiPopis(); // nové porovnanie = vlastný popis
     if (pred?.id) sk.vlozObrazok(0, kt.adresa(pred.id), pred.den, false);
     if (po?.id) sk.vlozObrazok(1, kt.adresa(po.id), po.den, false);
   });
@@ -262,7 +268,12 @@
     b.disabled = false; b.textContent = "Uložiť ku klientovi";
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
     st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
+    // Popis patrí tomuto porovnaniu. Keď sa do polovíc dajú iné fotky, začne sa prázdny.
+    if (r.ok) ulozeneZdroje = sk.stav.map((x) => x.src || "").join("|");
   };
+  let ulozeneZdroje = null;
+  const vycistiPopis = () => { $("popisFotky").value = ""; ulozeneZdroje = null; };
+  $("popisFotky").addEventListener("input", () => window.poZmene?.());
 
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];
@@ -401,6 +412,7 @@
       }
       aktualny = id;
       clearTimeout(casovac);
+      ulozeneZdroje = null; // návrh si nesie vlastný popis — nemazať ho
       sk.nacitajStav(JSON.stringify(o), rozmery);
       // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
       if (n.klient && n.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: n.klient }, location.origin);
@@ -418,6 +430,7 @@
     function novy(vycistit = true) {
       clearTimeout(casovac);
       aktualny = null;
+      ulozeneZdroje = null;
       if (vycistit) sk.nacitajStav(sk.prazdnyStav, {});
       stavText("");
       nacitajZoznam();
@@ -462,6 +475,9 @@
     const s = sk.stav;
     $("stavFotky").textContent = `${sk.denCz(s[0].den) || "—"} · ${sk.denCz(s[1].den) || "—"}`;
     $("stavRozlozenie").textContent = NAZVY[sk.rozdelenie];
+    if (ulozeneZdroje !== null && sk.stav.map((x) => x.src || "").join("|") !== ulozeneZdroje) vycistiPopis();
+    const popis = $("popisFotky").value.trim();
+    $("stavPopis").textContent = popis ? (popis.length > 22 ? `${popis.slice(0, 22)}…` : popis) : "žiadny";
     const st = sk.stitok;
     $("stavStitok").textContent = st.zap ? `${{ lh: "↖", ph: "↗", ld: "↙", pd: "↘" }[st.roh]} ${{ biely: "biely", tmavy: "tmavý", zeleny: "zelený", text: "len text" }[st.dizajn]}` : "vypnutý";
     const m = sk.mriezka;

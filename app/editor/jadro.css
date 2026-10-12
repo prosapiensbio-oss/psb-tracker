@@ -31,5 +31,8 @@
   .popiska { position: absolute; display: flex; align-items: center; box-sizing: border-box; pointer-events: none; white-space: nowrap; z-index: 2; }
   .popiska[hidden] { display: none; }
   .vodoznak { position: absolute; pointer-events: none; opacity: .85; z-index: 2; }
+  /* Lupa pri kreslení — nad prstom, nič nechytá. */
+  .lupa { position: absolute; z-index: 6; pointer-events: none; border-radius: 50%; box-shadow: 0 6px 22px rgba(0,0,0,.45); }
+  .lupa[hidden] { display: none; }
   .popiska span { display: inline-block; line-height: 1; padding-top: .08em; }
 

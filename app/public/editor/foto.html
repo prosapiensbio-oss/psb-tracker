@@ -82,9 +82,6 @@
   .dizajny { flex-wrap: wrap; }
   .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
   .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
-  .popis-fotky { padding: 10px 14px 0; }
-  .popis-fotky label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
-  .popis-fotky label span { font-weight: 400; color: var(--dim); margin-left: 4px; }
   .popis-fotky textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
   .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /*/ui-css*/
@@ -124,6 +121,9 @@
   .popiska { position: absolute; display: flex; align-items: center; box-sizing: border-box; pointer-events: none; white-space: nowrap; z-index: 2; }
   .popiska[hidden] { display: none; }
   .vodoznak { position: absolute; pointer-events: none; opacity: .85; z-index: 2; }
+  /* Lupa pri kreslení — nad prstom, nič nechytá. */
+  .lupa { position: absolute; z-index: 6; pointer-events: none; border-radius: 50%; box-shadow: 0 6px 22px rgba(0,0,0,.45); }
+  .lupa[hidden] { display: none; }
   .popiska span { display: inline-block; line-height: 1; padding-top: .08em; }
 
 /*/jadro-css*/
@@ -281,10 +281,15 @@
           <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
-    </div>
-    <div class="popis-fotky">
-      <label for="popisFotky">Popis k fotke <span>uloží sa s ňou ku klientovi</span></label>
-      <textarea id="popisFotky" rows="3" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+
+      <!-- Popis k fotke ako jedna zo skupín, nie stále otvorený (Jerry, 12. 10. 2026). -->
+      <details data-skupina="popis">
+        <summary><span class="sipka">▸</span>Popis k fotke<span class="stav" id="stavPopis"></span></summary>
+        <div class="obsah popis-fotky">
+          <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+          <div class="napoveda">Uloží sa s porovnaním ku klientovi a klient ho uvidí pod fotkou v odkaze. Každé porovnanie má svoj — pri nových fotkách začína prázdny.</div>
+        </div>
+      </details>
     </div>
     <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
@@ -686,6 +691,60 @@ window.kartotekaKlienta = (() => {
     }
   }
 
+  /**
+   * LUPA PRI KRESLENÍ (Jerry, 12. 10. 2026: „pri zakresľovaní čiar potrebujem
+   * aj zoom automaticky"). Kým drží prst/pero/myš, nad miestom dotyku sa
+   * ukáže kruh so zväčšeným výrezom fotky, čiarami a zameriavačom — prst
+   * inak zakrýva presne ten bod, ktorý sa kladie. Kreslí sa na plátno z tých
+   * istých súradníc ako obrazovka (bodVOkne), takže lupa sedí aj pri zrkadle.
+   */
+  const LUPA = { strana: 140, zvacsenie: 2.6 };
+  const lupa = document.createElement("canvas");
+  lupa.className = "lupa";
+  lupa.hidden = true;
+  stvorec.appendChild(lupa);
+  function ukazLupu(P, okno) {
+    const L = LUPA.strana, Z = LUPA.zvacsenie, dpr = window.devicePixelRatio || 1;
+    if (lupa.width !== L * dpr) { lupa.width = L * dpr; lupa.height = L * dpr; lupa.style.width = `${L}px`; lupa.style.height = `${L}px`; }
+    const x = lupa.getContext("2d");
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, L, L);
+    x.save();
+    x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.clip();
+    x.fillStyle = "#222"; x.fillRect(0, 0, L, L);
+    // Bod obrazovky → bod lupy: posun na stred a zväčšenie.
+    x.translate(L / 2, L / 2); x.scale(Z, Z); x.translate(-P.x, -P.y);
+    const R = oknaNaObrazovke();
+    const kresliOkno = (i) => {
+      const t = stav[i], img = okna[i].querySelector("img");
+      if (!t.src || !img || !img.complete) return;
+      const r = rozlozenie(t.v, t.fw, t.fh, R[i].w, R[i].h);
+      x.save();
+      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
+      if (rozdelenie === "cez" && i === 1) x.globalAlpha = priehladnost;
+      if (t.zrkadlo) { x.translate(R[i].x + r.vlavo + r.sirka, R[i].y + r.hore); x.scale(-1, 1); x.drawImage(img, 0, 0, r.sirka, r.vyska); }
+      else x.drawImage(img, R[i].x + r.vlavo, R[i].y + r.hore, r.sirka, r.vyska);
+      x.restore();
+    };
+    if (rozdelenie === "cez") { kresliOkno(0); kresliOkno(1); } else if (okno >= 0) kresliOkno(okno);
+    ciaryNaPlatno(x, R, 1 / Z, 0);
+    x.restore();
+    // Zameriavač a okraj — v pixeloch lupy, nie zväčšené.
+    x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(L / 2 - 10, L / 2); x.lineTo(L / 2 - 3, L / 2); x.moveTo(L / 2 + 3, L / 2); x.lineTo(L / 2 + 10, L / 2);
+    x.moveTo(L / 2, L / 2 - 10); x.lineTo(L / 2, L / 2 - 3); x.moveTo(L / 2, L / 2 + 3); x.lineTo(L / 2, L / 2 + 10); x.stroke();
+    x.strokeStyle = "rgba(0,0,0,.6)"; x.lineWidth = 3; x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = "#fff"; x.lineWidth = 1.5; x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.stroke();
+    // Poloha: nad prstom (vľavo hore); pri hornom okraji pod neho.
+    const W = stvorec.clientWidth;
+    let lx = P.x - L / 2, ly = P.y - L - 36;
+    if (ly < 4) ly = P.y + 36;
+    lx = Math.max(4, Math.min(W - L - 4, lx));
+    lupa.style.left = `${lx}px`; lupa.style.top = `${ly}px`;
+    lupa.hidden = false;
+  }
+  const skryLupu = () => { lupa.hidden = true; };
+
   // Ovládanie kreslenia — myš aj prst.
   (() => {
     let tah = null; // { druh: "nova" | "koniec", ciara, kluce: [[ciara, "a"|"b"], …] }
@@ -712,6 +771,7 @@ window.kartotekaKlienta = (() => {
         tah = { druh: "kresba", kresba: k, okno, posledny: P };
         svgCiary.setPointerCapture(e.pointerId);
         kresliCiary();
+        ukazLupu(P, okno);
         return;
       }
       // 1) chytil koniec existujúcej čiary → ťahá ho (aj spojené konce s ním)
@@ -744,6 +804,7 @@ window.kartotekaKlienta = (() => {
       }
       svgCiary.setPointerCapture(e.pointerId);
       kresliCiary();
+      ukazLupu(P, tah.okno);
     });
     svgCiary.addEventListener("pointermove", (e) => {
       if (!tah) return;
@@ -754,6 +815,7 @@ window.kartotekaKlienta = (() => {
         tah.posledny = P;
         tah.kresba.body.push(bodZOkna(tah.okno, P.x, P.y, R));
         kresliCiary();
+        ukazLupu(P, tah.okno);
         return;
       }
       if (rozdelenie !== "cez") P = { x: Math.max(r.x, Math.min(r.x + r.w, P.x)), y: Math.max(r.y, Math.min(r.y + r.h, P.y)) };
@@ -774,8 +836,10 @@ window.kartotekaKlienta = (() => {
       }
       for (const [c, kl] of tah.kluce) c[kl] = { ...ciel };
       kresliCiary();
+      ukazLupu(bodVOkne(tah.okno, ciel, R), tah.okno);
     });
     const pusti = () => {
+      skryLupu();
       if (!tah) return;
       if (tah.druh === "kresba") {
         if (tah.kresba.body.length < 2) kresby = kresby.filter((k) => k !== tah.kresba); // ťuknutie nie je kresba
@@ -1511,6 +1575,7 @@ window.kartotekaKlienta = (() => {
     if (e.origin !== location.origin || e.data?.typ !== "psb-dvojica") return;
     const { pred, po } = e.data;
     window.rozrobene?.novy(false); // nová dvojica z profilu = nový návrh, starý ostane v Rozrobených
+    vycistiPopis(); // nové porovnanie = vlastný popis
     if (pred?.id) sk.vlozObrazok(0, kt.adresa(pred.id), pred.den, false);
     if (po?.id) sk.vlozObrazok(1, kt.adresa(po.id), po.den, false);
   });
@@ -1526,7 +1591,12 @@ window.kartotekaKlienta = (() => {
     b.disabled = false; b.textContent = "Uložiť ku klientovi";
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
     st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
+    // Popis patrí tomuto porovnaniu. Keď sa do polovíc dajú iné fotky, začne sa prázdny.
+    if (r.ok) ulozeneZdroje = sk.stav.map((x) => x.src || "").join("|");
   };
+  let ulozeneZdroje = null;
+  const vycistiPopis = () => { $("popisFotky").value = ""; ulozeneZdroje = null; };
+  $("popisFotky").addEventListener("input", () => window.poZmene?.());
 
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];
@@ -1665,6 +1735,7 @@ window.kartotekaKlienta = (() => {
       }
       aktualny = id;
       clearTimeout(casovac);
+      ulozeneZdroje = null; // návrh si nesie vlastný popis — nemazať ho
       sk.nacitajStav(JSON.stringify(o), rozmery);
       // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
       if (n.klient && n.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: n.klient }, location.origin);
@@ -1682,6 +1753,7 @@ window.kartotekaKlienta = (() => {
     function novy(vycistit = true) {
       clearTimeout(casovac);
       aktualny = null;
+      ulozeneZdroje = null;
       if (vycistit) sk.nacitajStav(sk.prazdnyStav, {});
       stavText("");
       nacitajZoznam();
@@ -1726,6 +1798,9 @@ window.kartotekaKlienta = (() => {
     const s = sk.stav;
     $("stavFotky").textContent = `${sk.denCz(s[0].den) || "—"} · ${sk.denCz(s[1].den) || "—"}`;
     $("stavRozlozenie").textContent = NAZVY[sk.rozdelenie];
+    if (ulozeneZdroje !== null && sk.stav.map((x) => x.src || "").join("|") !== ulozeneZdroje) vycistiPopis();
+    const popis = $("popisFotky").value.trim();
+    $("stavPopis").textContent = popis ? (popis.length > 22 ? `${popis.slice(0, 22)}…` : popis) : "žiadny";
     const st = sk.stitok;
     $("stavStitok").textContent = st.zap ? `${{ lh: "↖", ph: "↗", ld: "↙", pd: "↘" }[st.roh]} ${{ biely: "biely", tmavy: "tmavý", zeleny: "zelený", text: "len text" }[st.dizajn]}` : "vypnutý";
     const m = sk.mriezka;

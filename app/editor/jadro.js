@@ -227,6 +227,60 @@
     }
   }
 
+  /**
+   * LUPA PRI KRESLENÍ (Jerry, 12. 10. 2026: „pri zakresľovaní čiar potrebujem
+   * aj zoom automaticky"). Kým drží prst/pero/myš, nad miestom dotyku sa
+   * ukáže kruh so zväčšeným výrezom fotky, čiarami a zameriavačom — prst
+   * inak zakrýva presne ten bod, ktorý sa kladie. Kreslí sa na plátno z tých
+   * istých súradníc ako obrazovka (bodVOkne), takže lupa sedí aj pri zrkadle.
+   */
+  const LUPA = { strana: 140, zvacsenie: 2.6 };
+  const lupa = document.createElement("canvas");
+  lupa.className = "lupa";
+  lupa.hidden = true;
+  stvorec.appendChild(lupa);
+  function ukazLupu(P, okno) {
+    const L = LUPA.strana, Z = LUPA.zvacsenie, dpr = window.devicePixelRatio || 1;
+    if (lupa.width !== L * dpr) { lupa.width = L * dpr; lupa.height = L * dpr; lupa.style.width = `${L}px`; lupa.style.height = `${L}px`; }
+    const x = lupa.getContext("2d");
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, L, L);
+    x.save();
+    x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.clip();
+    x.fillStyle = "#222"; x.fillRect(0, 0, L, L);
+    // Bod obrazovky → bod lupy: posun na stred a zväčšenie.
+    x.translate(L / 2, L / 2); x.scale(Z, Z); x.translate(-P.x, -P.y);
+    const R = oknaNaObrazovke();
+    const kresliOkno = (i) => {
+      const t = stav[i], img = okna[i].querySelector("img");
+      if (!t.src || !img || !img.complete) return;
+      const r = rozlozenie(t.v, t.fw, t.fh, R[i].w, R[i].h);
+      x.save();
+      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
+      if (rozdelenie === "cez" && i === 1) x.globalAlpha = priehladnost;
+      if (t.zrkadlo) { x.translate(R[i].x + r.vlavo + r.sirka, R[i].y + r.hore); x.scale(-1, 1); x.drawImage(img, 0, 0, r.sirka, r.vyska); }
+      else x.drawImage(img, R[i].x + r.vlavo, R[i].y + r.hore, r.sirka, r.vyska);
+      x.restore();
+    };
+    if (rozdelenie === "cez") { kresliOkno(0); kresliOkno(1); } else if (okno >= 0) kresliOkno(okno);
+    ciaryNaPlatno(x, R, 1 / Z, 0);
+    x.restore();
+    // Zameriavač a okraj — v pixeloch lupy, nie zväčšené.
+    x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(L / 2 - 10, L / 2); x.lineTo(L / 2 - 3, L / 2); x.moveTo(L / 2 + 3, L / 2); x.lineTo(L / 2 + 10, L / 2);
+    x.moveTo(L / 2, L / 2 - 10); x.lineTo(L / 2, L / 2 - 3); x.moveTo(L / 2, L / 2 + 3); x.lineTo(L / 2, L / 2 + 10); x.stroke();
+    x.strokeStyle = "rgba(0,0,0,.6)"; x.lineWidth = 3; x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = "#fff"; x.lineWidth = 1.5; x.beginPath(); x.arc(L / 2, L / 2, L / 2 - 2, 0, Math.PI * 2); x.stroke();
+    // Poloha: nad prstom (vľavo hore); pri hornom okraji pod neho.
+    const W = stvorec.clientWidth;
+    let lx = P.x - L / 2, ly = P.y - L - 36;
+    if (ly < 4) ly = P.y + 36;
+    lx = Math.max(4, Math.min(W - L - 4, lx));
+    lupa.style.left = `${lx}px`; lupa.style.top = `${ly}px`;
+    lupa.hidden = false;
+  }
+  const skryLupu = () => { lupa.hidden = true; };
+
   // Ovládanie kreslenia — myš aj prst.
   (() => {
     let tah = null; // { druh: "nova" | "koniec", ciara, kluce: [[ciara, "a"|"b"], …] }
@@ -253,6 +307,7 @@
         tah = { druh: "kresba", kresba: k, okno, posledny: P };
         svgCiary.setPointerCapture(e.pointerId);
         kresliCiary();
+        ukazLupu(P, okno);
         return;
       }
       // 1) chytil koniec existujúcej čiary → ťahá ho (aj spojené konce s ním)
@@ -285,6 +340,7 @@
       }
       svgCiary.setPointerCapture(e.pointerId);
       kresliCiary();
+      ukazLupu(P, tah.okno);
     });
     svgCiary.addEventListener("pointermove", (e) => {
       if (!tah) return;
@@ -295,6 +351,7 @@
         tah.posledny = P;
         tah.kresba.body.push(bodZOkna(tah.okno, P.x, P.y, R));
         kresliCiary();
+        ukazLupu(P, tah.okno);
         return;
       }
       if (rozdelenie !== "cez") P = { x: Math.max(r.x, Math.min(r.x + r.w, P.x)), y: Math.max(r.y, Math.min(r.y + r.h, P.y)) };
@@ -315,8 +372,10 @@
       }
       for (const [c, kl] of tah.kluce) c[kl] = { ...ciel };
       kresliCiary();
+      ukazLupu(bodVOkne(tah.okno, ciel, R), tah.okno);
     });
     const pusti = () => {
+      skryLupu();
       if (!tah) return;
       if (tah.druh === "kresba") {
         if (tah.kresba.body.length < 2) kresby = kresby.filter((k) => k !== tah.kresba); // ťuknutie nie je kresba
