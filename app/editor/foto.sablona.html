@@ -34,6 +34,8 @@
         <div class="ramcek-fotky"></div>
         <span class="roh" data-roh="lh"></span><span class="roh" data-roh="ph"></span>
         <span class="roh" data-roh="ld"></span><span class="roh" data-roh="pd"></span>
+        <span class="otoc-stopka"></span>
+        <span class="otoc" title="Otočiť fotku (ťahaj; Shift = po 15°)">⟳</span>
       </div>
       <div class="okno" data-i="0" tabindex="0"></div>
       <div class="okno" data-i="1" tabindex="0"></div>
@@ -88,6 +90,12 @@
             <input type="range" id="zoom" min="0.3" max="6" step="0.001" value="1">
             <button class="krok-zoom" id="zoomViac" type="button" title="Priblížiť o 0,1 % (podrž = plynulo)" aria-label="Priblížiť o 0,1 %">▶</button>
             <span id="zoomH" class="zoom-h">100,0 %</span>
+          </div>
+          <div class="riadok">otočenie
+            <button class="krok-zoom" id="otocMenej" type="button" title="Otočiť o 0,1° doľava (podrž = plynulo)" aria-label="Otočiť o 0,1° doľava">◀</button>
+            <span id="otocH" class="zoom-h" style="flex:1;text-align:center">0,0°</span>
+            <button class="krok-zoom" id="otocViac" type="button" title="Otočiť o 0,1° doprava (podrž = plynulo)" aria-label="Otočiť o 0,1° doprava">▶</button>
+            <button class="krok-zoom" id="otocNula" type="button" title="Vyrovnať na 0°" style="width:auto;padding:0 8px">0°</button>
           </div>
           <div class="riadok">deň fotky <input type="date" id="den"></div>
           <div class="tlacidla">
@@ -193,7 +201,7 @@
           </div>
           <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
           <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
-          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj; novú čiaru začni v konci inej → <b>uhol medzi nimi</b>. Klik na čiaru ju vyberie. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. Klikni a ťahaj. <b>Koniec</b> hocijakej čiary či šípky chytíš a posunieš; <b>ťah po čiare</b> ju posunie celú. Uhol: novú čiaru dotiahni na koniec inej → prichytí sa a ukáže sa <b>uhol medzi nimi</b>. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť.</div>
         </div>
       </details>
 

@@ -27,6 +27,9 @@
   .roh { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 4px; background: #fff; border: 2px solid var(--accent, #e8893a); box-shadow: 0 1px 4px rgba(0,0,0,.4); pointer-events: auto; touch-action: none; }
   .roh[data-roh="lh"], .roh[data-roh="pd"] { cursor: nwse-resize; }
   .roh[data-roh="ph"], .roh[data-roh="ld"] { cursor: nesw-resize; }
+  /* Úchyt na otáčanie nad fotkou a stopka k hornej hrane. */
+  .otoc { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--accent, #e8893a); color: #fff; font-size: 16px; line-height: 26px; text-align: center; box-shadow: 0 1px 5px rgba(0,0,0,.45); pointer-events: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .otoc-stopka { position: absolute; width: 0; height: 21px; margin-top: -21px; border-left: 1.5px dashed rgba(232,137,58,.95); transform-origin: 0 100%; pointer-events: none; }
   .okno.tahanie { cursor: grabbing; }
   .okno.aktivne::after { content: ""; position: absolute; inset: 0; border: 3px solid var(--accent); pointer-events: none; }
   .okno img, .okno video { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; max-width: none; }

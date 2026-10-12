@@ -2,10 +2,21 @@
 (() => {
   // ── ČISTÁ MATEMATIKA (rovnaká, ako pôjde do Kokpitu) ──
   const MAX_ZOOM = 6;
+  const RAD = Math.PI / 180;
   const rozlozenie = (v, fw, fh, ow, oh) => {
     const s = Math.max(ow / fw, oh / fh) * v.zoom;
     const sirka = fw * s, vyska = fh * s;
     return { sirka, vyska, vlavo: ow / 2 + v.x * ow - sirka / 2, hore: oh / 2 + v.y * oh - vyska / 2 };
+  };
+  /** CSS transformácia fotky v okne (otočenie okolo stredu, zrkadlo) — obrazovka aj priesvitný presah. */
+  const transformaciaFotky = (r, t, dx = 0, dy = 0) =>
+    `translate(${dx + r.vlavo + r.sirka / 2}px, ${dy + r.hore + r.vyska / 2}px) rotate(${t.v.rot || 0}deg) scaleX(${t.zrkadlo ? -1 : 1}) translate(${-r.sirka / 2}px, ${-r.vyska / 2}px)`;
+  /** To isté na plátno — export a lupa. */
+  const fotkaNaPlatno = (x, img, t, ox, oy, r) => {
+    x.translate(ox + r.vlavo + r.sirka / 2, oy + r.hore + r.vyska / 2);
+    x.rotate((t.v.rot || 0) * RAD);
+    x.scale(t.zrkadlo ? -1 : 1, 1);
+    x.drawImage(img, -r.sirka / 2, -r.vyska / 2, r.sirka, r.vyska);
   };
   const obmedz = (v, fw, fh, ow, oh) => {
     // Skrytý editor (karta v Kokpite bez rozmerov) má okná 0 × 0 — delenie
@@ -13,17 +24,21 @@
     if (!(ow > 0 && oh > 0 && fw > 0 && fh > 0)) return v;
     // Oddialiť sa dá, až kým nie je vidno celú fotku (12. 10. 2026: „oddialenú
     // fotku mám v rámčeku") — zoom 1 = fotka práve vyplní okno.
-    const pokryt = Math.max(ow / fw, oh / fh), celu = Math.min(ow / fw, oh / fh);
+    // Otočená fotka (12. 10. 2026) sa meria svojím obaľujúcim obdĺžnikom.
+    const uhol = (v.rot || 0) * RAD, cs = Math.abs(Math.cos(uhol)), sn = Math.abs(Math.sin(uhol));
+    const bw = fw * cs + fh * sn, bh = fw * sn + fh * cs;
+    const pokryt = Math.max(ow / fw, oh / fh), celu = Math.min(ow / bw, oh / bh);
     const zoom = Math.min(MAX_ZOOM, Math.max(celu / pokryt, v.zoom));
     const s = pokryt * zoom;
     // Väčšia fotka musí okno pokryť; menšia sa môže hýbať len vnútri okna.
-    const mx = Math.abs(fw * s - ow) / 2 / ow, my = Math.abs(fh * s - oh) / 2 / oh;
-    return { zoom, x: Math.min(mx, Math.max(-mx, v.x)), y: Math.min(my, Math.max(-my, v.y)) };
+    const mx = Math.abs(bw * s - ow) / 2 / ow, my = Math.abs(bh * s - oh) / 2 / oh;
+    return { ...v, zoom, x: Math.min(mx, Math.max(-mx, v.x)), y: Math.min(my, Math.max(-my, v.y)) };
   };
   const zoomOkolo = (v, z, bx, by) => {
     z = Math.min(MAX_ZOOM, Math.max(0.05, z)); // dolnú hranicu (celá fotka) stráži obmedz
     const k = z / v.zoom;
-    return { zoom: z, x: bx - (bx - v.x) * k, y: by - (by - v.y) * k };
+    // (otočenie ostáva — zoomOkolo mení len mierku a posun)
+    return { ...v, zoom: z, x: bx - (bx - v.x) * k, y: by - (by - v.y) * k };
   };
 
   // ── STAV ──
@@ -85,14 +100,19 @@
   const desatinne = (n) => n.toFixed(1).replace(".", ",");
   /** Obdĺžniky okien na obrazovke (px od rohu štvorca). */
   const oknaNaObrazovke = () => okna.map((el) => ({ x: el.offsetLeft, y: el.offsetTop, w: el.clientWidth, h: el.clientHeight }));
+  // Bod fotky (u, v ∈ 0–1) ↔ bod štvorca. Zrkadlo a otočenie okolo stredu fotky.
   const bodVOkne = (i, p, R) => {
     const s = stav[i], r = rozlozenie(s.v, s.fw, s.fh, R[i].w, R[i].h);
-    return { x: R[i].x + r.vlavo + (s.zrkadlo ? 1 - p.u : p.u) * r.sirka, y: R[i].y + r.hore + p.v * r.vyska };
+    const lx = ((s.zrkadlo ? 1 - p.u : p.u) - 0.5) * r.sirka, ly = (p.v - 0.5) * r.vyska;
+    const a = (s.v.rot || 0) * RAD, c = Math.cos(a), n = Math.sin(a);
+    return { x: R[i].x + r.vlavo + r.sirka / 2 + lx * c - ly * n, y: R[i].y + r.hore + r.vyska / 2 + lx * n + ly * c };
   };
   const bodZOkna = (i, x, y, R) => {
     const s = stav[i], r = rozlozenie(s.v, s.fw, s.fh, R[i].w, R[i].h);
-    const u = (x - R[i].x - r.vlavo) / r.sirka;
-    return { u: s.zrkadlo ? 1 - u : u, v: (y - R[i].y - r.hore) / r.vyska };
+    const dx = x - (R[i].x + r.vlavo + r.sirka / 2), dy = y - (R[i].y + r.hore + r.vyska / 2);
+    const a = (s.v.rot || 0) * RAD, c = Math.cos(a), n = Math.sin(a);
+    const u = (dx * c + dy * n) / r.sirka + 0.5, v = (-dx * n + dy * c) / r.vyska + 0.5;
+    return { u: s.zrkadlo ? 1 - u : u, v };
   };
   const rovnakyBod = (p, q) => Math.abs(p.u - q.u) < 1e-9 && Math.abs(p.v - q.v) < 1e-9;
   /** Sklon čiary: k vodorovnej, ak je bližšie k nej, inak k zvislej. */
@@ -277,8 +297,7 @@
       x.save();
       if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
       if (rozdelenie === "cez" && i === 1) x.globalAlpha = priehladnost;
-      if (t.zrkadlo) { x.translate(R[i].x + r.vlavo + r.sirka, R[i].y + r.hore); x.scale(-1, 1); x.drawImage(img, 0, 0, r.sirka, r.vyska); }
-      else x.drawImage(img, R[i].x + r.vlavo, R[i].y + r.hore, r.sirka, r.vyska);
+      fotkaNaPlatno(x, img, t, R[i].x, R[i].y, r);
       x.restore();
     };
     if (rozdelenie === "cez") { kresliOkno(0); kresliOkno(1); } else if (okno >= 0) kresliOkno(okno);
@@ -324,7 +343,7 @@
         kresby.push(k);
         vybrana = null;
         tah = { druh: "kresba", kresba: k, okno, posledny: P };
-        svgCiary.setPointerCapture(e.pointerId);
+        try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
         kresliCiary();
         ukazLupu(P, okno);
         return;
@@ -338,17 +357,26 @@
           if (d < 12 && (!najblizsi || d < najblizsi.d)) najblizsi = { c, kl, d };
         }
       }
-      // Koniec VYBRANEJ čiary sa ťahá (doladenie). Koniec nevybranej je
-      // začiatok novej čiary — tak vzniká uhol (koleno, bedro, krk).
-      // 2) klik na čiaru → vyberie ju; 3) inak nová čiara.
+      // KONIEC KAŽDEJ ČIARY, ŠÍPKY ČI RAMENA UHLA SA DÁ VŽDY CHYTIŤ A POSUNÚŤ
+      // (Jerry, 12. 10. 2026: „všetky prvky, keď ich chytím na konci, vždy
+      // ich môžem upraviť"). Spojené konce (vrchol uhla) idú spolu. Uhol
+      // vznikne tak, že novú čiaru dotiahneš na koniec inej — prichytí sa.
+      // 2) ťah po čiare ju vyberie a posunie celú; 3) inak nová čiara.
       const okno = oknoPodBodom(P, R);
-      if (najblizsi && najblizsi.c.id === vybrana) {
+      if (najblizsi) {
         const bod = najblizsi.c[najblizsi.kl];
         const spojene = ciary.flatMap((c) => ["a", "b"].filter((kl) => c.okno === najblizsi.c.okno && rovnakyBod(c[kl], bod)).map((kl) => [c, kl]));
+        vybrana = najblizsi.c.id;
         tah = { druh: "koniec", kluce: spojene, okno: najblizsi.c.okno };
       } else {
-        const naCiare = !najblizsi && ciary.find((c) => stav[c.okno]?.src && vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R)) < 7);
-        if (naCiare) { vybrana = naCiare.id; kresliCiary(); return; }
+        const naCiare = ciary.find((c) => stav[c.okno]?.src && vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R)) < 8);
+        if (naCiare) {
+          vybrana = naCiare.id;
+          tah = { druh: "cela", ciara: naCiare, okno: naCiare.okno, P, A: bodVOkne(naCiare.okno, naCiare.a, R), B: bodVOkne(naCiare.okno, naCiare.b, R) };
+          try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
+          kresliCiary();
+          return;
+        }
         if (okno < 0 || !stav[okno].src) return;
         let zaciatok = bodZOkna(okno, P.x, P.y, R);
         if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
@@ -357,7 +385,7 @@
         vybrana = c.id;
         tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
       }
-      svgCiary.setPointerCapture(e.pointerId);
+      try { svgCiary.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
       kresliCiary();
       ukazLupu(P, tah.okno);
     });
@@ -365,6 +393,14 @@
       if (!tah) return;
       const R = oknaNaObrazovke(), r = R[tah.okno];
       let P = miesto(e);
+      if (tah.druh === "cela") {
+        // Celá čiara (šípka) sa posúva bez zmeny tvaru.
+        const dx = P.x - tah.P.x, dy = P.y - tah.P.y;
+        tah.ciara.a = bodZOkna(tah.okno, tah.A.x + dx, tah.A.y + dy, R);
+        tah.ciara.b = bodZOkna(tah.okno, tah.B.x + dx, tah.B.y + dy, R);
+        kresliCiary();
+        return;
+      }
       if (tah.druh === "kresba") {
         if (Math.hypot(P.x - tah.posledny.x, P.y - tah.posledny.y) < 2.5) return; // hustejšie body nič nepridajú
         tah.posledny = P;
@@ -482,9 +518,7 @@
       const r = rozlozenie(s.v, s.fw, s.fh, ow, oh);
       img.style.width = `${r.sirka}px`;
       img.style.height = `${r.vyska}px`;
-      img.style.transform = s.zrkadlo
-        ? `translate(${r.vlavo + r.sirka}px, ${r.hore}px) scaleX(-1)`
-        : `translate(${r.vlavo}px, ${r.hore}px)`;
+      img.style.transform = transformaciaFotky(r, s);
       kresliStitok(el.querySelector(".popiska"), i, ow, oh);
       img.style.opacity = rozdelenie === "cez" && i === 1 ? String(priehladnost) : "1";
     });
@@ -502,6 +536,8 @@
     document.getElementById("zoom").value = s.v.zoom;
     const zh = document.getElementById("zoomH");
     if (zh) zh.textContent = `${(s.v.zoom * 100).toFixed(1).replace(".", ",")} %`;
+    const oh2 = document.getElementById("otocH");
+    if (oh2) oh2.textContent = `${(s.v.rot || 0).toFixed(1).replace(".", ",")}°`;
     document.getElementById("den").value = s.den || "";
     const nazvy = rozdelenie === "vedla" ? ["ľavá", "pravá"] : rozdelenie === "pod" ? ["horná", "dolná"] : ["spodná", "vrchná"];
     const pop2 = popisky();
@@ -688,6 +724,22 @@
     s.v = obmedz(zoomOkolo(s.v, s.v.zoom * Math.pow(1.001, smer * krokov), 0, 0), s.fw, s.fh, ow, oh);
     kresli();
   };
+  // Otočenie po 0,1° (podržanie zrýchľuje) a vyrovnanie na 0°.
+  const otocO = (krok) => { if (stav[aktivne].src) nastavOtocenie(aktivne, (stav[aktivne].v.rot || 0) + krok); };
+  for (const [id, smer] of [["otocMenej", -1], ["otocViac", 1]]) {
+    const b = document.getElementById(id);
+    if (!b) continue;
+    let casovac = 0, opakovanie = 0, kolo = 0;
+    const stop = () => { clearTimeout(casovac); clearInterval(opakovanie); };
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      otocO(smer * 0.1);
+      kolo = 0;
+      casovac = setTimeout(() => { opakovanie = setInterval(() => { kolo++; otocO(smer * (kolo > 40 ? 1 : kolo > 15 ? 0.3 : 0.1)); }, 45); }, 450);
+    });
+    for (const u of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(u, stop);
+  }
+  document.getElementById("otocNula")?.addEventListener("click", () => { if (stav[aktivne].src) nastavOtocenie(aktivne, 0); });
   for (const [id, smer] of [["zoomMenej", -1], ["zoomViac", 1]]) {
     const b = document.getElementById(id);
     if (!b) continue;
@@ -881,8 +933,7 @@
       if (cez && i === 1) x.globalAlpha = priehladnost;
       if (img && s.src) {
         const r = rozlozenie(s.v, s.fw, s.fh, ow, oh);
-        if (s.zrkadlo) { x.translate(ox + r.vlavo + r.sirka, oy + r.hore); x.scale(-1, 1); x.drawImage(img, 0, 0, r.sirka, r.vyska); }
-        else x.drawImage(img, ox + r.vlavo, oy + r.hore, r.sirka, r.vyska);
+        fotkaNaPlatno(x, img, s, ox, oy, r);
       } else { x.fillStyle = "#ddd"; x.fillRect(ox, oy, ow, oh); }
       x.restore();
       if (stitok.zap && s.src) {
@@ -979,12 +1030,23 @@
    */
   const duch = document.getElementById("duch");
   const uchopy = document.getElementById("uchopy");
-  /** Obdĺžnik fotky i v súradniciach štvorca (px). */
+  /** Fotka i v súradniciach štvorca: stred, rozmer a otočenie (px, stupne). */
   function obdlznikFotky(i) {
     const t = stav[i], R = oknaNaObrazovke()[i];
     const r = rozlozenie(t.v, t.fw, t.fh, R.w, R.h);
-    return { x: R.x + r.vlavo, y: R.y + r.hore, w: r.sirka, h: r.vyska, R };
+    return { cx: R.x + r.vlavo + r.sirka / 2, cy: R.y + r.hore + r.vyska / 2, w: r.sirka, h: r.vyska, rot: t.v.rot || 0, R };
   }
+  /** Bod vo vlastných osiach fotky (lx, ly od stredu) → bod štvorca. */
+  const zFotky = (o, lx, ly) => {
+    const a = o.rot * RAD, c = Math.cos(a), n = Math.sin(a);
+    return { x: o.cx + lx * c - ly * n, y: o.cy + lx * n + ly * c };
+  };
+  const doFotky = (o, P) => {
+    const a = o.rot * RAD, c = Math.cos(a), n = Math.sin(a), dx = P.x - o.cx, dy = P.y - o.cy;
+    return { x: dx * c + dy * n, y: -dx * n + dy * c };
+  };
+  const jeNaFotke = (o, P) => { const l = doFotky(o, P); return Math.abs(l.x) <= o.w / 2 && Math.abs(l.y) <= o.h / 2; };
+  const otocUchyt = document.querySelector("#uchopy .otoc");
   function kresliUchopy() {
     if (!duch || !uchopy) return;
     const t = stav[aktivne];
@@ -994,50 +1056,96 @@
     const o = obdlznikFotky(aktivne);
     const img = duch.querySelector("img");
     if (img.getAttribute("src") !== t.src) img.src = t.src;
+    const r = rozlozenie(t.v, t.fw, t.fh, o.R.w, o.R.h);
     img.style.width = `${o.w}px`; img.style.height = `${o.h}px`;
-    img.style.transform = t.zrkadlo ? `translate(${o.x + o.w}px, ${o.y}px) scaleX(-1)` : `translate(${o.x}px, ${o.y}px)`;
+    img.style.transform = transformaciaFotky(r, t, o.R.x, o.R.y);
     const ram = uchopy.querySelector(".ramcek-fotky");
-    Object.assign(ram.style, { left: `${o.x}px`, top: `${o.y}px`, width: `${o.w}px`, height: `${o.h}px` });
+    Object.assign(ram.style, { left: `${o.cx - o.w / 2}px`, top: `${o.cy - o.h / 2}px`, width: `${o.w}px`, height: `${o.h}px`, transform: `rotate(${o.rot}deg)` });
     for (const h of uchopy.querySelectorAll(".roh")) {
       const [sx, sy] = h.dataset.roh;
-      h.style.left = `${sx === "p" ? o.x + o.w : o.x}px`;
-      h.style.top = `${sy === "d" ? o.y + o.h : o.y}px`;
+      const P = zFotky(o, sx === "p" ? o.w / 2 : -o.w / 2, sy === "d" ? o.h / 2 : -o.h / 2);
+      h.style.left = `${P.x}px`; h.style.top = `${P.y}px`;
+    }
+    if (otocUchyt) {
+      // Úchyt na otáčanie nad horným okrajom (v osi fotky), aby ho nezakryl prst pri rohu.
+      const P = zFotky(o, 0, -o.h / 2 - 34);
+      otocUchyt.style.left = `${P.x}px`; otocUchyt.style.top = `${P.y}px`;
+      const hrana = zFotky(o, 0, -o.h / 2);
+      const st = uchopy.querySelector(".otoc-stopka");
+      if (st) Object.assign(st.style, { left: `${hrana.x}px`, top: `${hrana.y}px`, transform: `rotate(${o.rot}deg)` });
     }
   }
   const miestoVoStvorci = (e) => {
     const b = stvorec.getBoundingClientRect();
     return { x: e.clientX - b.left, y: e.clientY - b.top };
   };
-  /** Nastaví fotke obdĺžnik (ľavý horný roh x, y a šírku w) — výrez sa prepočíta. */
-  function nastavObdlznik(i, x, y, w) {
+  /** Nastaví fotke stred (cx, cy v px štvorca) a šírku w — výrez sa prepočíta. */
+  function nastavStred(i, cx, cy, w) {
     const t = stav[i], R = oknaNaObrazovke()[i];
     const pokryt = Math.max(R.w / t.fw, R.h / t.fh);
-    const sc = w / t.fw, h = t.fh * sc;
-    const v = { zoom: sc / pokryt, x: (x - R.x + w / 2 - R.w / 2) / R.w, y: (y - R.y + h / 2 - R.h / 2) / R.h };
+    const v = { ...t.v, zoom: (w / t.fw) / pokryt, x: (cx - R.x - R.w / 2) / R.w, y: (cy - R.y - R.h / 2) / R.h };
     t.v = obmedz(v, t.fw, t.fh, R.w, R.h);
     kresli();
   }
-  // Ťah za roh: protiľahlý roh stojí, pomer strán ostáva.
+  /** Otočenie v stupňoch, (−180, 180]; pomer strán ani stred sa nemení. */
+  function nastavOtocenie(i, uhol) {
+    const t = stav[i], R = oknaNaObrazovke()[i];
+    let u = ((uhol + 180) % 360 + 360) % 360 - 180;
+    if (u === -180) u = 180;
+    t.v = obmedz({ ...t.v, rot: Math.round(u * 100) / 100 }, t.fw, t.fh, R.w, R.h);
+    kresli();
+  }
+  // Ťah za roh: protiľahlý roh stojí, pomer strán ostáva — aj pri otočenej fotke.
   uchopy?.querySelectorAll(".roh").forEach((h) => {
     let kotva = null;
     h.addEventListener("pointerdown", (e) => {
       e.preventDefault(); e.stopPropagation();
       const o = obdlznikFotky(aktivne), [sx, sy] = h.dataset.roh;
-      kotva = { x: sx === "p" ? o.x : o.x + o.w, y: sy === "d" ? o.y : o.y + o.h, sx, sy };
+      const A = zFotky(o, sx === "p" ? -o.w / 2 : o.w / 2, sy === "d" ? -o.h / 2 : o.h / 2);
+      kotva = { ...A, sx, sy, rot: o.rot };
       try { h.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
     });
     h.addEventListener("pointermove", (e) => {
       if (!kotva) return;
       const t = stav[aktivne], P = miestoVoStvorci(e);
-      const sc = Math.max(Math.abs(P.x - kotva.x) / t.fw, Math.abs(P.y - kotva.y) / t.fh);
+      const a = kotva.rot * RAD, c = Math.cos(a), n = Math.sin(a), dx = P.x - kotva.x, dy = P.y - kotva.y;
+      const lx = dx * c + dy * n, ly = -dx * n + dy * c;
+      const sc = Math.max(Math.abs(lx) / t.fw, Math.abs(ly) / t.fh);
       const w = t.fw * sc, hh = t.fh * sc;
-      nastavObdlznik(aktivne, kotva.sx === "p" ? kotva.x : kotva.x - w, kotva.sy === "d" ? kotva.y : kotva.y - hh, w);
+      const ox = kotva.sx === "p" ? w / 2 : -w / 2, oy = kotva.sy === "d" ? hh / 2 : -hh / 2;
+      nastavStred(aktivne, kotva.x + ox * c - oy * n, kotva.y + ox * n + oy * c, w);
       ukazLupuRohu(P);
     });
     const pusti = () => { kotva = null; skryLupu(); };
     h.addEventListener("pointerup", pusti);
     h.addEventListener("pointercancel", pusti);
   });
+  /**
+   * OTÁČANIE ŤAHOM (Jerry, 12. 10. 2026: „pridaj aj otáčanie fotky ťahom").
+   * Úchyt nad fotkou; uhol sa prichytí k 0°/90°/180°, keď je do 1,5°
+   * (rovná fotka je najčastejší cieľ), Shift = po 15°. Presné doladenie je
+   * v paneli Fotky (◀ ▶ po 0,1°).
+   */
+  if (otocUchyt) {
+    let zac = null;
+    otocUchyt.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const o = obdlznikFotky(aktivne), P = miestoVoStvorci(e);
+      zac = { uhol: Math.atan2(P.y - o.cy, P.x - o.cx), rot: o.rot, cx: o.cx, cy: o.cy };
+      try { otocUchyt.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
+    });
+    otocUchyt.addEventListener("pointermove", (e) => {
+      if (!zac) return;
+      const P = miestoVoStvorci(e);
+      let u = zac.rot + (Math.atan2(P.y - zac.cy, P.x - zac.cx) - zac.uhol) / RAD;
+      if (e.shiftKey) u = Math.round(u / 15) * 15;
+      else { const k = Math.round(u / 90) * 90; if (Math.abs(u - k) < 1.5) u = k; }
+      nastavOtocenie(aktivne, u);
+    });
+    const pusti = () => { zac = null; };
+    otocUchyt.addEventListener("pointerup", pusti);
+    otocUchyt.addEventListener("pointercancel", pusti);
+  }
   const ukazLupuRohu = (P) => { try { ukazLupu(P, rozdelenie === "cez" ? -1 : aktivne); } catch { /* lupa nie je podmienka */ } };
 
   // ── POHĽAD NA PLOCHU: priblížiť / oddialiť bez zmeny fotky ──
@@ -1092,13 +1200,13 @@
     const prsty = new Map();
     let tah = null;
     platno.addEventListener("pointerdown", (e) => {
-      if (e.target.closest?.(".okno, .roh, .pohlad, svg.ciary.kreslim")) return;
+      if (e.target.closest?.(".okno, .roh, .otoc, .pohlad, svg.ciary.kreslim")) return;
       prsty.set(e.pointerId, bodPlatna(e));
       try { platno.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
       if (prsty.size === 1) {
         const P = miestoVoStvorci(e), t = stav[aktivne];
         const o = t?.src && !rezimCiar ? obdlznikFotky(aktivne) : null;
-        const naFotke = o && P.x >= o.x && P.x <= o.x + o.w && P.y >= o.y && P.y <= o.y + o.h;
+        const naFotke = o && jeNaFotke(o, P);
         tah = naFotke ? { druh: "fotka", P, o } : { druh: "plocha", x: e.clientX, y: e.clientY, sl: platno.scrollLeft, st: platno.scrollTop };
         if (naFotke) drzi = true; // posun fotky je jeden krok späť, nie desať
       } else if (prsty.size === 2) {
@@ -1114,7 +1222,7 @@
         platno.scrollTop = tah.st - (e.clientY - tah.y);
       } else if (tah.druh === "fotka") {
         const P = miestoVoStvorci(e);
-        nastavObdlznik(aktivne, tah.o.x + P.x - tah.P.x, tah.o.y + P.y - tah.P.y, tah.o.w);
+        nastavStred(aktivne, tah.o.cx + P.x - tah.P.x, tah.o.cy + P.y - tah.P.y, tah.o.w);
       } else if (tah.druh === "stipnutie" && prsty.size === 2) {
         const [a, b] = [...prsty.values()];
         nastavPohlad(tah.z * Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
