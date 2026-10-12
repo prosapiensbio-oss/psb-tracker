@@ -26,6 +26,13 @@ import { VyberMena } from "./VyberMena";
  * „do editora" — karta prepne klienta, otvorí Foto a dvojicu pošle
  * (`psb-dvojica`) do ľavej a pravej polovice (lib/psb/doEditora.ts).
  *
+ * CELÁ OBRAZOVKA (Jerry, 12. 10. 2026: „na iPade a telefóne mať možnosť
+ * pustiť editor na celú obrazovku"). Editor sa roztiahne cez celý Kokpit
+ * (bez hornej lišty a kariet); kde to prehliadač dovolí (iPad, Mac), zapne
+ * aj systémovú celú obrazovku bez lišty Safari. iPhone ju stránkam
+ * nedovoľuje — tam ostane roztiahnutie cez Kokpit (na ploche ako appka je
+ * to bez lišty aj tak).
+ *
  * Raz otvorený editor ostane načítaný aj po prepnutí na druhý (aj na inú
  * kartu Workspace) — inak by prepnutie zahodilo rozrobenú prácu
  * (pravidlo „Workspace drží prácu").
@@ -100,6 +107,76 @@ export function EditorKarta({ mena }: { mena: string[] }) {
     return () => removeEventListener(UDALOST_DO_EDITORA, prevezmi);
   }, [posliDvojicu]);
 
+  // ── Celá obrazovka ──
+  const [cela, setCela] = useState(false);
+  const obal = useRef<HTMLDivElement | null>(null);
+  const systemova = useRef(false);
+  const zapniCelu = useCallback(() => {
+    setCela(true);
+    const el = obal.current as (HTMLDivElement & { webkitRequestFullscreen?: () => void }) | null;
+    try {
+      const p = el?.requestFullscreen ? el.requestFullscreen() : (el?.webkitRequestFullscreen?.(), undefined);
+      systemova.current = true;
+      if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => { systemova.current = false; });
+    } catch { systemova.current = false; }
+  }, []);
+  const vypniCelu = useCallback(() => {
+    setCela(false);
+    const d = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
+    if (systemova.current && (d.fullscreenElement || d.webkitFullscreenElement)) {
+      try { if (d.exitFullscreen) void d.exitFullscreen().catch(() => {}); else d.webkitExitFullscreen?.(); } catch { /* nič */ }
+    }
+    systemova.current = false;
+  }, []);
+  useEffect(() => {
+    if (!cela) return;
+    // Kokpit pod editorom sa nemá posúvať; systémové zavretie (gesto, Esc) zavrie aj režim.
+    const html = document.documentElement, predtym = html.style.overflow;
+    html.style.overflow = "hidden";
+    /*
+     * `position: fixed` platí voči obrazovke, len kým žiadny rodič nemá
+     * transform, filter či backdrop-filter — inak sa roztiahne len cez kartu
+     * (Workspace karty majú transform z listovania, sklenená paleta blur).
+     * Rámik s editorom sa presunúť nesmie (načítal by sa znova a zahodil
+     * rozrobenú prácu), tak sa na chvíľu „vypnú" tie vlastnosti rodičom.
+     */
+    const vratit: { el: HTMLElement; css: string }[] = [];
+    for (let el = obal.current?.parentElement; el && el !== document.body; el = el.parentElement) {
+      const cs = getComputedStyle(el);
+      const tvori = cs.transform !== "none" || cs.filter !== "none" || (cs as CSSStyleDeclaration & { backdropFilter?: string }).backdropFilter !== "none"
+        || cs.perspective !== "none" || /transform|filter/.test(cs.willChange) || /paint|layout|strict|content/.test(cs.contain || "");
+      const vrstva = cs.position !== "static" && cs.zIndex !== "auto";
+      if (!tvori && !vrstva) continue;
+      vratit.push({ el, css: el.style.cssText });
+      if (tvori) {
+        el.style.setProperty("transform", "none", "important");
+        el.style.setProperty("filter", "none", "important");
+        el.style.setProperty("backdrop-filter", "none", "important");
+        el.style.setProperty("-webkit-backdrop-filter", "none", "important");
+        el.style.setProperty("perspective", "none", "important");
+        el.style.setProperty("will-change", "auto", "important");
+        el.style.setProperty("contain", "none", "important");
+      }
+      // Vrstva rodiča by editor držala pod hornou lištou Kokpitu.
+      if (vrstva) el.style.setProperty("z-index", "2147483000", "important");
+    }
+    const zmena = () => {
+      const d = document as Document & { webkitFullscreenElement?: Element };
+      if (systemova.current && !d.fullscreenElement && !d.webkitFullscreenElement) { systemova.current = false; setCela(false); }
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") vypniCelu(); };
+    document.addEventListener("fullscreenchange", zmena);
+    document.addEventListener("webkitfullscreenchange", zmena);
+    addEventListener("keydown", esc);
+    return () => {
+      html.style.overflow = predtym;
+      for (const { el, css } of vratit) el.style.cssText = css;
+      document.removeEventListener("fullscreenchange", zmena);
+      document.removeEventListener("webkitfullscreenchange", zmena);
+      removeEventListener("keydown", esc);
+    };
+  }, [cela, vypniCelu]);
+
   if (!otvoreny) {
     return (
       <div style={{ flexGrow: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -126,8 +203,14 @@ export function EditorKarta({ mena }: { mena: string[] }) {
   }
 
   return (
-    <div style={{ flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <div
+      ref={obal}
+      style={cela ? {
+        position: "fixed", inset: 0, zIndex: 2147483000, background: C.bg, display: "flex", flexDirection: "column", gap: 6,
+        padding: "max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left))",
+      } : { flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 10 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: cela ? 8 : 10, flexWrap: "wrap" }}>
         <div role="tablist" aria-label="Editor" style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 10, border: `1px solid ${mix(C.border, 120)}`, background: C.surface }}>
           {EDITORY.map((e) => (
             <button
@@ -152,13 +235,24 @@ export function EditorKarta({ mena }: { mena: string[] }) {
             style={{ width: 230 }}
           />
         </div>
-        <span style={{ fontSize: 11.5, color: C.textDim }}>
-          {platny
-            ? `ukladá sa do kartotéky — ${platny}`
-            : "bez klienta sa dá upravovať aj sťahovať, len nie uložiť ku klientovi"}
-        </span>
+        {!cela && (
+          <span style={{ fontSize: 11.5, color: C.textDim }}>
+            {platny
+              ? `ukladá sa do kartotéky — ${platny}`
+              : "bez klienta sa dá upravovať aj sťahovať, len nie uložiť ku klientovi"}
+          </span>
+        )}
+        <button
+          type="button" onClick={cela ? vypniCelu : zapniCelu}
+          title={cela ? "Späť do Kokpitu (Esc)" : "Editor cez celú obrazovku"}
+          style={{
+            marginLeft: "auto", padding: "7px 12px", borderRadius: 9, border: `1px solid ${cela ? C.accent : mix(C.border, 140)}`,
+            background: cela ? mix(C.accent, 18) : C.surface, color: cela ? C.accentLight : C.text,
+            fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+          }}
+        >{cela ? "✕ zavrieť" : "⛶ celá obrazovka"}</button>
       </div>
-      <div style={{ position: "relative", flexGrow: 1, minHeight: 420, borderRadius: 12, overflow: "hidden", border: `1px solid ${mix(C.border, 100)}` }}>
+      <div style={{ position: "relative", flexGrow: 1, minHeight: cela ? 0 : 420, borderRadius: cela ? 8 : 12, overflow: "hidden", border: `1px solid ${mix(C.border, 100)}` }}>
         {nacitane.map((d) => (
           <iframe
             key={d}
