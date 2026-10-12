@@ -6,6 +6,9 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; }
+  /* Vodorovné potiahnutie dvoma prstami v editore nesmie odísť do Kokpitu
+     (prepnutie karty) ani do prehliadača („späť") — 12. 10. 2026. */
+  html, body { overscroll-behavior: none; }
   body { background: var(--surface); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; -webkit-tap-highlight-color: transparent; overflow: hidden; }
 
   .hlavicka { height: var(--hlavicka); display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--line); }

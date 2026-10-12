@@ -524,6 +524,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // náhrada, bez ktorej sa šípky 28. 9. 2026 skryť nesmeli.
   const mobil = useMobilRozlozenie();
   const poistka = useRef(0 as unknown as ReturnType<typeof setTimeout>);
+  /**
+   * V EDITORE SA GESTOM NEPREPÍNA (Jerry, 12. 10. 2026: „keď pracujem
+   * v editore a posúvam myškou doľava doprava a mám dva prsty na touchpade,
+   * prepne ma to na ďalšiu kartu"). Editor sám ťahá a posúva fotky; kto
+   * v ňom robí, kartu meniť nechce. Prepína sa šípkami a radom kariet hore.
+   */
+  const vEditore = useRef(false);
+  vEditore.current = k?.druh === "editor";
   useEffect(() => {
     const el = kopa.current;
     if (!el || zive.length < 2) return;
@@ -532,6 +540,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       // Bez toho Safari zo šmyknutia urobí „krok späť v histórii" a appka
       // sa zavrie. Preto `passive: false` nižšie.
       e.preventDefault();
+      if (vEditore.current) return;
       // Poistka LEN otvára, nikdy nezatvára — preto ju smie odkladať každá
       // udalosť bez rizika, že zámok zostane visieť. Presne na to doplatila
       // prvá verzia, kde odkladanie zámok DRŽALO.
@@ -572,7 +581,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     };
 
     const zacP = (e: PointerEvent) => {
-      if (e.pointerType === "mouse") return;
+      if (e.pointerType === "mouse" || vEditore.current) return;
       zacniSvih(svih.current, e.clientX, e.clientY, e.timeStamp);
     };
     const pohybP = (e: PointerEvent) => {
@@ -585,6 +594,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     el.addEventListener("pointercancel", zrus);
 
     const zacD = (e: TouchEvent) => {
+      if (vEditore.current) return;
       const t = e.touches[0];
       if (t) zacniSvih(svih.current, t.clientX, t.clientY, e.timeStamp);
     };
