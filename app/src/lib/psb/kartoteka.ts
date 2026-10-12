@@ -55,6 +55,8 @@ export type Fotka = {
   popis?: string;
   /** Porovnanie má aj čistú podobu (bez čiar a kresby) — `/api/fotky?id=…&ciste=1`. */
   maCiste?: boolean;
+  /** Pri porovnaní je uložený stav editora — dá sa k nemu vrátiť (✎ upraviť). */
+  maEdit?: boolean;
 };
 
 export type Fotenie = { den: string; fotky: Fotka[]; poznamka: string };

@@ -83,6 +83,9 @@
   .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
   .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
   .popis-fotky textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
+  .krok-zoom { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line2); background: var(--card); color: var(--text); font-size: 11px; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .krok-zoom:active { background: rgba(232,137,58,.22); }
+  .zoom-h { flex: 0 0 auto; min-width: 54px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /*/ui-css*/
   /* V Kokpite je hlavička na karte Workspace, tu nie. */
@@ -356,6 +359,10 @@ window.kartotekaKlienta = (() => {
     fd.append("subor", z.blob, z.nazov || "subor");
     // Čistá podoba toho istého porovnania (bez čiar a kresby) — klient si ju na stránke prepne.
     if (z.ciste) fd.append("subor_ciste", z.ciste, "ciste.jpg");
+    // Stav editora (návrat k hotovému editu) a pôvodné fotky mimo kartotéky.
+    if (z.edit) fd.append("edit", z.edit);
+    (z.zdroje || []).forEach((b, n) => fd.append(`zdroj${n}`, b, `zdroj${n}.jpg`));
+    if (z.nahradit) fd.append("nahradit", z.nahradit);
     let j;
     try {
       const r = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd });

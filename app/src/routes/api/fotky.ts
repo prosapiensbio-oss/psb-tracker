@@ -14,7 +14,10 @@ import { vyplneneCisla } from "../../lib/psb/fotkyStranka";
  * KARTOTÉKA FOTIEK DRŽANIA TELA (5. 10. 2026).
  *
  *   GET  ?klient=X  → zoznam fotiek, poznámky k foteniam, či je súhlas
- *   GET  ?id=X      → samotná fotka (rozšifrovaná, len prihlásenému); &ciste=1 = porovnanie bez čiar a kresby
+ *   GET  ?id=X      → samotná fotka (rozšifrovaná, len prihlásenému); &ciste=1 = porovnanie bez čiar a kresby;
+ *                     &zdroj=<tok> = pôvodná fotka z editora (nebola v kartotéke) — na návrat k úprave
+ *   GET  ?edit=X    → uložený stav editora k porovnaniu (návrat k hotovému editu)
+ *   POST multipart s „nahradit=<id>" → prepíše porovnanie (obrázok, čistá podoba, popis, stav editora)
  *   POST multipart  → nahratie: klient, den, pohlad, subor (+ suhlasOsobne)
  *                     pohlad „porovnanie" a „video" posiela editor (Workspace → Editor)
  *   POST { akcia: "poznamka" | "popis" | "pohlad" | "zmaz" }
@@ -60,7 +63,9 @@ export const Route = createFileRoute("/api/fotky")({
           if (!ANAMNEZA_KLUC) return chyba("Šifrovací kľúč nie je nastavený (ANAMNEZA_KLUC).", 503);
           const r = await DB.prepare("SELECT kluc, typ, kluc_ciste FROM klient_fotky WHERE id = ?1").bind(id).first<{ kluc: string; typ: string | null; kluc_ciste: string | null }>();
           if (!r) return chyba("Taká fotka nie je.", 404);
-          const obj = await STORAGE.get(q.get("ciste") === "1" && r.kluc_ciste ? r.kluc_ciste : r.kluc);
+          const zdroj = q.get("zdroj") || "";
+          if (zdroj && !/^[a-z0-9]{6,16}$/.test(zdroj)) return chyba("zlý zdroj");
+          const obj = await STORAGE.get(zdroj ? `${r.kluc}-zdroj-${zdroj}` : q.get("ciste") === "1" && r.kluc_ciste ? r.kluc_ciste : r.kluc);
           if (!obj) return chyba("Fotka v úložisku chýba.", 404);
           try {
             const cista = await odsifrujBajty(await obj.arrayBuffer(), ANAMNEZA_KLUC);
@@ -79,10 +84,27 @@ export const Route = createFileRoute("/api/fotky")({
           }
         }
 
+        // Stav editora k porovnaniu — „✎ upraviť" v kartotéke.
+        const editId = kus(q.get("edit"), 40);
+        if (editId) {
+          if (!ANAMNEZA_KLUC) return chyba("Šifrovací kľúč nie je nastavený (ANAMNEZA_KLUC).", 503);
+          const r = await DB.prepare("SELECT klient, den, edit_json, popis FROM klient_fotky WHERE id = ?1").bind(editId)
+            .first<{ klient: string; den: string; edit_json: string | null; popis: string | null }>();
+          if (!r) return chyba("Také porovnanie nie je.", 404);
+          if (!r.edit_json) return chyba("Toto porovnanie vzniklo skôr, než editor ukladal svoj stav — upraviť sa nedá, len urobiť nové.", 404);
+          try {
+            const edit = JSON.parse(await odsifruj(r.edit_json, ANAMNEZA_KLUC));
+            const popis = r.popis ? await odsifruj(r.popis, ANAMNEZA_KLUC).catch(() => "") : "";
+            return Response.json({ ok: true, id: editId, klient: r.klient, den: r.den, popis, edit }, { headers: { "cache-control": "no-store" } });
+          } catch (e) {
+            return chyba(`Stav editora sa nepodarilo prečítať: ${String(e).slice(0, 120)}`, 500);
+          }
+        }
+
         const klient = kus(q.get("klient"), 120);
         if (!klient) return chyba("chýba klient");
         const [fotky, poznamky, suhlas] = await Promise.all([
-          DB.prepare("SELECT id, klient, den, pohlad, sirka, vyska, suhlas, kto, created_at, typ, popis, kluc_ciste FROM klient_fotky WHERE klient = ?1 ORDER BY den DESC, created_at")
+          DB.prepare("SELECT id, klient, den, pohlad, sirka, vyska, suhlas, kto, created_at, typ, popis, kluc_ciste, edit_json IS NOT NULL AS ma_edit FROM klient_fotky WHERE klient = ?1 ORDER BY den DESC, created_at")
             .bind(klient).all().then((x) => x.results as Record<string, unknown>[]).catch(() => null),
           DB.prepare("SELECT den, text FROM klient_fotky_poznamky WHERE klient = ?1").bind(klient).all()
             .then((x) => x.results as { den: string; text: string }[]).catch(() => null),
@@ -131,6 +153,7 @@ export const Route = createFileRoute("/api/fotky")({
             id: f.id, klient: f.klient, den: f.den, pohlad: f.pohlad, sirka: f.sirka, vyska: f.vyska,
             suhlas: f.suhlas, kto: f.kto, createdAt: f.created_at, typ: f.typ ?? null, popis: popisy[String(f.id)] || "",
             maCiste: !!f.kluc_ciste,
+            maEdit: !!f.ma_edit,
           })),
           poznamky: poz,
           odkazy,
@@ -179,8 +202,17 @@ export const Route = createFileRoute("/api/fotky")({
             return chyba("Klient nemá v anamnéze súhlas s fotkami. Potvrď, že súhlasil osobne, alebo mu pošli anamnézu.", 403);
           }
 
-          const id = `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-          const kluc = klucFotky(id, den);
+          // Prepísanie hotového porovnania (návrat k editu) — to isté id, ten istý
+          // kľúč v R2; odkazy klientovi tak ukážu novú verziu.
+          const nahradit = kus(form.get("nahradit"), 40);
+          let povodny: { id: string; kluc: string; kluc_ciste: string | null } | null = null;
+          if (nahradit) {
+            povodny = await DB.prepare("SELECT id, kluc, kluc_ciste FROM klient_fotky WHERE id = ?1 AND klient = ?2 AND pohlad = 'porovnanie'")
+              .bind(nahradit, klient).first<{ id: string; kluc: string; kluc_ciste: string | null }>();
+            if (!povodny) return chyba("Porovnanie, ktoré upravuješ, už v kartotéke nie je — ulož ho ako nové.", 404);
+          }
+          const id = povodny?.id || `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+          const kluc = povodny?.kluc || klucFotky(id, den);
           const sifra = await zasifrujBajty(await f.arrayBuffer(), ANAMNEZA_KLUC);
           await STORAGE.put(kluc, sifra, { httpMetadata: { contentType: "application/octet-stream" } });
           // Čistá podoba porovnania (bez čiar a kresby) — len pri porovnaní z editora.
@@ -195,12 +227,47 @@ export const Route = createFileRoute("/api/fotky")({
           }
           const popisText = String(form.get("popis") ?? "").trim().slice(0, 4000);
           const popis = popisText ? await zasifruj(popisText, ANAMNEZA_KLUC) : null;
+
+          // Stav editora + fotky, ktoré neboli z kartotéky („zdroj:N" → adresa v R2).
+          let editJson: string | null = null;
+          if (pohlad === POROVNANIE) {
+            let edit = String(form.get("edit") ?? "");
+            if (edit && edit.length < 400_000) {
+              for (let n = 0; n < 2; n++) {
+                const z = form.get(`zdroj${n}`);
+                if (!z || typeof z === "string" || !edit.includes(`zdroj:${n}`)) continue;
+                const zf = z as unknown as { type: string; size: number; arrayBuffer: () => Promise<ArrayBuffer> };
+                if (!/^image\/(jpeg|png|webp)$/.test((zf.type || "").split(";")[0]) || zf.size > MAX_BAJTOV) continue;
+                const tok = Math.random().toString(36).slice(2, 12).padEnd(8, "0");
+                await STORAGE.put(`${kluc}-zdroj-${tok}`, await zasifrujBajty(await zf.arrayBuffer(), ANAMNEZA_KLUC), { httpMetadata: { contentType: "application/octet-stream" } });
+                edit = edit.split(`zdroj:${n}`).join(`/api/fotky?id=${id}&zdroj=${tok}`);
+              }
+              editJson = await zasifruj(edit, ANAMNEZA_KLUC);
+              // Pôvodné fotky, na ktoré nový stav už neodkazuje, preč.
+              const zoznam = await STORAGE.list({ prefix: `${kluc}-zdroj-` }).catch(() => null);
+              for (const o of zoznam?.objects || []) {
+                const t = o.key.slice(`${kluc}-zdroj-`.length);
+                if (!edit.includes(`zdroj=${t}`)) await STORAGE.delete(o.key).catch(() => {});
+              }
+            }
+          }
+
+          if (povodny) {
+            // Čistá podoba: nová, alebo už žiadna (porovnanie bez čiar).
+            if (!klucCiste && povodny.kluc_ciste) await STORAGE.delete(povodny.kluc_ciste).catch(() => {});
+            const sirkaN = Math.max(0, Math.round(Number(form.get("sirka")) || 0)) || null;
+            const vyskaN = Math.max(0, Math.round(Number(form.get("vyska")) || 0)) || null;
+            await DB.prepare("UPDATE klient_fotky SET sirka = ?2, vyska = ?3, bajty = ?4, popis = ?5, kluc_ciste = ?6, edit_json = ?7, kto = ?8 WHERE id = ?1")
+              .bind(id, sirkaN, vyskaN, sifra.length, popis, klucCiste, editJson, kto).run();
+            await audit(DB, { action: "fotka-prepisana", predmet: klient, neu: { id }, actor: kto || undefined });
+            return Response.json({ ok: true, id, prepisane: true });
+          }
           const sirka = Math.max(0, Math.round(Number(form.get("sirka")) || 0)) || null;
           const vyska = Math.max(0, Math.round(Number(form.get("vyska")) || 0)) || null;
           try {
             await DB.prepare(
-              "INSERT INTO klient_fotky (id, klient, den, pohlad, kluc, sirka, vyska, bajty, suhlas, kto, created_at, typ, popis, kluc_ciste) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
-            ).bind(id, klient, den, pohlad, kluc, sirka, vyska, sifra.length, zAnamnezy ? "anamneza" : "osobne", kto, new Date().toISOString(), typ === "image/jpeg" ? null : typ, popis, klucCiste).run();
+              "INSERT INTO klient_fotky (id, klient, den, pohlad, kluc, sirka, vyska, bajty, suhlas, kto, created_at, typ, popis, kluc_ciste, edit_json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+            ).bind(id, klient, den, pohlad, kluc, sirka, vyska, sifra.length, zAnamnezy ? "anamneza" : "osobne", kto, new Date().toISOString(), typ === "image/jpeg" ? null : typ, popis, klucCiste, editJson).run();
           } catch (e) {
             // Bez riadku by fotka v úložisku visela a nikto by o nej nevedel.
             await STORAGE.delete(kluc).catch(() => {});
@@ -291,6 +358,10 @@ export const Route = createFileRoute("/api/fotky")({
           if (!r) return chyba("Taká fotka nie je.", 404);
           if (STORAGE) await STORAGE.delete(r.kluc);
           if (STORAGE && r.kluc_ciste) await STORAGE.delete(r.kluc_ciste);
+          if (STORAGE) {
+            const zdroje = await STORAGE.list({ prefix: `${r.kluc}-zdroj-` }).catch(() => null);
+            for (const o of zdroje?.objects || []) await STORAGE.delete(o.key).catch(() => {});
+          }
           await DB.prepare("DELETE FROM klient_fotky WHERE id = ?1").bind(id).run();
           await audit(DB, { action: "fotka-zmazana", predmet: r.klient, old: { den: r.den, pohlad: r.pohlad }, actor: kto || undefined });
           return Response.json({ ok: true });

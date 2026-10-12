@@ -83,7 +83,7 @@ export function EditorKarta({ mena }: { mena: string[] }) {
     const el = ramiky.current.foto;
     if (!d || !el?.contentWindow || !fotoNacitane.current) return;
     dvojica.current = null;
-    el.contentWindow.postMessage({ typ: "psb-dvojica", pred: d.pred, po: d.po }, location.origin);
+    el.contentWindow.postMessage(d.upravit ? { typ: "psb-upravit", id: d.upravit } : { typ: "psb-dvojica", pred: d.pred, po: d.po }, location.origin);
   }, []);
   useEffect(() => {
     const prevezmi = () => {

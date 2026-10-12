@@ -71,7 +71,7 @@
    * súradniciach fotky — ide s ňou pri posune, zväčšení aj zrkadle, ako čiary.
    */
   let kresby = [];      // { id, okno, body: [{u,v}], farba, hrubka }
-  let nastroj = "ciara"; // "ciara" | "kresba"
+  let nastroj = "ciara"; // "ciara" | "sipka" | "kresba"
   let hrubkaKresby = 4;
   let rezimCiar = false;
   let vybrana = null;
@@ -103,10 +103,12 @@
    */
   function tvaryCiar(R, k, sSklonom) {
     const tvary = [];
-    const body = ciary.filter((c) => stav[c.okno]?.src).map((c) => ({ c, A: bodVOkne(c.okno, c.a, R), B: bodVOkne(c.okno, c.b, R) }));
-    for (const { c, A, B } of body) {
-      tvary.push({ typ: "ciara", okno: c.okno, A, B, farba: c.farba, vybrana: c.id === vybrana });
-      if (sSklonom) {
+    const vsetky = ciary.filter((c) => stav[c.okno]?.src).map((c) => ({ c, A: bodVOkne(c.okno, c.a, R), B: bodVOkne(c.okno, c.b, R) }));
+    // Šípka (12. 10. 2026) ukazuje smer — nemá sklon ani uhol s inými čiarami.
+    const body = vsetky.filter((x) => !x.c.sipka);
+    for (const { c, A, B } of vsetky) {
+      tvary.push({ typ: "ciara", okno: c.okno, A, B, farba: c.farba, vybrana: c.id === vybrana, sipka: !!c.sipka });
+      if (sSklonom && !c.sipka) {
         const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1;
         // popiska kolmo od stredu čiary, vždy „nad" ňou
         let nx = -dy / d, ny = dx / d;
@@ -139,6 +141,12 @@
     return tvary;
   }
 
+  /** Hrot šípky v bode B (smer A → B): tri body trojuholníka, veľkosť v px × k. */
+  function hrotSipky(A, B, k) {
+    const d = Math.hypot(B.x - A.x, B.y - A.y) || 1, ux = (B.x - A.x) / d, uy = (B.y - A.y) / d;
+    const dl = 16 * k, sir = 8 * k;
+    return [{ x: B.x, y: B.y }, { x: B.x - ux * dl - uy * sir, y: B.y - uy * dl + ux * sir }, { x: B.x - ux * dl + uy * sir, y: B.y - uy * dl - ux * sir }];
+  }
   /** Hladká cesta cez body ťahu (krivky cez stredy úsekov) — pre SVG aj plátno (Path2D). */
   function cestaKresby(P) {
     if (P.length < 3) return `M ${P[0].x} ${P[0].y} L ${P[P.length - 1].x} ${P[P.length - 1].y}`;
@@ -168,7 +176,8 @@
         html.push(`<g ${klip(t.okno)}>
           <line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="rgba(0,0,0,.45)" stroke-width="${t.vybrana ? 6 : 4}" stroke-linecap="round"/>
           <line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="${t.farba}" stroke-width="${t.vybrana ? 3.5 : 2}" stroke-linecap="round" ${t.vybrana ? 'stroke-dasharray="8 5"' : ""}/>
-          ${[t.A, t.B].map((b) => `<circle cx="${b.x}" cy="${b.y}" r="${rezimCiar ? 6 : 3.5}" fill="${rezimCiar ? "rgba(0,0,0,.35)" : t.farba}" stroke="${t.farba}" stroke-width="2"/>`).join("")}
+          ${t.sipka ? `<polygon points="${hrotSipky(t.A, t.B, 1).map((b) => `${b.x},${b.y}`).join(" ")}" fill="${t.farba}" stroke="rgba(0,0,0,.45)" stroke-width="1"/>` : ""}
+          ${(t.sipka ? [t.A] : [t.A, t.B]).map((b) => `<circle cx="${b.x}" cy="${b.y}" r="${rezimCiar ? 6 : 3.5}" fill="${rezimCiar ? "rgba(0,0,0,.35)" : t.farba}" stroke="${t.farba}" stroke-width="2"/>`).join("")}
         </g>`);
       } else if (t.typ === "oblúk") {
         html.push(`<path d="${t.d}" fill="none" stroke="${t.farba}" stroke-width="2" ${klip(t.okno)}/>`);
@@ -211,7 +220,13 @@
         x.strokeStyle = t.farba; x.lineWidth = 2 * k;
         x.beginPath(); x.moveTo(t.A.x, t.A.y); x.lineTo(t.B.x, t.B.y); x.stroke();
         x.fillStyle = t.farba;
-        for (const b of [t.A, t.B]) { x.beginPath(); x.arc(b.x, b.y, 3.5 * k, 0, Math.PI * 2); x.fill(); }
+        if (t.sipka) {
+          const h = hrotSipky(t.A, t.B, k);
+          x.beginPath(); x.moveTo(h[0].x, h[0].y); x.lineTo(h[1].x, h[1].y); x.lineTo(h[2].x, h[2].y); x.closePath(); x.fill();
+          x.beginPath(); x.arc(t.A.x, t.A.y, 3.5 * k, 0, Math.PI * 2); x.fill();
+        } else {
+          for (const b of [t.A, t.B]) { x.beginPath(); x.arc(b.x, b.y, 3.5 * k, 0, Math.PI * 2); x.fill(); }
+        }
       } else if (t.typ === "oblúk") {
         // oblúk sa počíta s polomerom v px exportu, Path2D zoberie ten istý zápis
         x.strokeStyle = t.farba; x.lineWidth = 2 * k; x.stroke(new Path2D(t.d));
@@ -333,7 +348,7 @@
         if (okno < 0 || !stav[okno].src) return;
         let zaciatok = bodZOkna(okno, P.x, P.y, R);
         if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
-        const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar };
+        const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar, ...(nastroj === "sipka" ? { sipka: true } : {}) };
         ciary.push(c);
         vybrana = c.id;
         tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
@@ -480,6 +495,8 @@
     // panel
     const s = stav[aktivne];
     document.getElementById("zoom").value = s.v.zoom;
+    const zh = document.getElementById("zoomH");
+    if (zh) zh.textContent = `${(s.v.zoom * 100).toFixed(1).replace(".", ",")} %`;
     document.getElementById("den").value = s.den || "";
     const nazvy = rozdelenie === "vedla" ? ["ľavá", "pravá"] : rozdelenie === "pod" ? ["horná", "dolná"] : ["spodná", "vrchná"];
     const pop2 = popisky();
@@ -653,6 +670,32 @@
     const s = stav[aktivne]; const { ow, oh } = rozmerOkna(okna[aktivne]);
     s.v = obmedz(zoomOkolo(s.v, Number(e.target.value), 0, 0), s.fw, s.fh, ow, oh); kresli();
   };
+  /**
+   * JEMNÉ ZVÄČŠENIE (Jerry, 12. 10. 2026: „nie len posuvník, ale vedľa šípku,
+   * ktorá by približovala o 0,1 % — keď to chcem zarovnať, s posuvníkom je to
+   * ťažké"). Klik = 0,1 %, podržanie opakuje (po pol sekunde a čím dlhšie,
+   * tým rýchlejšie — inak by cesta zo 100 na 110 % trvala sto klikov).
+   */
+  const zmenZoom = (smer, krokov = 1) => {
+    const s = stav[aktivne];
+    if (!s.src) return;
+    const { ow, oh } = rozmerOkna(okna[aktivne]);
+    s.v = obmedz(zoomOkolo(s.v, s.v.zoom * Math.pow(1.001, smer * krokov), 0, 0), s.fw, s.fh, ow, oh);
+    kresli();
+  };
+  for (const [id, smer] of [["zoomMenej", -1], ["zoomViac", 1]]) {
+    const b = document.getElementById(id);
+    if (!b) continue;
+    let casovac = 0, opakovanie = 0, kolo = 0;
+    const stop = () => { clearTimeout(casovac); clearInterval(opakovanie); casovac = 0; opakovanie = 0; };
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      zmenZoom(smer);
+      kolo = 0;
+      casovac = setTimeout(() => { opakovanie = setInterval(() => { kolo++; zmenZoom(smer, kolo > 40 ? 5 : kolo > 15 ? 2 : 1); }, 45); }, 450);
+    });
+    for (const u of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(u, stop);
+  }
   document.getElementById("den").onchange = (e) => { stav[aktivne].den = e.target.value; kresli(); };
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
@@ -731,6 +774,14 @@
     if (e.target.closest?.("input, textarea")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
+    // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10) — na presné zarovnanie.
+    const posun = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (posun && !e.metaKey && !e.ctrlKey && !e.altKey && stav[aktivne].src) {
+      e.preventDefault();
+      const s = stav[aktivne], { ow, oh } = rozmerOkna(okna[aktivne]), n = e.shiftKey ? 10 : 1;
+      s.v = obmedz({ ...s.v, x: s.v.x + (posun[0] * n) / ow, y: s.v.y + (posun[1] * n) / oh }, s.fw, s.fh, ow, oh);
+      kresli();
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); krokDopredu(); }
   });

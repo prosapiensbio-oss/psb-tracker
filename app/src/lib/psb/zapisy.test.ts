@@ -36,6 +36,9 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   klient_kalendar: {
     zrusene_at: "zneplatnenie odkazu — nový odkaz zneplatnený nevzniká",
   },
+  fotky_odkazy: {
+    zrusene_at: "zrušenie odkazu s fotkami — nový odkaz zrušený nevzniká",
+  },
   jarvis_dokumenty: {
     zmazane_at: "mäkké mazanie — pri vzniku dokument zmazaný nie je",
   },

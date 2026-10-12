@@ -8,6 +8,8 @@ describe("krátka adresa pre SMS", () => {
   it("odkaz na stránku pred úvodným aj na výpis ide cez vlastnú doménu", () => {
     expect(verejnyOdkaz("/u/DD7bibTzQk9A", WORKER)).toBe(`${VEREJNA_DOMENA}/u/DD7bibTzQk9A`);
     expect(verejnyOdkaz("/v/AZG5rX2v4bdP", WORKER)).toBe(`${VEREJNA_DOMENA}/v/AZG5rX2v4bdP`);
+    // Fotky pre klienta (12. 10. 2026) — snippet 26 presmeruje aj /f/.
+    expect(verejnyOdkaz("/f/mEgmruAcQkQPQn", WORKER)).toBe(`${VEREJNA_DOMENA}/f/mEgmruAcQkQPQn`);
   });
 
   it("ponuka termínov aj kalendár v mobile idú cez doménu, feed .ics nie", () => {

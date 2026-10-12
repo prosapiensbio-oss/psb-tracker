@@ -18,11 +18,11 @@ describe("stránka s fotkami pre klienta", () => {
     const h = fotkyStranka(vstup({ karty: [{ id: "f1", popis: "", maCiste: false, cisla: [{ nazov: "pánev", pred: "14°", po: "6°" }] }] }));
     expect(h).toContain("<b>14°</b>");
   });
-  it("prepínač čisté / s rozborom len keď čistá podoba existuje", () => {
-    expect(fotkyStranka(vstup())).not.toContain("Čisté fotky");
+  it("najprv čistá fotka, s rozborom až po posune doprava — len keď čistá podoba existuje", () => {
+    expect(fotkyStranka(vstup())).not.toContain('class="snimky"');
     const h = fotkyStranka(vstup({ karty: [{ id: "f1", popis: "", maCiste: true, cisla: [] }] }));
-    expect(h).toContain("Čisté fotky");
-    expect(h).toContain("foto=f1&ciste=1");
+    expect(h).toContain('class="snimky"');
+    expect(h.indexOf("foto=f1&ciste=1")).toBeLessThan(h.indexOf('foto=f1" target'));
   });
   it("čo ďalej len keď je čo napísať", () => {
     expect(fotkyStranka(vstup({ dalej: ["", "  "] }))).not.toContain("Na čem budeme pracovat dál");

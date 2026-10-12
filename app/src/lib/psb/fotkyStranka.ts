@@ -8,7 +8,9 @@ import { SADZBA } from "./klientStranka";
  *   • správa navrchu je VŠEOBECNÁ — platí aj pre klienta, ktorý chodí tri roky
  *     („z dřívějšího a z nedávného focení… alespoň malé zlepšení"),
  *   • čísla „pred → po" len keď ich vyplní — inak nie sú,
- *   • fotky sa dajú prepnúť: s rozborom (čiary, kresba) / čisté,
+ *   • fotky sa dajú prepnúť: NAJPRV čisté, posunom doprava s rozborom
+ *     (Jerry, 12. 10.: „najprv vidieť pred a po bez čiar a kliknutím doprava
+ *     sa zobrazí s čiarami"),
  *   • „Na čem budeme pracovat dál" ostáva, ale len keď je čo napísať,
  *   • súhlas so zverejnením a stiahnutie ostávajú,
  *   • nové pole „Chceš se na něco zeptat?" — odpoveď ide trénerovi do
@@ -54,7 +56,6 @@ export function fotkyStranka(v: FotkyStrankaVstup): string {
   const t = encodeURIComponent(v.token);
   const adresa = (id: string, ciste: boolean, stiahnut = false) =>
     `/f/${t}?foto=${encodeURIComponent(id)}${ciste ? "&ciste=1" : ""}${stiahnut ? "&stahnout=1" : ""}`;
-  const prepinac = v.karty.some((k) => k.maCiste);
   const logo = v.logoUrl
     // Logo je tmavozelené (#1A2E24) — na olivovom podklade by zmizlo; filter ho zosvetlí.
     ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="190" style="width:190px;max-width:60%;height:auto;display:block;filter:brightness(0) invert(.88)">`
@@ -62,10 +63,16 @@ export function fotkyStranka(v: FotkyStrankaVstup): string {
 
   const karty = v.karty.map((k, i) => {
     const cisla = vyplneneCisla(k.cisla);
-    const obrazok = (ciste: boolean, trieda: string) =>
-      `<a class="foto ${trieda}" href="${adresa(k.id, ciste)}" target="_blank" rel="noopener"><img src="${adresa(k.id, ciste)}" alt="Srovnání předtím a potom ${i + 1}" loading="${i ? "lazy" : "eager"}"><span class="zvacsit" aria-hidden="true">⤢</span></a>`;
+    const obrazok = (ciste: boolean, stitok = "") =>
+      `<a class="foto" href="${adresa(k.id, ciste)}" target="_blank" rel="noopener"><img src="${adresa(k.id, ciste)}" alt="Srovnání předtím a potom ${i + 1}${stitok ? ` — ${stitok}` : ""}" loading="${i ? "lazy" : "eager"}"><span class="zvacsit" aria-hidden="true">⤢</span>${stitok ? `<span class="stitok">${stitok}</span>` : ""}</a>`;
+    // Dve podoby: čistá prvá, s rozborom za ňou — posun prstom alebo šípkou.
+    const snimky = k.maCiste
+      ? `<div class="listovanie"><div class="snimky" onscroll="psbBodky(this)">${obrazok(true, "bez čar")}${obrazok(false, "s rozborem")}</div>
+<button type="button" class="dalsia" aria-label="S rozborem" onclick="psbListuj(this)">›</button>
+<div class="bodky"><span class="on"></span><span></span></div></div>`
+      : obrazok(false);
     return `<div class="karta">
-${k.maCiste ? `${obrazok(false, "s-rozborom")}${obrazok(true, "ciste")}` : obrazok(false, "")}
+${snimky}
 ${k.popis || cisla.length ? `<div class="telo">
 ${k.popis ? `<p>${esc(k.popis).replace(/\n/g, "<br>")}</p>` : ""}
 ${cisla.length ? `<div class="cisla">${cisla.map((c) => `<span class="cislo">${esc(c.nazov)} ${c.pred ? `<b>${esc(c.pred)}</b>` : ""}${c.pred && c.po ? `<span class="sip">→</span>` : ""}${c.po ? `<b>${esc(c.po)}</b>` : ""}</span>`).join("")}</div>` : ""}
@@ -115,12 +122,15 @@ h1{margin:6px 0 0;font-family:Raleway,sans-serif;font-weight:700;font-size:32px;
 .vzkaz .kto b{display:block;font-size:14.5px;color:${s.biela}}
 .vzkaz .kto small{font-size:12.5px;color:${s.tlmeny}}
 .vzkaz p{margin:0}
-.prepinac{display:flex;gap:4px;margin-top:22px;padding:4px;border-radius:12px;background:${s.plocha}}
-.prepinac label{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:14px;color:${s.tlmeny};cursor:pointer}
-#r-rozbor:checked ~ .prepinac label[for=r-rozbor],#r-ciste:checked ~ .prepinac label[for=r-ciste]{background:${s.zelena};color:${s.pozadie};font-weight:600}
-.skryte{position:absolute;opacity:0;pointer-events:none}
-#r-rozbor:checked ~ .karty .ciste{display:none}
-#r-ciste:checked ~ .karty .s-rozborom{display:none}
+.listovanie{position:relative}
+.snimky{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.snimky::-webkit-scrollbar{display:none}
+.snimky .foto{flex:0 0 100%;scroll-snap-align:start}
+.stitok{position:absolute;left:10px;bottom:10px;padding:4px 10px;border-radius:99px;background:rgba(20,20,20,.6);color:#fff;font-size:12px;font-weight:600}
+.dalsia{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:rgba(20,20,20,.55);color:#fff;font-size:26px;line-height:1;cursor:pointer;padding:0 0 4px}
+.bodky{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.bodky span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.5)}
+.bodky span.on{background:#fff}
 .karta{margin-top:16px;border-radius:18px;overflow:hidden;background:${s.plocha}}
 .foto{position:relative;display:block}
 .foto img{display:block;width:100%;height:auto;background:#fff}
@@ -166,8 +176,6 @@ h4{margin:0;font-family:Raleway,sans-serif;font-weight:700;font-size:19px}
 <div class="kedy">Poslal ${esc(v.trener || "trenér")} · ${esc(den(v.poslane))}</div>
 ${v.hlaska ? `<div class="hlaska">${esc(v.hlaska)}</div>` : ""}
 ${v.sprava.trim() ? `<div class="vzkaz"><div class="kto"><div class="avatar">${esc((v.trener || "P").slice(0, 1).toUpperCase())}</div><div><b>${esc(v.trener || "Tvůj trenér")}</b><small>tvůj trenér</small></div></div><p>${esc(v.sprava.trim()).replace(/\n/g, "<br>")}</p></div>` : ""}
-${prepinac ? `<input class="skryte" type="radio" name="podoba" id="r-rozbor" checked><input class="skryte" type="radio" name="podoba" id="r-ciste">
-<div class="prepinac"><label for="r-rozbor">S rozborem</label><label for="r-ciste">Čisté fotky</label></div>` : ""}
 <div class="karty">
 ${karty}
 </div>
@@ -175,6 +183,10 @@ ${dalej.length ? `<div class="dalej"><h4>Na čem budeme pracovat dál</h4><ol>${
 ${odpovedBlok}
 ${suhlasBlok}
 ${v.karty.length ? `<details class="stiahnut"><summary>↓ Stáhnout fotky</summary><div class="zoznam">${stiahnut}</div></details>` : ""}
+<script>
+function psbListuj(b){var s=b.parentNode.querySelector('.snimky');var na=s.scrollLeft<s.clientWidth/2;s.scrollTo({left:na?s.clientWidth:0,behavior:'smooth'});}
+function psbBodky(s){var i=Math.round(s.scrollLeft/s.clientWidth);var w=s.parentNode;var b=w.querySelectorAll('.bodky span');for(var k=0;k<b.length;k++)b[k].className=k===i?'on':'';var t=w.querySelector('.dalsia');t.textContent=i?'‹':'›';t.setAttribute('aria-label',i?'Bez čar':'S rozborem');}
+</script>
 <div class="pata">Fotky vidíš jen ty přes tento odkaz. Jsou zašifrované a bez tvého souhlasu je nikde nezveřejníme. Odkaz platí do ${esc(den(v.platiDo))}.</div>
 </div>
 </body></html>`;

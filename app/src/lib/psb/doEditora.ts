@@ -10,7 +10,10 @@
  * kým si ju niekto nevezme.
  */
 export type FotkaDoEditora = { id: string; den: string };
-export type DvojicaDoEditora = { klient: string; pred: FotkaDoEditora; po: FotkaDoEditora };
+export type DvojicaDoEditora =
+  | { klient: string; pred: FotkaDoEditora; po: FotkaDoEditora; upravit?: undefined }
+  /** Návrat k hotovému porovnaniu (12. 10. 2026) — editor si stav načíta sám (`/api/fotky?edit=`). */
+  | { klient: string; upravit: string; pred?: undefined; po?: undefined };
 
 export const UDALOST_DO_EDITORA = "psb-do-editora";
 
@@ -24,6 +27,11 @@ export function zoradDvojicu(a: FotkaDoEditora, b: FotkaDoEditora): [FotkaDoEdit
 export function posliDoEditora(klient: string, a: FotkaDoEditora, b: FotkaDoEditora): void {
   const [pred, po] = zoradDvojicu(a, b);
   cakajuca = { klient, pred, po };
+  dispatchEvent(new CustomEvent(UDALOST_DO_EDITORA));
+}
+
+export function upravVEditore(klient: string, id: string): void {
+  cakajuca = { klient, upravit: id };
   dispatchEvent(new CustomEvent(UDALOST_DO_EDITORA));
 }
 

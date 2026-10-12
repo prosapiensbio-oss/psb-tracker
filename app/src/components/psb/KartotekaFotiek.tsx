@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
-import { posliDoEditora } from "../../lib/psb/doEditora";
+import { posliDoEditora, upravVEditore } from "../../lib/psb/doEditora";
 import { PoslaneKlientovi, PoslatKlientovi, type OdkazFotiek, type OdpovedFotky } from "./FotkyKlientovi";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
@@ -356,6 +356,13 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
                   <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}{f.maCiste ? " · aj čisté" : ""}</div>
                   {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
                 </button>
+                {f.maEdit && (
+                  <button
+                    type="button" onClick={() => upravVEditore(meno, f.id)}
+                    title="Otvoriť v editore s čiarami a kresbou — uloženie porovnanie prepíše"
+                    style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderTop: `1px solid ${mix(C.border, 80)}`, background: "transparent", color: C.accentLight, fontFamily: "inherit", fontSize: 12, textAlign: "left", cursor: "pointer" }}
+                  >✎ upraviť v editore</button>
+                )}
                 {f.pohlad !== VIDEO && (
                   <button
                     type="button" onClick={() => oznacNaPoslanie(f.id)}

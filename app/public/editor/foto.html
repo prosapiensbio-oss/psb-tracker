@@ -83,6 +83,9 @@
   .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
   .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
   .popis-fotky textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
+  .krok-zoom { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line2); background: var(--card); color: var(--text); font-size: 11px; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .krok-zoom:active { background: rgba(232,137,58,.22); }
+  .zoom-h { flex: 0 0 auto; min-width: 54px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /*/ui-css*/
   .platno .stvorec { --strana: min(calc(100vw - var(--panel) - 44px), calc(100vh - var(--hlavicka) - 44px)); width: var(--strana); height: var(--strana); }
@@ -148,6 +151,7 @@
     <div class="kroky">
       <button class="tl" id="krokSpat" disabled title="Krok späť (⌘Z)">↶ späť</button>
       <button class="tl" id="krokDopredu" disabled title="Znova (⌘⇧Z)">↷ znova</button>
+      <button class="tl" id="ulozitNavrh" title="Uložiť rozrobené hneď (ukladá sa aj samo)">💾 uložiť</button>
       <span class="ulozene" id="stavUlozenia"></span>
     </div>
     <div class="skupiny">
@@ -174,7 +178,12 @@
             <button data-i="0" class="on"><img data-nahlad="0" alt=""><span><span class="t"></span><span class="d"></span></span></button>
             <button data-i="1"><img data-nahlad="1" alt=""><span><span class="t"></span><span class="d"></span></span></button>
           </div>
-          <div class="riadok">zväčšenie <input type="range" id="zoom" min="1" max="6" step="0.01" value="1"></div>
+          <div class="riadok">zväčšenie
+            <button class="krok-zoom" id="zoomMenej" type="button" title="Oddialiť o 0,1 % (podrž = plynulo)" aria-label="Oddialiť o 0,1 %">◀</button>
+            <input type="range" id="zoom" min="1" max="6" step="0.001" value="1">
+            <button class="krok-zoom" id="zoomViac" type="button" title="Priblížiť o 0,1 % (podrž = plynulo)" aria-label="Priblížiť o 0,1 %">▶</button>
+            <span id="zoomH" class="zoom-h">100,0 %</span>
+          </div>
           <div class="riadok">deň fotky <input type="date" id="den"></div>
           <div class="tlacidla">
             <label class="tl" id="vlozit" for="subor" role="button" style="display:inline-block">Vložiť fotku…</label>
@@ -182,7 +191,7 @@
             <button class="tl" id="reset">na stred</button>
             <button class="tl" id="vymenit" title="Vymeniť ľavú a pravú">⇄</button>
           </div>
-          <div class="napoveda"><b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
+          <div class="napoveda"><b>Doladenie:</b> ◀ ▶ pri zväčšení po 0,1 %, šípky na klávesnici posúvajú vybranú fotku po 1 bode (so Shiftom po 10). <b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
         </div>
       </details>
 
@@ -258,6 +267,7 @@
           <button class="tl" id="kreslit">✎ kresliť čiary</button>
           <div class="prepinac" id="nastroj">
             <button data-v="ciara" class="on">／ čiara a uhol</button>
+            <button data-v="sipka">➚ šípka</button>
             <button data-v="kresba">〰 voľná kresba</button>
           </div>
           <div class="prepinac" id="riadokHrubka" hidden>
@@ -291,6 +301,7 @@
         </div>
       </details>
     </div>
+    <div class="napoveda" id="upravujem" style="padding:8px 14px 0;min-height:0" hidden><span id="upravujemText"></span> <button type="button" id="akoNove" style="background:none;border:none;padding:0;color:var(--accentLight);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline">uložiť ako nové</button></div>
     <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
       <button class="tl" id="stiahnut">Stiahnuť JPEG</button>
@@ -424,6 +435,10 @@ window.kartotekaKlienta = (() => {
     fd.append("subor", z.blob, z.nazov || "subor");
     // Čistá podoba toho istého porovnania (bez čiar a kresby) — klient si ju na stránke prepne.
     if (z.ciste) fd.append("subor_ciste", z.ciste, "ciste.jpg");
+    // Stav editora (návrat k hotovému editu) a pôvodné fotky mimo kartotéky.
+    if (z.edit) fd.append("edit", z.edit);
+    (z.zdroje || []).forEach((b, n) => fd.append(`zdroj${n}`, b, `zdroj${n}.jpg`));
+    if (z.nahradit) fd.append("nahradit", z.nahradit);
     let j;
     try {
       const r = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd });
@@ -535,7 +550,7 @@ window.kartotekaKlienta = (() => {
    * súradniciach fotky — ide s ňou pri posune, zväčšení aj zrkadle, ako čiary.
    */
   let kresby = [];      // { id, okno, body: [{u,v}], farba, hrubka }
-  let nastroj = "ciara"; // "ciara" | "kresba"
+  let nastroj = "ciara"; // "ciara" | "sipka" | "kresba"
   let hrubkaKresby = 4;
   let rezimCiar = false;
   let vybrana = null;
@@ -567,10 +582,12 @@ window.kartotekaKlienta = (() => {
    */
   function tvaryCiar(R, k, sSklonom) {
     const tvary = [];
-    const body = ciary.filter((c) => stav[c.okno]?.src).map((c) => ({ c, A: bodVOkne(c.okno, c.a, R), B: bodVOkne(c.okno, c.b, R) }));
-    for (const { c, A, B } of body) {
-      tvary.push({ typ: "ciara", okno: c.okno, A, B, farba: c.farba, vybrana: c.id === vybrana });
-      if (sSklonom) {
+    const vsetky = ciary.filter((c) => stav[c.okno]?.src).map((c) => ({ c, A: bodVOkne(c.okno, c.a, R), B: bodVOkne(c.okno, c.b, R) }));
+    // Šípka (12. 10. 2026) ukazuje smer — nemá sklon ani uhol s inými čiarami.
+    const body = vsetky.filter((x) => !x.c.sipka);
+    for (const { c, A, B } of vsetky) {
+      tvary.push({ typ: "ciara", okno: c.okno, A, B, farba: c.farba, vybrana: c.id === vybrana, sipka: !!c.sipka });
+      if (sSklonom && !c.sipka) {
         const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1;
         // popiska kolmo od stredu čiary, vždy „nad" ňou
         let nx = -dy / d, ny = dx / d;
@@ -603,6 +620,12 @@ window.kartotekaKlienta = (() => {
     return tvary;
   }
 
+  /** Hrot šípky v bode B (smer A → B): tri body trojuholníka, veľkosť v px × k. */
+  function hrotSipky(A, B, k) {
+    const d = Math.hypot(B.x - A.x, B.y - A.y) || 1, ux = (B.x - A.x) / d, uy = (B.y - A.y) / d;
+    const dl = 16 * k, sir = 8 * k;
+    return [{ x: B.x, y: B.y }, { x: B.x - ux * dl - uy * sir, y: B.y - uy * dl + ux * sir }, { x: B.x - ux * dl + uy * sir, y: B.y - uy * dl - ux * sir }];
+  }
   /** Hladká cesta cez body ťahu (krivky cez stredy úsekov) — pre SVG aj plátno (Path2D). */
   function cestaKresby(P) {
     if (P.length < 3) return `M ${P[0].x} ${P[0].y} L ${P[P.length - 1].x} ${P[P.length - 1].y}`;
@@ -632,7 +655,8 @@ window.kartotekaKlienta = (() => {
         html.push(`<g ${klip(t.okno)}>
           <line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="rgba(0,0,0,.45)" stroke-width="${t.vybrana ? 6 : 4}" stroke-linecap="round"/>
           <line x1="${t.A.x}" y1="${t.A.y}" x2="${t.B.x}" y2="${t.B.y}" stroke="${t.farba}" stroke-width="${t.vybrana ? 3.5 : 2}" stroke-linecap="round" ${t.vybrana ? 'stroke-dasharray="8 5"' : ""}/>
-          ${[t.A, t.B].map((b) => `<circle cx="${b.x}" cy="${b.y}" r="${rezimCiar ? 6 : 3.5}" fill="${rezimCiar ? "rgba(0,0,0,.35)" : t.farba}" stroke="${t.farba}" stroke-width="2"/>`).join("")}
+          ${t.sipka ? `<polygon points="${hrotSipky(t.A, t.B, 1).map((b) => `${b.x},${b.y}`).join(" ")}" fill="${t.farba}" stroke="rgba(0,0,0,.45)" stroke-width="1"/>` : ""}
+          ${(t.sipka ? [t.A] : [t.A, t.B]).map((b) => `<circle cx="${b.x}" cy="${b.y}" r="${rezimCiar ? 6 : 3.5}" fill="${rezimCiar ? "rgba(0,0,0,.35)" : t.farba}" stroke="${t.farba}" stroke-width="2"/>`).join("")}
         </g>`);
       } else if (t.typ === "oblúk") {
         html.push(`<path d="${t.d}" fill="none" stroke="${t.farba}" stroke-width="2" ${klip(t.okno)}/>`);
@@ -675,7 +699,13 @@ window.kartotekaKlienta = (() => {
         x.strokeStyle = t.farba; x.lineWidth = 2 * k;
         x.beginPath(); x.moveTo(t.A.x, t.A.y); x.lineTo(t.B.x, t.B.y); x.stroke();
         x.fillStyle = t.farba;
-        for (const b of [t.A, t.B]) { x.beginPath(); x.arc(b.x, b.y, 3.5 * k, 0, Math.PI * 2); x.fill(); }
+        if (t.sipka) {
+          const h = hrotSipky(t.A, t.B, k);
+          x.beginPath(); x.moveTo(h[0].x, h[0].y); x.lineTo(h[1].x, h[1].y); x.lineTo(h[2].x, h[2].y); x.closePath(); x.fill();
+          x.beginPath(); x.arc(t.A.x, t.A.y, 3.5 * k, 0, Math.PI * 2); x.fill();
+        } else {
+          for (const b of [t.A, t.B]) { x.beginPath(); x.arc(b.x, b.y, 3.5 * k, 0, Math.PI * 2); x.fill(); }
+        }
       } else if (t.typ === "oblúk") {
         // oblúk sa počíta s polomerom v px exportu, Path2D zoberie ten istý zápis
         x.strokeStyle = t.farba; x.lineWidth = 2 * k; x.stroke(new Path2D(t.d));
@@ -797,7 +827,7 @@ window.kartotekaKlienta = (() => {
         if (okno < 0 || !stav[okno].src) return;
         let zaciatok = bodZOkna(okno, P.x, P.y, R);
         if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
-        const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar };
+        const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar, ...(nastroj === "sipka" ? { sipka: true } : {}) };
         ciary.push(c);
         vybrana = c.id;
         tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
@@ -944,6 +974,8 @@ window.kartotekaKlienta = (() => {
     // panel
     const s = stav[aktivne];
     document.getElementById("zoom").value = s.v.zoom;
+    const zh = document.getElementById("zoomH");
+    if (zh) zh.textContent = `${(s.v.zoom * 100).toFixed(1).replace(".", ",")} %`;
     document.getElementById("den").value = s.den || "";
     const nazvy = rozdelenie === "vedla" ? ["ľavá", "pravá"] : rozdelenie === "pod" ? ["horná", "dolná"] : ["spodná", "vrchná"];
     const pop2 = popisky();
@@ -1117,6 +1149,32 @@ window.kartotekaKlienta = (() => {
     const s = stav[aktivne]; const { ow, oh } = rozmerOkna(okna[aktivne]);
     s.v = obmedz(zoomOkolo(s.v, Number(e.target.value), 0, 0), s.fw, s.fh, ow, oh); kresli();
   };
+  /**
+   * JEMNÉ ZVÄČŠENIE (Jerry, 12. 10. 2026: „nie len posuvník, ale vedľa šípku,
+   * ktorá by približovala o 0,1 % — keď to chcem zarovnať, s posuvníkom je to
+   * ťažké"). Klik = 0,1 %, podržanie opakuje (po pol sekunde a čím dlhšie,
+   * tým rýchlejšie — inak by cesta zo 100 na 110 % trvala sto klikov).
+   */
+  const zmenZoom = (smer, krokov = 1) => {
+    const s = stav[aktivne];
+    if (!s.src) return;
+    const { ow, oh } = rozmerOkna(okna[aktivne]);
+    s.v = obmedz(zoomOkolo(s.v, s.v.zoom * Math.pow(1.001, smer * krokov), 0, 0), s.fw, s.fh, ow, oh);
+    kresli();
+  };
+  for (const [id, smer] of [["zoomMenej", -1], ["zoomViac", 1]]) {
+    const b = document.getElementById(id);
+    if (!b) continue;
+    let casovac = 0, opakovanie = 0, kolo = 0;
+    const stop = () => { clearTimeout(casovac); clearInterval(opakovanie); casovac = 0; opakovanie = 0; };
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      zmenZoom(smer);
+      kolo = 0;
+      casovac = setTimeout(() => { opakovanie = setInterval(() => { kolo++; zmenZoom(smer, kolo > 40 ? 5 : kolo > 15 ? 2 : 1); }, 45); }, 450);
+    });
+    for (const u of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(u, stop);
+  }
   document.getElementById("den").onchange = (e) => { stav[aktivne].den = e.target.value; kresli(); };
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
@@ -1195,6 +1253,14 @@ window.kartotekaKlienta = (() => {
     if (e.target.closest?.("input, textarea")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
+    // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10) — na presné zarovnanie.
+    const posun = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (posun && !e.metaKey && !e.ctrlKey && !e.altKey && stav[aktivne].src) {
+      e.preventDefault();
+      const s = stav[aktivne], { ow, oh } = rozmerOkna(okna[aktivne]), n = e.shiftKey ? 10 : 1;
+      s.v = obmedz({ ...s.v, x: s.v.x + (posun[0] * n) / ow, y: s.v.y + (posun[1] * n) / oh }, s.fw, s.fh, ow, oh);
+      kresli();
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); krokDopredu(); }
   });
@@ -1576,6 +1642,7 @@ window.kartotekaKlienta = (() => {
     const { pred, po } = e.data;
     window.rozrobene?.novy(false); // nová dvojica z profilu = nový návrh, starý ostane v Rozrobených
     vycistiPopis(); // nové porovnanie = vlastný popis
+    nastavUpravovane(null);
     if (pred?.id) sk.vlozObrazok(0, kt.adresa(pred.id), pred.den, false);
     if (po?.id) sk.vlozObrazok(1, kt.adresa(po.id), po.den, false);
   });
@@ -1587,14 +1654,74 @@ window.kartotekaKlienta = (() => {
     st.hidden = false; st.style.color = ""; st.textContent = `Ukladám do kartotéky — ${kt.klient}…`;
     const blob = await sk.vyrobJpeg(2000);
     const ciste = sk.maRozbor ? await sk.vyrobJpeg(2000, true) : null;
-    const r = await kt.nahraj({ blob, ciste, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
-    b.disabled = false; b.textContent = "Uložiť ku klientovi";
+    const { edit, zdroje } = await stavNaUlozenie();
+    const r = await kt.nahraj({ blob, ciste, edit, zdroje, nahradit: upravovane && !akoNove ? upravovane.id : "", pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
+    akoNove = false;
+    b.disabled = false;
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
-    st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;
+    st.textContent = r.ok
+      ? (r.prepisane ? `✓ Porovnanie prepísané — ${kt.klient}. Odkaz klientovi už ukazuje novú verziu.` : `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).`)
+      : r.error;
+    // Uložené porovnanie sa dá ďalej upravovať a ukladať tým istým tlačidlom.
+    if (r.ok && r.id) nastavUpravovane({ id: r.id, den: upravovane?.den || kt.dnes() });
+    else popisTlacidla();
     // Popis patrí tomuto porovnaniu. Keď sa do polovíc dajú iné fotky, začne sa prázdny.
     if (r.ok) ulozeneZdroje = sk.stav.map((x) => x.src || "").join("|");
   };
   let ulozeneZdroje = null;
+
+  /**
+   * NÁVRAT K HOTOVÉMU EDITU (Jerry, 12. 10. 2026). S porovnaním sa uloží
+   * stav editora; fotky, ktoré neboli z kartotéky, idú na server zmenšené
+   * ako „zdroj:N". Otvorené porovnanie (✎ upraviť v kartotéke) sa tlačidlom
+   * PREPÍŠE — odkaz klientovi ukáže novú verziu; „ako nové" urobí ďalšie.
+   */
+  let upravovane = null; // { id, den }
+  let akoNove = false;
+  async function stavNaUlozenie() {
+    const o = JSON.parse(sk.snimkaStavu());
+    const rozmery = sk.rozmeryFotiek();
+    const noveRozmery = {};
+    const zdroje = [];
+    for (const x of o.stav) {
+      if (!x.src) continue;
+      const povodna = x.src;
+      if (!povodna.startsWith("/api/fotky")) {
+        try {
+          const z = await kt.zmensi(await fetch(povodna).then((r) => r.blob()), 2400);
+          zdroje.push(z.blob);
+          x.src = `zdroj:${zdroje.length - 1}`;
+          noveRozmery[x.src] = { fw: z.sirka, fh: z.vyska };
+          continue;
+        } catch { x.src = null; continue; }
+      }
+      if (rozmery[povodna]) noveRozmery[povodna] = rozmery[povodna];
+    }
+    return { edit: JSON.stringify({ stav: JSON.stringify(o), rozmery: noveRozmery }), zdroje };
+  }
+  function popisTlacidla() {
+    const b = $("ulozitKlientovi");
+    b.textContent = upravovane ? "Prepísať porovnanie" : "Uložiť ku klientovi";
+    $("upravujem").hidden = !upravovane;
+    if (upravovane) $("upravujemText").textContent = `Upravuješ porovnanie z ${sk.denCz(upravovane.den)} — uloženie ho prepíše (aj v odkaze klientovi).`;
+  }
+  function nastavUpravovane(u) { upravovane = u; popisTlacidla(); }
+  $("akoNove").onclick = () => { akoNove = true; $("ulozitKlientovi").click(); };
+  // Otvoriť uložené porovnanie z kartotéky (Kokpit → ✎ upraviť).
+  addEventListener("message", async (e) => {
+    if (e.origin !== location.origin || e.data?.typ !== "psb-upravit") return;
+    const st = $("ulozStav");
+    st.hidden = false; st.style.color = ""; st.textContent = "Otváram uložené porovnanie…";
+    const j = await fetch(`/api/fotky?edit=${encodeURIComponent(e.data.id)}`, { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+    if (!j?.ok) { st.style.color = "#ff8a7a"; st.textContent = j?.error || "Porovnanie sa nepodarilo otvoriť."; return; }
+    window.rozrobene?.novy(false);
+    const o = JSON.parse(j.edit.stav);
+    o.popis = j.popis || ""; // popis mohol byť upravený v kartotéke neskôr
+    ulozeneZdroje = null;
+    sk.nacitajStav(JSON.stringify(o), j.edit.rozmery || {});
+    nastavUpravovane({ id: j.id, den: j.den });
+    st.textContent = "Otvorené — uprav a ulož.";
+  });
   const vycistiPopis = () => { $("popisFotky").value = ""; ulozeneZdroje = null; };
   $("popisFotky").addEventListener("input", () => window.poZmene?.());
 
@@ -1736,6 +1863,7 @@ window.kartotekaKlienta = (() => {
       aktualny = id;
       clearTimeout(casovac);
       ulozeneZdroje = null; // návrh si nesie vlastný popis — nemazať ho
+      nastavUpravovane(null);
       sk.nacitajStav(JSON.stringify(o), rozmery);
       // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
       if (n.klient && n.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: n.klient }, location.origin);
@@ -1754,6 +1882,7 @@ window.kartotekaKlienta = (() => {
       clearTimeout(casovac);
       aktualny = null;
       ulozeneZdroje = null;
+      nastavUpravovane(null);
       if (vycistit) sk.nacitajStav(sk.prazdnyStav, {});
       stavText("");
       nacitajZoznam();
@@ -1788,6 +1917,13 @@ window.kartotekaKlienta = (() => {
       casovac = setTimeout(() => uloz(t), 1500);
     };
     $("novyNavrh").onclick = () => novy(true);
+    // „Uložiť si" na požiadanie (Jerry, 12. 10. 2026) — to isté, čo robí samo, len hneď.
+    $("ulozitNavrh").onclick = async () => {
+      clearTimeout(casovac);
+      if (!sk.stav.some((x) => x.src)) { stavText("niet čo uložiť — vlož fotku"); return; }
+      stavText("ukladám…");
+      await uloz(sk.snimkaStavu());
+    };
     nacitajZoznam();
     return { novy, otvor, nacitajZoznam, get aktualny() { return aktualny; } };
   })();
@@ -1798,7 +1934,7 @@ window.kartotekaKlienta = (() => {
     const s = sk.stav;
     $("stavFotky").textContent = `${sk.denCz(s[0].den) || "—"} · ${sk.denCz(s[1].den) || "—"}`;
     $("stavRozlozenie").textContent = NAZVY[sk.rozdelenie];
-    if (ulozeneZdroje !== null && sk.stav.map((x) => x.src || "").join("|") !== ulozeneZdroje) vycistiPopis();
+    if (ulozeneZdroje !== null && sk.stav.map((x) => x.src || "").join("|") !== ulozeneZdroje) { vycistiPopis(); nastavUpravovane(null); }
     const popis = $("popisFotky").value.trim();
     $("stavPopis").textContent = popis ? (popis.length > 22 ? `${popis.slice(0, 22)}…` : popis) : "žiadny";
     const st = sk.stitok;

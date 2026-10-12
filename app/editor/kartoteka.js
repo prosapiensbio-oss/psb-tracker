@@ -55,6 +55,10 @@ window.kartotekaKlienta = (() => {
     fd.append("subor", z.blob, z.nazov || "subor");
     // Čistá podoba toho istého porovnania (bez čiar a kresby) — klient si ju na stránke prepne.
     if (z.ciste) fd.append("subor_ciste", z.ciste, "ciste.jpg");
+    // Stav editora (návrat k hotovému editu) a pôvodné fotky mimo kartotéky.
+    if (z.edit) fd.append("edit", z.edit);
+    (z.zdroje || []).forEach((b, n) => fd.append(`zdroj${n}`, b, `zdroj${n}.jpg`));
+    if (z.nahradit) fd.append("nahradit", z.nahradit);
     let j;
     try {
       const r = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd });
