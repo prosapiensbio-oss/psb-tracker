@@ -27,7 +27,8 @@ export function polozkyFotiek(f: FotkyKlientov | undefined): PolozkaFotiek[] {
     von.push({
       key: `fotky|odpoved|${o.id}`, tone: "orange", klient: o.klient, trener: o.trener,
       title: `${o.klient} odpísal na fotky`,
-      detail: `Píše: „${ukazka(o.text)}“ — celé je v profile klienta → fotky. Odpoveď mu napíš sám (telefón, tréning); stránka ju neposiela.`,
+      // Riadok registra kreslí DETAIL, nie titulok — meno musí byť v ňom.
+      detail: `${o.klient} odpísal na fotky: „${ukazka(o.text)}“ — celé je v profile → fotky. Odpovedz mu sám (telefón, tréning); stránka odpoveď neposiela.`,
     });
   }
   for (const s of f.suhlasy) {
@@ -35,7 +36,7 @@ export function polozkyFotiek(f: FotkyKlientov | undefined): PolozkaFotiek[] {
     von.push({
       key: `fotky|suhlas|${s.token}`, tone: "blue", klient: s.klient, trener: s.trener,
       title: `${s.klient} súhlasí so zverejnením porovnania`,
-      detail: "Bez tváre a bez mena (Instagram, web). Súhlas je pri odkaze v profile → fotky; klient ho môže na stránke zmeniť.",
+      detail: `${s.klient} súhlasí so zverejnením porovnania — bez tváre a bez mena (Instagram, web). Je to pri odkaze v profile → fotky; klient to môže na stránke zmeniť.`,
     });
   }
   return von;

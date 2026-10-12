@@ -11,6 +11,7 @@ describe("odpovede klientov na fotky v notifikáciách", () => {
     expect(p[0].key).toBe("fotky|odpoved|7");
     expect(p[0].trener).toBe("Terezka");
     expect(p[0].detail).toContain("Super, díky!");
+    expect(p[0].detail).toMatch(/^Tomáš Novák/);
   });
   it("súhlas „ano“ sa oznámi, „ne“ nie", () => {
     const p = polozkyFotiek({ odpovede: [], suhlasy: [

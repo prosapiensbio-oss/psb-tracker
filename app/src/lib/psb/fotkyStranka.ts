@@ -56,7 +56,8 @@ export function fotkyStranka(v: FotkyStrankaVstup): string {
     `/f/${t}?foto=${encodeURIComponent(id)}${ciste ? "&ciste=1" : ""}${stiahnut ? "&stahnout=1" : ""}`;
   const prepinac = v.karty.some((k) => k.maCiste);
   const logo = v.logoUrl
-    ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="190" style="width:190px;max-width:60%;height:auto;display:block">`
+    // Logo je tmavozelené (#1A2E24) — na olivovom podklade by zmizlo; filter ho zosvetlí.
+    ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="190" style="width:190px;max-width:60%;height:auto;display:block;filter:brightness(0) invert(.88)">`
     : `<div class="znacka">PROSAPIENS BIOMECHANIC</div>`;
 
   const karty = v.karty.map((k, i) => {
