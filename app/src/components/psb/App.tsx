@@ -3132,8 +3132,11 @@ function skupinaFaktur(
               ...TABS.filter((t) => !MIMO_RAD.includes(t.id) && !(FIRMA_IDS.includes(t.id) && t.id !== FIRMA_IDS[0]))
                 .map((t) => (FIRMA_IDS.includes(t.id) ? { id: "firma", label: "Firma", icon: "barChart" } : { id: t.id, label: t.label, icon: t.icon })),
               { id: "btc", label: "Bitcoin", icon: "bitcoin" },
+              // Videá z telefónu pre Strižňu — na telefóne sa natáča, tak
+              // nesmie byť schované za Marketing → rad podzáložiek.
+              { id: "strizna-nahrat", label: "Nahrať do Strižne", icon: "upload" },
             ]}
-            chod={(id) => setActive(id === "firma" ? firmaSub : id)}
+            chod={(id) => (id === "strizna-nahrat" ? navigate("marketing", "nahrat") : setActive(id === "firma" ? firmaSub : id))}
             onZapis={() => setZapisSignal((n) => n + 1)}
             zapisCaka={pocetCakajucich(ritualyZapisu)}
             onJarvis={() => navigate("jarvis")}

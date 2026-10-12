@@ -3029,3 +3029,26 @@ z konverzácie „FB Reklama" (30. 9. – 8. 10.):
   „FB Reklama". Dopyty v dozore sú bez `druh = magnet` (stiahnutý protokol
   nie je dopyt) — loadData ich vyraďuje.
 
+
+## Nahrať do Strižne — videá z telefónu (12. 10. 2026)
+
+Marketing → „Nahrať do Strižne" (na telefóne aj vo ≡ Viac, `ciele` v App).
+Video ide po 25 MiB častiach (R2 multipart) do bucketu `kokpit-fotky` pod
+`strizna/nahrate/<id>/<meno>`; riadok v `strizna_nahrate` (migrácia 0115).
+Strižňa (Mac) si ho tokenom `x-strizna-token` stiahne a nahlási „stiahnuté" —
+vtedy sa objekt z R2 HNEĎ zmaže (riadok ostáva ako história). Kód:
+`lib/psb/striznaNahrate.ts` (čisté, testy), `routes/api/strizna.nahrate.$.ts`,
+`components/psb/StriznaNahrat.tsx`.
+
+- **Všetko je v JEDNEJ splat route.** Samostatná `strizna.nahrate.ts` pre holú
+  cestu nefungovala — `/api/strizna/nahrate/$` chytí aj prázdny splat a POST
+  štartu skončil v nej s „Také nahrávanie nie je". Overené lokálne.
+- **Časť musí mať presnú dĺžku** (R2 chce rovnaké časti okrem poslednej);
+  server kontroluje `content-length` a pri dokončení aj veľkosť objektu.
+- **Safari pri zamknutom telefóne JS zastaví** — stránka drží Wake Lock
+  a hovorí „nechaj stránku otvorenú". Nedokončené R2 samo zahodí po 7 dňoch,
+  riadok `nahrava` sa dá zmazať ×.
+- **Lokálny test bez hesla:** `wrangler dev -c wrangler.jsonc --local
+  --persist-to <tmp> --var STRIZNA_TOKEN:<32+ znakov>`, tabuľka cez
+  `wrangler d1 execute DB --local --persist-to <tmp> --file …`; cookie pre
+  obrazovku je `Jerry|HMAC("dev-secret", "psb-authed-v1|Jerry")`.

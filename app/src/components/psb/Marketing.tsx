@@ -1,5 +1,6 @@
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { MarketingPrehlad } from "./MarketingPrehlad";
+import { StriznaNahrat } from "./StriznaNahrat";
 import { MapaNapadov } from "./MapaNapadov";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -1162,6 +1163,10 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           { id: "navrhy", label: "Čo publikovať", skupina: "Čo púšťame von" },
           { id: "obsah", label: "Reels & posty", skupina: "Čo púšťame von" },
           { id: "mail", label: "Mailer", skupina: "Čo púšťame von" },
+          // Videá z telefónu pre Strižňu (Mac appka na strih, 12. 10. 2026).
+          // Je tu, lebo natočené video je surovina obsahu; na telefóne je
+          // aj priamo vo „≡ Viac" (ciele v App).
+          { id: "nahrat", label: "Nahrať do Strižne", skupina: "Čo púšťame von" },
           // Kampaň nie je záložka — je to preklik do Jarvisa. Kampaň sa
           // pripravuje debatou (čo má dosiahnuť, kam viesť, za koľko) a tá
           // patrí k nemu; formulár bez debaty by bol len ďalšie políčko.
@@ -1259,6 +1264,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
       )}
 
       {sub === "mail" && <Mail clients={clients} leads={leads} />}
+      {sub === "nahrat" && <StriznaNahrat />}
 
       {/* Vyhľadávanie = kto ma hľadá a či klikne. Google Ads sem patrí:
           je to platené vyhľadávanie, tá istá otázka za peniaze. */}

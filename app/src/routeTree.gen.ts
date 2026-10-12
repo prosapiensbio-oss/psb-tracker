@@ -97,6 +97,7 @@ import { Route as ApiAnamnezaRouteImport } from './routes/api/anamneza'
 import { Route as ApiAlgoRouteImport } from './routes/api/algo'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as KTokenKalendarDoticsRouteImport } from './routes/k.$token.kalendar[.]ics'
+import { Route as ApiStriznaNahrateSplatRouteImport } from './routes/api/strizna.nahrate.$'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -538,6 +539,11 @@ const KTokenKalendarDoticsRoute = KTokenKalendarDoticsRouteImport.update({
   path: '/kalendar.ics',
   getParentRoute: () => KTokenRoute,
 } as any)
+const ApiStriznaNahrateSplatRoute = ApiStriznaNahrateSplatRouteImport.update({
+  id: '/api/strizna/nahrate/$',
+  path: '/api/strizna/nahrate/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -628,6 +634,7 @@ export interface FileRoutesByFullPath {
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
+  '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -718,6 +725,7 @@ export interface FileRoutesByTo {
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
+  '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -809,6 +817,7 @@ export interface FileRoutesById {
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
+  '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -901,6 +910,7 @@ export interface FileRouteTypes {
     | '/u/$token'
     | '/v/$token'
     | '/k/$token/kalendar.ics'
+    | '/api/strizna/nahrate/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -991,6 +1001,7 @@ export interface FileRouteTypes {
     | '/u/$token'
     | '/v/$token'
     | '/k/$token/kalendar.ics'
+    | '/api/strizna/nahrate/$'
   id:
     | '__root__'
     | '/'
@@ -1081,6 +1092,7 @@ export interface FileRouteTypes {
     | '/u/$token'
     | '/v/$token'
     | '/k/$token/kalendar.ics'
+    | '/api/strizna/nahrate/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1171,6 +1183,7 @@ export interface RootRouteChildren {
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
+  ApiStriznaNahrateSplatRoute: typeof ApiStriznaNahrateSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1791,6 +1804,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KTokenKalendarDoticsRouteImport
       parentRoute: typeof KTokenRoute
     }
+    '/api/strizna/nahrate/$': {
+      id: '/api/strizna/nahrate/$'
+      path: '/api/strizna/nahrate/$'
+      fullPath: '/api/strizna/nahrate/$'
+      preLoaderRoute: typeof ApiStriznaNahrateSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1893,6 +1913,7 @@ const rootRouteChildren: RootRouteChildren = {
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
+  ApiStriznaNahrateSplatRoute: ApiStriznaNahrateSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
