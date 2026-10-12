@@ -124,8 +124,41 @@ function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: bo
  */
 const ZDIELAJ_QR = "try{if(navigator.canShare){var d=this.href,b=atob(d.split(',')[1]),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);var f=new File([a],this.getAttribute('download'),{type:d.slice(5,d.indexOf(';'))});if(navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return false;}}}catch(e){}";
 
+/**
+ * POPISOK DO SAMOTNÉHO OBRÁZKA QR.
+ *
+ * Petr Gažo, 11. 10. 2026: „daj do QR ProSapiens — keď si uložím obrázok QR
+ * a potom ho hľadám medzi obrázkami, tak ak ich tam má viac, nevie, ktorý
+ * patrí k nám." Názov súboru to nerieši: na iPhone sa obrázok ukladá
+ * podržaním prsta do Fotiek a meno sa zahodí. Popisok teda musí byť
+ * NAKRESLENÝ V OBRÁZKU.
+ *
+ * Kreslí sa až v prehliadači na canvas (QR vyrába server ako GIF a dopísať
+ * text do GIF-u by znamenalo vlastný enkodér). Keď canvas zlyhá — starý
+ * prehliadač, vypnutý skript, prísna politika — nestane sa NIČ a zostane
+ * pôvodný čistý QR. Stránka sa otvára z SMS, takže na skripte tu nesmie
+ * stáť nič podstatné.
+ *
+ * Text je POD kódom, mimo jeho plochy, takže čítateľnosť QR neohrozí.
+ */
+const POPIS_QR = (popis: string) => `(function(){try{
+var img=document.querySelector('img[data-psb-qr]');var odkaz=document.querySelector('a[data-psb-qr-ulozit]');
+if(!img)return;var hotovo=function(){try{
+var m=3,p=14,v=34,w=img.naturalWidth||256,c=document.createElement('canvas');
+c.width=w*m;c.height=(w+p+v)*m;var x=c.getContext('2d');if(!x)return;
+x.imageSmoothingEnabled=false;x.fillStyle='#ffffff';x.fillRect(0,0,c.width,c.height);
+x.drawImage(img,0,0,c.width,w*m);
+x.fillStyle='${SADZBA.pozadie}';x.textAlign='center';
+x.font='700 '+(15*m)+'px Raleway, Arial, sans-serif';
+x.fillText(${JSON.stringify(popis)},c.width/2,(w+p+15)*m);
+var d=c.toDataURL('image/png');if(!d||d.length<200)return;
+img.src=d;if(odkaz){odkaz.href=d;odkaz.setAttribute('download','ProSapiens-QR.png');}
+}catch(e){}};
+if(img.complete&&img.naturalWidth)hotovo();else img.addEventListener('load',hotovo);
+}catch(e){}})();`;
+
 function tlacidloUlozQr(qrUrl: string, subor: string, farba: string): string {
-  return `<a href="${esc(qrUrl)}" download="${esc(subor)}" onclick="${ZDIELAJ_QR}" style="display:inline-block;text-decoration:none;border:2px solid ${farba};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${farba}">Uložit QR do fotek</a>
+  return `<a href="${esc(qrUrl)}" download="${esc(subor)}" data-psb-qr-ulozit onclick="${ZDIELAJ_QR}" style="display:inline-block;text-decoration:none;border:2px solid ${farba};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${farba}">Uložit QR do fotek</a>
 <div style="margin-top:7px;font-size:12px;line-height:1.5;color:#4d5940">Na iPhonu zvol v nabídce „Uložit obrázek". Jde to i podržením prstu na QR.</div>`;
 }
 
@@ -135,7 +168,7 @@ function blokLightning(v: VypisKlienta, qrUrl?: string): string {
   if (!l) return "";
   const qr = qrUrl
     ? `<div style="margin-top:16px;background:#ffffff;border-radius:14px;padding:12px;display:inline-block">
-<img src="${esc(qrUrl)}" alt="QR na platbu přes Lightning" width="200" style="display:block;width:200px;height:auto">
+<img src="${esc(qrUrl)}" data-psb-qr alt="QR na platbu přes Lightning" width="200" style="display:block;width:200px;height:auto">
 </div>`
     : "";
   const ulozQr = qrUrl
@@ -143,10 +176,24 @@ function blokLightning(v: VypisKlienta, qrUrl?: string): string {
 ${tlacidloUlozQr(qrUrl, "platba-lightning.gif", s.pozadie)}
 </div>`
     : "";
-  return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
+  /**
+   * KORUNA JE PEVNÁ, BITCOIN SA DOPOČÍTAVA.
+   *
+   * Petr Gažo, 11. 10. 2026: „mal rozdiel v sumách pri BTC v českých
+   * korunách." Nie je to chyba výpočtu — kurz sa hýbe a peňaženka prepočíta
+   * sats vlastným kurzom, takže klientovi ukáže o pár korún inú sumu než
+   * naša stránka. Dovtedy ale stránka kričala satoshi a korunu dávala
+   * drobným pod ne, takže to vyzeralo, že sa mení dlh.
+   *
+   * Hierarchia je preto obrátená: veľká je ČIASTKA V KORUNÁCH (tá je daná
+   * a nemení sa), satoshi sú pod ňou ako prepočet k tejto minúte. A je pod
+   * tým napísané, že peňaženka môže ukázať o niečo inú korunovú hodnotu —
+   * inak to klient čita ako nezhodu.
+   */
+  return `<div id="platba" style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba?.novy === false ? "K úhradě" : "Nový balíček"} · bitcoin</div>
-<div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(l.sats)} sats</div>
-<div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(kc(l.czk))}${l.zlava ? ` · sleva ${l.zlava} % z ${esc(kc(l.plnaCena))}` : ""}</div>
+<div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(l.czk))}</div>
+<div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(l.sats)} sats${l.zlava ? ` · sleva ${l.zlava} % z ${esc(kc(l.plnaCena))}` : ""}</div>
 ${qr}
 ${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:${s.pozadie}">Načti QR v Lightning peněžence. Faktura má omezenou platnost — když ji peněženka odmítne, stačí stránku obnovit.</div>` : ""}
 <label style="display:block;margin-top:12px;text-align:left">
@@ -155,16 +202,17 @@ ${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:$
 </label>
 ${l.bolt11 ? "" : `<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#4d5940">Částku ${esc(l.sats)} sats zadej v peněžence sám.</div>`}
 ${ulozQr}
-<div style="margin-top:14px;font-size:11.5px;line-height:1.5;color:#4d5940">kurz ${esc(l.kurz)} Kč/BTC${l.kurzKedy ? ` · ${esc(l.kurzKedy)}` : ""}</div>
+<div style="margin-top:14px;font-size:11.5px;line-height:1.5;color:#4d5940">Částka je ${esc(kc(l.czk))}; satoshi jsou přepočet kurzem ${esc(l.kurz)} Kč/BTC${l.kurzKedy ? ` v ${esc(l.kurzKedy)}` : ""}. Peněženka může ukázat o pár korun jinak — platí korunová částka.</div>
 </div>`;
 }
 
 function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
   if (!v.platba || v.platba.suma <= 0) return "";
+  // `id="platba"` je cieľ CTA zhora — pri bankovej platbe rovnako ako pri bitcoine.
   const s = SADZBA;
   const qr = qrUrl
     ? `<div style="margin-top:14px;text-align:center">
-<img src="${esc(qrUrl)}" alt="QR platba" width="190" height="190" style="width:190px;height:190px;display:inline-block;border-radius:10px;background:#FFFFFF">
+<img src="${esc(qrUrl)}" data-psb-qr alt="QR platba" width="190" height="190" style="width:190px;height:190px;display:inline-block;border-radius:10px;background:#FFFFFF">
 <div style="margin-top:6px;font-size:12px;color:#4d5940">Načti QR v bankovní aplikaci</div>
 </div>`
     : "";
@@ -194,7 +242,7 @@ ${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
 </div>`
     : "";
 
-  return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
+  return `<div id="platba" style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.novy ? "Nový balíček" : "K úhradě"}</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}${v.platba.odpocet ? ` · ${esc(hod(v.platba.odpocet))} se hned odečte` : ""}</div>
@@ -396,6 +444,28 @@ ${osZvisla(v.os)}</div>`;
 }
 
 /**
+ * CTA HORE, KTORÉ PREKLIKNE NA PLATBU.
+ *
+ * Petr Gažo, 11. 10. 2026: „hore by mohlo byť nejaké CTA na platbu, ktoré by
+ * ho prekliklo nižšie." Mal pravdu — suma je až pod osou času a na telefóne
+ * je to niekoľko obrazoviek rolovania. Kto prišiel zaplatiť, nemá listovať
+ * cez históriu tréningov.
+ *
+ * Je to kotva, nie tlačidlo s obsluhou: `href="#platba"` funguje bez
+ * JavaScriptu aj v okne, ktoré si otvorí SMS.
+ */
+function ctaNaPlatbu(v: VypisKlienta): string {
+  const s = SADZBA;
+  const suma = v.lightning ? v.lightning.czk : v.platba?.suma;
+  if (!suma || suma <= 0) return "";
+  return `<a href="#platba" style="display:block;margin-top:18px;text-decoration:none;background:${s.zelena};border-radius:14px;padding:14px 18px;text-align:center">
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">Zaplatit</div>
+<div style="margin-top:3px;font-family:'Raleway',sans-serif;font-weight:800;font-size:26px;line-height:1.1;color:${s.pozadie}">${esc(kc(suma))}</div>
+<div style="margin-top:4px;font-size:13px;color:#4d5940">${v.platba?.novy ? "nový balíček" : "přejít na platbu"} &darr;</div>
+</a>`;
+}
+
+/**
  * CTA na celú históriu. Je to `<form>`, nie odkaz: posielanie mailu je
  * zmena, nie čítanie — a odkaz, ktorý niečo odošle, raz odošle aj robot,
  * čo si stránku načíta dopredu.
@@ -482,6 +552,7 @@ details[open] .psb-sip{transform:rotate(90deg)}
 <h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${stav.cervene ? s.minus : s.biela}">${esc(stav.velke)}</h1>
 <div style="margin-top:6px;font-size:15px;color:${s.tlmeny}">${esc(stav.pod)}</div>
 ${dalsi}
+${ctaNaPlatbu(v)}
 
 ${blokOsi(v, false)}
 ${v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl)}
@@ -494,5 +565,6 @@ ${blokHistorie(!!v.historiaPoslana)}
 </div>
 
 </div>
+${v.qrUrl ? `<script>${POPIS_QR(`ProSapiens · ${kc(v.lightning ? v.lightning.czk : v.platba?.suma || 0)}`)}</script>` : ""}
 </body></html>`;
 }

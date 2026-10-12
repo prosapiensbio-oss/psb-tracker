@@ -185,15 +185,46 @@ describe("platba na telefóne", () => {
 
   it("Uložit QR otvorí zdieľanie (iPhone → Uložit obrázek), a obsluha je platný JavaScript", () => {
     const h = klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" });
-    const m = /download="platba-prosapiens\.gif" onclick="([^"]+)"/.exec(h);
+    const m = /download="platba-prosapiens\.gif"[^>]*onclick="([^"]+)"/.exec(h);
     expect(m).not.toBeNull();
     expect(m![1]).toContain("navigator.share");
     // Atribút sa musí dať preložiť ako telo funkcie — preklep by tlačidlo ticho rozbil.
     expect(() => new Function(m![1].replace(/&#39;/g, "'"))).not.toThrow();
   });
 
-  it("nič z toho nestojí na JavaScripte", () => {
-    expect(klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,AAA" })).not.toContain("<script");
+  it("nič PODSTATNÉ nestojí na JavaScripte", () => {
+    // Pôvodne tu stálo „stránka neobsahuje <script> vôbec". Od 11. 10. 2026
+    // jeden skript na konci je — kreslí do obrázka QR popisok „ProSapiens"
+    // (Gažo: „keď si uložím QR a hľadám ho medzi obrázkami, neviem, ktorý
+    // patrí k nám"). Do GIF-u zo servera sa text dopísať nedá, canvas to vie.
+    //
+    // Pravidlo však platí ďalej a tento test ho stráži doslovne: bez skriptu
+    // musí byť na stránke SKUTOČNÝ QR aj funkčné tlačidlo na uloženie.
+    // Skript smie obrázok vylepšiť, nikdy ho nesmie vyrábať.
+    const qr = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+    const h = klientStranka({ ...zaklad2, platba, qrUrl: qr });
+    const bezSkriptov = h.replace(/<script>[\s\S]*?<\/script>/g, "");
+    expect(bezSkriptov).toContain(`src="${qr}"`);
+    expect(bezSkriptov).toContain(`href="${qr}"`);
+    expect(bezSkriptov).toContain("Uložit QR do fotek");
+    // A skript je naozaj len jeden a celý v try/catch — keď spadne, nestane sa nič.
+    const skripty = h.match(/<script>[\s\S]*?<\/script>/g) || [];
+    expect(skripty).toHaveLength(1);
+    const telo = (skripty[0] || "").replace(/<\/?script>/g, "");
+    expect(telo).toContain("try{");
+    expect(() => new Function(telo)).not.toThrow();
+  });
+
+  it("bez QR sa skript nekreslí vôbec", () => {
+    expect(klientStranka({ ...zaklad2, platba })).not.toContain("<script");
+  });
+
+  it("hore je CTA, ktoré preklikne na platbu", () => {
+    const h = klientStranka({ ...zaklad2, platba });
+    expect(h).toContain('href="#platba"');
+    expect(h).toContain('id="platba"');
+    // Kotva musí byť POD odkazom, inak preklik nikam neposunie.
+    expect(h.indexOf('href="#platba"')).toBeLessThan(h.indexOf('id="platba"'));
   });
 });
 
