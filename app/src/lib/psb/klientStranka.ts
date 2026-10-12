@@ -141,21 +141,46 @@ const ZDIELAJ_QR = "try{if(navigator.canShare){var d=this.href,b=atob(d.split(',
  *
  * Text je POD kódom, mimo jeho plochy, takže čítateľnosť QR neohrozí.
  */
-const POPIS_QR = (popis: string) => `(function(){try{
+const POPIS_QR = (popis: string, logo: string) => `(function(){try{
 var img=document.querySelector('img[data-psb-qr]');var odkaz=document.querySelector('a[data-psb-qr-ulozit]');
-if(!img)return;var hotovo=function(){try{
-var m=3,p=14,v=34,w=img.naturalWidth||256,c=document.createElement('canvas');
-c.width=w*m;c.height=(w+p+v)*m;var x=c.getContext('2d');if(!x)return;
+if(!img)return;
+/* PNG, nie SVG: znacka-figura.svg ma len viewBox bez width/height
+   a Safari takú kresbu do canvasu nevykreslí — na Macu by logo bolo
+   a na iPhone klienta nie. PNG nakreslí každý prehliadač rovnako.
+   (Bez spätných apostrofov: celý tento skript je template literal.) */
+var zn=new Image();zn.src=${JSON.stringify(logo)};
+var hotovo=function(){try{
+var m=3,p=10,v=32,w=img.naturalWidth||256,c=document.createElement('canvas');
+c.width=(w+p*2)*m;c.height=(w+p*2+v)*m;var x=c.getContext('2d');if(!x)return;
 x.imageSmoothingEnabled=false;x.fillStyle='#ffffff';x.fillRect(0,0,c.width,c.height);
-x.drawImage(img,0,0,c.width,w*m);
+x.drawImage(img,p*m,p*m,w*m,w*m);
+/* Doštička so značkou: 26 % šírky kódu = 6,8 % plochy. Korekcia „M" opraví
+   pätnásť percent, takže je to s rezervou — ale je to strop, nie cieľ. */
+if(zn.complete&&zn.naturalWidth){
+ var d=Math.round(w*0.26)*m,cx=c.width/2,cy=(p+w/2)*m,X=cx-d/2,Y=cy-d/2,r=7*m;
+ x.imageSmoothingEnabled=true;
+ x.fillStyle='#ffffff';x.strokeStyle='${SADZBA.pozadie}';x.lineWidth=m;
+ x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+d,Y,X+d,Y+d,r);x.arcTo(X+d,Y+d,X,Y+d,r);
+ x.arcTo(X,Y+d,X,Y,r);x.arcTo(X,Y,X+d,Y,r);x.closePath();x.fill();x.stroke();
+ var h=d*0.74,sir=h*(zn.naturalWidth/zn.naturalHeight||0.5);
+ x.drawImage(zn,cx-sir/2,cy-h/2,sir,h);
+}
 x.fillStyle='${SADZBA.pozadie}';x.textAlign='center';
-x.font='700 '+(15*m)+'px Raleway, Arial, sans-serif';
-x.fillText(${JSON.stringify(popis)},c.width/2,(w+p+15)*m);
-var d=c.toDataURL('image/png');if(!d||d.length<200)return;
-img.src=d;if(odkaz){odkaz.href=d;odkaz.setAttribute('download','ProSapiens-QR.png');}
+x.font='700 '+(13*m)+'px Raleway, Arial, sans-serif';
+x.fillText(${JSON.stringify(popis)},c.width/2,(p*2+w+14)*m);
+var u=c.toDataURL('image/png');if(!u||u.length<200)return;
+img.src=u;if(odkaz){odkaz.href=u;odkaz.setAttribute('download','ProSapiens-QR.png');}
 }catch(e){}};
-if(img.complete&&img.naturalWidth)hotovo();else img.addEventListener('load',hotovo);
+var pocet=0,skus=function(){if(++pocet>40)return;
+ if(img.complete&&img.naturalWidth&&(zn.complete||pocet>12))hotovo();else setTimeout(skus,100);};
+skus();
 }catch(e){}})();`;
+
+/** Čo sa vkreslí pod kód: pri bitcoine obe meny, pri banke len koruny. */
+function popisQr(v: VypisKlienta): string {
+  if (v.lightning) return `${kc(v.lightning.czk)} · ${v.lightning.sats} sats`;
+  return kc(v.platba?.suma || 0);
+}
 
 function tlacidloUlozQr(qrUrl: string, subor: string, farba: string): string {
   return `<a href="${esc(qrUrl)}" download="${esc(subor)}" data-psb-qr-ulozit onclick="${ZDIELAJ_QR}" style="display:inline-block;text-decoration:none;border:2px solid ${farba};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${farba}">Uložit QR do fotek</a>
@@ -438,6 +463,26 @@ function blokOsi(v: VypisKlienta, zlozena: boolean): string {
 <summary style="font-size:14px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>${esc(nazov)} — co se stalo</summary>
 <div style="margin-top:18px">${osZvisla(v.os)}</div></details></div>`;
   }
+  /**
+   * VIDNO ZAČIATOK, ZVYŠOK ZA TROJUHOLNÍKOM (Jerry, 12. 10. 2026).
+   *
+   * Pôvodne tu bola celá os — dvadsať a viac riadkov, cez ktoré musel klient
+   * rolovať k sume. Úplne zbaliť ju tiež nie: stránka by stratila to, prečo
+   * sa otvára druhýkrát. Vidno preto prvé riadky a pod nimi „…a dalších N
+   * řádků"; kto chce celú históriu, rozklikne ju jedným ťuknutím.
+   *
+   * `PRVYCH` je zámerne malé číslo: tri riadky sú ukážka, osem je zoznam.
+   */
+  const PRVYCH = 4;
+  if (v.os.length > PRVYCH + 2) {
+    const zvysok = v.os.length - PRVYCH;
+    return `<div style="margin-top:30px">
+<div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">${esc(nazov)}</div>
+${osZvisla(v.os.slice(0, PRVYCH))}
+<details style="margin-top:4px">
+<summary style="font-size:13.5px;color:${s.zelena};padding:8px 0"><span class="psb-sip">▸</span>…a dalších ${zvysok} ${zvysok < 5 ? "řádky" : "řádků"}</summary>
+<div style="margin-top:6px">${osZvisla(v.os.slice(PRVYCH))}</div></details></div>`;
+  }
   return `<div style="margin-top:30px">
 <div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">${esc(nazov)}</div>
 ${osZvisla(v.os)}</div>`;
@@ -458,10 +503,11 @@ function ctaNaPlatbu(v: VypisKlienta): string {
   const s = SADZBA;
   const suma = v.lightning ? v.lightning.czk : v.platba?.suma;
   if (!suma || suma <= 0) return "";
-  return `<a href="#platba" style="display:block;margin-top:18px;text-decoration:none;background:${s.zelena};border-radius:14px;padding:14px 18px;text-align:center">
-<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">Zaplatit</div>
-<div style="margin-top:3px;font-family:'Raleway',sans-serif;font-weight:800;font-size:26px;line-height:1.1;color:${s.pozadie}">${esc(kc(suma))}</div>
-<div style="margin-top:4px;font-size:13px;color:#4d5940">${v.platba?.novy ? "nový balíček" : "přejít na platbu"} &darr;</div>
+  // Jerry, 12. 10. 2026: „to CTA platby nemusí byť také veľké." Pilulka so
+  // šírkou podľa textu — zostáva prvá vec pod nadpisom, len nekričí.
+  return `<a href="#platba" style="display:inline-flex;align-items:center;gap:9px;margin-top:16px;text-decoration:none;background:${s.zelena};border-radius:999px;padding:9px 18px">
+<span style="font-size:15px;font-weight:700;color:${s.pozadie}">Zaplatit ${esc(kc(suma))}</span>
+<span style="font-size:15px;color:#4d5940">&darr;</span>
 </a>`;
 }
 
@@ -565,6 +611,6 @@ ${blokHistorie(!!v.historiaPoslana)}
 </div>
 
 </div>
-${v.qrUrl ? `<script>${POPIS_QR(`ProSapiens · ${kc(v.lightning ? v.lightning.czk : v.platba?.suma || 0)}`)}</script>` : ""}
+${v.qrUrl ? `<script>${POPIS_QR(popisQr(v), "/znacka-figura-qr.png")}</script>` : ""}
 </body></html>`;
 }

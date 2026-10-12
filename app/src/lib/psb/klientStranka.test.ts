@@ -399,3 +399,44 @@ describe("platba bitcoinom", () => {
     expect(h).not.toContain("omezenou platnost");
   });
 });
+
+describe("QR so značkou a sumou (12. 10. 2026)", () => {
+  const sQr = { ...zaklad, qrUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", platba: { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" } } as never;
+
+  it("značka ide ako PNG, nie SVG — Safari nevykreslí SVG bez rozmerov", () => {
+    const h = klientStranka(sQr);
+    expect(h).toContain('zn.src="/znacka-figura-qr.png"');
+    // Pozor: názov SVG stojí v komentári skriptu, tak sa kontroluje priradenie.
+    expect(h).not.toContain('zn.src="/znacka-figura.svg"');
+  });
+
+  it("v skripte nie je spätný apostrof — je to template literal", () => {
+    // Stalo sa pri písaní tejto zmeny: komentár so spätnými apostrofmi
+    // ukončil literal a build spadol na typoch.
+    const skript = (klientStranka(sQr).match(/<script>[\s\S]*?<\/script>/) || [""])[0];
+    expect(skript).not.toContain("`");
+  });
+
+  it("pod kódom je suma — pri banke koruny, pri bitcoine obe meny", () => {
+    expect(klientStranka(sQr)).toContain("9 400");
+    const btc = klientStranka({ ...sQr, lightning: { sats: "1 102 956", czk: 20093, kurz: "1 819 299", adresa: "a@b.c" } } as never);
+    const skript = (btc.match(/<script>[\s\S]*?<\/script>/) || [""])[0];
+    expect(skript).toContain("sats");
+    expect(skript).toContain("20 093");
+  });
+});
+
+describe("os ukáže začiatok a zvyšok schová", () => {
+  const dlha = { ...zaklad, os: Array.from({ length: 24 }, (_, i) => ({ den: `2026-09-${String(i + 1).padStart(2, "0")}`, popis: "trénink", druh: "trening" as const, zostatok: 24 - i, dlh: null })) };
+
+  it("pri dlhej osi sú vidieť štyri riadky a zvyšok je za trojuholníkom", () => {
+    const h = klientStranka(dlha);
+    expect(h).toContain("…a dalších 20 řádků");
+    expect(h).toContain("<details");
+  });
+
+  it("krátka os sa nezbaľuje — trojuholník nad piatimi riadkami je zbytočný", () => {
+    const h = klientStranka({ ...zaklad, os: dlha.os.slice(0, 5) });
+    expect(h).not.toContain("…a dalších");
+  });
+});
