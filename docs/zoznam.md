@@ -210,6 +210,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
+- **Odkaz s fotkami pre klienta** (12. 10. 2026) — návrh `navrhy-kokpitu/odkaz-fotky-klientovi.html` (mimo repa, v philipjerry-web). Čaká: podoba A (olivová ako stránka klienta) alebo B (svetlá ako web) a ktoré z bodov 4–7 (čísla uhlov, čo ďalej, súhlas so zverejnením, stiahnuť). Popis k fotke už je naostro (stĺpec `klient_fotky.popis`, migrácia 0112).
+
 - **Dozor reklám — NAOSTRO od 10. 10. 2026.** Notifikácia z dôvodu, s číslami a návrhom (`lib/psb/reklamaDozor.ts`, testy; `/api/meta` akcie `dozor`, `rozhodni-kampan`, `dozor-nastavenie`; plánovač 4:20 UTC; migrácia 0109). Tlačidlá Nechať · Vypnúť · Zmeniť rozpočet (potvrdenie so sumou na mesiac, strop 2 000 Kč/deň a 3×) · počet DM pri interakciách · Prompt pre Clauda; karta Marketing → Náklady → Dozor reklám. **Čaká na Jerryho:** (1) prvé tri vyhodnotenia (retargeting 1 099 Kč/dopyt, návštevy 1 961 Kč/dopyt, interakcie — zadať DM); (2) **cieľová cena za dopyt** a prípadne mesačný strop v karte — bez cieľa Kokpit vie povedať len „nechať/vypnúť", nie „pridať". 3 z 8 dopytov z reklamy od 20. 9. nemajú utm (označené ručne) — nedajú sa pripísať kampani.
 - **Reklamný agent — NAOSTRO od 10. 10. 2026.** Panel „Reklama · Jarvis" v Marketing → Čo to stálo vedľa dozoru: jedna stála debata (zameranie Kampaň, Opus), Jarvis číta Metu sám (`meta_citaj`) a zmeny navrhuje tlačidlami — rozpočet, vek/publiká sady, nová reklama s novým textom (médium z existujúcej), zapnúť/vypnúť reklamu. Notifikácia dozoru má „Prebrať s Jarvisom →". **Neoverené v prehliadači** (Chrome rozšírenie sa nepripojilo) — prvé použitie sleduj.
 
