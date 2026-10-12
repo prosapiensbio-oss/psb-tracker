@@ -597,7 +597,7 @@
     kresliCiary();
   });
   addEventListener("keydown", (e) => {
-    if (e.target.closest?.("input")) return;
+    if (e.target.closest?.("input, textarea")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
@@ -795,6 +795,7 @@
       ciary, rozdelenie, priehladnost, mriezka, stitok,
       medzera: Number(document.getElementById("medzera").value),
       sklon: zaskrtnute("sklon"), ciaryExport: zaskrtnute("ciaryExport"), mriezkaExport: zaskrtnute("mriezkaExport"),
+      popis: document.getElementById("popisFotky")?.value || "",
     }, zaokruhli);
   }
   function zmena() {
@@ -840,6 +841,8 @@
       document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle("on", x.dataset.v === h));
     }
     for (const id of ["sklon", "ciaryExport", "mriezkaExport"]) if (typeof o[id] === "boolean") document.getElementById(id).checked = o[id];
+    const popisEl = document.getElementById("popisFotky");
+    if (popisEl) popisEl.value = o.popis || "";
     pouziRozdelenie();
     pouziStitok();
     kresli();
@@ -877,6 +880,7 @@
   document.getElementById("krokSpat").onclick = krokSpat;
   document.getElementById("krokDopredu").onclick = krokDopredu;
   for (const id of ["ciaryExport", "mriezkaExport"]) document.getElementById(id).addEventListener("change", zmena);
+  document.getElementById("popisFotky")?.addEventListener("input", zmena);
   // Ťah = jeden krok: počas držania sa nezapisuje, po pustení áno.
   stvorec.addEventListener("pointerdown", () => { drzi = true; }, true);
   const pustene = () => { if (drzi) { drzi = false; zmena(); } };

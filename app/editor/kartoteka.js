@@ -50,6 +50,7 @@ window.kartotekaKlienta = (() => {
     fd.append("pohlad", z.pohlad);
     if (z.sirka) fd.append("sirka", String(z.sirka));
     if (z.vyska) fd.append("vyska", String(z.vyska));
+    if (z.popis) fd.append("popis", z.popis);
     if (osobne) fd.append("suhlasOsobne", "1");
     fd.append("subor", z.blob, z.nazov || "subor");
     let j;

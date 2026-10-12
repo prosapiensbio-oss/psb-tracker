@@ -14,7 +14,8 @@ import { odsifruj, odsifrujBajty, zasifruj, zasifrujBajty } from "../../lib/psb/
  *   GET  ?id=X      → samotná fotka (rozšifrovaná, len prihlásenému)
  *   POST multipart  → nahratie: klient, den, pohlad, subor (+ suhlasOsobne)
  *                     pohlad „porovnanie" a „video" posiela editor (Workspace → Editor)
- *   POST { akcia: "poznamka" | "pohlad" | "zmaz" }
+ *   POST { akcia: "poznamka" | "popis" | "pohlad" | "zmaz" }
+ *   popis = text k jednej fotke (šifrovaný), pri nahratí aj v poli „popis"
  *
  * Fotka je v R2 (väzba STORAGE) ZAŠIFROVANÁ kľúčom anamnézy; bez neho sa
  * nedá ani nahrať, ani pozrieť — radšej nič než čitateľná fotka tela
@@ -76,7 +77,7 @@ export const Route = createFileRoute("/api/fotky")({
         const klient = kus(q.get("klient"), 120);
         if (!klient) return chyba("chýba klient");
         const [fotky, poznamky, suhlas] = await Promise.all([
-          DB.prepare("SELECT id, klient, den, pohlad, sirka, vyska, suhlas, kto, created_at, typ FROM klient_fotky WHERE klient = ?1 ORDER BY den DESC, created_at")
+          DB.prepare("SELECT id, klient, den, pohlad, sirka, vyska, suhlas, kto, created_at, typ, popis FROM klient_fotky WHERE klient = ?1 ORDER BY den DESC, created_at")
             .bind(klient).all().then((x) => x.results as Record<string, unknown>[]).catch(() => null),
           DB.prepare("SELECT den, text FROM klient_fotky_poznamky WHERE klient = ?1").bind(klient).all()
             .then((x) => x.results as { den: string; text: string }[]).catch(() => null),
@@ -90,11 +91,18 @@ export const Route = createFileRoute("/api/fotky")({
             try { poz[p.den] = await odsifruj(p.text, ANAMNEZA_KLUC); } catch { poz[p.den] = "(poznámku sa nepodarilo rozšifrovať)"; }
           }
         }
+        const popisy: Record<string, string> = {};
+        if (ANAMNEZA_KLUC) {
+          for (const f of fotky) {
+            if (!f.popis) continue;
+            try { popisy[String(f.id)] = await odsifruj(String(f.popis), ANAMNEZA_KLUC); } catch { popisy[String(f.id)] = "(popis sa nepodarilo rozšifrovať)"; }
+          }
+        }
         return Response.json({
           ok: true,
           fotky: fotky.map((f) => ({
             id: f.id, klient: f.klient, den: f.den, pohlad: f.pohlad, sirka: f.sirka, vyska: f.vyska,
-            suhlas: f.suhlas, kto: f.kto, createdAt: f.created_at, typ: f.typ ?? null,
+            suhlas: f.suhlas, kto: f.kto, createdAt: f.created_at, typ: f.typ ?? null, popis: popisy[String(f.id)] || "",
           })),
           poznamky: poz,
           suhlas,
@@ -145,12 +153,14 @@ export const Route = createFileRoute("/api/fotky")({
           const kluc = klucFotky(id, den);
           const sifra = await zasifrujBajty(await f.arrayBuffer(), ANAMNEZA_KLUC);
           await STORAGE.put(kluc, sifra, { httpMetadata: { contentType: "application/octet-stream" } });
+          const popisText = String(form.get("popis") ?? "").trim().slice(0, 4000);
+          const popis = popisText ? await zasifruj(popisText, ANAMNEZA_KLUC) : null;
           const sirka = Math.max(0, Math.round(Number(form.get("sirka")) || 0)) || null;
           const vyska = Math.max(0, Math.round(Number(form.get("vyska")) || 0)) || null;
           try {
             await DB.prepare(
-              "INSERT INTO klient_fotky (id, klient, den, pohlad, kluc, sirka, vyska, bajty, suhlas, kto, created_at, typ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
-            ).bind(id, klient, den, pohlad, kluc, sirka, vyska, sifra.length, zAnamnezy ? "anamneza" : "osobne", kto, new Date().toISOString(), typ === "image/jpeg" ? null : typ).run();
+              "INSERT INTO klient_fotky (id, klient, den, pohlad, kluc, sirka, vyska, bajty, suhlas, kto, created_at, typ, popis) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
+            ).bind(id, klient, den, pohlad, kluc, sirka, vyska, sifra.length, zAnamnezy ? "anamneza" : "osobne", kto, new Date().toISOString(), typ === "image/jpeg" ? null : typ, popis).run();
           } catch (e) {
             // Bez riadku by fotka v úložisku visela a nikto by o nej nevedel.
             await STORAGE.delete(kluc).catch(() => {});
@@ -180,6 +190,14 @@ export const Route = createFileRoute("/api/fotky")({
 
         const id = kus(b.id, 40);
         if (!id) return chyba("chýba id");
+
+        if (b.akcia === "popis") {
+          const text = String(b.text ?? "").trim().slice(0, 4000);
+          const r = await DB.prepare("UPDATE klient_fotky SET popis = ?2 WHERE id = ?1")
+            .bind(id, text ? await zasifruj(text, ANAMNEZA_KLUC) : null).run();
+          if (!r.meta.changes) return chyba("Taká fotka nie je.", 404);
+          return Response.json({ ok: true });
+        }
 
         if (b.akcia === "pohlad") {
           // Fotku tela nejde prerobiť na porovnanie či video (ani naopak).

@@ -82,6 +82,10 @@
   .dizajny { flex-wrap: wrap; }
   .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
   .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
+  .popis-fotky { padding: 10px 14px 0; }
+  .popis-fotky label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  .popis-fotky label span { font-weight: 400; color: var(--dim); margin-left: 4px; }
+  .popis-fotky textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
   .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /*/ui-css*/
   /* V Kokpite je hlavička na karte Workspace, tu nie. */
@@ -350,6 +354,7 @@ window.kartotekaKlienta = (() => {
     fd.append("pohlad", z.pohlad);
     if (z.sirka) fd.append("sirka", String(z.sirka));
     if (z.vyska) fd.append("vyska", String(z.vyska));
+    if (z.popis) fd.append("popis", z.popis);
     if (osobne) fd.append("suhlasOsobne", "1");
     fd.append("subor", z.blob, z.nazov || "subor");
     let j;

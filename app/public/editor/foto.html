@@ -82,6 +82,10 @@
   .dizajny { flex-wrap: wrap; }
   .dizajny button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
   .dizajny i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 3px 8px; border-radius: 99px; }
+  .popis-fotky { padding: 10px 14px 0; }
+  .popis-fotky label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  .popis-fotky label span { font-weight: 400; color: var(--dim); margin-left: 4px; }
+  .popis-fotky textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line2); background: rgba(255,255,255,.04); color: var(--text); font: inherit; font-size: 13px; line-height: 1.5; resize: vertical; }
   .zasobnik .sn.teraz { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /*/ui-css*/
   .platno .stvorec { --strana: min(calc(100vw - var(--panel) - 44px), calc(100vh - var(--hlavicka) - 44px)); width: var(--strana); height: var(--strana); }
@@ -269,6 +273,10 @@
         </div>
       </details>
     </div>
+    <div class="popis-fotky">
+      <label for="popisFotky">Popis k fotke <span>uloží sa s ňou ku klientovi</span></label>
+      <textarea id="popisFotky" rows="3" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+    </div>
     <div class="napoveda" id="ulozStav" style="padding:8px 14px 0;min-height:0" hidden></div>
     <div class="spodok">
       <button class="tl" id="stiahnut">Stiahnuť JPEG</button>
@@ -397,6 +405,7 @@ window.kartotekaKlienta = (() => {
     fd.append("pohlad", z.pohlad);
     if (z.sirka) fd.append("sirka", String(z.sirka));
     if (z.vyska) fd.append("vyska", String(z.vyska));
+    if (z.popis) fd.append("popis", z.popis);
     if (osobne) fd.append("suhlasOsobne", "1");
     fd.append("subor", z.blob, z.nazov || "subor");
     let j;
@@ -1036,7 +1045,7 @@ window.kartotekaKlienta = (() => {
     kresliCiary();
   });
   addEventListener("keydown", (e) => {
-    if (e.target.closest?.("input")) return;
+    if (e.target.closest?.("input, textarea")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
@@ -1234,6 +1243,7 @@ window.kartotekaKlienta = (() => {
       ciary, rozdelenie, priehladnost, mriezka, stitok,
       medzera: Number(document.getElementById("medzera").value),
       sklon: zaskrtnute("sklon"), ciaryExport: zaskrtnute("ciaryExport"), mriezkaExport: zaskrtnute("mriezkaExport"),
+      popis: document.getElementById("popisFotky")?.value || "",
     }, zaokruhli);
   }
   function zmena() {
@@ -1279,6 +1289,8 @@ window.kartotekaKlienta = (() => {
       document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle("on", x.dataset.v === h));
     }
     for (const id of ["sklon", "ciaryExport", "mriezkaExport"]) if (typeof o[id] === "boolean") document.getElementById(id).checked = o[id];
+    const popisEl = document.getElementById("popisFotky");
+    if (popisEl) popisEl.value = o.popis || "";
     pouziRozdelenie();
     pouziStitok();
     kresli();
@@ -1316,6 +1328,7 @@ window.kartotekaKlienta = (() => {
   document.getElementById("krokSpat").onclick = krokSpat;
   document.getElementById("krokDopredu").onclick = krokDopredu;
   for (const id of ["ciaryExport", "mriezkaExport"]) document.getElementById(id).addEventListener("change", zmena);
+  document.getElementById("popisFotky")?.addEventListener("input", zmena);
   // Ťah = jeden krok: počas držania sa nezapisuje, po pustení áno.
   stvorec.addEventListener("pointerdown", () => { drzi = true; }, true);
   const pustene = () => { if (drzi) { drzi = false; zmena(); } };
@@ -1414,7 +1427,7 @@ window.kartotekaKlienta = (() => {
     b.disabled = true; b.textContent = "Ukladám…";
     st.hidden = false; st.style.color = ""; st.textContent = `Ukladám do kartotéky — ${kt.klient}…`;
     const blob = await sk.vyrobJpeg(2000);
-    const r = await kt.nahraj({ blob, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg" });
+    const r = await kt.nahraj({ blob, pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
     b.disabled = false; b.textContent = "Uložiť ku klientovi";
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
     st.textContent = r.ok ? `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).` : r.error;

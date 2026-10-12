@@ -51,6 +51,8 @@ export type Fotka = {
   createdAt?: string;
   /** MIME súboru; chýba = image/jpeg. */
   typ?: string | null;
+  /** Popis k fotke (rozšifrovaný) — hlavne k porovnaniu, ktoré ide klientovi. */
+  popis?: string;
 };
 
 export type Fotenie = { den: string; fotky: Fotka[]; poznamka: string };

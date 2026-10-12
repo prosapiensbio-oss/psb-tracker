@@ -65,6 +65,9 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   const [osobne, setOsobne] = useState(false);
   const [nahravam, setNahravam] = useState<string | null>(null);
   const [zvacsena, setZvacsena] = useState<Fotka | null>(null);
+  /** Rozpísaný popis zväčšenej fotky — zapíše sa pri odchode z políčka. */
+  const [popisKoncept, setPopisKoncept] = useState<string | null>(null);
+  useEffect(() => { setPopisKoncept(null); }, [zvacsena?.id]);
   /** Prehrávané video z editora: zašifrované ide celé cez fetch, potom z pamäte. */
   const [video, setVideo] = useState<{ f: Fotka; url: string } | null>(null);
   /** Rozpísané poznámky po dňoch — zapisujú sa pri odchode z políčka. */
@@ -90,7 +93,12 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   // Esc zavrie zväčšenú fotku aj video.
   useEffect(() => {
     if (!zvacsena && !video) return;
-    const na = (e: KeyboardEvent) => { if (e.key === "Escape") { setZvacsena(null); setVideo(null); } };
+    const na = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Rozpísaný popis sa zapíše pri strate zamerania — Esc ho nesmie zahodiť.
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      setZvacsena(null); setVideo(null);
+    };
     document.addEventListener("keydown", na);
     return () => document.removeEventListener("keydown", na);
   }, [zvacsena, video]);
@@ -164,6 +172,16 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
       setZvacsena(null); setVideo(null);
       setVyber((v) => v.filter((x) => x !== f.id));
       setHlaska("Fotka zmazaná.");
+      await nacitaj();
+    }
+  };
+
+  const ulozPopis = async (f: Fotka) => {
+    if (popisKoncept === null || popisKoncept.trim() === (f.popis || "")) return;
+    if (await posli({ akcia: "popis", id: f.id, text: popisKoncept })) {
+      setHlaska("Popis uložený.");
+      // Len ak je tá istá fotka ešte otvorená — zavreté okno sa nesmie znova otvoriť.
+      setZvacsena((z) => (z && z.id === f.id ? { ...z, popis: popisKoncept.trim() } : z));
       await nacitaj();
     }
   };
@@ -324,6 +342,7 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
                   <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
                 )}
                 <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}</div>
+                {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
               </button>
             ))}
           </div>
@@ -441,7 +460,17 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
           role="dialog" aria-label="Fotka" onClick={() => setZvacsena(null)}
           style={{ position: "fixed", inset: 0, zIndex: 60, background: C.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, gap: 10 }}
         >
-          <img src={obrazok(zvacsena)} alt="" style={{ maxWidth: "100%", maxHeight: "calc(100vh - 110px)", objectFit: "contain", borderRadius: 8 }} />
+          <img src={obrazok(zvacsena)} alt="" style={{ maxWidth: "100%", maxHeight: "calc(100vh - 210px)", objectFit: "contain", borderRadius: 8 }} />
+          <textarea
+            aria-label="Popis k fotke"
+            onClick={(e) => e.stopPropagation()}
+            placeholder="Popis k fotke — čo je na nej vidieť. Uloží sa, keď klikneš mimo."
+            value={popisKoncept ?? (zvacsena.popis || "")}
+            onChange={(e) => setPopisKoncept(e.target.value)}
+            onBlur={() => void ulozPopis(zvacsena)}
+            rows={3}
+            style={{ width: "min(640px, 100%)", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13, lineHeight: 1.55, resize: "vertical" }}
+          />
           <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: C.textMuted }}>
             <span>{nazovPohladu(zvacsena.pohlad)} · {denCz(zvacsena.den)}{zvacsena.kto ? ` · ${zvacsena.kto}` : ""}</span>
             <button type="button" onClick={() => void zmaz(zvacsena)} style={{ background: "none", border: "none", color: C.red, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zmazať</button>
