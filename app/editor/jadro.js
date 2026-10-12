@@ -55,6 +55,24 @@
   let vybrana = null;
   let farbaCiar = "#ff8a1f";
   let dalsieId = 1;
+  /**
+   * KROK SPÄŤ (Jerry, 12. 10. 2026: „dal som to zle a potrebujem krok späť
+   * a ten tam nie je"). Pred každou zmenou čiar sa odloží ich celý stav;
+   * ↶ / ⌘Z ho vráti. Ťah, ktorý nič nezmenil (klik bez posunu), sa
+   * z histórie vyhodí, aby krok späť nebol „naprázdno".
+   */
+  const historia = [];
+  const zapamataj = () => {
+    historia.push(JSON.stringify(ciary));
+    if (historia.length > 100) historia.shift();
+  };
+  const zabudniAkNic = () => { if (historia.at(-1) === JSON.stringify(ciary)) historia.pop(); };
+  const krokSpat = () => {
+    if (!historia.length) return;
+    ciary = JSON.parse(historia.pop());
+    vybrana = null;
+    kresliCiary();
+  };
   const svgCiary = document.getElementById("ciary");
   const desatinne = (n) => n.toFixed(1).replace(".", ",");
   /** Obdĺžniky okien na obrazovke (px od rohu štvorca). */
@@ -145,6 +163,8 @@
     svgCiary.innerHTML = html.join("");
     document.getElementById("zmazVybranu").disabled = vybrana == null;
     document.getElementById("zmazVsetky").disabled = !ciary.length;
+    const spat = document.getElementById("krokSpat");
+    if (spat) spat.disabled = !historia.length;
     window.poZmene?.();
   }
 
@@ -210,6 +230,7 @@
       if (najblizsi && najblizsi.c.id === vybrana) {
         const bod = najblizsi.c[najblizsi.kl];
         const spojene = ciary.flatMap((c) => ["a", "b"].filter((kl) => c.okno === najblizsi.c.okno && rovnakyBod(c[kl], bod)).map((kl) => [c, kl]));
+        zapamataj();
         tah = { druh: "koniec", kluce: spojene, okno: najblizsi.c.okno };
       } else {
         const naCiare = !najblizsi && ciary.find((c) => stav[c.okno]?.src && vzdialenostOdUsecky(P, bodVOkne(c.okno, c.a, R), bodVOkne(c.okno, c.b, R)) < 7);
@@ -218,6 +239,7 @@
         let zaciatok = bodZOkna(okno, P.x, P.y, R);
         if (najblizsi && najblizsi.c.okno === okno) zaciatok = { ...najblizsi.c[najblizsi.kl] };
         const c = { id: dalsieId++, okno, a: zaciatok, b: { ...zaciatok }, farba: farbaCiar };
+        zapamataj();
         ciary.push(c);
         vybrana = c.id;
         tah = { druh: "nova", kluce: [[c, "b"]], okno, ciara: c };
@@ -258,6 +280,7 @@
         vybrana = null;
       }
       tah = null;
+      zabudniAkNic();
       kresliCiary();
     };
     svgCiary.addEventListener("pointerup", pusti);
@@ -291,7 +314,7 @@
     }
     return { sklon, uhly, farba: c.farba };
   }
-  const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
+  const zmazVybranu = () => { zapamataj(); ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; kresliCiary(); };
 
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
   // Po česky: hotová fotka ide klientovi alebo na sociálne siete (Jerry vybral
@@ -432,6 +455,8 @@
     Object.assign(s, { src, vlastny: !!vlastny, v: { zoom: 1, x: 0, y: 0 }, zrkadlo: false });
     if (den) s.den = den;
     ciary = ciary.filter((c) => c.okno !== i); // čiary patrili starej fotke
+    // …aj v odložených krokoch — krok späť nesmie vrátiť čiary na novú fotku.
+    for (let k = 0; k < historia.length; k++) historia[k] = JSON.stringify(JSON.parse(historia[k]).filter((c) => c.okno !== i));
     aktivne = i;
     kresli();
   }
@@ -508,7 +533,10 @@
   document.getElementById("den").onchange = (e) => { stav[aktivne].den = e.target.value; kresli(); };
   document.getElementById("zrkadlo").onclick = () => { stav[aktivne].zrkadlo = !stav[aktivne].zrkadlo; kresli(); };
   document.getElementById("reset").onclick = () => { stav[aktivne].v = { zoom: 1, x: 0, y: 0 }; kresli(); };
-  document.getElementById("vymenit").onclick = () => { stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
+  document.getElementById("vymenit").onclick = () => {
+    // Aj odložené kroky idú s fotkami na druhú stranu — inak by krok späť vrátil čiary na cudziu fotku.
+    for (let k = 0; k < historia.length; k++) historia[k] = JSON.stringify(JSON.parse(historia[k]).map((c) => ({ ...c, okno: 1 - c.okno })));
+    stav.reverse(); ciary.forEach((c) => { c.okno = 1 - c.okno; }); okna.forEach((el) => el.innerHTML = ""); aktivne = 1 - aktivne; kresli(); };
   document.getElementById("popisky").onchange = (e) => stvorec.classList.toggle("skryte-popisky", !e.target.checked);
   document.getElementById("medzera").oninput = (e) => stvorec.style.setProperty("--medzera", `${e.target.value}px`);
   document.querySelectorAll("#rozdelenie button").forEach((b) => b.onclick = () => {
@@ -540,19 +568,22 @@
   };
   document.getElementById("kreslit").onclick = () => nastavRezim(!rezimCiar);
   document.getElementById("zmazVybranu").onclick = zmazVybranu;
-  document.getElementById("zmazVsetky").onclick = () => { if (confirm("Zmazať všetky čiary?")) { ciary = []; vybrana = null; kresliCiary(); } };
+  // Krok späť vie vrátiť aj „zmazať všetky" — preto sa už nepýta.
+  document.getElementById("zmazVsetky").onclick = () => { zapamataj(); ciary = []; vybrana = null; kresliCiary(); };
+  document.getElementById("krokSpat").onclick = krokSpat;
   document.getElementById("sklon").onchange = kresliCiary;
   document.querySelectorAll("#farbaCiar button").forEach((b) => b.onclick = () => {
     document.querySelectorAll("#farbaCiar button").forEach((x) => x.classList.toggle("on", x === b));
     farbaCiar = b.dataset.v;
     const c = ciary.find((q) => q.id === vybrana);
-    if (c) c.farba = farbaCiar; // farba sa dá zmeniť aj vybranej čiare
+    if (c && c.farba !== farbaCiar) { zapamataj(); c.farba = farbaCiar; } // farba sa dá zmeniť aj vybranej čiare
     kresliCiary();
   });
   addEventListener("keydown", (e) => {
     if (e.target.closest?.("input")) return;
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); krokSpat(); }
   });
   addEventListener("resize", kresli);
 
