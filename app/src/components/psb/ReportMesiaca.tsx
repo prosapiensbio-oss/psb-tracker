@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { reportNaMarkdown, suhrnPlnenia, type OtazkaReportu, type Report, type StavPlnenia } from "../../lib/psb/mesacnyReport";
+import { Prezentacia } from "./Prezentacia";
 import { stlpcovyGraf, FARBY } from "../../lib/psb/reportGrafy";
 import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
@@ -210,11 +211,14 @@ function PlnenieKvartalu({ mesiace }: { mesiace: NavrhyMesiaca[] }) {
 }
 
 export function ReportMesiaca({ report, nahlad, onZavri, plnenie }: { report: Report; nahlad: boolean; onZavri: () => void; plnenie?: NavrhyMesiaca[] }) {
+  const [prezentuje, setPrezentuje] = useState(false);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onZavri(); };
+    // Escape nad otvorenou prezentáciou zatvára JU, nie report pod ňou —
+    // inak by jedno stlačenie zavrelo oboje a Jerry by sa vrátil do uzávierky.
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !prezentuje) onZavri(); };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [onZavri]);
+  }, [onZavri, prezentuje]);
   return (
     <div role="dialog" aria-modal="true" aria-label={`Report ${report.nadpis}`} onClick={onZavri}
       style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,.55)", display: "grid", placeItems: "start center", overflowY: "auto", padding: "40px 16px" }}>
@@ -226,6 +230,7 @@ export function ReportMesiaca({ report, nahlad, onZavri, plnenie }: { report: Re
           <span style={{ fontSize: 13, color: C.textMuted }}>{report.porovnanie}</span>
           {nahlad && <span style={{ fontSize: 11.5, color: C.orange, border: `1px solid ${mix(C.orange, 45)}`, borderRadius: 10, padding: "2px 8px" }}>náhľad — mesiac ešte nie je zamknutý</span>}
           <span style={{ marginLeft: "auto" }} />
+          <button onClick={() => setPrezentuje(true)} style={{ background: mix(C.accent, 18), border: `1px solid ${mix(C.accent, 55)}`, color: C.accentLight, borderRadius: 9, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 650 }}>▶ Prezentácia</button>
           <button onClick={() => tlac(report)} style={{ background: mix(C.green, 14), border: `1px solid ${mix(C.green, 45)}`, color: C.green, borderRadius: 9, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 650 }}>🖨 Tlačiť / PDF</button>
           <button onClick={onZavri} style={{ background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: 9, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Zavrieť</button>
         </div>
@@ -236,6 +241,7 @@ export function ReportMesiaca({ report, nahlad, onZavri, plnenie }: { report: Re
         <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 14, lineHeight: 1.5 }}>
           Zisk je z P&L Kokpitu, hodiny a klienti zo sedení, Instagram z Metricoolu, reklama z Mety. Všetky porovnania sú s priemerom ({report.porovnanie.replace("proti priemeru ", "")}), nie s predošlým obdobím.
         </div>
+        {prezentuje && <Prezentacia report={report} onZavri={() => setPrezentuje(false)} />}
       </div>
     </div>
   );

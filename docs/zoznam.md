@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **5. 10. 2026**.
+Stav k **12. 10. 2026**.
 
 ---
 
@@ -266,6 +266,20 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 | ~~PSI kľúč~~ — HOTOVÉ 6. 10. 2026: nový kľúč (projekt Kokpit kalendar, obmedzený na PageSpeed Insights API) v Údajoch; 3 merania cez appku prešli (07:09 UTC), priamy test u Google 200. Pozn.: „41 znakov" bola dĺžka s úvodzovkami JSON v `vzas_settings`, nie chyba kľúča. | 1. 10. | — |
 
 ## 2 · Prijaté, nezačaté
+
+- **Prezentácia z mesačného reportu — POSTAVENÁ 12. 10. 2026** (Jerry: „chcel
+  by som aby mi to rovno vygenerovalo nejakú prezentáciu… niečo ako
+  powerpointovú, prepínam medzi slajdami, postupne sa mi tam zobrazujú
+  jednotlivé data", potom nad náhľadom „postav to, ľúbi sa mi to"): v okne
+  reportu tlačidlo **▶ Prezentácia** → slajdy na celú obrazovku. Príbeh mesiaca:
+  titulka → semafor šiestich otázok → otázka po otázke (veľké číslo, stĺpce,
+  tabuľka, „Urob") → Čo to znamená → Čo urobíme. Šípky, medzerník, F = celá
+  obrazovka, Esc zatvára prezentáciu (nie report pod ňou). Čísla sa NEPOČÍTAJÚ
+  znova — `prezentacia.ts` len prestavuje hotový `Report`. Otvorené: (1) na
+  telefóne je slajd zmenšený na šírku displeja a text je malý — prezentuje sa
+  z notebooku, pre mobil by chcelo vlastné rozloženie; (2) prezentácia sa zatiaľ
+  nedá vytlačiť ani poslať ďalej (report áno, `reportHtml.ts`) — `Platno` je
+  z komponentu vyčlenené práve na to.
 
 - **Termíny klienta v kalendári mobilu — NAOSTRO 7. 10. 2026 (A1 profil + B1 stránka /k/). Otvorené: overiť na skutočnom iPhone upozornenia a obnovu; Android/Google obnova. Pôvodne — náčrty 7. 10.: `navrhy-kokpitu/kalendar-do-mobilu.html` (A1 profil / A2 záložka „V mobile" / A3 hromadne; B1–B3 stránka /k/; C náhľad v telefóne), čaká sa na výber:** každý klient tajný odkaz (iCal odber) na svoje tréningy z Google kalendára; telefón ich pripomenie sám, presuny sa prejavia samy, zadarmo. Pozor: iPhone obnovuje po hodinách, Android/Google aj pol dňa–deň; iOS pri odberoch často vypína upozornenia — OVERIŤ na skutočnom iPhone pred spustením (návod klientovi „zapni Upozornění"). V udalosti len „Trénink ProSapiens · tréner" + adresa, nič citlivé. Ide až po ponuke termínov.
 - **Ponuka termínov klientovi — NAOSTRO 7. 10. 2026 (A1 + B1):** záložka Kalendár → Ponuka termínov (pôvodne Workspace, presunuté na Jerryho želanie), bez ±15 min, stránka /t/. Otvorené: prvý ostrý výber sledovať (zápis do Google netestovaný naostro); kratší odkaz cez prosapiens.cz chce /t/ v WP snippete id 26. Pôvodné zadanie: v Kokpite týždeň z Google kalendára, ťukaním ponúknuť voľné časy (60 min, upraviť po 15 min hore/dole), vybrať klienta (alebo nový z dopytu), „Vytvoriť odkaz" → SMS. Klient na stránke (čeština) klepne na jeden → udalosť v kalendári trénera + push. Platí do konca týždňa alebo kým sa termín nezaplní (vybraný termín zmizne aj z iných ponúk). Každý tréner ponúka zo svojho kalendára, filter Jerryho / Terezkine / oboje. Náčrty: `navrhy-kokpitu/ponuka-terminov.html`.
