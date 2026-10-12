@@ -144,7 +144,7 @@
           <div class="riadok" id="snimkaPohladRiadok">ako <select id="snimkaPohlad"><option value="bok">zboku</option><option value="predok">spredu</option><option value="zadok">zozadu</option><option value="ine">iné</option></select></div>
           <div class="zasobnik" id="zasobnik"></div>
           <div class="napoveda" id="zasobnikPrazdny">📷 alebo kláves <b>S</b> uloží snímku. Snímky čakajú v editore fotiek (hore prepni na <b>Foto</b>, skupina „Snímky z videa") — tam ich dáš vedľa seba a upravíš ako fotky.</div>
-          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Tento prehliadač nedovolil uložiť snímky natrvalo — do editora fotiek ich prenesieš len stiahnutím (⤓).</div>
+          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Server teraz nie je dostupný — snímka je len v tejto stránke; ulož si ju stiahnutím (⤓).</div>
         </div>
       </details>
     </div>
@@ -731,7 +731,8 @@
   }
   $("snimka").onclick = ulozSnimku;
   const adresy = new Map();
-  const adresa = (z) => { if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
+  // Snímka zo servera má trvalú adresu; len núdzová (v pamäti) nesie súbor.
+  const adresa = (z) => { if (z.url) return z.url; if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
   async function nacitajSnimky() {
     const sn = (await window.skladSnimok.vsetky()).sort((a, b) => a.id - b.id);
     $("stavSnimky").textContent = sn.length ? String(sn.length) : "žiadne";

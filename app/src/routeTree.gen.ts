@@ -83,6 +83,8 @@ import { Route as ApiFotkyRouteImport } from './routes/api/fotky'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
+import { Route as ApiEditorSnimkyRouteImport } from './routes/api/editor-snimky'
+import { Route as ApiEditorNavrhyRouteImport } from './routes/api/editor-navrhy'
 import { Route as ApiDotaznikRouteImport } from './routes/api/dotaznik'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
@@ -469,6 +471,16 @@ const ApiExportRoute = ApiExportRouteImport.update({
   path: '/api/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEditorSnimkyRoute = ApiEditorSnimkyRouteImport.update({
+  id: '/api/editor-snimky',
+  path: '/api/editor-snimky',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEditorNavrhyRoute = ApiEditorNavrhyRouteImport.update({
+  id: '/api/editor-navrhy',
+  path: '/api/editor-navrhy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDotaznikRoute = ApiDotaznikRouteImport.update({
   id: '/api/dotaznik',
   path: '/api/dotaznik',
@@ -564,6 +576,8 @@ export interface FileRoutesByFullPath {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/dotaznik': typeof ApiDotaznikRoute
+  '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
+  '/api/editor-snimky': typeof ApiEditorSnimkyRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -655,6 +669,8 @@ export interface FileRoutesByTo {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/dotaznik': typeof ApiDotaznikRoute
+  '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
+  '/api/editor-snimky': typeof ApiEditorSnimkyRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -747,6 +763,8 @@ export interface FileRoutesById {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/dotaznik': typeof ApiDotaznikRoute
+  '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
+  '/api/editor-snimky': typeof ApiEditorSnimkyRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -840,6 +858,8 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/dotaznik'
+    | '/api/editor-navrhy'
+    | '/api/editor-snimky'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -931,6 +951,8 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/dotaznik'
+    | '/api/editor-navrhy'
+    | '/api/editor-snimky'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1022,6 +1044,8 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/dotaznik'
+    | '/api/editor-navrhy'
+    | '/api/editor-snimky'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1114,6 +1138,8 @@ export interface RootRouteChildren {
   ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiDotaznikRoute: typeof ApiDotaznikRoute
+  ApiEditorNavrhyRoute: typeof ApiEditorNavrhyRoute
+  ApiEditorSnimkyRoute: typeof ApiEditorSnimkyRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
@@ -1706,6 +1732,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/editor-snimky': {
+      id: '/api/editor-snimky'
+      path: '/api/editor-snimky'
+      fullPath: '/api/editor-snimky'
+      preLoaderRoute: typeof ApiEditorSnimkyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/editor-navrhy': {
+      id: '/api/editor-navrhy'
+      path: '/api/editor-navrhy'
+      fullPath: '/api/editor-navrhy'
+      preLoaderRoute: typeof ApiEditorNavrhyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dotaznik': {
       id: '/api/dotaznik'
       path: '/api/dotaznik'
@@ -1844,6 +1884,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,
   ApiDotaznikRoute: ApiDotaznikRoute,
+  ApiEditorNavrhyRoute: ApiEditorNavrhyRoute,
+  ApiEditorSnimkyRoute: ApiEditorSnimkyRoute,
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,

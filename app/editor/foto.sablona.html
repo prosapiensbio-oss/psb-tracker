@@ -65,7 +65,7 @@
       <details data-skupina="navrhy">
         <summary><span class="sipka">▸</span>Rozrobené<span class="stav" id="stavNavrhy"></span></summary>
         <div class="obsah">
-          <div class="napoveda">Rozrobená práca sa ukladá sama pár sekúnd po každej zmene — aj keď zavrieš Kokpit. Je len v tomto prehliadači (iPad a Mac majú každý svoje).</div>
+          <div class="napoveda">Rozrobená práca sa ukladá sama pár sekúnd po každej zmene — na server, takže ju nájdeš aj na inom zariadení (PC, iPad, telefón).</div>
           <div class="zasobnik" id="navrhyGrid"></div>
           <button class="tl" id="novyNavrh">+ nový prázdny</button>
         </div>
@@ -113,7 +113,7 @@
         <div class="obsah">
           <div class="zasobnik" id="zasobnik"></div>
           <div class="napoveda" id="zasobnikPrazdny">Zatiaľ žiadne. Snímky sa robia v editore videa (hore prepni na <b>Video</b>, tam 📷) a objavia sa tu samé. Do polovice ich dáš ◧ ◨ alebo pretiahnutím.</div>
-          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Tento prehliadač nedovolil uložiť snímky natrvalo — vidíš len tie z tejto stránky.</div>
+          <div class="napoveda" id="zasobnikPamat" hidden style="color:var(--accentLight)">Server teraz nie je dostupný — snímka je len v tejto stránke a po zatvorení zmizne.</div>
         </div>
       </details>
 
@@ -383,7 +383,8 @@
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];
   const adresy = new Map(); // id → objectURL
-  const adresa = (z) => { if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
+  // Snímka zo servera má trvalú adresu; len núdzová (v pamäti) nesie súbor.
+  const adresa = (z) => { if (z.url) return z.url; if (!adresy.has(z.id)) adresy.set(z.id, URL.createObjectURL(z.blob)); return adresy.get(z.id); };
   window.snimkaDoPolovice = (id, i) => {
     const z = snimky.find((x) => x.id === id);
     if (z) sk.vlozObrazok(i, adresa(z), z.den, false);
@@ -420,116 +421,94 @@
   /**
    * „Chcel by som mať uložené návrhy / rozrobenú robotu, ktorá by sa
    * automaticky ukladala po pár krokoch." Po každom kroku (jadro volá
-   * poZmeneStavu) sa o 1,5 s uloží celý stav do IndexedDB tohto
-   * prehliadača. Fotky z kartotéky sa ukladajú len adresou (sú zašifrované
-   * na serveri), fotky z počítača a snímky z videa ako súbor — tie by
-   * inak po zatvorení stránky zmizli. Najviac MAX_NAVRHOV, najstarší odchádza.
+   * poZmeneStavu) sa o 1,5 s uloží celý stav.
+   *
+   * NA SERVERI (`/api/editor-navrhy`, šifrovane) — „prečo fotky, ktoré
+   * upravím v PC, nie sú potom v iPade". Fotky z kartotéky a snímky z videa
+   * sa ukladajú len adresou; fotka z počítača ide na server raz (zmenšená)
+   * a ďalej sa odkazuje jej adresou. Staré návrhy z IndexedDB tohto
+   * prehliadača sa pri prvom spustení prenesú a lokálne zmažú.
    */
   window.rozrobene = (() => {
-    const MAX_NAVRHOV = 20;
-    let dbP = null;
-    const db = () => dbP || (dbP = new Promise((res, rej) => {
-      try {
-        const r = indexedDB.open("skladacka-navrhy", 1);
-        r.onupgradeneeded = () => {
-          r.result.createObjectStore("navrhy", { keyPath: "id", autoIncrement: true });
-          r.result.createObjectStore("obrazky", { keyPath: "id", autoIncrement: true });
-        };
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => rej(r.error);
-      } catch (e) { rej(e); }
-    }));
-    const transakcia = async (sklady, mod, f) => {
-      const d = await db();
-      return new Promise((res, rej) => {
-        const t = d.transaction(sklady, mod);
-        const v = f(...sklady.map((x) => t.objectStore(x)));
-        t.oncomplete = () => res(v && "result" in v ? v.result : v);
-        t.onerror = () => rej(t.error);
-      });
-    };
-    let aktualny = null;           // id otvoreného návrhu
-    const obrazkyId = new Map();   // src v tejto stránke → id súboru v IndexedDB
-    let casovac = 0;
+    let aktualny = null;             // id otvoreného návrhu (na serveri)
+    const naServeri = new Map();     // lokálna adresa fotky (blob:, data:) → adresa na serveri
+    let casovac = 0, ukladam = Promise.resolve();
     const stavText = (t) => { $("stavUlozenia").textContent = t; };
-    const cas = (ms) => new Date(ms).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const cas = (iso) => new Date(iso).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const trvala = (src) => src.startsWith("/api/");
+
+    /** Pošle návrh na server. edit = { stav (reťazec), rozmery }; lokálne fotky idú ako súbory. */
+    async function posliNaServer(id, klient, o, rozmery, nahlad, zdrojFotky) {
+      const fd = new FormData();
+      if (id) fd.append("id", id);
+      fd.append("klient", klient || "");
+      const noveRozmery = {};
+      let n = 0;
+      for (const x of o.stav) {
+        if (!x.src) continue;
+        const povodna = x.src;
+        if (!trvala(povodna)) {
+          if (naServeri.has(povodna)) x.src = naServeri.get(povodna);
+          else {
+            const z = await kt.zmensi(await zdrojFotky(povodna), 2400);
+            fd.append(`obr${n}`, z.blob, `obr${n}.jpg`);
+            x.src = `obr:${n}`;
+            x.__povodna = povodna;
+            noveRozmery[x.src] = { fw: z.sirka, fh: z.vyska };
+            n++;
+            continue;
+          }
+        }
+        if (rozmery[povodna]) noveRozmery[x.src] = rozmery[povodna];
+      }
+      const povodne = o.stav.map((x) => x.__povodna);
+      for (const x of o.stav) delete x.__povodna;
+      fd.append("edit", JSON.stringify({ stav: JSON.stringify(o), rozmery: noveRozmery }));
+      if (nahlad) fd.append("nahlad", nahlad, "nahlad.jpg");
+      const r = await fetch("/api/editor-navrhy", { method: "POST", credentials: "same-origin", body: fd });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      // Lokálna fotka má odteraz adresu na serveri — druhýkrát sa už nenahrá.
+      o.stav.forEach((x, i) => { if (povodne[i] && j.zdroje?.[x.src]) naServeri.set(povodne[i], j.zdroje[x.src]); });
+      return j;
+    }
 
     async function uloz(t) {
       const o = JSON.parse(t);
       if (!o.stav.some((x) => x.src)) return; // prázdny editor sa neukladá
-      try {
-        // Súbory, ktoré ešte uložené nie sú (z počítača, snímky z videa).
-        for (const x of o.stav) {
-          if (!x.src || x.src.startsWith("/api/") || obrazkyId.has(x.src)) continue;
-          const blob = await fetch(x.src).then((r) => r.blob());
-          const id = await transakcia(["obrazky"], "readwrite", (st) => st.add({ blob }));
-          obrazkyId.set(x.src, id);
+      const krok = async () => {
+        try {
+          const nahlad = await sk.vyrobJpeg(320);
+          const j = await posliNaServer(aktualny, kt.klient, o, sk.rozmeryFotiek(), nahlad, (src) => fetch(src).then((r) => r.blob()));
+          aktualny = j.id;
+          stavText(`uložené ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
+          nacitajZoznam();
+        } catch (e) {
+          stavText("neuložilo sa — skúsim pri ďalšej zmene");
+          console.warn("rozrobené:", e);
         }
-        const rozmery = {};
-        const vRozmeroch = sk.rozmeryFotiek();
-        for (const x of o.stav) {
-          if (!x.src) continue;
-          const kluc = obrazkyId.has(x.src) ? `idb:${obrazkyId.get(x.src)}` : x.src;
-          if (vRozmeroch[x.src]) rozmery[kluc] = vRozmeroch[x.src];
-          x.src = kluc;
-        }
-        const nahlad = await sk.vyrobJpeg(320);
-        const zaznam = { klient: kt.klient, upravene: Date.now(), stav: JSON.stringify(o), rozmery, nahlad };
-        if (aktualny != null) zaznam.id = aktualny;
-        aktualny = await transakcia(["navrhy"], "readwrite", (st) => st.put(zaznam));
-        await uprac();
-        stavText(`uložené ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
-        nacitajZoznam();
-      } catch (e) {
-        stavText("neuložilo sa");
-        console.warn("rozrobené:", e);
-      }
+      };
+      ukladam = ukladam.then(krok); // nikdy dve ukladania naraz (druhé by založilo nový návrh)
+      return ukladam;
     }
-    /** Najviac MAX_NAVRHOV; súbory, na ktoré už nič neodkazuje, preč. */
-    async function uprac() {
-      const vsetky = (await transakcia(["navrhy"], "readonly", (st) => st.getAll())) || [];
-      vsetky.sort((a, b) => b.upravene - a.upravene);
-      const nadbytok = vsetky.slice(MAX_NAVRHOV).filter((n) => n.id !== aktualny);
-      if (nadbytok.length) await transakcia(["navrhy"], "readwrite", (st) => nadbytok.forEach((n) => st.delete(n.id)));
-      const ostava = vsetky.filter((n) => !nadbytok.includes(n));
-      const pouzite = new Set(ostava.flatMap((n) => [...n.stav.matchAll(/"idb:(\d+)"/g)].map((m) => Number(m[1]))));
-      for (const id of obrazkyId.values()) pouzite.add(id); // súbory otvorené v editore ešte poslúžia
-      const kluce = (await transakcia(["obrazky"], "readonly", (st) => st.getAllKeys())) || [];
-      const prec = kluce.filter((k) => !pouzite.has(k));
-      if (prec.length) await transakcia(["obrazky"], "readwrite", (st) => prec.forEach((k) => st.delete(k)));
-    }
+
     async function otvor(id) {
-      const n = await transakcia(["navrhy"], "readonly", (st) => st.get(id));
-      if (!n) return;
-      const o = JSON.parse(n.stav);
-      const rozmery = {};
-      for (const x of o.stav) {
-        if (!x.src) continue;
-        const stary = x.src;
-        const m = /^idb:(\d+)$/.exec(stary);
-        if (m) {
-          const z = await transakcia(["obrazky"], "readonly", (st) => st.get(Number(m[1])));
-          if (!z) { x.src = null; continue; }
-          x.src = URL.createObjectURL(z.blob);
-          obrazkyId.set(x.src, Number(m[1]));
-        }
-        if (n.rozmery?.[stary]) rozmery[x.src] = n.rozmery[stary];
-      }
+      const j = await fetch(`/api/editor-navrhy?id=${encodeURIComponent(id)}`, { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+      if (!j?.ok) { stavText(j?.error || "návrh sa neotvoril"); return; }
       aktualny = id;
       clearTimeout(casovac);
       ulozeneZdroje = null; // návrh si nesie vlastný popis — nemazať ho
       nastavUpravovane(null);
-      sk.nacitajStav(JSON.stringify(o), rozmery);
+      sk.nacitajStav(j.edit.stav, j.edit.rozmery || {});
       // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
-      if (n.klient && n.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: n.klient }, location.origin);
-      stavText(`otvorené · ${cas(n.upravene)}`);
+      if (j.klient && j.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: j.klient }, location.origin);
+      stavText(`otvorené · ${cas(j.upravene)}`);
       nacitajZoznam();
     }
     async function zmaz(id) {
-      if (!confirm("Zmazať tento rozrobený návrh?")) return;
-      await transakcia(["navrhy"], "readwrite", (st) => st.delete(id));
+      if (!confirm("Zmazať tento rozrobený návrh? Zmizne na všetkých zariadeniach.")) return;
+      await fetch("/api/editor-navrhy", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ akcia: "zmaz", id }) }).catch(() => null);
       if (aktualny === id) aktualny = null;
-      await uprac();
       nacitajZoznam();
     }
     /** Ďalšie zmeny pôjdu do nového návrhu; vycistit = aj prázdny editor. */
@@ -542,30 +521,64 @@
       stavText("");
       nacitajZoznam();
     }
-    const adresy = new Map();
     async function nacitajZoznam() {
-      let vsetky = [];
-      try { vsetky = (await transakcia(["navrhy"], "readonly", (st) => st.getAll())) || []; }
-      catch { $("navrhyGrid").innerHTML = `<div class="napoveda">Tento prehliadač nedovolil ukladať (súkromné okno?) — rozrobené sa neuchovajú.</div>`; return; }
-      vsetky.sort((a, b) => b.upravene - a.upravene);
+      const j = await fetch("/api/editor-navrhy", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+      if (!j?.ok) {
+        $("navrhyGrid").innerHTML = `<div class="napoveda">${j?.error || "Rozrobené sa nenačítali — skontroluj pripojenie."}</div>`;
+        return;
+      }
+      const vsetky = j.navrhy;
       $("stavNavrhy").textContent = vsetky.length ? String(vsetky.length) : "žiadne";
-      for (const u of adresy.values()) URL.revokeObjectURL(u);
-      adresy.clear();
-      $("navrhyGrid").innerHTML = vsetky.length ? vsetky.map((n) => {
-        const u = n.nahlad ? URL.createObjectURL(n.nahlad) : "";
-        if (u) adresy.set(n.id, u);
-        return `<div class="sn${n.id === aktualny ? " teraz" : ""}" data-id="${n.id}" title="Otvoriť" style="cursor:pointer">
-          <img src="${u}" alt="" style="aspect-ratio:1/1">
+      $("navrhyGrid").innerHTML = vsetky.length ? vsetky.map((n) => `
+        <div class="sn${n.id === aktualny ? " teraz" : ""}" data-id="${n.id}" title="Otvoriť" style="cursor:pointer">
+          <img src="${n.maNahlad ? `/api/editor-navrhy?nahlad=${n.id}&v=${encodeURIComponent(n.upravene)}` : ""}" alt="" style="aspect-ratio:1/1">
           <div class="popis"><b>${n.klient || "bez klienta"}</b><br>${cas(n.upravene)}${n.id === aktualny ? " · otvorené" : ""}</div>
           <div class="akcie"><button data-a="zmaz" title="Zmazať návrh">✕</button></div>
-        </div>`;
-      }).join("") : `<div class="napoveda">Zatiaľ nič. Prvý návrh sa uloží sám, keď vložíš fotku.</div>`;
+        </div>`).join("") : `<div class="napoveda">Zatiaľ nič. Prvý návrh sa uloží sám, keď vložíš fotku.</div>`;
       $("navrhyGrid").querySelectorAll(".sn").forEach((el) => {
-        const id = Number(el.dataset.id);
+        const id = el.dataset.id;
         el.onclick = (e) => { if (e.target.closest("button")) return; if (id !== aktualny) otvor(id); };
         el.querySelector("button").onclick = () => zmaz(id);
       });
     }
+
+    // Jednorazový prenos starých návrhov z IndexedDB tohto prehliadača na server.
+    async function prenesLokalne() {
+      let db;
+      try {
+        db = await new Promise((res, rej) => {
+          const r = indexedDB.open("skladacka-navrhy", 1);
+          r.onupgradeneeded = () => { r.result.createObjectStore("navrhy", { keyPath: "id", autoIncrement: true }); r.result.createObjectStore("obrazky", { keyPath: "id", autoIncrement: true }); };
+          r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+        });
+      } catch { return; }
+      const daj = (sklad, kluc) => new Promise((res) => {
+        const t = db.transaction(sklad, "readonly").objectStore(sklad)[kluc === undefined ? "getAll" : "get"](kluc);
+        t.onsuccess = () => res(t.result); t.onerror = () => res(null);
+      });
+      const stare = ((await daj("navrhy")) || []).sort((x, y) => x.upravene - y.upravene);
+      if (!stare.length) { db.close(); indexedDB.deleteDatabase("skladacka-navrhy"); return; }
+      stavText(`prenášam ${stare.length} rozrobené z tohto zariadenia…`);
+      let preneseny = 0;
+      for (const n of stare) {
+        try {
+          const o = JSON.parse(n.stav);
+          const rozmery = { ...(n.rozmery || {}) };
+          await posliNaServer(null, n.klient, o, rozmery, n.nahlad || null, async (src) => {
+            const m = /^idb:(\d+)$/.exec(src);
+            const z = m ? await daj("obrazky", Number(m[1])) : null;
+            if (!z?.blob) throw new Error("fotka návrhu chýba");
+            return z.blob;
+          });
+          preneseny++;
+        } catch (e) { console.warn("prenos návrhu:", e); }
+      }
+      db.close();
+      if (preneseny === stare.length) indexedDB.deleteDatabase("skladacka-navrhy");
+      stavText(preneseny ? `prenesené na server: ${preneseny}` : "");
+      nacitajZoznam();
+    }
+
     window.poZmeneStavu = (t) => {
       clearTimeout(casovac);
       stavText("ukladám…");
@@ -579,7 +592,10 @@
       stavText("ukladám…");
       await uloz(sk.snimkaStavu());
     };
+    // Návrat na stránku (iné zariadenie medzitým mohlo uložiť) → čerstvý zoznam.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) nacitajZoznam(); });
     nacitajZoznam();
+    prenesLokalne();
     return { novy, otvor, nacitajZoznam, get aktualny() { return aktualny; } };
   })();
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { dnesPraha } from "../../lib/psb/cas";
 import { posliDoEditora, upravVEditore } from "../../lib/psb/doEditora";
@@ -69,7 +70,12 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   const [zvacsena, setZvacsena] = useState<Fotka | null>(null);
   /** Rozpísaný popis zväčšenej fotky — zapíše sa pri odchode z políčka. */
   const [popisKoncept, setPopisKoncept] = useState<string | null>(null);
-  useEffect(() => { setPopisKoncept(null); }, [zvacsena?.id]);
+  /** Zväčšené porovnanie: ukázať čistú podobu (bez čiar)? */
+  const [zvacsenaCiste, setZvacsenaCiste] = useState(false);
+  /** Popis upravovaný priamo na dlaždici „Z editora" (id fotky) a jeho text. */
+  const [textNa, setTextNa] = useState<string | null>(null);
+  const [textKoncept, setTextKoncept] = useState("");
+  useEffect(() => { setPopisKoncept(null); setZvacsenaCiste(false); }, [zvacsena?.id]);
   /** Prehrávané video z editora: zašifrované ide celé cez fetch, potom z pamäte. */
   const [video, setVideo] = useState<{ f: Fotka; url: string } | null>(null);
   /** Rozpísané poznámky po dňoch — zapisujú sa pri odchode z políčka. */
@@ -356,12 +362,36 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
                   <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}{f.maCiste ? " · aj čisté" : ""}</div>
                   {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
                 </button>
-                {f.maEdit && (
-                  <button
-                    type="button" onClick={() => upravVEditore(meno, f.id)}
-                    title="Otvoriť v editore s čiarami a kresbou — uloženie porovnanie prepíše"
-                    style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderTop: `1px solid ${mix(C.border, 80)}`, background: "transparent", color: C.accentLight, fontFamily: "inherit", fontSize: 12, textAlign: "left", cursor: "pointer" }}
-                  >✎ upraviť v editore</button>
+                {/* Text a mazanie priamo na dlaždici (Jerry, 12. 10. 2026: „chýba upraviť/vložiť text, vymazať"). */}
+                {textNa === f.id && (
+                  <div style={{ padding: "0 8px 8px" }}>
+                    <textarea
+                      autoFocus value={textKoncept} onChange={(e) => setTextKoncept(e.target.value)} rows={4}
+                      placeholder="Čo je na porovnaní vidieť — klient to uvidí pod fotkou."
+                      style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, lineHeight: 1.5, resize: "vertical" }}
+                    />
+                    <div style={{ display: "flex", gap: 10, marginTop: 5 }}>
+                      <button type="button" onClick={async () => { if (await posli({ akcia: "popis", id: f.id, text: textKoncept })) { setTextNa(null); setHlaska("Popis uložený."); await nacitaj(); } }} style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>uložiť</button>
+                      <button type="button" onClick={() => setTextNa(null)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 9px", borderTop: `1px solid ${mix(C.border, 80)}` }}>
+                  {f.maEdit && (
+                    <button type="button" onClick={() => upravVEditore(meno, f.id)} title="Otvoriť v editore s čiarami a kresbou — uloženie ho prepíše, upraviť sa dá kedykoľvek znova"
+                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>✎ upraviť v editore</button>
+                  )}
+                  {f.pohlad !== VIDEO && textNa !== f.id && (
+                    <button type="button" onClick={() => { setTextNa(f.id); setTextKoncept(f.popis || ""); }}
+                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>{f.popis ? "✎ upraviť text" : "+ vložiť text"}</button>
+                  )}
+                  <button type="button" onClick={() => void zmaz(f)}
+                    style={{ background: "none", border: "none", padding: 0, color: C.red, fontFamily: "inherit", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>zmazať</button>
+                </div>
+                {!f.maEdit && f.pohlad !== VIDEO && (
+                  <div style={{ padding: "0 9px 8px", fontSize: 11, color: C.textDim, lineHeight: 1.45 }}>
+                    Uložené skôr, než editor ukladal svoj stav — čiary sa nedajú otvoriť znova. Nové porovnanie: označ dve fotky nižšie → Do editora.
+                  </div>
                 )}
                 {f.pohlad !== VIDEO && (
                   <button
@@ -489,10 +519,10 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
       ))}
 
       {/* ── VIDEO Z EDITORA ── */}
-      {video && (
+      {video && createPortal(
         <div
           role="dialog" aria-label="Video" onClick={() => setVideo(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 60, background: C.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, gap: 10 }}
+          style={{ position: "fixed", inset: 0, zIndex: 2147482000, background: C.surface, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", alignItems: "center", padding: "max(16px, env(safe-area-inset-top)) 16px 24px", gap: 10 }}
         >
           <video src={video.url} controls autoPlay muted playsInline onClick={(e) => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "calc(100vh - 110px)", borderRadius: 8, background: "#000" }} />
           <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: C.textMuted }}>
@@ -501,32 +531,49 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
             <button type="button" onClick={() => void zmaz(video.f)} style={{ background: "none", border: "none", color: C.red, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zmazať</button>
             <button type="button" onClick={() => setVideo(null)} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {/* ── ZVÄČŠENIE ── nepriehľadné pozadie (pravidlo z 30. 9.: okno nad obsahom nesmie byť priesvitné) */}
-      {zvacsena && (
+      {/* ── ZVÄČŠENIE ── nepriehľadné pozadie (pravidlo z 30. 9.: okno nad obsahom nesmie byť priesvitné).
+          Cez portál do <body> a s vlastným posúvaním (Jerry, 12. 10. 2026: „keď kliknem na fotku,
+          nedá sa scrollovať") — karta Workspace má transform, takže okno sa zmestilo len do nej. */}
+      {zvacsena && createPortal(
         <div
           role="dialog" aria-label="Fotka" onClick={() => setZvacsena(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 60, background: C.surface, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, gap: 10 }}
+          style={{ position: "fixed", inset: 0, zIndex: 2147482000, background: C.surface, overflowY: "auto", WebkitOverflowScrolling: "touch" }}
         >
-          <img src={obrazok(zvacsena)} alt="" style={{ maxWidth: "100%", maxHeight: "calc(100vh - 210px)", objectFit: "contain", borderRadius: 8 }} />
-          <textarea
-            aria-label="Popis k fotke"
-            onClick={(e) => e.stopPropagation()}
-            placeholder="Popis k fotke — čo je na nej vidieť. Uloží sa, keď klikneš mimo."
-            value={popisKoncept ?? (zvacsena.popis || "")}
-            onChange={(e) => setPopisKoncept(e.target.value)}
-            onBlur={() => void ulozPopis(zvacsena)}
-            rows={3}
-            style={{ width: "min(640px, 100%)", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13, lineHeight: 1.55, resize: "vertical" }}
-          />
-          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, color: C.textMuted }}>
-            <span>{nazovPohladu(zvacsena.pohlad)} · {denCz(zvacsena.den)}{zvacsena.kto ? ` · ${zvacsena.kto}` : ""}</span>
-            <button type="button" onClick={() => void zmaz(zvacsena)} style={{ background: "none", border: "none", color: C.red, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zmazať</button>
-            <button type="button" onClick={() => setZvacsena(null)} style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>
+          <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", justifyContent: "flex-end", gap: 8, padding: "max(10px, env(safe-area-inset-top)) 14px 10px", background: C.surface }}>
+            <button type="button" onClick={() => setZvacsena(null)} style={{ padding: "8px 16px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>✕ zavrieť</button>
           </div>
-        </div>
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0 16px 32px", maxWidth: 980, margin: "0 auto" }}>
+            {zvacsena.maCiste && (
+              <div style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 10, border: `1px solid ${mix(C.border, 120)}`, background: C.card }}>
+                {[false, true].map((c) => (
+                  <button key={String(c)} type="button" onClick={() => setZvacsenaCiste(c)} style={{ padding: "6px 14px", borderRadius: 7, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, background: zvacsenaCiste === c ? mix(C.accent, 22) : "transparent", color: zvacsenaCiste === c ? C.accentLight : C.textMuted }}>{c ? "čisté" : "s rozborom"}</button>
+                ))}
+              </div>
+            )}
+            <img src={`${obrazok(zvacsena)}${zvacsena.maCiste && zvacsenaCiste ? "&ciste=1" : ""}`} alt="" style={{ display: "block", maxWidth: "100%", maxHeight: "78vh", objectFit: "contain", borderRadius: 8 }} />
+            <textarea
+              aria-label="Popis k fotke"
+              placeholder="Popis k fotke — čo je na nej vidieť. Uloží sa, keď klikneš mimo."
+              value={popisKoncept ?? (zvacsena.popis || "")}
+              onChange={(e) => setPopisKoncept(e.target.value)}
+              onBlur={() => void ulozPopis(zvacsena)}
+              rows={4}
+              style={{ width: "min(680px, 100%)", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 14, lineHeight: 1.55, resize: "vertical" }}
+            />
+            <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "center", fontSize: 13, color: C.textMuted }}>
+              <span>{nazovPohladu(zvacsena.pohlad)} · {denCz(zvacsena.den)}{zvacsena.kto ? ` · ${zvacsena.kto}` : ""}</span>
+              {zvacsena.maEdit && (
+                <button type="button" onClick={() => { const f = zvacsena; setZvacsena(null); upravVEditore(meno, f.id); }} style={{ background: "none", border: "none", color: C.accentLight, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>✎ upraviť v editore</button>
+              )}
+              <button type="button" onClick={() => void zmaz(zvacsena)} style={{ background: "none", border: "none", color: C.red, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>zmazať</button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
