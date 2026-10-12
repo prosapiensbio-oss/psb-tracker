@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
+import { posliDoEditora } from "../../lib/psb/doEditora";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
@@ -12,6 +13,11 @@ import { C, mix } from "../../lib/psb/theme";
  * z iPadu: políčko na súbor otvorí fotoaparát aj galériu. Pred odoslaním
  * sa fotka v prehliadači zmenší na 2000 px dlhšej strany — z iPadu chodia
  * 5–12 MB súbory, ktoré by sa nahrávali pol minúty a nič by nepridali.
+ *
+ * ZMAZAŤ A DO EDITORA (Jerry, 12. 10. 2026: „jednu som dal zle a nie je tam
+ * vymazať fotku… chcel by som mať možnosť označiť tie fotky a dať ich rovno
+ * do editora pred a po"): na každej dlaždici je ✕ (zmazať) a krúžok na
+ * označenie. Dve označené → „do editora": staršia ide doľava, novšia doprava.
  *
  * Čo sa nahrá, musí sa dať aj vidieť: zápis vracia úspech a zoznam sa po
  * ňom načíta znova zo servera (pravidlo „ticho zlyhávajúci zápis").
@@ -64,6 +70,10 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   /** Rozpísané poznámky po dňoch — zapisujú sa pri odchode z políčka. */
   const [koncepty, setKoncepty] = useState<Record<string, string>>({});
   const vstup = useRef<HTMLInputElement | null>(null);
+  /** Označené fotky pre editor — najviac dve; tretia vytlačí najstaršie označenie. */
+  const [vyber, setVyber] = useState<string[]>([]);
+  const oznac = (id: string) => setVyber((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id].slice(-2)));
+  useEffect(() => { setVyber([]); }, [meno]);
 
   const nacitaj = useCallback(async () => {
     const j = (await fetch(`/api/fotky?klient=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
@@ -150,7 +160,12 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
 
   const zmaz = async (f: Fotka) => {
     if (!window.confirm(`Zmazať fotku ${nazovPohladu(f.pohlad)} z ${denCz(f.den)}? Vrátiť sa to nedá.`)) return;
-    if (await posli({ akcia: "zmaz", id: f.id })) { setZvacsena(null); setVideo(null); await nacitaj(); }
+    if (await posli({ akcia: "zmaz", id: f.id })) {
+      setZvacsena(null); setVideo(null);
+      setVyber((v) => v.filter((x) => x !== f.id));
+      setHlaska("Fotka zmazaná.");
+      await nacitaj();
+    }
   };
 
   const ulozPoznamku = async (dn: string) => {
@@ -181,6 +196,16 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
   const nalepka = (txt: string, farba: string) => (
     <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, padding: "2px 8px", borderRadius: 6, background: mix(farba, 16), color: farba, textTransform: "uppercase", whiteSpace: "nowrap" }}>{txt}</span>
   );
+
+  const doEditora = (a: Fotka, b: Fotka) => posliDoEditora(meno, { id: a.id, den: a.den }, { id: b.id, den: b.den });
+  const oznacene = vyber.map((id) => fs.find((f) => f.id === id)).filter((f): f is Fotka => !!f);
+  /** Okrúhle tlačidlo v rohu dlaždice — dosť veľké na prst na iPade. */
+  const rohove = (strana: "left" | "right", farba: string, plne: boolean): React.CSSProperties => ({
+    position: "absolute", top: 6, [strana]: 6, width: 30, height: 30, borderRadius: 15, padding: 0,
+    display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+    border: `2px solid ${plne ? farba : "rgba(255,255,255,0.9)"}`, background: plne ? farba : "rgba(0,0,0,0.45)",
+    color: "#fff", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
@@ -261,7 +286,8 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
           <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim, marginBottom: 8 }}>Predtým a teraz</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {porov.map((p) => (
-              <div key={p.pohlad} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div key={p.pohlad}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {[p.prva, p.posledna].map((f, k) => (
                   <button key={f.id} type="button" onClick={() => setZvacsena(f)} style={{ padding: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", background: C.card, cursor: "zoom-in", textAlign: "left", fontFamily: "inherit" }}>
                     <img src={obrazok(f)} alt={`${nazovPohladu(p.pohlad)} ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "3 / 4", objectFit: "cover", background: C.bg }} />
@@ -270,6 +296,11 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
                     </div>
                   </button>
                 ))}
+              </div>
+              <button
+                type="button" onClick={() => doEditora(p.prva, p.posledna)}
+                style={{ marginTop: 6, background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
+              >◧ tieto dve do editora</button>
               </div>
             ))}
           </div>
@@ -299,6 +330,35 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
         </div>
       )}
 
+      {/* ── VÝBER DO EDITORA ── drží sa pri vrchu, kým sa označuje */}
+      {fs.length > 1 && (
+        <div style={{
+          position: "sticky", top: 0, zIndex: 5, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          padding: "10px 12px", borderRadius: 10, background: C.surface, border: `1px solid ${vyber.length ? C.accent : mix(C.border, 120)}`,
+        }}>
+          <span style={{ fontSize: 12.5, color: vyber.length ? C.text : C.textMuted, flexGrow: 1, minWidth: 180 }}>
+            {vyber.length === 0 && <>Pred a po: označ krúžkom dve fotky a otvor ich v editore.</>}
+            {vyber.length === 1 && <>Označená 1 z 2 — vyber ešte jednu.</>}
+            {vyber.length === 2 && oznacene.length === 2 && (() => {
+              const [a, b] = oznacene[1].den < oznacene[0].den ? [oznacene[1], oznacene[0]] : oznacene;
+              return <>Pred: {denCz(a.den)} · Po: {denCz(b.den)}</>;
+            })()}
+          </span>
+          {vyber.length > 0 && (
+            <button type="button" onClick={() => setVyber([])} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť</button>
+          )}
+          <button
+            type="button" disabled={oznacene.length !== 2}
+            onClick={() => { if (oznacene.length === 2) { doEditora(oznacene[0], oznacene[1]); setVyber([]); } }}
+            style={{
+              padding: "8px 14px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, oznacene.length === 2 ? 22 : 8),
+              color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+              cursor: oznacene.length === 2 ? "pointer" : "default", opacity: oznacene.length === 2 ? 1 : 0.5,
+            }}
+          >◧ Do editora — pred a po</button>
+        </div>
+      )}
+
       {/* ── FOTENIA ── */}
       {!dni.length && (
         <div style={{ fontSize: 13, color: C.textDim }}>Zatiaľ žiadne fotky. Prvé sa robia na úvodnom tréningu — zboku, spredu, zozadu.</div>
@@ -320,10 +380,21 @@ export function KartotekaFotiek({ meno, uzke }: { meno: string; uzke: boolean })
           </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 120 : 150}px, 1fr))`, gap: 8, marginTop: 9 }}>
             {x.fotky.map((f) => (
-              <div key={f.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", background: C.card }}>
+              <div key={f.id} style={{ position: "relative", border: `${vyber.includes(f.id) ? 2 : 1}px solid ${vyber.includes(f.id) ? C.accent : C.border}`, borderRadius: 10, overflow: "hidden", background: C.card }}>
                 <button type="button" onClick={() => setZvacsena(f)} style={{ display: "block", width: "100%", padding: 0, border: "none", background: C.bg, cursor: "zoom-in" }}>
                   <img src={obrazok(f)} alt={`${nazovPohladu(f.pohlad)} ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "3 / 4", objectFit: "cover" }} />
                 </button>
+                <button
+                  type="button" onClick={() => oznac(f.id)}
+                  aria-pressed={vyber.includes(f.id)}
+                  title={vyber.includes(f.id) ? "Zrušiť označenie" : "Označiť do editora (pred a po)"}
+                  style={rohove("left", C.accent, vyber.includes(f.id))}
+                >{vyber.includes(f.id) ? "✓" : ""}</button>
+                <button
+                  type="button" onClick={() => void zmaz(f)}
+                  aria-label={`Zmazať fotku ${nazovPohladu(f.pohlad)} z ${denCz(f.den)}`} title="Zmazať fotku"
+                  style={rohove("right", C.red, false)}
+                >✕</button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 6px" }}>
                   <select
                     aria-label="Pohľad" value={f.pohlad} onChange={(e) => void zmenPohlad(f, e.target.value)}

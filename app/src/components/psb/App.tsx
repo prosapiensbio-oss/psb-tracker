@@ -108,6 +108,7 @@ import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 import { dnesPraha } from "../../lib/psb/cas";
+import { UDALOST_DO_EDITORA } from "../../lib/psb/doEditora";
 import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
 
 export type Actions = {
@@ -415,6 +416,12 @@ export function PSBApp() {
   peniazeOdRef.current = data.peniazeOd || "";
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
+  // Fotky označené v profile klienta → Workspace → Editor (lib/psb/doEditora.ts).
+  useEffect(() => {
+    const na = () => { setActive("workspace"); setWorkspaceKartu("editor"); };
+    addEventListener(UDALOST_DO_EDITORA, na);
+    return () => removeEventListener(UDALOST_DO_EDITORA, na);
+  }, []);
   const [trackerSection, setTrackerSection] = useState("treningy");
   // Kam Firma otvorí, keď na ňu klikneš. Drží poslednú navštívenú sekciu —
   // pri uzávierke chodíš do Peňazí a nemá zmysel ťa zakaždým hodiť inam.

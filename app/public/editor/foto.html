@@ -1140,6 +1140,14 @@ window.kartotekaKlienta = (() => {
   }));
   kt.priZmene(nacitajKartoteku);
   nacitajKartoteku();
+  // Dvojica označená v profile klienta (Kokpit → kartotéka → „do editora"):
+  // staršia do ľavej / hornej polovice, novšia do pravej / dolnej.
+  addEventListener("message", (e) => {
+    if (e.origin !== location.origin || e.data?.typ !== "psb-dvojica") return;
+    const { pred, po } = e.data;
+    if (pred?.id) sk.vlozObrazok(0, kt.adresa(pred.id), pred.den, false);
+    if (po?.id) sk.vlozObrazok(1, kt.adresa(po.id), po.den, false);
+  });
 
   $("ulozitKlientovi").onclick = async () => {
     const b = $("ulozitKlientovi"), st = $("ulozStav");

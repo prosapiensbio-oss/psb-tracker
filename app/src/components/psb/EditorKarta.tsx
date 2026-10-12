@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { UDALOST_DO_EDITORA, vezmiDvojicu, type DvojicaDoEditora } from "../../lib/psb/doEditora";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { C, mix } from "../../lib/psb/theme";
 import { VyberMena } from "./VyberMena";
@@ -20,6 +21,10 @@ import { VyberMena } from "./VyberMena";
  * (`postMessage`, ten istý pôvod). Editor fotiek z neho berie fotky do
  * polovíc a ukladá porovnanie, editor videa ukladá strih a snímky. Po
  * uložení editor ohlási `psb-ulozene` a kartotéka v profile sa obnoví.
+ *
+ * Z PROFILU (12. 10. 2026): v kartotéke klienta sa označia dve fotky a
+ * „do editora" — karta prepne klienta, otvorí Foto a dvojicu pošle
+ * (`psb-dvojica`) do ľavej a pravej polovice (lib/psb/doEditora.ts).
  *
  * Raz otvorený editor ostane načítaný aj po prepnutí na druhý (aj na inú
  * kartu Workspace) — inak by prepnutie zahodilo rozrobenú prácu
@@ -67,6 +72,31 @@ export function EditorKarta({ mena }: { mena: string[] }) {
     setOtvoreny(d);
     setNacitane((n) => (n.includes(d) ? n : [...n, d]));
   };
+
+  // Dvojica z profilu: počká, kým je editor fotiek načítaný, potom ide do polovíc.
+  const dvojica = useRef<DvojicaDoEditora | null>(null);
+  const fotoNacitane = useRef(false);
+  const posliDvojicu = useCallback(() => {
+    const d = dvojica.current;
+    const el = ramiky.current.foto;
+    if (!d || !el?.contentWindow || !fotoNacitane.current) return;
+    dvojica.current = null;
+    el.contentWindow.postMessage({ typ: "psb-dvojica", pred: d.pred, po: d.po }, location.origin);
+  }, []);
+  useEffect(() => {
+    const prevezmi = () => {
+      const d = vezmiDvojicu();
+      if (!d) return;
+      dvojica.current = d;
+      setKlient(d.klient);
+      setOtvoreny("foto");
+      setNacitane((n) => (n.includes("foto") ? n : [...n, "foto"]));
+      posliDvojicu();
+    };
+    prevezmi(); // karta sa mohla pripojiť až po udalosti
+    addEventListener(UDALOST_DO_EDITORA, prevezmi);
+    return () => removeEventListener(UDALOST_DO_EDITORA, prevezmi);
+  }, [posliDvojicu]);
 
   if (!otvoreny) {
     return (
@@ -131,7 +161,10 @@ export function EditorKarta({ mena }: { mena: string[] }) {
           <iframe
             key={d}
             ref={(el) => { ramiky.current[d] = el; }}
-            onLoad={() => posliKlienta(d)}
+            onLoad={() => {
+              posliKlienta(d);
+              if (d === "foto") { fotoNacitane.current = true; posliDvojicu(); }
+            }}
             // Bez .html — Cloudflare assets by ho presmerovali (307) na túto adresu.
             src={`/editor/${d}`}
             title={d === "foto" ? "Editor fotiek" : "Editor videa"}
