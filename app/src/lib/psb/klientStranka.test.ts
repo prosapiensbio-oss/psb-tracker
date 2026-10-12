@@ -401,7 +401,11 @@ describe("platba bitcoinom", () => {
 });
 
 describe("QR so značkou a sumou (12. 10. 2026)", () => {
-  const sQr = { ...zaklad, qrUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", platba: { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" } } as never;
+  const sQr: VypisKlienta = {
+    ...zaklad,
+    qrUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+    platba: { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" },
+  };
 
   it("značka ide ako PNG, nie SVG — Safari nevykreslí SVG bez rozmerov", () => {
     const h = klientStranka(sQr);
@@ -419,7 +423,7 @@ describe("QR so značkou a sumou (12. 10. 2026)", () => {
 
   it("pod kódom je suma — pri banke koruny, pri bitcoine obe meny", () => {
     expect(klientStranka(sQr)).toContain("9 400");
-    const btc = klientStranka({ ...sQr, lightning: { sats: "1 102 956", czk: 20093, kurz: "1 819 299", adresa: "a@b.c" } } as never);
+    const btc = klientStranka({ ...sQr, lightning: { sats: "1 102 956", czk: 20093, plnaCena: 21150, zlava: 5, kurz: "1 819 299", kurzKedy: "08:40", adresa: "a@b.c" } });
     const skript = (btc.match(/<script>[\s\S]*?<\/script>/) || [""])[0];
     expect(skript).toContain("sats");
     expect(skript).toContain("20 093");
