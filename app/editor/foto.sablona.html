@@ -6,8 +6,17 @@
 <title>Editor fotiek</title>
 <style>
 /*ui-css*//*/ui-css*/
-  .platno .stvorec { --strana: min(calc(100vw - var(--panel) - 44px), calc(100vh - var(--hlavicka) - 44px)); width: var(--strana); height: var(--strana); }
-  @media (max-width: 860px) { .platno .stvorec { --strana: min(calc(100vw - 32px), 640px); } }
+  /* PRACOVNÁ PLOCHA (12. 10. 2026): štvorec stojí na ploche, ktorá sa dá
+     priblížiť a posúvať (pohľad) — výrez fotky sa tým nemení. Veľkosť štvorca
+     nastavuje jadro (nastavPohlad), plocha okolo ukazuje, čo z fotky presahuje. */
+  .platno-obal { flex: 1; min-width: 0; position: relative; display: flex; }
+  .platno-obal .platno { flex: 1; display: block; overflow: auto; padding: 0; touch-action: none; overscroll-behavior: contain; }
+  .plocha { display: flex; align-items: center; justify-content: center; min-width: 100%; min-height: 100%; width: max-content; padding: var(--okraj, 70px); box-sizing: border-box; }
+  .pohlad { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(20,24,18,.82); border: 1px solid var(--line2); z-index: 20; }
+  .pohlad button { min-width: 30px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font: inherit; font-size: 15px; cursor: pointer; }
+  .pohlad button:hover { background: var(--accentBg); color: var(--accentLight); }
+  .pohlad span { min-width: 48px; text-align: center; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 860px) { .platno-obal { height: calc(min(100vw, 680px) + 10px); flex: none; } }
 /*jadro-css*//*/jadro-css*/
   /* V Kokpite je hlavička na karte Workspace, tu nie. */
   :root { --hlavicka: 0px; }
@@ -15,8 +24,17 @@
 </head>
 <body>
 <div class="telo">
-  <div class="platno">
+  <div class="platno-obal">
+  <div class="platno" id="platno">
+  <div class="plocha" id="plocha">
     <div class="stvorec" id="stvorec">
+      <!-- Priesvitný zvyšok vybranej fotky mimo rámčeka + rám s rohmi na zväčšovanie. -->
+      <div class="duch" id="duch" hidden><img alt=""></div>
+      <div class="uchopy" id="uchopy" hidden>
+        <div class="ramcek-fotky"></div>
+        <span class="roh" data-roh="lh"></span><span class="roh" data-roh="ph"></span>
+        <span class="roh" data-roh="ld"></span><span class="roh" data-roh="pd"></span>
+      </div>
       <div class="okno" data-i="0" tabindex="0"></div>
       <div class="okno" data-i="1" tabindex="0"></div>
       <svg class="mriezka" id="mriezka" aria-hidden="true"></svg>
@@ -24,6 +42,14 @@
       <!-- Postavička je aj v stiahnutej fotke — tu, aby bolo vidno, kam štítok nesmie. -->
       <img class="vodoznak" id="vodoznak" src="/znacka-figura-biela.svg" alt="" aria-hidden="true">
     </div>
+  </div>
+  </div>
+  <div class="pohlad" aria-label="Pohľad na plochu">
+    <button type="button" id="pohladMenej" title="Oddialiť plochu (fotka sa nemení)">−</button>
+    <span id="pohladH">100 %</span>
+    <button type="button" id="pohladViac" title="Priblížiť plochu (fotka sa nemení)">+</button>
+    <button type="button" id="pohladCely" title="Celý štvorec na obrazovku">⤢</button>
+  </div>
   </div>
 
   <aside class="panel">
@@ -59,7 +85,7 @@
           </div>
           <div class="riadok">zväčšenie
             <button class="krok-zoom" id="zoomMenej" type="button" title="Oddialiť o 0,1 % (podrž = plynulo)" aria-label="Oddialiť o 0,1 %">◀</button>
-            <input type="range" id="zoom" min="1" max="6" step="0.001" value="1">
+            <input type="range" id="zoom" min="0.3" max="6" step="0.001" value="1">
             <button class="krok-zoom" id="zoomViac" type="button" title="Priblížiť o 0,1 % (podrž = plynulo)" aria-label="Priblížiť o 0,1 %">▶</button>
             <span id="zoomH" class="zoom-h">100,0 %</span>
           </div>

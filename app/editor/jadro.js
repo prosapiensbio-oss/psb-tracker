@@ -11,13 +11,17 @@
     // Skrytý editor (karta v Kokpite bez rozmerov) má okná 0 × 0 — delenie
     // nulou by dalo NaN a fotka by zmizla z obrazovky aj z exportu.
     if (!(ow > 0 && oh > 0 && fw > 0 && fh > 0)) return v;
-    const zoom = Math.min(MAX_ZOOM, Math.max(1, v.zoom));
-    const s = Math.max(ow / fw, oh / fh) * zoom;
-    const mx = Math.max(0, (fw * s - ow) / 2 / ow), my = Math.max(0, (fh * s - oh) / 2 / oh);
+    // Oddialiť sa dá, až kým nie je vidno celú fotku (12. 10. 2026: „oddialenú
+    // fotku mám v rámčeku") — zoom 1 = fotka práve vyplní okno.
+    const pokryt = Math.max(ow / fw, oh / fh), celu = Math.min(ow / fw, oh / fh);
+    const zoom = Math.min(MAX_ZOOM, Math.max(celu / pokryt, v.zoom));
+    const s = pokryt * zoom;
+    // Väčšia fotka musí okno pokryť; menšia sa môže hýbať len vnútri okna.
+    const mx = Math.abs(fw * s - ow) / 2 / ow, my = Math.abs(fh * s - oh) / 2 / oh;
     return { zoom, x: Math.min(mx, Math.max(-mx, v.x)), y: Math.min(my, Math.max(-my, v.y)) };
   };
   const zoomOkolo = (v, z, bx, by) => {
-    z = Math.min(MAX_ZOOM, Math.max(1, z));
+    z = Math.min(MAX_ZOOM, Math.max(0.05, z)); // dolnú hranicu (celá fotka) stráži obmedz
     const k = z / v.zoom;
     return { zoom: z, x: bx - (bx - v.x) * k, y: by - (by - v.y) * k };
   };
@@ -484,6 +488,7 @@
       kresliStitok(el.querySelector(".popiska"), i, ow, oh);
       img.style.opacity = rozdelenie === "cez" && i === 1 ? String(priehladnost) : "1";
     });
+    kresliUchopy();
     // Vodoznak ako v exporte: 70/2000 strany, 60/2000 od pravého dolného rohu.
     const vz = document.getElementById("vodoznak");
     if (vz) {
@@ -963,6 +968,166 @@
   if (tlIg) tlIg.onclick = async () => stiahni(await vyrobInstagram(), "predtim-potom-instagram.jpg");
   document.getElementById("stiahnut").onclick = async () => stiahni(await vyrobJpeg(), "predtim-potom.jpg");
 
+  // ── RÁM FOTKY: zvyšok mimo rámčeka a rohy na zväčšovanie ──
+  /**
+   * Jerry, 12. 10. 2026: „pracovná plocha pred a po rámčeku; oddialenú fotku
+   * mám v rámčeku a keď ju približujem, presahujem štvorec, držím ju za roh
+   * a rozťahujem, potom na ňu kliknem, držím a posúvam ju po ploche."
+   * Vybraná fotka ukáže celý svoj obdĺžnik: čo presahuje okno, je priesvitné
+   * (pod oknami), rohy menia veľkosť (protiľahlý roh stojí), ťah po
+   * priesvitnej časti fotku posúva. Pri kreslení čiar sa rám schová.
+   */
+  const duch = document.getElementById("duch");
+  const uchopy = document.getElementById("uchopy");
+  /** Obdĺžnik fotky i v súradniciach štvorca (px). */
+  function obdlznikFotky(i) {
+    const t = stav[i], R = oknaNaObrazovke()[i];
+    const r = rozlozenie(t.v, t.fw, t.fh, R.w, R.h);
+    return { x: R.x + r.vlavo, y: R.y + r.hore, w: r.sirka, h: r.vyska, R };
+  }
+  function kresliUchopy() {
+    if (!duch || !uchopy) return;
+    const t = stav[aktivne];
+    const ukaz = !!t?.src && !rezimCiar && rozmery.has(t.src);
+    duch.hidden = !ukaz; uchopy.hidden = !ukaz;
+    if (!ukaz) return;
+    const o = obdlznikFotky(aktivne);
+    const img = duch.querySelector("img");
+    if (img.getAttribute("src") !== t.src) img.src = t.src;
+    img.style.width = `${o.w}px`; img.style.height = `${o.h}px`;
+    img.style.transform = t.zrkadlo ? `translate(${o.x + o.w}px, ${o.y}px) scaleX(-1)` : `translate(${o.x}px, ${o.y}px)`;
+    const ram = uchopy.querySelector(".ramcek-fotky");
+    Object.assign(ram.style, { left: `${o.x}px`, top: `${o.y}px`, width: `${o.w}px`, height: `${o.h}px` });
+    for (const h of uchopy.querySelectorAll(".roh")) {
+      const [sx, sy] = h.dataset.roh;
+      h.style.left = `${sx === "p" ? o.x + o.w : o.x}px`;
+      h.style.top = `${sy === "d" ? o.y + o.h : o.y}px`;
+    }
+  }
+  const miestoVoStvorci = (e) => {
+    const b = stvorec.getBoundingClientRect();
+    return { x: e.clientX - b.left, y: e.clientY - b.top };
+  };
+  /** Nastaví fotke obdĺžnik (ľavý horný roh x, y a šírku w) — výrez sa prepočíta. */
+  function nastavObdlznik(i, x, y, w) {
+    const t = stav[i], R = oknaNaObrazovke()[i];
+    const pokryt = Math.max(R.w / t.fw, R.h / t.fh);
+    const sc = w / t.fw, h = t.fh * sc;
+    const v = { zoom: sc / pokryt, x: (x - R.x + w / 2 - R.w / 2) / R.w, y: (y - R.y + h / 2 - R.h / 2) / R.h };
+    t.v = obmedz(v, t.fw, t.fh, R.w, R.h);
+    kresli();
+  }
+  // Ťah za roh: protiľahlý roh stojí, pomer strán ostáva.
+  uchopy?.querySelectorAll(".roh").forEach((h) => {
+    let kotva = null;
+    h.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const o = obdlznikFotky(aktivne), [sx, sy] = h.dataset.roh;
+      kotva = { x: sx === "p" ? o.x : o.x + o.w, y: sy === "d" ? o.y : o.y + o.h, sx, sy };
+      try { h.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
+    });
+    h.addEventListener("pointermove", (e) => {
+      if (!kotva) return;
+      const t = stav[aktivne], P = miestoVoStvorci(e);
+      const sc = Math.max(Math.abs(P.x - kotva.x) / t.fw, Math.abs(P.y - kotva.y) / t.fh);
+      const w = t.fw * sc, hh = t.fh * sc;
+      nastavObdlznik(aktivne, kotva.sx === "p" ? kotva.x : kotva.x - w, kotva.sy === "d" ? kotva.y : kotva.y - hh, w);
+      ukazLupuRohu(P);
+    });
+    const pusti = () => { kotva = null; skryLupu(); };
+    h.addEventListener("pointerup", pusti);
+    h.addEventListener("pointercancel", pusti);
+  });
+  const ukazLupuRohu = (P) => { try { ukazLupu(P, rozdelenie === "cez" ? -1 : aktivne); } catch { /* lupa nie je podmienka */ } };
+
+  // ── POHĽAD NA PLOCHU: priblížiť / oddialiť bez zmeny fotky ──
+  /**
+   * Jerry, 12. 10. 2026: „daj mi zoom, aby som si pracovnú plochu mohol
+   * priblížiť bez toho, aby som si priblížil fotku." Mení sa VEĽKOSŤ štvorca
+   * na obrazovke (nie transformácia) — čiary, lupa aj štítky tak počítajú
+   * v tých istých bodoch a export o pohľade nevie (počíta pomerom).
+   */
+  const platno = document.getElementById("platno");
+  const plocha = document.getElementById("plocha");
+  let pohlad = 1;
+  const okrajPlochy = () => (window.innerWidth <= 860 ? 24 : 70);
+  function zakladnaStrana() {
+    if (!platno) return stvorec.clientWidth || 500;
+    const o = okrajPlochy();
+    return Math.max(220, Math.min(platno.clientWidth, platno.clientHeight) - 2 * o);
+  }
+  /** Nastaví priblíženie plochy; bod (v px okna platna) ostane pod prstom/myšou. */
+  function nastavPohlad(z, bod) {
+    if (!platno || !plocha) return;
+    const stary = pohlad;
+    pohlad = Math.min(6, Math.max(0.4, z));
+    const o = okrajPlochy();
+    plocha.style.setProperty("--okraj", `${o}px`);
+    const b = bod || { x: platno.clientWidth / 2, y: platno.clientHeight / 2 };
+    // Bod v obsahu pred zmenou (s posunom) → po zmene na tom istom mieste.
+    const cx = (platno.scrollLeft + b.x - o) / stary, cy = (platno.scrollTop + b.y - o) / stary;
+    const strana = Math.round(zakladnaStrana() * pohlad);
+    stvorec.style.width = `${strana}px`; stvorec.style.height = `${strana}px`;
+    platno.scrollLeft = cx * pohlad + o - b.x;
+    platno.scrollTop = cy * pohlad + o - b.y;
+    const h = document.getElementById("pohladH");
+    if (h) h.textContent = `${Math.round(pohlad * 100)} %`;
+    kresli();
+  }
+  document.getElementById("pohladViac")?.addEventListener("click", () => nastavPohlad(pohlad * 1.25));
+  document.getElementById("pohladMenej")?.addEventListener("click", () => nastavPohlad(pohlad / 1.25));
+  document.getElementById("pohladCely")?.addEventListener("click", () => { pohlad = 1; nastavPohlad(1); platno.scrollLeft = 0; platno.scrollTop = 0; });
+  addEventListener("resize", () => nastavPohlad(pohlad));
+  if (platno) {
+    const bodPlatna = (e) => { const b = platno.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
+    // Ctrl/⌘ + koliesko (alebo štipnutie na touchpade) MIMO fotky = plocha.
+    platno.addEventListener("wheel", (e) => {
+      if (e.target.closest?.(".okno")) return; // na fotke to rieši fotka
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      nastavPohlad(pohlad * Math.exp(-e.deltaY * 0.01), bodPlatna(e));
+    }, { passive: false });
+    // Prsty na prázdnej ploche: jeden posúva plochu (alebo fotku, ak je pod
+    // ním jej priesvitná časť), dva približujú plochu.
+    const prsty = new Map();
+    let tah = null;
+    platno.addEventListener("pointerdown", (e) => {
+      if (e.target.closest?.(".okno, .roh, .pohlad, svg.ciary.kreslim")) return;
+      prsty.set(e.pointerId, bodPlatna(e));
+      try { platno.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
+      if (prsty.size === 1) {
+        const P = miestoVoStvorci(e), t = stav[aktivne];
+        const o = t?.src && !rezimCiar ? obdlznikFotky(aktivne) : null;
+        const naFotke = o && P.x >= o.x && P.x <= o.x + o.w && P.y >= o.y && P.y <= o.y + o.h;
+        tah = naFotke ? { druh: "fotka", P, o } : { druh: "plocha", x: e.clientX, y: e.clientY, sl: platno.scrollLeft, st: platno.scrollTop };
+        if (naFotke) drzi = true; // posun fotky je jeden krok späť, nie desať
+      } else if (prsty.size === 2) {
+        const [a, b] = [...prsty.values()];
+        tah = { druh: "stipnutie", d: Math.hypot(a.x - b.x, a.y - b.y), z: pohlad };
+      }
+    });
+    platno.addEventListener("pointermove", (e) => {
+      if (!prsty.has(e.pointerId) || !tah) return;
+      prsty.set(e.pointerId, bodPlatna(e));
+      if (tah.druh === "plocha") {
+        platno.scrollLeft = tah.sl - (e.clientX - tah.x);
+        platno.scrollTop = tah.st - (e.clientY - tah.y);
+      } else if (tah.druh === "fotka") {
+        const P = miestoVoStvorci(e);
+        nastavObdlznik(aktivne, tah.o.x + P.x - tah.P.x, tah.o.y + P.y - tah.P.y, tah.o.w);
+      } else if (tah.druh === "stipnutie" && prsty.size === 2) {
+        const [a, b] = [...prsty.values()];
+        nastavPohlad(tah.z * Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      }
+    });
+    const koniec = (e) => {
+      prsty.delete(e.pointerId);
+      if (!prsty.size) tah = null;
+    };
+    platno.addEventListener("pointerup", koniec);
+    platno.addEventListener("pointercancel", koniec);
+  }
+
   // ── KROK SPÄŤ PRE CELÝ EDITOR ──
   /**
    * Jerry, 12. 10. 2026: „krok späť by mal fungovať na všetko v tom editore."
@@ -1096,6 +1261,7 @@
     get prazdnyStav() { return prazdny; },
   };
   pouziStitok();
+  nastavPohlad(1);
   kresli();
   posledny = snimkaStavu();
   const prazdny = posledny;
