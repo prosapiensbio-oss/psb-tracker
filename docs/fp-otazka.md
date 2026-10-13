@@ -57,34 +57,6 @@ ProSapiens Biomechanic, Brno
 
 ---
 
-## Otázka 3 — reakčné videá (pridané 13. 10. 2026)
+## Otázka 3 — ZRUŠENÁ 13. 10. 2026
 
-Ak mail vyššie ešte neodišiel, vlož ju ako tretí bod. Ak odišiel, pošli ju
-samostatne na tú istú adresu s predmetom „Policy question — short clips of
-people normalising injuries".
-
-**3 — Short clips of people normalising injuries, with my commentary**
-
-FP's main channels sometimes show a short clip of people casually talking
-about how many injuries they've had — as if constant injury were simply part
-of training — and point out that this is exactly the result of how most
-people train. Nobody is mocked; the point is the pattern, not the person.
-
-I'd like to post the same kind of content on my FP MIP: a few seconds of a
-publicly available clip (anyone, not necessarily a public figure) followed by
-my own commentary on why being "always injured" isn't normal. I would not
-explain or demonstrate any FP technique, and I would credit FP for the
-concepts I refer to.
-
-Since FP posts this format itself, I read it as aligned with the
-methodology rather than "interacting with content that contradicts" it —
-but I'd rather confirm than assume. Is this allowed on the MIP, and is there
-anything you'd want me to avoid?
-
-### Čo z odpovede vyplynie
-
-| Odpoveď | Dôsledok |
-|---|---|
-| Áno, aj na MIP | Stavia sa vyhľadávač a šablóna reakcie v Strižni, ide na MIP aj PSB |
-| Len na účte PSB | To isté, ale MIP len reposty z FP |
-| Nie | Vyhľadávač sa nestavia; téma ide len do vlastných videí bez cudzieho klipu |
+Jerry ju zrušil: reakčné videá robí hlavný FP profil, potvrdenie netreba.

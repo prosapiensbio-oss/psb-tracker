@@ -26,24 +26,24 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 2. [ ] Maily a telefóny klientov z PTmindera k profilom — sekcia 4.
 
 **B · Čaká len na Jerryho slovo (minúty)**
-3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 3 otázky).
+3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 2 otázky — NDA a overovací odkaz; otázka o reakčných videách zrušená 13. 10.).
 4. [ ] Cieľová cena za dopyt v Dozore reklám + prvé tri vyhodnotenia.
 5. [ ] Vyskúšať na telefóne: kalendár v mobile, gestá v kalendári, push z ponuky termínov.
 6. [ ] Miřejovský 752 a októbrové príjmy z banky priradiť → potom prepínač peňazí na Kokpit.
 7. [ ] FIO_TOKEN do bety (jeden príkaz).
 
-**C · Strižňa 1.0 (hranica v sekcii 2)**
+**C · Strižňa 1.0 (hranica v sekcii 2) — Jerry: na zajtra, 14. 10. 2026**
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
 9. [ ] Upload do Higgsfieldu (SSL pri PUT).
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
 9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
-10. [ ] Vyhľadávač normalizovaných zranení (po odpovedi FP na otázku 3).
+10. [ ] Vyhľadávač tém na reakčné videá — zranenia sú len jedna téma; zoznam tém z Naudiho streamov v sekcii 2 (bez čakania na FP).
 11. [ ] Šablóna reakčného videa v Strižni (stojí na 10).
 12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
 13. [ ] Memy.
-14. [ ] Osobné profily v Strižni (otvorené otázky v sekcii 2).
+14. [ ] Osobné profily — SAMOSTATNÝ projekt, nie súčasť Strižne (Jerry 13. 10.; otvorené otázky v sekcii 2).
 
 **E · Keď bude čas / keď sa niečo ukáže**
 15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
@@ -352,8 +352,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   cudzieho videa hore, Jerry dole (alebo greenscreen), titulky oboch.
   Nadväzuje na vyhľadávač; samostatne nemá z čoho žiť.
 
-- **Strižňa – osobné profily (odložené 13. 10. 2026, Jerry: „osobné profily
-  nechame na neskôr“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
+- **Osobné profily — samostatný projekt (odložené 13. 10. 2026, Jerry: „osobné profily
+  nechame na neskôr“, neskôr v ten deň: „toto by som staval samostatne“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
   šablóny a textár podľa profilu, karty a výsledky v Kokpite s profilom,
   nahrávanie vlastných štatistík (snímky z Instagramu alebo CSV z Meta
   Business Suite), keď profil nie je v Metricoole. Otvorené otázky pre Jerryho:
