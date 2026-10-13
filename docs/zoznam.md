@@ -405,7 +405,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
   balíčku, niesť QR platbu a odísť mailom.
 
-- **6. 10. 2026 — PREPÍNAČ PEŇAZÍ POSTAVENÝ** (`peniazeZKokpitu.ts`): tržby,
+- **PENIAZE Z KOKPITU OD 10/2026 — ZAPNUTÉ 13. 10. 2026** (Jerry: „áno, priraď a prepni na Kokpit"). Priradených 6 októbrových príjmov (Nová, Šašinková, Malinová, Rupová, Lozias, Doležalová — 43 665 Kč, každý jediný návrh s menom v texte), október Kokpit 70 427 / PTminder 70 435 Kč. Tržby a P&L od októbra berú vlastnú evidenciu.
+- ~~**6. 10. 2026 — PREPÍNAČ PEŇAZÍ POSTAVENÝ**~~ (`peniazeZKokpitu.ts`): tržby,
   grafy aj P&L berú platby pred zvoleným mesiacom z PTmindera, od neho
   z vlastnej evidencie; prepína sa v Prechode → Platby a server pustí len
   mesiac, ktorý sedí (200 Kč / 1 %) a nečaká v ňom nepriradený príjem.
