@@ -43,6 +43,7 @@ const PREKLAD = [
   "· Odborné pojmy (kyfóza, lordóza…) prelož do českého tvaru.",
   "· Neuhládzaj do reklamy ani do úradného štýlu. Zalomenia riadkov zachovaj.",
   "· Keď je text už po česky, len ho oprav.",
+  "· Úvodzovky české: „…“ (nie anglické \"…\").",
   "",
   "Odpovedz IBA českým textom. Žiadny úvod, žiadne úvodzovky, žiadne vysvetlenie.",
 ].join("\n");
