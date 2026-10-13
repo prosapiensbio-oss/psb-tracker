@@ -42,6 +42,8 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
   const [sprava, setSprava] = useState(() => vychodiskovaSprava(krstne(meno)));
   const [cisla, setCisla] = useState<Record<string, CisloKarty[]>>({});
   const [dalej, setDalej] = useState("");
+  // „Na čem budeme pracovat dál" sa pýta až tesne pred odoslaním (Jerry, 13. 10. 2026).
+  const [poslednyKrok, setPoslednyKrok] = useState(false);
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
   const [hotovo, setHotovo] = useState<{ url: string; nahlad: string } | null>(null);
@@ -49,12 +51,12 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
   const zmenCislo = (id: string, i: number, kluc: keyof CisloKarty, h: string) =>
     setCisla((c) => ({ ...c, [id]: (c[id] || []).map((x, j) => (j === i ? { ...x, [kluc]: h } : x)) }));
 
-  const vytvor = async () => {
+  const vytvor = async (body = dalej) => {
     setPracujem(true);
     setChyba("");
     const j = await fetch("/api/fotky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "odkaz", klient: meno, trener, sprava, dalej, fotky: fotky.map((f) => ({ id: f.id, cisla: cisla[f.id] || [] })) }),
+      body: JSON.stringify({ akcia: "odkaz", klient: meno, trener, sprava, dalej: body, fotky: fotky.map((f) => ({ id: f.id, cisla: cisla[f.id] || [] })) }),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!j?.ok) { setChyba(j?.error || "Odkaz nevznikol."); return; }
@@ -79,6 +81,32 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
           />
         </div>
         <button type="button" onClick={onZrus} style={{ marginTop: 10, background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>
+      </div>
+    );
+  }
+
+  const tlacidlo = { padding: "9px 16px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: pracujem ? "default" : "pointer", opacity: pracujem ? 0.6 : 1 } as const;
+  const odkazTl = { background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" } as const;
+
+  if (poslednyKrok) {
+    return (
+      <div style={{ padding: 14, borderRadius: 12, background: C.surface, border: `1px solid ${C.accent}`, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Na čem budeme pracovat dál?</div>
+        <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>
+          Každý bod na nový riadok — na stránke bude pod fotkami ako očíslovaný zoznam. Nechceš? Vytvor odkaz bez toho.
+        </div>
+        <textarea autoFocus value={dalej} onChange={(e) => setDalej(e.target.value)} rows={4}
+          placeholder={"Pravá kyčel — stabilita ve stoji na jedné noze\nUdržet hrudník otevřený i při práci u počítače\nDalší focení za 12 týdnů"}
+          style={{ ...pole, resize: "vertical" }} />
+        {dalej.trim() && <div style={{ marginTop: -4 }}><OpravitText maly text={dalej} onOpravene={setDalej} /></div>}
+        {chyba && <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>}
+        <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <button type="button" disabled={pracujem || !dalej.trim()} onClick={() => void vytvor()} style={{ ...tlacidlo, opacity: pracujem || !dalej.trim() ? 0.5 : 1 }}>
+            {pracujem ? "Vytváram…" : "Vytvoriť odkaz"}
+          </button>
+          <button type="button" disabled={pracujem} onClick={() => void vytvor("")} style={{ ...odkazTl, color: C.accentLight }}>bez toho — vytvoriť odkaz</button>
+          <button type="button" disabled={pracujem} onClick={() => setPoslednyKrok(false)} style={odkazTl}>← späť</button>
+        </div>
       </div>
     );
   }
@@ -122,18 +150,13 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         </div>
       ))}
 
-      <label style={{ fontSize: 12, color: C.textMuted }}>
-        na čom budeme pracovať ďalej <span style={{ color: C.textDim }}>— každý bod na nový riadok; prázdne sa na stránke neukáže</span>
-        <textarea value={dalej} onChange={(e) => setDalej(e.target.value)} rows={3} placeholder={"Pravá kyčel — stabilita na jednej nohe\nDalší focení za 12 týdnů"} style={{ ...pole, marginTop: 4, resize: "vertical" }} />
-      </label>
-      {dalej.trim() && <div style={{ marginTop: -6 }}><OpravitText maly text={dalej} onOpravene={setDalej} /></div>}
       <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-        Na stránke bude aj „Chceš se na něco zeptat?" (odpoveď príde {trener || "trénerovi"} do notifikácií a do profilu), súhlas so zverejnením a stiahnutie. Odkaz platí 30 dní.
+        Pred vytvorením sa ešte spýtam, na čom budete pracovať ďalej. Na stránke bude aj „Chceš se na něco zeptat?" (odpoveď príde {trener || "trénerovi"} do notifikácií a do profilu), súhlas so zverejnením a stiahnutie. Odkaz platí 30 dní.
       </div>
       {chyba && <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>}
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <button type="button" disabled={pracujem} onClick={() => void vytvor()} style={{ padding: "9px 16px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: pracujem ? "default" : "pointer", opacity: pracujem ? 0.6 : 1 }}>
-          {pracujem ? "Vytváram…" : "Vytvoriť odkaz"}
+        <button type="button" onClick={() => { setChyba(""); setPoslednyKrok(true); }} style={tlacidlo}>
+          Ďalej →
         </button>
         <button type="button" onClick={onZrus} style={{ background: "none", border: "none", color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť</button>
       </div>

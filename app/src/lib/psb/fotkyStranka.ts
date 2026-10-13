@@ -24,7 +24,7 @@ export const vychodiskovaSprava = (krstne: string) =>
   `Ahoj${krstne ? ` ${krstne}` : ""}, posílám ti fotky z dřívějšího a z nedávného focení. Podívej se na ně — věřím, že tam uvidíš alespoň malé zlepšení.`;
 
 export type CisloKarty = { nazov: string; pred: string; po: string };
-export type KartaFotky = { id: string; popis: string; maCiste: boolean; cisla: CisloKarty[] };
+export type KartaFotky = { id: string; popis: string; maCiste: boolean; cisla: CisloKarty[]; dni?: string[] };
 export type FotkyStrankaVstup = {
   token: string;
   trener: string;
@@ -50,6 +50,40 @@ const den = (d: string) => {
 export const vyplneneCisla = (c: CisloKarty[] | undefined) =>
   (c || []).map((x) => ({ nazov: String(x.nazov || "").trim(), pred: String(x.pred || "").trim(), po: String(x.po || "").trim() }))
     .filter((x) => x.nazov && (x.pred || x.po));
+
+/**
+ * Dni odfotenia z uloženého stavu editora (PŘEDTÍM a POTOM pri štítku).
+ * Stav je JSON a v ňom ďalší JSON ako reťazec: `{ stav: "{\"stav\":[{den}]}" }`.
+ */
+export function dniZEditu(edit: string | null | undefined): string[] {
+  if (!edit) return [];
+  try {
+    const vonku = JSON.parse(edit) as { stav?: unknown };
+    const vnutri = (typeof vonku.stav === "string" ? JSON.parse(vonku.stav) : vonku.stav) as { stav?: { den?: unknown; src?: unknown }[] };
+    return (vnutri?.stav || [])
+      .filter((x) => x && x.src && typeof x.den === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.den))
+      .map((x) => String(x.den));
+  } catch { return []; }
+}
+
+const tvar = (n: number, jeden: string, dva: string, pat: string) => (n === 1 ? jeden : n >= 2 && n <= 4 ? dva : pat);
+/**
+ * NADPIS „36 týdnů práce" + „30. 1. 2026 → 11. 10. 2026" (Jerry, 13. 10. 2026:
+ * „toto mi tam chýba" — bolo v návrhu). Od najstaršej po najnovšiu fotku zo
+ * všetkých porovnaní na stránke. Do roka v týždňoch, potom v mesiacoch; bez
+ * dvoch rôznych dní nadpis nie je (vráti null a ostane „Tvoje srovnání").
+ */
+export function obdobieSrovnani(dni: string[]): { od: string; do: string; nadpis: string } | null {
+  const platne = dni.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (platne.length < 2 || platne[0] === platne[platne.length - 1]) return null;
+  const od = platne[0], doo = platne[platne.length - 1];
+  const dniMedzi = Math.round((Date.parse(`${doo}T12:00:00Z`) - Date.parse(`${od}T12:00:00Z`)) / 86_400_000);
+  let nadpis: string;
+  if (dniMedzi < 14) nadpis = `${dniMedzi} ${tvar(dniMedzi, "den", "dny", "dní")} práce`;
+  else if (dniMedzi < 365) { const t = Math.round(dniMedzi / 7); nadpis = `${t} ${tvar(t, "týden", "týdny", "týdnů")} práce`; }
+  else { const m = Math.round(dniMedzi / 30.44); nadpis = `${m} ${tvar(m, "měsíc", "měsíce", "měsíců")} práce`; }
+  return { od, do: doo, nadpis };
+}
 
 export function fotkyStranka(v: FotkyStrankaVstup): string {
   const s = SADZBA;
@@ -81,6 +115,9 @@ ${cisla.length ? `<div class="cisla">${cisla.map((c) => `<span class="cislo">${e
   }).join("\n");
 
   const dalej = v.dalej.map((x) => x.trim()).filter(Boolean);
+  const obdobie = obdobieSrovnani(v.karty.flatMap((k) => k.dni || []));
+  const poslal = /a$/i.test(v.trener) ? "poslala" : "poslal";
+  const kratkyDen = (d: string) => { const [, m, dd] = d.slice(0, 10).split("-"); return m && dd ? `${Number(dd)}. ${Number(m)}.` : d; };
   const suhlasBlok = v.suhlas
     ? `<div class="souhlas"><h4>${v.suhlas === "ano" ? "Díky, smíme je ukázat" : "Fotky zůstanou jen pro tebe"}</h4>
 <p>${v.suhlas === "ano" ? "Vždy bez obličeje a bez jména." : "Nikde je nezveřejníme."} Rozmyslel sis to?</p>
@@ -116,6 +153,8 @@ body{margin:0;background:${s.pozadie}}
 .nadtitul{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${s.tlmeny};font-weight:600}
 h1{margin:6px 0 0;font-family:Raleway,sans-serif;font-weight:700;font-size:32px;line-height:1.12;color:${s.biela}}
 .kedy{margin-top:6px;font-size:14px;color:${s.tlmeny}}
+.obdobie{margin-top:8px;font-family:Raleway,sans-serif;font-weight:700;font-size:15px;color:${s.text}}
+.obdobie span{color:${s.tlmeny};font-weight:600}
 .vzkaz{margin-top:20px;padding:16px;border-radius:16px;background:${s.plocha}}
 .vzkaz .kto{display:flex;align-items:center;gap:10px;margin-bottom:9px}
 .avatar{width:34px;height:34px;border-radius:50%;background:${s.zelena};color:${s.pozadie};display:flex;align-items:center;justify-content:center;font-family:Raleway,sans-serif;font-weight:800;font-size:14px}
@@ -172,10 +211,11 @@ h4{margin:0;font-family:Raleway,sans-serif;font-weight:700;font-size:19px}
 <div class="obal">
 <div style="padding:24px 0 18px">${logo}</div>
 <div class="nadtitul">Tvoje fotky z tréninku</div>
-<h1>Tvoje srovnání</h1>
-<div class="kedy">Poslal ${esc(v.trener || "trenér")} · ${esc(den(v.poslane))}</div>
+<h1>${esc(obdobie?.nadpis || "Tvoje srovnání")}</h1>
+${obdobie ? `<div class="obdobie">${esc(den(obdobie.od))} <span>→</span> ${esc(den(obdobie.do))}</div>` : ""}
+${v.sprava.trim() ? "" : `<div class="kedy">${poslal === "poslala" ? "Poslala" : "Poslal"} ${esc(v.trener || "trenér")} · ${esc(den(v.poslane))}</div>`}
 ${v.hlaska ? `<div class="hlaska">${esc(v.hlaska)}</div>` : ""}
-${v.sprava.trim() ? `<div class="vzkaz"><div class="kto"><div class="avatar">${esc((v.trener || "P").slice(0, 1).toUpperCase())}</div><div><b>${esc(v.trener || "Tvůj trenér")}</b><small>tvůj trenér</small></div></div><p>${esc(v.sprava.trim()).replace(/\n/g, "<br>")}</p></div>` : ""}
+${v.sprava.trim() ? `<div class="vzkaz"><div class="kto"><div class="avatar">${esc((v.trener || "P").slice(0, 1).toUpperCase())}</div><div><b>${esc(v.trener || "Tvůj trenér")}</b><small>${/a$/i.test(v.trener) ? "tvoje trenérka" : "tvůj trenér"} · ${poslal} ${esc(kratkyDen(v.poslane))}</small></div></div><p>${esc(v.sprava.trim()).replace(/\n/g, "<br>")}</p></div>` : ""}
 <div class="karty">
 ${karty}
 </div>
