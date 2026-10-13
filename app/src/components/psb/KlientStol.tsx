@@ -1677,7 +1677,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     )}
                     {!!b.hodiny && !!b.cena_czk && !(b.poznamka || "").includes("ukončené") && (
                       <button
-                        onClick={() => setUkoncenie((u) => (u?.id === b.id ? null : { id: b.id, odtrenovane: tre.filter((t) => t.den <= dnesISO()).length }))}
+                        onClick={() => setUkoncenie((u) => {
+                          if (u?.id === b.id) return null;
+                          /**
+                           * ODTRÉNOVANÉ BERIEM Z KARTY, NIE Z DÁTUMOV BALÍČKA.
+                           * Radek Baláž, 13. 10. 2026: tréningy medzi 15. 9. a dneškom
+                           * boli štyri, ale balíček prevzal aj 10. 9. z vyčerpaného
+                           * predošlého — karta hovorila 13 h, formulár by ponúkol 14.
+                           * Pri najnovšom balíčku platí číslo z karty; staršie nemajú
+                           * vlastný zostatok, tam zostáva počet podľa dátumov.
+                           */
+                          const zKarty = iB === 0 && c && Number.isFinite(c.packageRemaining) ? b.hodiny! - (c.packageRemaining - mimoExportu) : null;
+                          const odtrenovane = zKarty != null ? Math.max(0, Math.min(b.hodiny!, zKarty)) : tre.filter((t) => t.den <= dnesISO()).length;
+                          return { id: b.id, odtrenovane };
+                        })}
                         title="Klient končí — balíček sa uzavrie a nevyčerpané hodiny sa vrátia"
                         style={{ background: "none", border: "none", padding: 0, color: C.orange, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap" }}
                       >
