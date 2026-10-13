@@ -28,10 +28,11 @@ import { VyberMena } from "./VyberMena";
  *
  * CELÁ OBRAZOVKA (Jerry, 12. 10. 2026: „na iPade a telefóne mať možnosť
  * pustiť editor na celú obrazovku"). Editor sa roztiahne cez celý Kokpit
- * (bez hornej lišty a kariet); kde to prehliadač dovolí (iPad, Mac), zapne
- * aj systémovú celú obrazovku bez lišty Safari. iPhone ju stránkam
- * nedovoľuje — tam ostane roztiahnutie cez Kokpit (na ploche ako appka je
- * to bez lišty aj tak).
+ * (bez hornej lišty a kariet). SYSTÉMOVÁ celá obrazovka prehliadača sa NEPOUŽÍVA
+ * (13. 10. 2026: „keď to chcem zrušiť, zasekne sa to, celá obrazovka je
+ * zaseknutá, v tme") — s rámikom editora ju Safari/Chrome po zavretí nechávali
+ * čiernu a Kokpit ju nevedel zrušiť. Na ploche ako appka (PWA) lišta prehliadača
+ * aj tak nie je.
  *
  * Raz otvorený editor ostane načítaný aj po prepnutí na druhý (aj na inú
  * kartu Workspace) — inak by prepnutie zahodilo rozrobenú prácu
@@ -110,27 +111,19 @@ export function EditorKarta({ mena }: { mena: string[] }) {
   // ── Celá obrazovka ──
   const [cela, setCela] = useState(false);
   const obal = useRef<HTMLDivElement | null>(null);
-  const systemova = useRef(false);
-  const zapniCelu = useCallback(() => {
-    setCela(true);
-    const el = obal.current as (HTMLDivElement & { webkitRequestFullscreen?: () => void }) | null;
-    try {
-      const p = el?.requestFullscreen ? el.requestFullscreen() : (el?.webkitRequestFullscreen?.(), undefined);
-      systemova.current = true;
-      if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => { systemova.current = false; });
-    } catch { systemova.current = false; }
-  }, []);
+  const zapniCelu = useCallback(() => setCela(true), []);
   const vypniCelu = useCallback(() => {
     setCela(false);
+    // Poistka: keby prehliadač predsa ostal v systémovej celej obrazovke
+    // (stará verzia, gesto), zavretie ju ukončí — nikdy nech neostane tma.
     const d = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
-    if (systemova.current && (d.fullscreenElement || d.webkitFullscreenElement)) {
+    if (d.fullscreenElement || d.webkitFullscreenElement) {
       try { if (d.exitFullscreen) void d.exitFullscreen().catch(() => {}); else d.webkitExitFullscreen?.(); } catch { /* nič */ }
     }
-    systemova.current = false;
   }, []);
   useEffect(() => {
     if (!cela) return;
-    // Kokpit pod editorom sa nemá posúvať; systémové zavretie (gesto, Esc) zavrie aj režim.
+    // Kokpit pod editorom sa nemá posúvať; Esc režim zavrie.
     const html = document.documentElement, predtym = html.style.overflow;
     html.style.overflow = "hidden";
     /*
@@ -153,19 +146,11 @@ export function EditorKarta({ mena }: { mena: string[] }) {
       el.setAttribute("data-editor-cela-predok", "");
       predkovia.push(el);
     }
-    const zmena = () => {
-      const d = document as Document & { webkitFullscreenElement?: Element };
-      if (systemova.current && !d.fullscreenElement && !d.webkitFullscreenElement) { systemova.current = false; setCela(false); }
-    };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") vypniCelu(); };
-    document.addEventListener("fullscreenchange", zmena);
-    document.addEventListener("webkitfullscreenchange", zmena);
     addEventListener("keydown", esc);
     return () => {
       html.style.overflow = predtym;
       for (const el of predkovia) el.removeAttribute("data-editor-cela-predok");
-      document.removeEventListener("fullscreenchange", zmena);
-      document.removeEventListener("webkitfullscreenchange", zmena);
       removeEventListener("keydown", esc);
     };
   }, [cela, vypniCelu]);
