@@ -16,6 +16,45 @@ Stav k **13. 10. 2026**.
 
 ---
 
+## PORADIE OD 13. 10. 2026 (Jerry: „napíš celý zoznam a poradie“)
+
+Staré poradie z 5. 10. je celé hotové (nižšie). Toto je všetko, čo je
+otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na čom stojí.
+
+**A · Kým beží PTminder (po vypnutí sú dáta preč)**
+1. [ ] Export rokov pred 2025 → archív (Jerry stiahne, ja naleje) — sekcia 2.
+2. [ ] Maily a telefóny klientov z PTmindera k profilom — sekcia 4.
+
+**B · Čaká len na Jerryho slovo (minúty)**
+3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 3 otázky).
+4. [ ] Cieľová cena za dopyt v Dozore reklám + prvé tri vyhodnotenia.
+5. [ ] Vyskúšať na telefóne: kalendár v mobile, gestá v kalendári, push z ponuky termínov.
+6. [ ] Miřejovský 752 a októbrové príjmy z banky priradiť → potom prepínač peňazí na Kokpit.
+7. [ ] FIO_TOKEN do bety (jeden príkaz).
+
+**C · Strižňa 1.0 (hranica v sekcii 2)**
+8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
+9. [ ] Upload do Higgsfieldu (SSL pri PUT).
+
+**D · Obsah — nové nástroje, až po Strižni 1.0**
+10. [ ] Vyhľadávač normalizovaných zranení (po odpovedi FP na otázku 3).
+11. [ ] Šablóna reakčného videa v Strižni (stojí na 10).
+12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
+13. [ ] Memy.
+14. [ ] Osobné profily v Strižni (otvorené otázky v sekcii 2).
+
+**E · Keď bude čas / keď sa niečo ukáže**
+15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
+16. [ ] Prezentácia reportu: rozloženie pre mobil, export/tlač.
+17. [ ] Anonymný dotazník aj bývalým klientom.
+18. [ ] Obrazovka pre objem hľadania z Google Ads (prístup je).
+19. [ ] Zrušené tréningy z Google Calendar (odložené na po Fio).
+20. [ ] NDA pri fotkách pred/po — blokované kontrolou súhlasov.
+21. [ ] Po vypnutí PTmindera: karta klienta dve čísla vedľa seba (sekcia 4).
+
+**F · Fronty (práca, nie stavba)** — sekcia 5: 6 dôvodov odchodu, závery po
+termíne, čas prvej odpovede, zmeny v kalendári.
+
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
 
 Platby z banky si Jerry potvrdzuje sám. Moje kroky v tomto poradí — pri
