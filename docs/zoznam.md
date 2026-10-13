@@ -267,6 +267,23 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
+- **Strižňa na iPhone a motor, ktorý beží stále (odložené 13. 10. 2026, Jerry:
+  „toto ulož a porozprávame sa o tom niekedy v budúcnosti“):** cieľ – cestou
+  natočiť, kým dorazí, mať zostrihané a zverejnené; na iPhone 17 Pro / 17 aj
+  PLNÁ časová os (Jerry tak odpovedal). Nedá sa to celé na Cloudflare:
+  prepis je mlx-whisper (len Apple čip), render ide cez grafický čip Macu
+  (~5× rýchlejšie), Claude cez predplatné s konektormi Higgsfield a Metricool.
+  Dve cesty: **A · Mac mini ako domáci server** (~17 000 Kč jednorazovo
+  (cenu overiť), stále zapnutý, prístup cez Cloudflare Tunnel s prihlásením,
+  skoro bez prerábky, obaja vidia tie isté projekty; riziko výpadok prúdu
+  alebo internetu, odporúčané 512 GB alebo externý SSD) – **odporúčané**;
+  **B · server v cloude** (~30 €/mes. + platené API Clauda a Higgsfieldu,
+  náhrada prepisu, render 2–4× pomalší, veľká prerábka). Poradie: 1. Strižňa
+  na serveri + prihlásenie (Macy len okno), 2. nahrávanie z iPhonu + push
+  „strih hotový“, 3. rozloženie pre dotyk vrátane osi, 4. odkaz z Kokpitu.
+  Pri natáčaní cestou nahrávať 1080p (4K na mobilných dátach pomaly).
+  Čaká na Jerryho: A alebo B, či majú Mac mini, kde by stál, rýchlosť uploadu.
+
 - **Strižňa – osobné profily (odložené 13. 10. 2026, Jerry: „osobné profily
   nechame na neskôr“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
   šablóny a textár podľa profilu, karty a výsledky v Kokpite s profilom,
