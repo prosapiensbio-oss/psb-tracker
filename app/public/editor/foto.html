@@ -847,7 +847,7 @@ window.kartotekaKlienta = (() => {
   lupa.className = "lupa";
   lupa.hidden = true;
   stvorec.appendChild(lupa);
-  function ukazLupu(P, okno) {
+  function ukazLupu(P, okno, celaFotka = false) {
     const L = LUPA.strana, Z = LUPA.zvacsenie, dpr = window.devicePixelRatio || 1;
     if (lupa.width !== L * dpr) { lupa.width = L * dpr; lupa.height = L * dpr; lupa.style.width = `${L}px`; lupa.style.height = `${L}px`; }
     const x = lupa.getContext("2d");
@@ -864,7 +864,7 @@ window.kartotekaKlienta = (() => {
       if (!t.src || !img || !img.complete) return;
       const r = rozlozenie(t.v, t.fw, t.fh, R[i].w, R[i].h);
       x.save();
-      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
+      if (rozdelenie !== "cez" && !celaFotka) { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
       if (rozdelenie === "cez" && i === 1) x.globalAlpha = priehladnost;
       fotkaNaPlatno(x, img, t, R[i].x, R[i].y, r);
       x.restore();
@@ -1183,6 +1183,7 @@ window.kartotekaKlienta = (() => {
   okna.forEach((el, i) => {
     const prsty = new Map();
     let posledne = null; // { x, y, d } – stred a vzdialenosť prstov
+    let stipol = false; // po dvoch prstoch sa fotka nehýbe, kým sa nezdvihnú všetky
     const stredPrstov = () => {
       const p = [...prsty.values()];
       const x = p.reduce((a, q) => a + q.x, 0) / p.length, y = p.reduce((a, q) => a + q.y, 0) / p.length;
@@ -1200,20 +1201,19 @@ window.kartotekaKlienta = (() => {
       try { el.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
       prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
       posledne = stredPrstov();
+      if (prsty.size === 2) { stipol = true; stipZaciatok(...prsty.values()); }
       el.classList.add("tahanie");
       kresli();
     });
     el.addEventListener("pointermove", (e) => {
       if (!prsty.has(e.pointerId)) return;
       prsty.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (prsty.size > 1) { stipPohyb(...prsty.values()); return; } // dva prsty = plocha
+      if (stipol) return;
       const teraz = stredPrstov();
       const s = stav[i];
       const { ow, oh } = rozmerOkna(el);
-      let v = { ...s.v, x: s.v.x + (teraz.x - posledne.x) / ow, y: s.v.y + (teraz.y - posledne.y) / oh };
-      if (prsty.size > 1 && posledne.d > 0) {
-        const box = el.getBoundingClientRect();
-        v = zoomOkolo(v, v.zoom * (teraz.d / posledne.d), (teraz.x - box.left) / ow - 0.5, (teraz.y - box.top) / oh - 0.5);
-      }
+      const v = { ...s.v, x: s.v.x + (teraz.x - posledne.x) / ow, y: s.v.y + (teraz.y - posledne.y) / oh };
       s.v = obmedz(v, s.fw, s.fh, ow, oh);
       posledne = teraz;
       kresli();
@@ -1221,21 +1221,12 @@ window.kartotekaKlienta = (() => {
     const koniec = (e) => {
       prsty.delete(e.pointerId);
       posledne = prsty.size ? stredPrstov() : null;
-      if (!prsty.size) el.classList.remove("tahanie");
+      if (!prsty.size) { el.classList.remove("tahanie"); stipol = false; }
     };
     el.addEventListener("pointerup", koniec);
     el.addEventListener("pointercancel", koniec);
-    // Touchpad: dva prsty = posun, roztiahnutie (ctrl) = zväčšenie.
-    // Dva prsty na touchpade rieši plocha (platno) — jedno miesto pre okno aj presah fotky.
-    // Safari na Macu posiela štipnutie ako gesture*.
-    let gz = 1;
-    el.addEventListener("gesturestart", (e) => { e.preventDefault(); gz = stav[i].v.zoom; });
-    el.addEventListener("gesturechange", (e) => {
-      e.preventDefault();
-      const s = stav[i]; const { ow, oh } = rozmerOkna(el);
-      s.v = obmedz({ ...s.v, zoom: gz * e.scale }, s.fw, s.fh, ow, oh); kresli();
-    });
-    el.addEventListener("dblclick", () => { stav[i].v = { zoom: 1, x: 0, y: 0 }; kresli(); });
+    // Dva prsty (touchpad aj dotyk) aj štipnutie patria PLOCHE — rieši ich platno.
+    // Veľkosť fotky sa mení len za rohy (Jerry, 13. 10. 2026), preto ani dvojklik.
   });
 
   // ── PANEL ──
@@ -1735,6 +1726,7 @@ window.kartotekaKlienta = (() => {
     const pusti = () => { kotva = null; skryLupu(); };
     h.addEventListener("pointerup", pusti);
     h.addEventListener("pointercancel", pusti);
+    h.addEventListener("lostpointercapture", pusti);
   });
   /**
    * OTÁČANIE ŤAHOM (Jerry, 12. 10. 2026: „pridaj aj otáčanie fotky ťahom").
@@ -1762,7 +1754,8 @@ window.kartotekaKlienta = (() => {
     otocUchyt.addEventListener("pointerup", pusti);
     otocUchyt.addEventListener("pointercancel", pusti);
   }
-  const ukazLupuRohu = (P) => { try { ukazLupu(P, rozdelenie === "cez" ? -1 : aktivne); } catch { /* lupa nie je podmienka */ } };
+  // Roh je zväčša mimo okna — lupa kreslí celú fotku, inak ukazuje len tmu.
+  const ukazLupuRohu = (P) => { try { ukazLupu(P, rozdelenie === "cez" ? -1 : aktivne, true); } catch { /* lupa nie je podmienka */ } };
 
   // ── POHĽAD NA PLOCHU: priblížiť / oddialiť bez zmeny fotky ──
   /**
@@ -1775,6 +1768,24 @@ window.kartotekaKlienta = (() => {
   const plocha = document.getElementById("plocha");
   let pohlad = 1;
   const okrajPlochy = () => (window.innerWidth <= 860 ? 24 : 70);
+  /** Okraj plochy okolo štvorca — taký veľký, aby sa plochou dalo posúvať
+   * dvoma prstami aj pri 100 % (Jerry, 13. 10. 2026: „pohyb po ploche dva prsty"). */
+  const rezervaPlochy = () => (platno ? Math.round(Math.max(platno.clientWidth, platno.clientHeight) * 0.6) : 0);
+  const vycentruj = () => { if (!platno) return; platno.scrollLeft = (platno.scrollWidth - platno.clientWidth) / 2; platno.scrollTop = (platno.scrollHeight - platno.clientHeight) / 2; };
+  /** Štipnutie dvoma prstami (dotyk): priblíženie plochy + posun stredom prstov. Body v px obrazovky. */
+  let stip = null, rezerva = 0;
+  function stipZaciatok(a, b) {
+    if (!platno) return;
+    const k = platno.getBoundingClientRect();
+    stip = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: pohlad, m: { x: (a.x + b.x) / 2 - k.left, y: (a.y + b.y) / 2 - k.top } };
+  }
+  function stipPohyb(a, b) {
+    if (!platno || !stip) return;
+    const k = platno.getBoundingClientRect(), m = { x: (a.x + b.x) / 2 - k.left, y: (a.y + b.y) / 2 - k.top };
+    platno.scrollLeft -= m.x - stip.m.x; platno.scrollTop -= m.y - stip.m.y;
+    stip.m = m;
+    nastavPohlad(stip.z * Math.hypot(a.x - b.x, a.y - b.y) / stip.d, m);
+  }
   function zakladnaStrana() {
     if (!platno) return stvorec.clientWidth || 500;
     const o = okrajPlochy();
@@ -1785,64 +1796,58 @@ window.kartotekaKlienta = (() => {
     if (!platno || !plocha) return;
     const stary = pohlad;
     pohlad = Math.min(6, Math.max(0.4, z));
-    const o = okrajPlochy();
+    const o = rezervaPlochy(), oStara = rezerva, bezRozmeru = !rezerva;
+    rezerva = o;
     plocha.style.setProperty("--okraj", `${o}px`);
     const b = bod || { x: platno.clientWidth / 2, y: platno.clientHeight / 2 };
-    // Bod v obsahu pred zmenou (s posunom) → po zmene na tom istom mieste.
-    const cx = (platno.scrollLeft + b.x - o) / stary, cy = (platno.scrollTop + b.y - o) / stary;
+    // Bod v obsahu pred zmenou (s posunom a STARÝM okrajom) → po zmene na tom istom mieste.
+    const cx = (platno.scrollLeft + b.x - oStara) / stary, cy = (platno.scrollTop + b.y - oStara) / stary;
     const strana = Math.round(zakladnaStrana() * pohlad);
     stvorec.style.width = `${strana}px`; stvorec.style.height = `${strana}px`;
     platno.scrollLeft = cx * pohlad + o - b.x;
     platno.scrollTop = cy * pohlad + o - b.y;
+    if (bezRozmeru) vycentruj(); // editor bol skrytý (karta, 0 × 0) — teraz prvý raz naozaj vidno
     const h = document.getElementById("pohladH");
     if (h) h.textContent = `${Math.round(pohlad * 100)} %`;
     kresli();
   }
   document.getElementById("pohladViac")?.addEventListener("click", () => nastavPohlad(pohlad * 1.25));
   document.getElementById("pohladMenej")?.addEventListener("click", () => nastavPohlad(pohlad / 1.25));
-  document.getElementById("pohladCely")?.addEventListener("click", () => { pohlad = 1; nastavPohlad(1); platno.scrollLeft = 0; platno.scrollTop = 0; });
+  document.getElementById("pohladCely")?.addEventListener("click", () => { pohlad = 1; nastavPohlad(1); vycentruj(); });
   addEventListener("resize", () => nastavPohlad(pohlad));
+  // Skrytá karta, celá obrazovka, otočenie iPadu — mení sa platno, nie okno.
+  if (platno && window.ResizeObserver) new ResizeObserver(() => nastavPohlad(pohlad)).observe(platno);
   if (platno) {
     const bodPlatna = (e) => { const b = platno.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
-    // Ctrl/⌘ + koliesko (alebo štipnutie na touchpade) MIMO fotky = plocha.
     /**
-     * DVA PRSTY NA TOUCHPADE (Jerry, 13. 10. 2026: „fotkami nemôžem v editore
-     * pohybovať dvojitým dotykom, tak sa pohybujem po ploche"). Nad fotkou —
-     * v okne aj nad jej priesvitným presahom mimo rámčeka, aj pri kreslení —
-     * dva prsty fotku POSÚVAJÚ a štipnutie (ctrl) ju zväčšuje. Nad prázdnou
-     * plochou sa posúva plocha; ⌘ + koliesko alebo štipnutie mimo fotky
-     * približuje plochu.
+     * TOUCHPAD = PLOCHA (Jerry, 13. 10. 2026: „zväčšovanie a zmenšovanie fotky
+     * by malo ísť iba po rohoch, posúvanie fotky kliknem-držím-pohybujem a pohyb
+     * po ploche: štipnutie zväčšuje/zmenšuje, dva prsty posúvajú"). Koliesko ani
+     * štipnutie fotku nikdy nemenia — ani nad ňou, ani nad presahom.
      */
+    let gesto = false, gz = 1; // Safari na Macu posiela štipnutie aj ako gesture*
+    platno.addEventListener("gesturestart", (e) => { e.preventDefault(); gesto = true; gz = pohlad; });
+    platno.addEventListener("gesturechange", (e) => { e.preventDefault(); nastavPohlad(gz * e.scale, bodPlatna(e)); });
+    platno.addEventListener("gestureend", (e) => { e.preventDefault(); gesto = false; });
     platno.addEventListener("wheel", (e) => {
-      const P = miestoVoStvorci(e), R = oknaNaObrazovke();
-      const vnutri = (r) => P.x >= r.x && P.x <= r.x + r.w && P.y >= r.y && P.y <= r.y + r.h;
-      let i = -1;
-      if (rozdelenie === "cez") { if (stav[aktivne].src && vnutri(R[aktivne])) i = aktivne; }
-      else { const k = R.findIndex(vnutri); if (k >= 0 && stav[k].src) i = k; }
-      if (i < 0 && stav[aktivne].src && rozmery.has(stav[aktivne].src) && jeNaFotke(obdlznikFotky(aktivne), P)) i = aktivne;
-      const mierka = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // koliesko myši ide po riadkoch
-      if (i < 0 || e.metaKey) {
-        if (!e.ctrlKey && !e.metaKey) return; // prázdna plocha sa posúva sama
-        e.preventDefault();
-        nastavPohlad(pohlad * Math.exp(-e.deltaY * mierka * 0.01), bodPlatna(e));
-        return;
-      }
       e.preventDefault();
-      aktivne = i;
-      const t = stav[i], r = R[i];
-      let v = t.v;
-      if (e.ctrlKey) v = zoomOkolo(v, v.zoom * Math.exp(-e.deltaY * mierka * 0.01), (P.x - r.x) / r.w - 0.5, (P.y - r.y) / r.h - 0.5);
-      else v = { ...v, x: v.x - (e.deltaX * mierka) / r.w, y: v.y - (e.deltaY * mierka) / r.h };
-      t.v = obmedz(v, t.fw, t.fh, r.w, r.h);
-      kresli();
+      const mierka = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // koliesko myši ide po riadkoch
+      if (e.ctrlKey || e.metaKey) {
+        if (gesto) return; // to isté štipnutie už rieši gesturechange
+        nastavPohlad(pohlad * Math.exp(-e.deltaY * mierka * 0.01), bodPlatna(e));
+      } else {
+        platno.scrollLeft += e.deltaX * mierka;
+        platno.scrollTop += e.deltaY * mierka;
+      }
     }, { passive: false });
     // Prsty na prázdnej ploche: jeden posúva plochu (alebo fotku, ak je pod
     // ním jej priesvitná časť), dva približujú plochu.
-    const prsty = new Map();
+    const prsty = new Map(), prstyObr = new Map();
     let tah = null;
     platno.addEventListener("pointerdown", (e) => {
       if (e.target.closest?.(".okno, .roh, .otoc, .pohlad, svg.ciary.kreslim")) return;
       prsty.set(e.pointerId, bodPlatna(e));
+      prstyObr.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try { platno.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
       if (prsty.size === 1) {
         const P = miestoVoStvorci(e), t = stav[aktivne];
@@ -1851,36 +1856,29 @@ window.kartotekaKlienta = (() => {
         tah = naFotke ? { druh: "fotka", P, o } : { druh: "plocha", x: e.clientX, y: e.clientY, sl: platno.scrollLeft, st: platno.scrollTop };
         if (naFotke) drzi = true; // posun fotky je jeden krok späť, nie desať
       } else if (prsty.size === 2) {
-        const [a, b] = [...prsty.values()];
-        const d = Math.hypot(a.x - b.x, a.y - b.y), stred = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        // Prvý prst držal fotku → dva prsty zväčšujú a posúvajú FOTKU, nie plochu.
-        tah = tah?.druh === "fotka"
-          ? { druh: "fotkaStipnutie", d, stred, o: obdlznikFotky(aktivne) }
-          : { druh: "stipnutie", d, z: pohlad };
+        // Dva prsty = plocha, aj keď prvý držal fotku (veľkosť fotky len za rohy).
+        stipZaciatok(...prstyObr.values());
+        tah = { druh: "stipnutie" };
       }
     });
     platno.addEventListener("pointermove", (e) => {
       if (!prsty.has(e.pointerId) || !tah) return;
       prsty.set(e.pointerId, bodPlatna(e));
+      prstyObr.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (tah.druh === "plocha") {
         platno.scrollLeft = tah.sl - (e.clientX - tah.x);
         platno.scrollTop = tah.st - (e.clientY - tah.y);
       } else if (tah.druh === "fotka") {
         const P = miestoVoStvorci(e);
         nastavStred(aktivne, tah.o.cx + P.x - tah.P.x, tah.o.cy + P.y - tah.P.y, tah.o.w);
-      } else if (tah.druh === "fotkaStipnutie" && prsty.size === 2) {
-        const [a, b] = [...prsty.values()];
-        const k = Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1);
-        const sx = (a.x + b.x) / 2 - tah.stred.x, sy = (a.y + b.y) / 2 - tah.stred.y;
-        nastavStred(aktivne, tah.o.cx + sx, tah.o.cy + sy, tah.o.w * k);
       } else if (tah.druh === "stipnutie" && prsty.size === 2) {
-        const [a, b] = [...prsty.values()];
-        nastavPohlad(tah.z * Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+        stipPohyb(...prstyObr.values());
       }
     });
     const koniec = (e) => {
-      prsty.delete(e.pointerId);
+      prsty.delete(e.pointerId); prstyObr.delete(e.pointerId);
       if (!prsty.size) tah = null;
+      else if (tah?.druh === "stipnutie") tah = { druh: "hotovo" }; // zvyšný prst už nič nehýbe
     };
     platno.addEventListener("pointerup", koniec);
     platno.addEventListener("pointercancel", koniec);
@@ -2021,6 +2019,7 @@ window.kartotekaKlienta = (() => {
   };
   pouziStitok();
   nastavPohlad(1);
+  vycentruj();
   kresli();
   posledny = snimkaStavu();
   const prazdny = posledny;
