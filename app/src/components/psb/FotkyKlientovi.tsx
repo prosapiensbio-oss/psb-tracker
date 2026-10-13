@@ -5,6 +5,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { krstne, TRENERI } from "../../lib/psb/mailFaktury";
 import { nazovPohladu, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
+import { OpravitText } from "./OpravitText";
 import { SmsKlientovi } from "./SmsKlientovi";
 
 /**
@@ -92,6 +93,7 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         správa navrchu
         <textarea value={sprava} onChange={(e) => setSprava(e.target.value)} rows={3} style={{ ...pole, marginTop: 4, resize: "vertical" }} />
       </label>
+      <div style={{ marginTop: -6 }}><OpravitText maly text={sprava} onOpravene={setSprava} /></div>
 
       {fotky.map((f) => (
         <div key={f.id} style={{ display: "grid", gridTemplateColumns: "84px 1fr", gap: 10, alignItems: "start" }}>
@@ -124,6 +126,7 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         na čom budeme pracovať ďalej <span style={{ color: C.textDim }}>— každý bod na nový riadok; prázdne sa na stránke neukáže</span>
         <textarea value={dalej} onChange={(e) => setDalej(e.target.value)} rows={3} placeholder={"Pravá kyčel — stabilita na jednej nohe\nDalší focení za 12 týdnů"} style={{ ...pole, marginTop: 4, resize: "vertical" }} />
       </label>
+      {dalej.trim() && <div style={{ marginTop: -6 }}><OpravitText maly text={dalej} onOpravene={setDalej} /></div>}
       <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
         Na stránke bude aj „Chceš se na něco zeptat?" (odpoveď príde {trener || "trénerovi"} do notifikácií a do profilu), súhlas so zverejnením a stiahnutie. Odkaz platí 30 dní.
       </div>

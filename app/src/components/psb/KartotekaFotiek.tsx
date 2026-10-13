@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { dnesPraha } from "../../lib/psb/cas";
 import { posliDoEditora, upravVEditore } from "../../lib/psb/doEditora";
 import { PoslaneKlientovi, PoslatKlientovi, type OdkazFotiek, type OdpovedFotky } from "./FotkyKlientovi";
+import { OpravitText } from "./OpravitText";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
@@ -374,6 +375,7 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
                       <button type="button" onClick={async () => { if (await posli({ akcia: "popis", id: f.id, text: textKoncept })) { setTextNa(null); setHlaska("Popis uložený."); await nacitaj(); } }} style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>uložiť</button>
                       <button type="button" onClick={() => setTextNa(null)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
                     </div>
+                    <div style={{ marginTop: 6 }}><OpravitText maly text={textKoncept} onOpravene={setTextKoncept} /></div>
                   </div>
                 )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 9px", borderTop: `1px solid ${mix(C.border, 80)}` }}>
@@ -564,6 +566,21 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
               rows={4}
               style={{ width: "min(680px, 100%)", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 14, lineHeight: 1.55, resize: "vertical" }}
             />
+            <div style={{ width: "min(680px, 100%)" }}>
+              <OpravitText
+                text={popisKoncept ?? (zvacsena.popis || "")}
+                onOpravene={async (t) => {
+                  // Opravený text sa hneď aj uloží — pole už stratilo zameranie.
+                  const f = zvacsena;
+                  setPopisKoncept(t);
+                  if (await posli({ akcia: "popis", id: f.id, text: t })) {
+                    setZvacsena((z) => (z && z.id === f.id ? { ...z, popis: t.trim() } : z));
+                    setPopisKoncept(null);
+                    await nacitaj();
+                  }
+                }}
+              />
+            </div>
             <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "center", fontSize: 13, color: C.textMuted }}>
               <span>{nazovPohladu(zvacsena.pohlad)} · {denCz(zvacsena.den)}{zvacsena.kto ? ` · ${zvacsena.kto}` : ""}</span>
               {zvacsena.maEdit && (

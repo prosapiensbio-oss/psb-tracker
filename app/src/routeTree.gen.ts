@@ -56,6 +56,7 @@ import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiOpravaTextuRouteImport } from './routes/api/oprava-textu'
 import { Route as ApiObrazokPromptRouteImport } from './routes/api/obrazok-prompt'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiNapadObrazokRouteImport } from './routes/api/napad-obrazok'
@@ -336,6 +337,11 @@ const ApiOverrideRoute = ApiOverrideRouteImport.update({
   path: '/api/override',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOpravaTextuRoute = ApiOpravaTextuRouteImport.update({
+  id: '/api/oprava-textu',
+  path: '/api/oprava-textu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiObrazokPromptRoute = ApiObrazokPromptRouteImport.update({
   id: '/api/obrazok-prompt',
   path: '/api/obrazok-prompt',
@@ -605,6 +611,7 @@ export interface FileRoutesByFullPath {
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
+  '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -698,6 +705,7 @@ export interface FileRoutesByTo {
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
+  '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -792,6 +800,7 @@ export interface FileRoutesById {
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
+  '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -887,6 +896,7 @@ export interface FileRouteTypes {
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
+    | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -980,6 +990,7 @@ export interface FileRouteTypes {
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
+    | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -1073,6 +1084,7 @@ export interface FileRouteTypes {
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/obrazok-prompt'
+    | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -1167,6 +1179,7 @@ export interface RootRouteChildren {
   ApiNapadObrazokRoute: typeof ApiNapadObrazokRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiObrazokPromptRoute: typeof ApiObrazokPromptRoute
+  ApiOpravaTextuRoute: typeof ApiOpravaTextuRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPagespeedRoute: typeof ApiPagespeedRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
@@ -1543,6 +1556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverrideRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/oprava-textu': {
+      id: '/api/oprava-textu'
+      path: '/api/oprava-textu'
+      fullPath: '/api/oprava-textu'
+      preLoaderRoute: typeof ApiOpravaTextuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/obrazok-prompt': {
       id: '/api/obrazok-prompt'
       path: '/api/obrazok-prompt'
@@ -1913,6 +1933,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNapadObrazokRoute: ApiNapadObrazokRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiObrazokPromptRoute: ApiObrazokPromptRoute,
+  ApiOpravaTextuRoute: ApiOpravaTextuRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPagespeedRoute: ApiPagespeedRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,

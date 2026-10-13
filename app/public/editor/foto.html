@@ -349,6 +349,11 @@
         <summary><span class="sipka">▸</span>Popis k fotke<span class="stav" id="stavPopis"></span></summary>
         <div class="obsah popis-fotky">
           <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+          <div class="tlacidla" style="align-items:center">
+            <button class="tl" id="opravitPopis" type="button" title="Oprava pravopisu, diakritiky, čiarok a gramatiky — jazyk aj obsah ostanú">✓ opraviť text</button>
+            <button class="tl" id="povodnyPopis" type="button" hidden>↶ vrátiť pôvodné</button>
+            <span id="opravaStav" class="napoveda" style="margin:0"></span>
+          </div>
           <div class="napoveda">Uloží sa s porovnaním ku klientovi a klient ho uvidí pod fotkou v odkaze. Každé porovnanie má svoj — pri nových fotkách začína prázdny.</div>
         </div>
       </details>
@@ -2142,6 +2147,36 @@ window.kartotekaKlienta = (() => {
   });
   const vycistiPopis = () => { $("popisFotky").value = ""; ulozeneZdroje = null; };
   $("popisFotky").addEventListener("input", () => window.poZmene?.());
+  // OPRAVA TEXTU (Jerry, 13. 10. 2026) — pravopis, diakritika, čiarky, gramatika.
+  // Jazyk a obsah ostávajú; pôvodný text sa dá vrátiť (aj krokom späť).
+  let povodnyPopis = null;
+  const nastavPopis = (t) => {
+    const el = $("popisFotky");
+    el.value = t;
+    el.dispatchEvent(new Event("input", { bubbles: true })); // krok späť aj rozrobené o tom vedia
+  };
+  $("opravitPopis").onclick = async () => {
+    const text = $("popisFotky").value.trim();
+    if (!text) { $("opravaStav").textContent = "Nie je čo opraviť."; return; }
+    const b = $("opravitPopis");
+    b.disabled = true; b.textContent = "opravujem…"; $("opravaStav").textContent = "";
+    const j = await fetch("/api/oprava-textu", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) })
+      .then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    b.disabled = false; b.textContent = "✓ opraviť text";
+    if (!j?.ok) { $("opravaStav").textContent = j?.error || "Oprava zlyhala."; return; }
+    if (!j.zmenene) { $("opravaStav").textContent = "Bez chýb ✓"; return; }
+    povodnyPopis = $("popisFotky").value;
+    nastavPopis(j.text);
+    $("povodnyPopis").hidden = false;
+    $("opravaStav").textContent = "Opravené.";
+  };
+  $("povodnyPopis").onclick = () => {
+    if (povodnyPopis === null) return;
+    nastavPopis(povodnyPopis);
+    povodnyPopis = null;
+    $("povodnyPopis").hidden = true;
+    $("opravaStav").textContent = "Vrátené pôvodné.";
+  };
 
   // ── Snímky z videa (spoločný zásobník s editorom videa) ──
   let snimky = [];
