@@ -300,6 +300,15 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   a dôvodom „toto sa dá komentovať“, raz denne/týždenne súhrn. Otvorené:
   autorské práva (krátky úsek + vlastný komentár; nie celé video),
   či FP nemá na tento formát pravidlá.
+  **Doplnené 13. 10.:** Jerry žiadne také kanály nesleduje — zoznam kanálov
+  musí nájsť nástroj sám (hľadanie podľa tém → kanály s najviac zásahmi →
+  Jerry ich odklikne). Štartovací zoznam: Men's Health (Gym & Fridge),
+  Brian Sutterer MD, The Injury Breakdown, Knees Over Toes Guy, Squat
+  University, Athlean-X, Huberman. **FP pravidlá (Practitioners Policy
+  + Handbook):** zákaz vysvetľovať FP techniky, logo, hovoriť za FP;
+  na MIP zákaz „interagovať s obsahom, ktorý protirečí FP“ → reakcie NIE na
+  MIP, na účte PSB áno s opatrnosťou; šedá zóna = nepublikovať. Otázka 3
+  v `docs/fp-otazka.md` – stavať až po odpovedi FP.
 
 - **Formát reakčného videa (13. 10. 2026):** šablóna v Strižni – úsek
   cudzieho videa hore, Jerry dole (alebo greenscreen), titulky oboch.
