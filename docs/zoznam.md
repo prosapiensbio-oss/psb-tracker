@@ -39,7 +39,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
-10. [ ] Vyhľadávač tém na reakčné videá — zranenia sú len jedna téma; zoznam tém z Naudiho streamov v sekcii 2 (bez čakania na FP).
+10. [ ] Vyhľadávač tém na reakčné videá — zranenia sú len jedna téma; 15 okruhov tém z 77 Naudiho streamov je v `docs/temy-reakcie.md` (bez čakania na FP).
 11. [ ] Šablóna reakčného videa v Strižni (stojí na 10).
 12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
 13. [ ] Memy.
