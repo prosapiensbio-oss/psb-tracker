@@ -133,7 +133,7 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       podľa trénera, vyťaženosť, navádzač kariet, hromadná SMS — naostro 5. 10.
 - [x] Duplicity mimo Workspace odstránené (Kalendár, Upload, Tréningy,
       + Zápis); duplikovať tréning a presun na iného trénera v kalendári.
-- [ ] **FIO_TOKEN v bete** (8. 10.: stále chýba, beta má len PSB_SESSION_SECRET) — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
+- [x] **FIO_TOKEN v bete** — Jerry ho nahral 13. 10. 2026 (nový token z Fia; ostrý Kokpit má pôvodný). Overené `wrangler secret list`.
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
 - [x] **Banka stiahnutá** (overené 5. 10. 2026: pohyby do 4. 10.). Pravidlo
       „nezaplatený balíček = mínus" stojí na spárovanej banke — sťahovať priebežne.
