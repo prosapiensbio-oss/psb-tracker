@@ -267,6 +267,17 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
+- **Strižňa – osobné profily (odložené 13. 10. 2026, Jerry: „osobné profily
+  nechame na neskôr“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
+  šablóny a textár podľa profilu, karty a výsledky v Kokpite s profilom,
+  nahrávanie vlastných štatistík (snímky z Instagramu alebo CSV z Meta
+  Business Suite), keď profil nie je v Metricoole. Otvorené otázky pre Jerryho:
+  (1) majú osobné profily ísť cez Metricool (Terezkin profil tam nie je,
+  môže to chcieť vyšší plán), alebo stačí nahrávanie štatistík?
+  (2) aké štatistiky presne nahrávať – ku konkrétnemu reelu, mesačný prehľad
+  účtu, aj mimo Instagramu (TikTok, YouTube)? Návrh je v konverzácii 13. 10.
+  a v pamäti `striznja-appka.md`.
+
 - **Prezentácia z mesačného reportu — POSTAVENÁ 12. 10. 2026** (Jerry: „chcel
   by som aby mi to rovno vygenerovalo nejakú prezentáciu… niečo ako
   powerpointovú, prepínam medzi slajdami, postupne sa mi tam zobrazujú
