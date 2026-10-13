@@ -267,22 +267,43 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
-- **Strižňa na iPhone a motor, ktorý beží stále (odložené 13. 10. 2026, Jerry:
-  „toto ulož a porozprávame sa o tom niekedy v budúcnosti“):** cieľ – cestou
-  natočiť, kým dorazí, mať zostrihané a zverejnené; na iPhone 17 Pro / 17 aj
-  PLNÁ časová os (Jerry tak odpovedal). Nedá sa to celé na Cloudflare:
-  prepis je mlx-whisper (len Apple čip), render ide cez grafický čip Macu
-  (~5× rýchlejšie), Claude cez predplatné s konektormi Higgsfield a Metricool.
-  Dve cesty: **A · Mac mini ako domáci server** (~17 000 Kč jednorazovo
-  (cenu overiť), stále zapnutý, prístup cez Cloudflare Tunnel s prihlásením,
-  skoro bez prerábky, obaja vidia tie isté projekty; riziko výpadok prúdu
-  alebo internetu, odporúčané 512 GB alebo externý SSD) – **odporúčané**;
-  **B · server v cloude** (~30 €/mes. + platené API Clauda a Higgsfieldu,
-  náhrada prepisu, render 2–4× pomalší, veľká prerábka). Poradie: 1. Strižňa
-  na serveri + prihlásenie (Macy len okno), 2. nahrávanie z iPhonu + push
-  „strih hotový“, 3. rozloženie pre dotyk vrátane osi, 4. odkaz z Kokpitu.
-  Pri natáčaní cestou nahrávať 1080p (4K na mobilných dátach pomaly).
-  Čaká na Jerryho: A alebo B, či majú Mac mini, kde by stál, rýchlosť uploadu.
+- **Strižňa 1.0 – hranica, aby sa nestavalo donekonečna (13. 10. 2026,
+  Jerry: „musíme to nejako zadefinovať“):** Strižňa je hotová, keď Terezka
+  na svojom Macu prejde celý kruh BEZ Clauda: nahrá deň → priradí klipy
+  ku kartám → zostrihá reel → schváli text → naplánuje cez Metricool →
+  výsledky sa vrátia na kartu v Kokpite. Do 1.0 patrí už len to, čo tento
+  kruh blokuje: (1) jeden ostrý reel od Terezky od nahratia po
+  naplánovanie, (2) opraviť, čo pri ňom padne, (3) upload do Higgsfieldu
+  (SSL chyba pri PUT – zatiaľ len raz). Všetko ostatné (memy, analyzátor,
+  vyhľadávač, profily) je samostatná vec s vlastným rozhodnutím Jerryho.
+
+- **Memy (13. 10. 2026, Jerry: „páči sa mi, ale aby sme nestavali všetko
+  naraz, daj to na zoznam“):** sekcia v Strižni – šablóna (obrázok/klip +
+  text hore/dole), texty navrhne Claude z témy karty, sadzba v značke.
+  Čaká, kým bude Strižňa 1.0.
+
+- **Analyzátor IG videa (13. 10. 2026, filozofická debata):** vložiť
+  odkaz/súbor → Claude rozoberie háčik (prvé 3 s), strihy (detekcia scén),
+  titulky a text, popis (hashtagy, jazyk, tón, vulgarizmy, téma) a povie,
+  čo z toho prevziať. Pozor: Instagram z Workera nestiahneš (429) – video
+  musí prísť ako súbor (stiahnuté z telefónu / nahrávka obrazovky).
+  Celý profil: Metricool vie LEN účty pridané ako konkurenti (overené
+  13. 10.: na PSB je jediný holystic.training; dáva popis, lajky,
+  komentáre, engagement, odkaz – NIE videá ani zhliadnutia). Rozbor
+  popisov celého profilu sa teda dá z Metricoolu, rozbor videí nie.
+
+- **Vyhľadávač YouTube na reakčné videá (13. 10. 2026):** Jerry nepozerá
+  Zaca Efrona ani „movement gurus“, takže materiál na reakciu (štýl FP)
+  nemá odkiaľ. Návrh: zoznam kanálov + kľúčové slová (tréning celebrít,
+  zranenia, mýty o strečingu, podcasty), YouTube Data API (bezplatný kľúč,
+  ~100 hľadaní/deň), Claude prečíta titulky a vyberie úseky s časom
+  a dôvodom „toto sa dá komentovať“, raz denne/týždenne súhrn. Otvorené:
+  autorské práva (krátky úsek + vlastný komentár; nie celé video),
+  či FP nemá na tento formát pravidlá.
+
+- **Formát reakčného videa (13. 10. 2026):** šablóna v Strižni – úsek
+  cudzieho videa hore, Jerry dole (alebo greenscreen), titulky oboch.
+  Nadväzuje na vyhľadávač; samostatne nemá z čoho žiť.
 
 - **Strižňa – osobné profily (odložené 13. 10. 2026, Jerry: „osobné profily
   nechame na neskôr“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
@@ -600,6 +621,11 @@ vyriešené opravami 5. 10. vyššie, ponechané ako história):
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **Strižňa na iPhone a Mac mini ako server — OPUSTENÉ 13. 10. 2026**
+  (Jerry: „tento nápad opúšťame“). Strižňa beží na Macoch (Jerry, Terezka);
+  z telefónu ide video cez Kokpit → Nahrať do Strižne. Neotvárať, kým to
+  nepovie Jerry sám.
 
 - **Potvrdenia mien z kalendára** (6. 10. 2026) — 17 z 25. 9. už vybavených;
   nové celé mená, ktoré sedia na jediného klienta, sa odvtedy priradia samy
