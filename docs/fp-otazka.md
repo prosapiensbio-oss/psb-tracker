@@ -54,3 +54,33 @@ ProSapiens Biomechanic, Brno
 | Zubár nie | Nič — a je jasné, kde je hranica pre budúcich klientov |
 | Odkaz na web áno | Ide na stránku „Co je Functional Patterns“, najnavštevovanejšiu podstránku |
 | Odkaz na web nie | Zostáva len v Instagram bio — a otázka je uzavretá, nie odložená |
+
+---
+
+## Otázka 3 — reakčné videá (pridané 13. 10. 2026)
+
+Ak mail vyššie ešte neodišiel, vlož ju ako tretí bod. Ak odišiel, pošli ju
+samostatne na tú istú adresu s predmetom „Policy question — reaction videos
+on a practitioner's business account".
+
+**3 — Reaction videos to public figures' training content**
+
+I'd like to post short reaction videos on my studio's business account
+(not my FP MIP): a few seconds of a publicly available clip — for example
+a celebrity's training routine or a viral mobility drill — followed by my
+own commentary on the general biomechanics of what is shown.
+
+My reading of the Practitioners Policy is that this is fine as long as I
+(a) don't explain or demonstrate FP techniques, (b) don't use FP branding
+or speak on FP's behalf, (c) keep the tone about the movement, not the
+person, and (d) don't post it on the MIP, since the clip itself contradicts
+FP methodology. Is that reading correct, and is there anything you'd want
+me to avoid — or would you prefer this format on the MIP with FP credited?
+
+### Čo z odpovede vyplynie
+
+| Odpoveď | Dôsledok |
+|---|---|
+| Áno, na firemnom účte | Stavia sa vyhľadávač a šablóna reakcie v Strižni |
+| Áno, aj na MIP s citovaním FP | To isté + verzia pre MIP |
+| Nie | Vyhľadávač sa nestavia; materiál ide len na vlastné vysvetľujúce videá bez cudzieho klipu |
