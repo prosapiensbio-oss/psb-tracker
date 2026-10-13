@@ -17,6 +17,7 @@ import { dnesPraha } from "../../lib/psb/cas";
  */
 const popisPreKlienta = (r: RiadokVypisu): string => {
   if (r.druh === "balicekOd") return r.popis.split("·")[0].trim();
+  if (r.druh === "platba" && /^vrátené/i.test(r.popis)) return r.popis.split("·")[0].trim();
   if (r.druh === "platba") return `zaplatené ${r.popis.replace(/^(platba|zaplatil)\s*/i, "").split("·")[0].trim()}`;
   return "tréning";
 };

@@ -148,6 +148,9 @@ const popisZ = (u: Udalost): string => {
   if (u.druh === "balicekOd") return `${nazovProduktu(u.nazov)}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
   if (u.druh === "balicekDo" && u.prepadlo) return `prepadlo ${prepadnuteRad(u.prepadlo)} — koniec platnosti`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
+  // Záporná platba je VRÁTENIE klientovi (ukončený balíček, 13. 10. 2026) —
+  // „platba −16 450 Kč" by sa čítalo ako preklep, nie ako peniaze, čo odišli.
+  if (u.druh === "platba" && u.suma < 0) return `vrátené ${suma(-u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   const zdarma = u.zdarma !== undefined ? ` · zdarma${u.zdarma ? ` (${u.zdarma})` : ""}` : "";
   return `tréning${u.cas ? ` ${cas24(u.cas)}` : ""}${u.trener ? ` · ${u.trener}` : ""}${zdarma}`;
@@ -566,8 +569,9 @@ export function priebehBalickov(
      */
     const maDokupene = usek.riadky.some((u) => u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && u.zKokpitu);
 
+    // Vrátenie (záporná platba) balíček nezaplatilo — peniaze išli opačným smerom.
     const platbaKBalicku = b
-      ? usek.riadky.find((u) => u.druh === "platba" && dniMedzi(b.den, u.den) <= 30)?.den
+      ? usek.riadky.find((u) => u.druh === "platba" && u.suma > 0 && dniMedzi(b.den, u.den) <= 30)?.den
       : undefined;
     // Otvorený poplatok = nezaplatené dodnes. Inak platí deň platby; keď
     // v období platba nie je vôbec, predpokladá sa, že sa platilo dopredu.
@@ -582,7 +586,7 @@ export function priebehBalickov(
      */
     const zaplateneOd = b?.nezaplatene ? null
       : b ? (platbaKBalicku || b.den)
-      : usek.riadky.find((u) => u.druh === "platba")?.den;
+      : usek.riadky.find((u) => u.druh === "platba" && u.suma > 0)?.den;
 
     const neznameHodiny = neznameDoplnenie(usek);
     /**
@@ -629,7 +633,8 @@ export function priebehBalickov(
        * riadkoch zostávajú (10. 8. ďalej hovorí −1) — to je fakt o tom dni;
        * mení sa len to, odkiaľ začína ďalší mínus.
        */
-      if (u.druh === "platba") dlhPocet = 0;
+      // Vrátenie mínus nevynuluje — nebola to platba za tréningy.
+      if (u.druh === "platba" && u.suma > 0) dlhPocet = 0;
       // Tréning zadarmo do odpočtu ani do dlhu nevstupuje — je darovaný,
       // takže zaň nemá čo chýbať ani hodina, ani platba.
       const single = samostatne.get(u);

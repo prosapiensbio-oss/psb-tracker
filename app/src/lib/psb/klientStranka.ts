@@ -72,6 +72,7 @@ const cesky = (t: string) =>
   t
     .replace(/doplnenie\s+členstva/gi, "Doplnění hodin")
     .replace(/zaplatené/g, "zaplaceno")
+    .replace(/vrátené/g, "vráceno")
     .replace(/koniec\s+platnosti/gi, "konec platnosti")
     .replace(/tréning/g, "trénink")
     .replace(/hodín/g, "hodin");
@@ -323,6 +324,8 @@ const maHodinu = (b: BodOsi) => b.druh === "trening" && b.zostatok != null;
 const farbaBodu = (b: BodOsi): string =>
   b.dlh && !maHodinu(b) ? SADZBA.minus
     : b.druh === "balicekOd" ? SADZBA.biela
+      // Vrátenie nie je platba — zelená by tvrdila „zaplatil".
+      : b.druh === "platba" && /^vrát/i.test(b.popis) ? SADZBA.tlmeny
       : b.druh === "platba" ? SADZBA.zelena
         : SADZBA.tlmeny;
 

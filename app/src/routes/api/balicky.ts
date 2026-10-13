@@ -10,6 +10,7 @@ import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac } from "../../lib/psb/format";
 import { jePlatenyBalicek, podobnyBalicek, type ExistujuciBalicek } from "../../lib/psb/duplicitaBalicka";
 import { dnesPraha } from "../../lib/psb/cas";
+import { chybaUkoncenia, poznamkaUkoncenia, poznamkaVratenia } from "../../lib/psb/ukoncenieBalicka";
 
 /**
  * Vlastná evidencia balíčkov — a jej porovnanie s PTminderom.
@@ -381,6 +382,52 @@ export const Route = createFileRoute("/api/balicky")({
          * zmizla aj tržba, ktorá k nemu patrí, a nikto by sa nedozvedel, že
          * tam niečo bolo.
          */
+        /**
+         * UKONČIŤ A VRÁTIŤ (Jerry, 13. 10. 2026 — Radek Baláž, prvýkrát v PSB).
+         * Balíček sa stiahne na čerpané hodiny a cenu po vrátení, vrátenie sa
+         * zapíše ako platba so zápornou sumou. JEDNA dávka: keby prešla len
+         * polovica, klient by mal buď dlh, alebo peniaze dvakrát. Pravidlá
+         * a texty sú v `ukoncenieBalicka.ts`.
+         */
+        if (akcia === "ukonci") {
+          const id = String(b.id || "");
+          const den = denISO(b.den) || "";
+          const odtrenovane = Number(b.odtrenovane);
+          const vratit = Math.round(Number(b.vratit) || 0);
+          const sposob = ["hotovost", "prevod", "bitcoin", "ine"].includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
+          if (!id) return Response.json({ ok: false, error: "Chýba id balíčka." }, { status: 400 });
+          const bal = await DB.prepare(
+            "SELECT id, klient, nazov, hodiny, cena_czk, platnost_od, poznamka, zrusene_at FROM balicky WHERE id = ?1",
+          ).bind(id).first<{ id: string; klient: string; nazov: string; hodiny: number | null; cena_czk: number | null; platnost_od: string; poznamka: string | null; zrusene_at: string | null }>();
+          if (!bal || bal.zrusene_at) return Response.json({ ok: false, error: "Taký balíček nie je (alebo je zrušený)." }, { status: 404 });
+          const chyba = chybaUkoncenia({ hodiny: bal.hodiny, cena: bal.cena_czk, odtrenovane, vratit, den, platnostOd: bal.platnost_od });
+          if (chyba) return Response.json({ ok: false, error: chyba }, { status: 400 });
+          const mesiac = den.slice(0, 7);
+          const zamknuty = await DB.prepare("SELECT 1 z FROM vzas_periods WHERE month = ?1 AND locked = 1").bind(mesiac).first().catch(() => null);
+          if (zamknuty) return Response.json({ ok: false, error: `Mesiac ${mesiac} je uzamknutý — vrátenie doň zapísať nejde.` }, { status: 409 });
+
+          const hodiny = Number(bal.hodiny), cena = Number(bal.cena_czk);
+          const novaCena = Math.round((cena - vratit) * 100) / 100;
+          const poz = poznamkaUkoncenia({ den, hodiny, cena, odtrenovane, vratit });
+          const kedy = teraz();
+          try {
+            await DB.batch([
+              DB.prepare("UPDATE balicky SET hodiny = ?1, cena_czk = ?2, platnost_do = ?3, poznamka = ?4 WHERE id = ?5")
+                .bind(odtrenovane, novaCena, den, bal.poznamka ? `${bal.poznamka} · ${poz}` : poz, id),
+              DB.prepare(
+                "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,NULL,?,?,?,0)",
+              ).bind(uid(), bal.klient, den, -vratit, sposob, poznamkaVratenia(hodiny - odtrenovane), kedy, kto || null),
+            ]);
+          } catch (e) {
+            return Response.json({ ok: false, error: `Zápis sa nepodaril: ${String((e as Error)?.message || e).slice(0, 200)}` }, { status: 500 });
+          }
+          await audit(DB, {
+            action: "balicek-ukonceny", predmet: `${bal.klient} — ${bal.nazov}`, month: mesiac,
+            old: `${hodiny} h · ${cena} Kč`, neu: `${odtrenovane} h · ${novaCena} Kč · vrátené ${vratit} Kč (${sposob}) · ${den}`, actor: kto,
+          });
+          return Response.json({ ok: true, vratene: vratit, novaCena });
+        }
+
         if (akcia === "zrus" || akcia === "vrat") {
           const id = String(b.id || "");
           if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });

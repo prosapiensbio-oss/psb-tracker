@@ -1,4 +1,5 @@
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import { chybaUkoncenia, navrhUkoncenia } from "../../lib/psb/ukoncenieBalicka";
 import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -151,6 +152,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Čo sa práve upravuje — id riadku, alebo prázdno. */
   const [upravaPlatby, setUpravaPlatby] = useState("");
   const [upravaBalicka, setUpravaBalicka] = useState("");
+  /** Balíček, ktorý sa práve ukončuje s vrátením peňazí (13. 10. 2026, Radek Baláž). */
+  const [ukoncenie, setUkoncenie] = useState<{ id: string; odtrenovane: number } | null>(null);
   const [penazSub, setPenazSub] = useState<"platby" | "bitcoin">("platby");
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
@@ -863,6 +866,24 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     // 6 h na 18 h ďalej hlásila „−3 h zostáva · 6h Balíček" až do obnovenia
     // stránky — pravidlo z obnovaSignal.ts: kto zapísal, oznámi oblasť.
     oznam("peniaze"); oznam("klienti");
+  };
+
+  /** Ukončiť balíček a zapísať vrátenie. Vracia vetu chyby alebo `null`. */
+  const ukonciBalicek = async (v: { id: string; den: string; odtrenovane: number; vratit: number; sposob: string; neaktivny: boolean }): Promise<string | null> => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/balicky", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "ukonci", id: v.id, den: v.den, odtrenovane: v.odtrenovane, vratit: v.vratit, sposob: v.sposob }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setPracujem(false);
+    if (!r?.ok) return r?.error || "nepodarilo sa uložiť";
+    setUkoncenie(null);
+    await nacitajBalicky();
+    // Koniec vzťahu je rozhodnutie, nie odhad z dochádzky — a „Neaktívny"
+    // tréning nezruší (pravidlo z 23. 9. 2026), takže sa nevráti sám.
+    if (v.neaktivny) await nastavStav("Neaktívny");
+    oznam("peniaze"); oznam("klienti");
+    return null;
   };
 
   const zrusBalicek = async (id: string) => {
@@ -1654,8 +1675,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                         faktúra
                       </button>
                     )}
+                    {!!b.hodiny && !!b.cena_czk && !(b.poznamka || "").includes("ukončené") && (
+                      <button
+                        onClick={() => setUkoncenie((u) => (u?.id === b.id ? null : { id: b.id, odtrenovane: tre.filter((t) => t.den <= dnesISO()).length }))}
+                        title="Klient končí — balíček sa uzavrie a nevyčerpané hodiny sa vrátia"
+                        style={{ background: "none", border: "none", padding: 0, color: C.orange, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, whiteSpace: "nowrap" }}
+                      >
+                        ukončiť a vrátiť
+                      </button>
+                    )}
                     <Upravit
                       naUpravu={() => {
+                        setUkoncenie(null);
                         setUpravaBalicka(b.id); setPisem(false);
                         setF({
                           nazov: b.nazov, hodiny: b.hodiny == null ? "" : String(b.hodiny),
@@ -1684,6 +1715,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   )}
                   {upravaBalicka === b.id && (
                     <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void upravBalicek(b.id)} popis="Uložiť zmenu" />
+                  )}
+                  {ukoncenie?.id === b.id && (
+                    <FormularUkoncenia
+                      hodiny={Number(b.hodiny)} cena={Number(b.cena_czk)} platnostOd={b.platnost_od}
+                      odtrenovane={ukoncenie.odtrenovane} pracujem={pracujem}
+                      onZrus={() => setUkoncenie(null)}
+                      onUloz={(v) => ukonciBalicek({ id: b.id, ...v })}
+                    />
                   )}
                 </div>
                 );
@@ -2178,8 +2217,8 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
     return (
       <div style={riadok}>
         <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
-        <span style={{ flex: 1, color: C.green }}>zaplatil {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
-        <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
+        <span style={{ flex: 1, color: u.suma < 0 ? C.orange : C.green }}>{u.suma < 0 ? "vrátené" : "zaplatil"} {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
+        <span style={{ color: u.suma < 0 ? C.orange : C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
         <StavHodin stav={stav} />
       </div>
     );
@@ -2301,6 +2340,107 @@ function FormularTreningu({ t, setT, pracujem, onUloz }: {
       >{pracujem ? "zapisujem…" : "Nahodiť do kalendára"}</button>
       <div style={{ flexBasis: "100%", fontSize: 10.5, color: C.textDim, lineHeight: 1.5 }}>
         Zapíše sa rovno do Google kalendára trénera a hneď aj medzi objednané termíny tu.
+      </div>
+    </div>
+  );
+}
+
+/**
+ * UKONČIŤ BALÍČEK A VRÁTIŤ PEŇAZE (13. 10. 2026).
+ *
+ * Predvyplní sa všetko, čo sa dá spočítať — odtrénované z osi, hodinovka
+ * z ceny balíčka, suma na vrátenie — a všetko sa dá prepísať. Zapisuje sa
+ * až na DRUHÝ klik so sumou v otázke: sú to peniaze, ktoré odchádzajú.
+ */
+function FormularUkoncenia({ hodiny, cena, platnostOd, odtrenovane, pracujem, onZrus, onUloz }: {
+  hodiny: number; cena: number; platnostOd: string; odtrenovane: number; pracujem: boolean;
+  onZrus: () => void;
+  onUloz: (v: { den: string; odtrenovane: number; vratit: number; sposob: string; neaktivny: boolean }) => Promise<string | null>;
+}) {
+  const [den, setDen] = useState(dnesISO());
+  const [odtr, setOdtr] = useState(String(Math.min(hodiny, odtrenovane)));
+  const [vratitRucne, setVratitRucne] = useState("");
+  const [sposob, setSposob] = useState("hotovost");
+  const [neaktivny, setNeaktivny] = useState(true);
+  const [pyta, setPyta] = useState(false);
+  const [chyba, setChyba] = useState("");
+
+  const n = navrhUkoncenia({ hodiny, cena, odtrenovane: Number(odtr) || 0 });
+  const vratit = vratitRucne !== "" ? Math.round(Number(vratitRucne) || 0) : (n?.vratit || 0);
+  const novaCena = Math.round((cena - vratit) * 100) / 100;
+  const problem = chybaUkoncenia({ hodiny, cena, odtrenovane: Number(odtr), vratit, den, platnostOd });
+
+  const pole = { padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" as const };
+  const stitok = { display: "flex", flexDirection: "column" as const, gap: 3, fontSize: 10.5, color: C.textDim };
+
+  return (
+    <div style={{ marginTop: 8, marginBottom: 10, padding: "12px 14px", borderRadius: 10, border: `1px solid ${mix(C.orange, 45)}`, background: mix(C.orange, 7) }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.orange, marginBottom: 8 }}>Ukončiť balíček a vrátiť nevyčerpané hodiny</div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label style={stitok}>ukončiť ku dňu
+          <input type="date" value={den} onChange={(e) => { setDen(e.target.value); setPyta(false); }} style={{ ...pole, width: 140 }} />
+        </label>
+        <label style={stitok}>odtrénované (z {hodiny} h)
+          <input type="number" min={0} max={hodiny} value={odtr} onChange={(e) => { setOdtr(e.target.value); setVratitRucne(""); setPyta(false); }} style={{ ...pole, width: 90 }} />
+        </label>
+        <label style={stitok}>vrátiť Kč
+          <input type="number" min={0} value={vratitRucne !== "" ? vratitRucne : String(n?.vratit || 0)} onChange={(e) => { setVratitRucne(e.target.value); setPyta(false); }} style={{ ...pole, width: 110 }} />
+        </label>
+        <div style={stitok}>ako
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["hotovost", "hotovosť"], ["prevod", "prevodom"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setSposob(k)} style={{
+                padding: "6px 9px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
+                border: `1px solid ${sposob === k ? C.accent : C.border}`, background: sposob === k ? C.accentBg : "transparent",
+                color: sposob === k ? C.accentLight : C.textMuted,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {n && (
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.6, marginTop: 10 }}>
+          {n.nevycerpane} nevyčerpaných h × {fmtCZK(Math.round(n.hodinovka))} = <b>{fmtCZK(n.vratit)}</b>
+          {vratitRucne !== "" && vratit !== n.vratit && <span style={{ color: C.orange }}> · vrátiš {fmtCZK(vratit)} (prepísané)</span>}
+          <br />
+          <span style={{ color: C.textMuted }}>
+            Balíček {hodiny} h · {fmtCZK(cena)} → {Number(odtr) || 0} h · {fmtCZK(novaCena)}, platí do {fmtDMY(den)}. Vrátenie sa zapíše ako platba −{fmtCZK(vratit)} ({sposob === "hotovost" ? "hotovosť" : "prevod"}) a zníži tržby mesiaca.
+          </span>
+        </div>
+      )}
+      {sposob === "hotovost" && (
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>Do zošita to už nepíš — vrátenie je zapísané tu.</div>
+      )}
+      {sposob === "prevod" && (
+        <div style={{ fontSize: 11.5, color: C.orange, marginTop: 6 }}>Odchádzajúci prevod vo výpise z Fio potom zaraď ako „mimo" — inak by bolo vrátenie v P&L dvakrát (raz tu, raz ako výdavok).</div>
+      )}
+      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.textMuted, marginTop: 8, cursor: "pointer" }}>
+        <input type="checkbox" checked={neaktivny} onChange={(e) => setNeaktivny(e.target.checked)} />
+        klienta označiť ako neaktívneho (končí s tréningami)
+      </label>
+
+      {problem && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{problem}</div>}
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+        {!pyta ? (
+          <button onClick={() => setPyta(true)} disabled={!!problem || pracujem} style={{
+            padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+            cursor: problem ? "not-allowed" : "pointer", border: `1px solid ${mix(C.orange, 55)}`,
+            background: problem ? "transparent" : mix(C.orange, 14), color: problem ? C.textDim : C.orange,
+          }}>Ukončiť a vrátiť {fmtCZK(vratit)}</button>
+        ) : (
+          <>
+            <span style={{ fontSize: 12, color: C.text }}>Naozaj ukončiť balíček a zapísať vrátenie <b>{fmtCZK(vratit)}</b>?</span>
+            <button onClick={async () => { const e = await onUloz({ den, odtrenovane: Number(odtr), vratit, sposob, neaktivny }); if (e) { setChyba(e); setPyta(false); } }} disabled={pracujem} style={{
+              padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+              border: `1px solid ${mix(C.orange, 55)}`, background: mix(C.orange, 18), color: C.orange,
+            }}>{pracujem ? "…" : "áno, zapísať"}</button>
+            <button onClick={() => setPyta(false)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>nie</button>
+          </>
+        )}
+        <button onClick={onZrus} style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>zavrieť</button>
       </div>
     </div>
   );
