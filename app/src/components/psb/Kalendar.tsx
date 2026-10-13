@@ -1811,6 +1811,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   const [novyTrener, setNovyTrener] = useState(druhiTreneri[0] || "");
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
+  const [kopie, setKopie] = useState<string[]>([]);
 
   const sMenom = typ === "trening" || typ === "uvodny";
   const trener = u ? u.trener : trenerNovej;
@@ -1861,8 +1862,16 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — kópia sa nezapísala" }));
     setBezi(false);
     if (!j.ok) { setChyba(j.error || "Kópia sa nezapísala."); return; }
-    setHlaska(`Skopírované na ${den(`${kopiaDen}T${kopiaCas}`)} o ${kopiaCas}.`);
-    setRezim("");
+    /**
+     * PANEL KÓPIE OSTÁVA OTVORENÝ (Jerry, 13. 10. 2026: „keď kliknem
+     * duplikovať, udalosť mi zmizne a musím ju spraviť nanovo"). Po kópii sa
+     * panel zavrel a pod ním stáli políčka deň/čas PÔVODNÉHO tréningu —
+     * zmena dátumu na ďalšiu kópiu a „Uložiť" presunuli originál (Papiež
+     * 26. 10. → 28. 10.). Ďalšia kópia sa teraz ponúkne o týždeň po tej
+     * poslednej a políčka originálu sú počas kopírovania skryté.
+     */
+    setKopie((k) => [...k, `${den(`${kopiaDen}T${kopiaCas}`)} o ${kopiaCas}`]);
+    setKopiaDen((d) => { const [r, m, dd] = d.split("-").map(Number); return new Date(Date.UTC(r, m - 1, dd + 7)).toISOString().slice(0, 10); });
     await onHotovo();
   };
   const inemuTrenerovi = async () => {
@@ -1961,7 +1970,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+      {rezim !== "kopia" && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
         <label style={popisok}>
           deň
           <input type="date" value={vyber.den} onChange={(e) => onZmen({ ...vyber, den: e.target.value })} style={{ ...pole, width: 128 }} />
@@ -1976,7 +1985,12 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
               dole z poľa urobí nezmysel a kód ho ticho prepíše na 15. */}
           <input type="number" min={15} max={240} step={15} value={vyber.minut} onChange={(e) => onZmen({ ...vyber, minut: Math.max(15, Math.min(240, Number(e.target.value) || 60)) })} style={{ ...pole, width: 58 }} />
         </label>
-      </div>
+      </div>}
+      {u && rezim === "kopia" && (
+        <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 8 }}>
+          Pôvodný tréning ostáva {den(u.zaciatok)} o {u.zaciatok.slice(11, 16)} — kópie sa robia v paneli nižšie.
+        </div>
+      )}
 
       {!u && (
         <label style={{ ...popisok, marginBottom: 8 }}>
@@ -1995,7 +2009,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       {chyba && <div style={{ fontSize: 11.5, color: C.red, lineHeight: 1.5, marginBottom: 8 }}>{chyba}</div>}
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <button
+        {rezim !== "kopia" && <button
           onClick={() => void uloz()}
           disabled={!daSa}
           style={{
@@ -2006,8 +2020,8 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             color: daSa ? C.green : C.textDim,
           }}
         >
-          {uklada ? "Zapisujem…" : u ? "Uložiť" : "Nahodiť do kalendára"}
-        </button>
+          {uklada ? "Zapisujem…" : u ? (casZmeneny ? `Presunúť na ${den(`${vyber.den}T${vyber.cas}`)} ${vyber.cas}` : "Uložiť") : "Nahodiť do kalendára"}
+        </button>}
         {u && zGoogle && sMenom && !!klientUdalosti && (
           <>
             <button onClick={() => setRezim(rezim === "kopia" ? "" : "kopia")}
@@ -2050,9 +2064,14 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             </label>
             <button onClick={() => void duplikuj()} disabled={bezi || !kopiaDen || !kopiaCas}
               style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: bezi ? "wait" : "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green }}>
-              {bezi ? "Zapisujem…" : "Vytvoriť kópiu"}
+              {bezi ? "Zapisujem…" : kopie.length ? "Vytvoriť ďalšiu kópiu" : "Vytvoriť kópiu"}
             </button>
           </div>
+          {kopie.length > 0 && (
+            <div style={{ fontSize: 11.5, color: C.green, lineHeight: 1.5, marginTop: 6 }}>
+              ✓ Kópie v kalendári: {kopie.join(" · ")}. Pôvodný tréning ostal na mieste.
+            </div>
+          )}
         </div>
       )}
       {u && rezim === "trener" && (
