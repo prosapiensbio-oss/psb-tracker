@@ -60,27 +60,31 @@ ProSapiens Biomechanic, Brno
 ## Otázka 3 — reakčné videá (pridané 13. 10. 2026)
 
 Ak mail vyššie ešte neodišiel, vlož ju ako tretí bod. Ak odišiel, pošli ju
-samostatne na tú istú adresu s predmetom „Policy question — reaction videos
-on a practitioner's business account".
+samostatne na tú istú adresu s predmetom „Policy question — short clips of
+people normalising injuries".
 
-**3 — Reaction videos to public figures' training content**
+**3 — Short clips of people normalising injuries, with my commentary**
 
-I'd like to post short reaction videos on my studio's business account
-(not my FP MIP): a few seconds of a publicly available clip — for example
-a celebrity's training routine or a viral mobility drill — followed by my
-own commentary on the general biomechanics of what is shown.
+FP's main channels sometimes show a short clip of people casually talking
+about how many injuries they've had — as if constant injury were simply part
+of training — and point out that this is exactly the result of how most
+people train. Nobody is mocked; the point is the pattern, not the person.
 
-My reading of the Practitioners Policy is that this is fine as long as I
-(a) don't explain or demonstrate FP techniques, (b) don't use FP branding
-or speak on FP's behalf, (c) keep the tone about the movement, not the
-person, and (d) don't post it on the MIP, since the clip itself contradicts
-FP methodology. Is that reading correct, and is there anything you'd want
-me to avoid — or would you prefer this format on the MIP with FP credited?
+I'd like to post the same kind of content on my FP MIP: a few seconds of a
+publicly available clip (anyone, not necessarily a public figure) followed by
+my own commentary on why being "always injured" isn't normal. I would not
+explain or demonstrate any FP technique, and I would credit FP for the
+concepts I refer to.
+
+Since FP posts this format itself, I read it as aligned with the
+methodology rather than "interacting with content that contradicts" it —
+but I'd rather confirm than assume. Is this allowed on the MIP, and is there
+anything you'd want me to avoid?
 
 ### Čo z odpovede vyplynie
 
 | Odpoveď | Dôsledok |
 |---|---|
-| Áno, na firemnom účte | Stavia sa vyhľadávač a šablóna reakcie v Strižni |
-| Áno, aj na MIP s citovaním FP | To isté + verzia pre MIP |
-| Nie | Vyhľadávač sa nestavia; materiál ide len na vlastné vysvetľujúce videá bez cudzieho klipu |
+| Áno, aj na MIP | Stavia sa vyhľadávač a šablóna reakcie v Strižni, ide na MIP aj PSB |
+| Len na účte PSB | To isté, ale MIP len reposty z FP |
+| Nie | Vyhľadávač sa nestavia; téma ide len do vlastných videí bez cudzieho klipu |

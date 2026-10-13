@@ -292,23 +292,19 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   komentáre, engagement, odkaz – NIE videá ani zhliadnutia). Rozbor
   popisov celého profilu sa teda dá z Metricoolu, rozbor videí nie.
 
-- **Vyhľadávač YouTube na reakčné videá (13. 10. 2026):** Jerry nepozerá
-  Zaca Efrona ani „movement gurus“, takže materiál na reakciu (štýl FP)
-  nemá odkiaľ. Návrh: zoznam kanálov + kľúčové slová (tréning celebrít,
-  zranenia, mýty o strečingu, podcasty), YouTube Data API (bezplatný kľúč,
-  ~100 hľadaní/deň), Claude prečíta titulky a vyberie úseky s časom
-  a dôvodom „toto sa dá komentovať“, raz denne/týždenne súhrn. Otvorené:
-  autorské práva (krátky úsek + vlastný komentár; nie celé video),
-  či FP nemá na tento formát pravidlá.
-  **Doplnené 13. 10.:** Jerry žiadne také kanály nesleduje — zoznam kanálov
-  musí nájsť nástroj sám (hľadanie podľa tém → kanály s najviac zásahmi →
-  Jerry ich odklikne). Štartovací zoznam: Men's Health (Gym & Fridge),
-  Brian Sutterer MD, The Injury Breakdown, Knees Over Toes Guy, Squat
-  University, Athlean-X, Huberman. **FP pravidlá (Practitioners Policy
-  + Handbook):** zákaz vysvetľovať FP techniky, logo, hovoriť za FP;
-  na MIP zákaz „interagovať s obsahom, ktorý protirečí FP“ → reakcie NIE na
-  MIP, na účte PSB áno s opatrnosťou; šedá zóna = nepublikovať. Otázka 3
-  v `docs/fp-otazka.md` – stavať až po odpovedi FP.
+- **Vyhľadávač „normalizovaných zranení“ (13. 10. 2026, Jerry spresnil):**
+  NEJDE o celebrity. Téma je moment, keď ľudia (hocikto – dvaja chalani pri
+  zhybových, podcast, celebrita) hovoria o tom, koľko zranení už mali, a berú
+  to ako súčasť tréningu („makám veľa, ale stále som zranený, to k tomu
+  patrí“). FP to ukazuje bez kritiky človeka: toto je výsledok, keď tak
+  trénujete. Jerry také videá nepozerá, takže nástroj musí nájsť aj kanály.
+  Postup: YouTube Data API (bezplatný kľúč) hľadá podľa fráz a tém (podcasty,
+  gym talk, vlogy, rozhovory so športovcami), Claude prečíta titulky a
+  vytiahne úseky, kde niekto vymenúva zranenia ako normálne – s časom
+  a vetou; kanály s najviac zásahmi ponúkne Jerrymu na sledovanie.
+  FP pravidlá: zákaz FP techník, loga, hovoriť za FP; formát robí aj hlavný
+  FP profil, takže podľa Jerryho môže ísť aj na MIP – potvrdiť otázkou 3
+  v `docs/fp-otazka.md`. Krátky úsek + zdroj (citačná licencia).
 
 - **Formát reakčného videa (13. 10. 2026):** šablóna v Strižni – úsek
   cudzieho videa hore, Jerry dole (alebo greenscreen), titulky oboch.
