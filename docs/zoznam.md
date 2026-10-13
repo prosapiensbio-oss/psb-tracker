@@ -35,6 +35,8 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 **C · Strižňa 1.0 (hranica v sekcii 2)**
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
 9. [ ] Upload do Higgsfieldu (SSL pri PUT).
+9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
+9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 10. [ ] Vyhľadávač normalizovaných zranení (po odpovedi FP na otázku 3).
