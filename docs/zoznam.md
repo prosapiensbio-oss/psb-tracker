@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **12. 10. 2026**.
+Stav k **13. 10. 2026**.
 
 ---
 
@@ -210,7 +210,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 1 · Čaká na Jerryho slovo
 
-- **Odkaz s fotkami pre klienta — NAOSTRO od 12. 10. 2026.** `/f/<token>` (podoba A, olivová; `lib/psb/fotkyStranka.ts`, route `f.$token.tsx`, migrácia 0113). Profil → fotky → krúžkom označiť porovnania z editora → „Poslať klientovi" (správa, voliteľné čísla, „čo ďalej") → odkaz + SMS tlačidlom. Odpoveď klienta → register trénerovi (`fotkyOdkazy.ts`) + push bez obsahu + denník (odkial „fotky") + sekcia „Poslané klientovi". Krátky odkaz prosapiens.cz/f/ zapnutý 12. 10. (snippet 26 so súhlasom). Editor od 12. 10.: šípka, lupa, jemné zväčšenie, návrat k hotovému porovnaniu (✎ upraviť, migrácia 0114). **Otvorené:** (1) lupa a kreslenie overené len simulovaným dotykom, nie na iPade; (2) „Na čem budeme pracovat dál" Jerry ešte nemá rozhodnuté (zatiaľ voliteľné, prázdne sa neukáže); (3) prvé ostré poslanie klientovi neoverené.
+- **Odkaz s fotkami pre klienta — NAOSTRO od 12. 10. 2026.** `/f/<token>` (podoba A, olivová; `lib/psb/fotkyStranka.ts`, route `f.$token.tsx`, migrácia 0113). Profil → fotky → krúžkom označiť porovnania z editora → „Poslať klientovi" (správa, voliteľné čísla, „čo ďalej") → odkaz + SMS tlačidlom. Odpoveď klienta → register trénerovi (`fotkyOdkazy.ts`) + push bez obsahu + denník (odkial „fotky") + sekcia „Poslané klientovi". Krátky odkaz prosapiens.cz/f/ zapnutý 12. 10. (snippet 26 so súhlasom). Editor od 12. 10.: šípka, lupa, jemné zväčšenie, návrat k hotovému porovnaniu (✎ upraviť, migrácia 0114). **Otvorené:** (1) lupa a kreslenie overené len simulovaným dotykom, nie na iPade; (2) ~~„Na čem budeme pracovat dál"~~ rozhodnuté 13. 10.: pýta sa až tesne pred vytvorením odkazu (krok „Ďalej →", dá sa preskočiť); v ten deň pribudol aj nadpis „N týdnů práce" s rozsahom dní a „tvůj trenér · poslal"; (3) prvé ostré poslanie klientovi neoverené (Vaškov odkaz z 13. 10. zatiaľ neotvorený; oslovenie „Ahoj Martin" bez 5. pádu — Jerry sa nevyjadril). Editor 13. 10.: touchpad a dva prsty = plocha, veľkosť fotky len za rohy — na skutočnom iPade neoverené.
 
 - **Dozor reklám — NAOSTRO od 10. 10. 2026.** Notifikácia z dôvodu, s číslami a návrhom (`lib/psb/reklamaDozor.ts`, testy; `/api/meta` akcie `dozor`, `rozhodni-kampan`, `dozor-nastavenie`; plánovač 4:20 UTC; migrácia 0109). Tlačidlá Nechať · Vypnúť · Zmeniť rozpočet (potvrdenie so sumou na mesiac, strop 2 000 Kč/deň a 3×) · počet DM pri interakciách · Prompt pre Clauda; karta Marketing → Náklady → Dozor reklám. **Čaká na Jerryho:** (1) prvé tri vyhodnotenia (retargeting 1 099 Kč/dopyt, návštevy 1 961 Kč/dopyt, interakcie — zadať DM); (2) **cieľová cena za dopyt** a prípadne mesačný strop v karte — bez cieľa Kokpit vie povedať len „nechať/vypnúť", nie „pridať". 3 z 8 dopytov z reklamy od 20. 9. nemajú utm (označené ručne) — nedajú sa pripísať kampani.
 - **Reklamný agent — NAOSTRO od 10. 10. 2026.** Panel „Reklama · Jarvis" v Marketing → Čo to stálo vedľa dozoru: jedna stála debata (zameranie Kampaň, Opus), Jarvis číta Metu sám (`meta_citaj`) a zmeny navrhuje tlačidlami — rozpočet, vek/publiká sady, nová reklama s novým textom (médium z existujúcej), zapnúť/vypnúť reklamu. Notifikácia dozoru má „Prebrať s Jarvisom →". **Neoverené v prehliadači** (Chrome rozšírenie sa nepripojilo) — prvé použitie sleduj.
