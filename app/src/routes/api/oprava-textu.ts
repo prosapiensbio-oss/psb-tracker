@@ -11,6 +11,10 @@ import { bindings } from "../../lib/bindings.server";
  * ostane, aký je (slovenčina slovenčinou, čeština češtinou), význam aj tón
  * tiež; nič sa nepridáva ani neuhládza do „marketingu". Text ide klientovi
  * a má znieť ako tréner, nie ako stroj.
+ *
+ * REŽIM „cestina" (13. 10. 2026: „áno, pridaj aj preklad do češtiny") —
+ * stránka pre klienta je po česky; preloží do prirodzenej češtiny a zároveň
+ * opraví chyby. Tykanie, tón a obsah ostávajú.
  */
 const MODEL = "claude-sonnet-5";
 
@@ -29,6 +33,20 @@ const ZADANIE = [
   "Odpovedz IBA opraveným textom. Žiadny úvod, žiadne úvodzovky, žiadny zoznam zmien.",
 ].join("\n");
 
+const PREKLAD = [
+  "Si prekladateľ a korektor. Dostaneš krátky text, ktorý tréner napísal klientovi k fotkám držania tela (pred/po).",
+  "Prelož ho do PRIROZENEJ, SPISOVNEJ ČEŠTINY tak, ako by ho napísal český tréner — a zároveň oprav chyby.",
+  "",
+  "PRAVIDLÁ:",
+  "· Zachovaj význam, poradie myšlienok, tón a oslovenie (tykání ostane tykáním). Nič nepridávaj, nič nevynechávaj, nevysvetľuj.",
+  "· Žiadne slovakizmy: „pozri“ → „podívej se“, „trošku“ → „trochu“, „doľava“ → „doleva“, „spredu“ → „zepředu“, „panva“ → „pánev“, „ramená“ → „ramena“, „oveľa“ → „mnohem“.",
+  "· Odborné pojmy (kyfóza, lordóza…) prelož do českého tvaru.",
+  "· Neuhládzaj do reklamy ani do úradného štýlu. Zalomenia riadkov zachovaj.",
+  "· Keď je text už po česky, len ho oprav.",
+  "",
+  "Odpovedz IBA českým textom. Žiadny úvod, žiadne úvodzovky, žiadne vysvetlenie.",
+].join("\n");
+
 export const Route = createFileRoute("/api/oprava-textu")({
   server: {
     handlers: {
@@ -36,7 +54,7 @@ export const Route = createFileRoute("/api/oprava-textu")({
         if (!(await isAuthed(request))) return Response.json({ ok: false, error: "neprihlásený" }, { status: 401 });
         const key = bindings().ANTHROPIC_API_KEY;
         if (!key) return Response.json({ ok: false, error: "Oprava nie je pripojená (chýba kľúč)." }, { status: 503 });
-        let b: { text?: unknown };
+        let b: { text?: unknown; rezim?: unknown };
         try { b = (await request.json()) as typeof b; } catch { return Response.json({ ok: false, error: "nečitateľné telo" }, { status: 400 }); }
         const text = String(b.text ?? "").trim();
         if (text.length < 2) return Response.json({ ok: false, error: "Nie je čo opraviť." }, { status: 400 });
@@ -45,7 +63,7 @@ export const Route = createFileRoute("/api/oprava-textu")({
           const r = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model: MODEL, max_tokens: 2000, system: ZADANIE, messages: [{ role: "user", content: text }] }),
+            body: JSON.stringify({ model: MODEL, max_tokens: 2000, system: b.rezim === "cestina" ? PREKLAD : ZADANIE, messages: [{ role: "user", content: text }] }),
             signal: AbortSignal.timeout(30000),
           });
           if (!r.ok) {

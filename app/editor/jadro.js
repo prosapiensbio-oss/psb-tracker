@@ -666,19 +666,7 @@
     el.addEventListener("pointerup", koniec);
     el.addEventListener("pointercancel", koniec);
     // Touchpad: dva prsty = posun, roztiahnutie (ctrl) = zväčšenie.
-    el.addEventListener("wheel", (e) => {
-      const s = stav[i];
-      if (!s.src) return;
-      e.preventDefault();
-      aktivne = i;
-      const { ow, oh } = rozmerOkna(el);
-      const box = el.getBoundingClientRect();
-      let v = s.v;
-      if (e.ctrlKey) v = zoomOkolo(v, v.zoom * Math.exp(-e.deltaY * 0.01), (e.clientX - box.left) / ow - 0.5, (e.clientY - box.top) / oh - 0.5);
-      else v = { ...v, x: v.x - e.deltaX / ow, y: v.y - e.deltaY / oh };
-      s.v = obmedz(v, s.fw, s.fh, ow, oh);
-      kresli();
-    }, { passive: false });
+    // Dva prsty na touchpade rieši plocha (platno) — jedno miesto pre okno aj presah fotky.
     // Safari na Macu posiela štipnutie ako gesture*.
     let gz = 1;
     el.addEventListener("gesturestart", (e) => { e.preventDefault(); gz = stav[i].v.zoom; });
@@ -1257,11 +1245,36 @@
   if (platno) {
     const bodPlatna = (e) => { const b = platno.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
     // Ctrl/⌘ + koliesko (alebo štipnutie na touchpade) MIMO fotky = plocha.
+    /**
+     * DVA PRSTY NA TOUCHPADE (Jerry, 13. 10. 2026: „fotkami nemôžem v editore
+     * pohybovať dvojitým dotykom, tak sa pohybujem po ploche"). Nad fotkou —
+     * v okne aj nad jej priesvitným presahom mimo rámčeka, aj pri kreslení —
+     * dva prsty fotku POSÚVAJÚ a štipnutie (ctrl) ju zväčšuje. Nad prázdnou
+     * plochou sa posúva plocha; ⌘ + koliesko alebo štipnutie mimo fotky
+     * približuje plochu.
+     */
     platno.addEventListener("wheel", (e) => {
-      if (e.target.closest?.(".okno")) return; // na fotke to rieši fotka
-      if (!e.ctrlKey && !e.metaKey) return;
+      const P = miestoVoStvorci(e), R = oknaNaObrazovke();
+      const vnutri = (r) => P.x >= r.x && P.x <= r.x + r.w && P.y >= r.y && P.y <= r.y + r.h;
+      let i = -1;
+      if (rozdelenie === "cez") { if (stav[aktivne].src && vnutri(R[aktivne])) i = aktivne; }
+      else { const k = R.findIndex(vnutri); if (k >= 0 && stav[k].src) i = k; }
+      if (i < 0 && stav[aktivne].src && rozmery.has(stav[aktivne].src) && jeNaFotke(obdlznikFotky(aktivne), P)) i = aktivne;
+      const mierka = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // koliesko myši ide po riadkoch
+      if (i < 0 || e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey) return; // prázdna plocha sa posúva sama
+        e.preventDefault();
+        nastavPohlad(pohlad * Math.exp(-e.deltaY * mierka * 0.01), bodPlatna(e));
+        return;
+      }
       e.preventDefault();
-      nastavPohlad(pohlad * Math.exp(-e.deltaY * 0.01), bodPlatna(e));
+      aktivne = i;
+      const t = stav[i], r = R[i];
+      let v = t.v;
+      if (e.ctrlKey) v = zoomOkolo(v, v.zoom * Math.exp(-e.deltaY * mierka * 0.01), (P.x - r.x) / r.w - 0.5, (P.y - r.y) / r.h - 0.5);
+      else v = { ...v, x: v.x - (e.deltaX * mierka) / r.w, y: v.y - (e.deltaY * mierka) / r.h };
+      t.v = obmedz(v, t.fw, t.fh, r.w, r.h);
+      kresli();
     }, { passive: false });
     // Prsty na prázdnej ploche: jeden posúva plochu (alebo fotku, ak je pod
     // ním jej priesvitná časť), dva približujú plochu.
@@ -1279,7 +1292,11 @@
         if (naFotke) drzi = true; // posun fotky je jeden krok späť, nie desať
       } else if (prsty.size === 2) {
         const [a, b] = [...prsty.values()];
-        tah = { druh: "stipnutie", d: Math.hypot(a.x - b.x, a.y - b.y), z: pohlad };
+        const d = Math.hypot(a.x - b.x, a.y - b.y), stred = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        // Prvý prst držal fotku → dva prsty zväčšujú a posúvajú FOTKU, nie plochu.
+        tah = tah?.druh === "fotka"
+          ? { druh: "fotkaStipnutie", d, stred, o: obdlznikFotky(aktivne) }
+          : { druh: "stipnutie", d, z: pohlad };
       }
     });
     platno.addEventListener("pointermove", (e) => {
@@ -1291,6 +1308,11 @@
       } else if (tah.druh === "fotka") {
         const P = miestoVoStvorci(e);
         nastavStred(aktivne, tah.o.cx + P.x - tah.P.x, tah.o.cy + P.y - tah.P.y, tah.o.w);
+      } else if (tah.druh === "fotkaStipnutie" && prsty.size === 2) {
+        const [a, b] = [...prsty.values()];
+        const k = Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1);
+        const sx = (a.x + b.x) / 2 - tah.stred.x, sy = (a.y + b.y) / 2 - tah.stred.y;
+        nastavStred(aktivne, tah.o.cx + sx, tah.o.cy + sy, tah.o.w * k);
       } else if (tah.druh === "stipnutie" && prsty.size === 2) {
         const [a, b] = [...prsty.values()];
         nastavPohlad(tah.z * Math.hypot(a.x - b.x, a.y - b.y) / (tah.d || 1), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });

@@ -214,6 +214,7 @@
           <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
           <div class="tlacidla" style="align-items:center">
             <button class="tl" id="opravitPopis" type="button" title="Oprava pravopisu, diakritiky, čiarok a gramatiky — jazyk aj obsah ostanú">✓ opraviť text</button>
+            <button class="tl" id="cestinaPopis" type="button" title="Preklad do češtiny (stránka pre klienta je po česky) a zároveň oprava chýb">⇄ do češtiny</button>
             <button class="tl" id="povodnyPopis" type="button" hidden>↶ vrátiť pôvodné</button>
             <span id="opravaStav" class="napoveda" style="margin:0"></span>
           </div>
@@ -392,21 +393,25 @@
     el.value = t;
     el.dispatchEvent(new Event("input", { bubbles: true })); // krok späť aj rozrobené o tom vedia
   };
-  $("opravitPopis").onclick = async () => {
+  // rezim „oprava" = len chyby; „cestina" = preklad do češtiny (stránka pre klienta je česky).
+  const oprav = async (rezim) => {
     const text = $("popisFotky").value.trim();
     if (!text) { $("opravaStav").textContent = "Nie je čo opraviť."; return; }
-    const b = $("opravitPopis");
-    b.disabled = true; b.textContent = "opravujem…"; $("opravaStav").textContent = "";
-    const j = await fetch("/api/oprava-textu", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) })
+    const b = $(rezim === "cestina" ? "cestinaPopis" : "opravitPopis"), popis = b.textContent;
+    $("opravitPopis").disabled = $("cestinaPopis").disabled = true;
+    b.textContent = rezim === "cestina" ? "prekladám…" : "opravujem…"; $("opravaStav").textContent = "";
+    const j = await fetch("/api/oprava-textu", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, rezim }) })
       .then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
-    b.disabled = false; b.textContent = "✓ opraviť text";
+    $("opravitPopis").disabled = $("cestinaPopis").disabled = false; b.textContent = popis;
     if (!j?.ok) { $("opravaStav").textContent = j?.error || "Oprava zlyhala."; return; }
-    if (!j.zmenene) { $("opravaStav").textContent = "Bez chýb ✓"; return; }
-    povodnyPopis = $("popisFotky").value;
+    if (!j.zmenene) { $("opravaStav").textContent = rezim === "cestina" ? "Už je to po česky ✓" : "Bez chýb ✓"; return; }
+    if (povodnyPopis === null) povodnyPopis = $("popisFotky").value; // pôvodné = pred prvou zmenou
     nastavPopis(j.text);
     $("povodnyPopis").hidden = false;
-    $("opravaStav").textContent = "Opravené.";
+    $("opravaStav").textContent = rezim === "cestina" ? "Preložené do češtiny." : "Opravené.";
   };
+  $("opravitPopis").onclick = () => oprav("oprava");
+  $("cestinaPopis").onclick = () => oprav("cestina");
   $("povodnyPopis").onclick = () => {
     if (povodnyPopis === null) return;
     nastavPopis(povodnyPopis);
