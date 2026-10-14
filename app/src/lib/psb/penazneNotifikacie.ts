@@ -40,7 +40,9 @@ export function polozkaZastaranaBanka(poslednyPohyb: string, ack: Ack, dnes = ne
       + (stara.dni >= 30
         ? " Bežiaci mesiac tak má v P&L tržby, ale nie náklady — zisk vyzerá vyšší, než je."
         : " Kým ich nestiahneš, výdavky bežiaceho mesiaca v P&L chýbajú.")
-      + " Stiahneš ich v Upload → Dáta → Banka (príjmy chodia zvlášť v kroku Platby).",
+      // Od 14. 10. 2026 ich Kokpit sťahuje sám každú noc (`fio-banka`) — keď
+      // je výdavok starší než prah, automat nebeží, nie „zabudol si".
+      + " Kokpit ich sťahuje sám každú noc, takže automat pravdepodobne nebeží — pozri Zdravie Kokpitu, alebo ich stiahni ručne v Upload → Dáta → Banka.",
     priority: 6, client: "udaje|", trener: "Jerry",
     ...stavPolozkyRegistra(key, ack, "banka", dnes),
   };

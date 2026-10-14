@@ -42,6 +42,20 @@ const metaReklamy = (env: Env, akcia: "kampane" | "reklamy" | "dozor") =>
     }),
   );
 
+/**
+ * Pohyby z banky (14. 10. 2026). Dovtedy sa výdavky sťahovali len tlačidlom
+ * a P&L bežiaceho mesiaca mal tržby bez nákladov. Appka stiahne posledných
+ * 35 dní a zapíše nové pohyby nepotvrdené — potvrdzuje ich Jerry v Banke.
+ */
+const fioBanka = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/fio", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "auto" }),
+    }),
+  );
+
 const zavolaj = (env: Env, cesta = "/api/kalendar?cron=1") =>
   env.KOKPIT.fetch(
     // Adresa musí byť SKUTOČNÁ, hoci požiadavka ide prepojením a von nikdy
@@ -273,6 +287,13 @@ export default {
     // 6:10 v zime — teda vtedy, keď človek berie telefón do ruky, nie keď
     // ešte spí. Beží PRED snímkou kalendára z toho istého behu by sa nezmestila
     // do jednej požiadavky (limit CPU, 29. 8.), preto vlastný plán.
+    // Banka PRED rannou dávkou (4:30), aby notifikácie ráno nehlásili
+    // „výdavky chýbajú" nad stavom zo včera. Vlastný spúšťač — ťažká práca
+    // patrí do vlastnej požiadavky (limit CPU, 29. 8. 2026).
+    if (event.cron === "10 4 * * *") {  // 06:10 lokál v lete
+      ctx.waitUntil(ohlas(env, "fio-banka", fioBanka(env)));
+      return;
+    }
     if (event.cron === "30 4 * * *") {  // 06:30 lokál — ranná dávka
       ctx.waitUntil(
         ohlas(env, "ranne-push", rannePush(env)),
@@ -388,6 +409,16 @@ export default {
         out.push(`${akcia}: ${r.status} ${(await r.text()).slice(0, 200)}`);
       }
       return new Response(out.join("\n"), { status: 200 });
+    }
+    // `?fio=1` stiahne pohyby z banky hneď — a zapíše beh do Zdravia Kokpitu
+    // rovnako ako nočný, aby overenie nebolo len v konzole.
+    if (q.get("fio") === "1") {
+      let text = "";
+      await ohlas(env, "fio-banka", fioBanka(env).then(async (r) => {
+        text = `${r.status} ${(await r.clone().text()).slice(0, 400)}`;
+        return r;
+      }));
+      return new Response(`Fio: ${text}`, { status: 200 });
     }
     if (q.get("push") === "1") {
       const r = await rannePush(env);

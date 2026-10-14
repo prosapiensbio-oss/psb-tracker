@@ -128,13 +128,89 @@ export const Route = createFileRoute("/api/fio")({
       },
 
       POST: async ({ request }) => {
-        if (!(await isAuthed(request))) return unauthorized();
+        // Plánovač (nočné sťahovanie, 14. 10. 2026) sa preukáže tokenom
+        // a smie LEN akciu `auto` — nič, čo mení kategórie či pravidlá.
+        const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
+        const dany = request.headers.get("x-cron-token") || "";
+        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[];
           stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
+        if (odPlanovaca && b.akcia !== "auto") return unauthorized();
+
+        /**
+         * AUTOMATICKÉ STIAHNUTIE POHYBOV — každú noc z plánovača (Jerry,
+         * 14. 10. 2026: „postav aj automatické sťahovanie výdavkov").
+         *
+         * Dovtedy sa výdavky sťahovali len tlačidlom v karte Banka a Kokpit
+         * ich mal 14 dní starých — október mal v P&L tržby bez nákladov. Teraz
+         * sa každú noc stiahne OBDOBIE posledných 35 dní (nie „od posledného
+         * stiahnutia" — to by v banke posunulo zarážku a ručnému stiahnutiu
+         * by chýbali riadky) a zapíše sa všetko nové, príjmy aj výdavky.
+         *
+         * Kategória je z pravidiel (odhad); pohyb ostáva NEPOTVRDENÝ a čaká
+         * na Jerryho v Banke, rovnako ako po ručnom stiahnutí. Pravidlá sa
+         * tu NEUČIA — učí ich len človek, keď kategóriu sám zvolí. Duplicity
+         * aj uzavreté mesiace stráži to isté `uzJeV` / `jeZamknuty` ako zápis.
+         */
+        if (b.akcia === "auto") {
+          const token = ((bindings() as { FIO_TOKEN?: string }).FIO_TOKEN || "").trim();
+          if (!token) return Response.json({ ok: false, chyba: "Fio token nie je nastavený." }, { status: 400 });
+          const doDna = dnesPraha();
+          const od = dnesPraha(new Date(Date.now() - 35 * 86400000));
+          let odpoved: Response;
+          try {
+            odpoved = await fetch(urlObdobie(token, od, doDna), {
+              headers: { "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)", accept: "application/json" },
+            });
+          } catch { return Response.json({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }, { status: 502 }); }
+          if (!odpoved.ok) {
+            const detail = await odpoved.text().catch(() => "");
+            return Response.json({
+              ok: false,
+              chyba: `${chybaOdpovede(odpoved.status)}${detail.trim() ? ` (banka: ${detail.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)})` : ""}`,
+            }, { status: 502 });
+          }
+          let json: FioOdpoved;
+          try { json = (await odpoved.json()) as FioOdpoved; }
+          catch { return Response.json({ ok: false, chyba: "Banka vrátila odpoveď, ktorej appka nerozumie." }, { status: 502 }); }
+          const pr = await DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
+            .catch(() => ({ results: [] as Record<string, unknown>[] }));
+          const pravidla = (pr.results as Record<string, unknown>[])
+            .map((r) => ({ vzor: String(r.text_pattern || ""), kategoria: String(r.category || "") }))
+            .filter((r) => r.vzor && r.kategoria);
+          const pohyby = pohybyZOdpovede(json, pravidla);
+          const existujuce = await uzZapisane(DB);
+          const zamky = await zamknuteMesiace(DB);
+          const now = new Date().toISOString();
+          const stmts = [];
+          let vydavky = 0, prijmy = 0, zamknute = 0;
+          for (const r of pohyby) {
+            if (jeZamknuty(zamky, r.datum)) { zamknute++; continue; }
+            if (uzJeV(existujuce, r)) continue;
+            const k = kluc(r);
+            existujuce.kluce.add(k);
+            stmts.push(
+              DB.prepare(
+                `INSERT OR IGNORE INTO fio_transactions (id, date, amount_czk, counterparty, note, typ, category, dedup_key, created_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+              ).bind(uid(), r.datum, r.suma, r.protistrana || "", r.poznamka || "", r.typ || "", r.kategoria || "", k, now),
+            );
+            if (r.suma < 0) vydavky++; else prijmy++;
+          }
+          if (stmts.length) await DB.batch(stmts);
+          await audit(DB, {
+            action: "import-banka-auto",
+            predmet: `${stmts.length} pohybov`,
+            neu: `${od} – ${doDna}: +${vydavky} výdavkov, +${prijmy} príjmov${zamknute ? `, ${zamknute} v uzavretom mesiaci preskočených` : ""}`,
+            actor: odPlanovaca ? "plánovač" : (await currentUser(request)) || undefined,
+          });
+          return Response.json({ ok: true, od, do: doDna, vydavky, prijmy, zamknute });
+        }
 
         /**
          * POHYBY ROVNO Z BANKY — bez nahrávania súboru.

@@ -59,6 +59,7 @@ export const MENA_AUTOMATOV: Record<string, string> = {
   "meta-kampane": "Meta — kampane",
   "meta-reklamy": "Meta — reklamy",
   "meta-dozor": "Meta — dozor",
+  "fio-banka": "Banka — pohyby z Fio",
 };
 
 /** Všetky automaty, ktoré majú bežať — aby bolo vidieť aj TIE, ktoré mlčia. */
