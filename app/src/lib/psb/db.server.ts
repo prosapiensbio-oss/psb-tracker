@@ -8,6 +8,7 @@ import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type Uda
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
 import { dlhyKlientov } from "./zaplatene";
+import { jeUkonceny } from "./ukoncenieBalicka";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
   detectCSVType,
@@ -390,6 +391,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
       zruseneAt: r.zrusene_at || null,
       kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
+      ukonceny: jeUkonceny(r),
     }));
   }
 

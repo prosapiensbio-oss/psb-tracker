@@ -48,6 +48,12 @@ export type BalicekPreZostatok = {
   zruseneAt?: string | null;
   /** `true` = hodiny sú zostatok k `platnostOd`, nie celý balíček. */
   kotva?: boolean;
+  /**
+   * Ukončený s vrátením peňazí (`ukoncenieBalicka.ts`). Nevyčerpané hodiny
+   * dostal klient späť v peniazoch, takže zostáva NULA — nech hovorí
+   * čokoľvek iný, formálne ešte platný balíček.
+   */
+  ukonceny?: boolean;
 };
 
 export type SedeniePreZostatok = { client: string; date: string; duration?: number };
@@ -95,6 +101,25 @@ export function zostatokKokpitu(
   nezaplatene: Set<string> = new Set(),
 ): ZostatokKokpitu | null {
   const k = normName(klient);
+  /**
+   * UKONČENÝ BALÍČEK JE KONIEC (Radek Baláž, 14. 10. 2026).
+   *
+   * Po ukončení 13. 10. ukazoval profil −5: ukončený balíček už dnes
+   * neplatil, ale starší, dávno vyčerpaný, platil v PTminderi do 20. 10.
+   * Karta vzala len ten a pripísala mu všetky tréningy od jeho začiatku
+   * (18 h − 23). Kto má balíček ukončený a vrátené peniaze, má nula —
+   * kým si nekúpi nový (vtedy rozhoduje bežné pravidlo nižšie).
+   */
+  const ukonceny = balicky
+    .filter((b) => normName(b.klient) === k && !b.zruseneAt && b.ukonceny && den(b.platnostOd) <= dnes)
+    .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
+  if (ukonceny && !balicky.some((b) => normName(b.klient) === k && !b.zruseneAt && !b.ukonceny && den(b.platnostOd) > den(ukonceny.platnostOd))) {
+    const hod = ukonceny.hodiny || 0;
+    return {
+      zostatok: 0, nadRamec: 0, spolu: hod, nezaplateneHodin: 0, minute: hod, od: den(ukonceny.platnostOd),
+      nazov: ukonceny.nazov, platnostDo: ukonceny.platnostDo || null, pausal: false,
+    };
+  }
   const aktivne = balicky
     .filter((b) => normName(b.klient) === k && jeAktivnyBalicek(b, dnes))
     .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)));

@@ -83,3 +83,11 @@ export function poznamkaUkoncenia(v: { den: string; hodiny: number; cena: number
 /** Poznámka k zápornej platbe — klient aj účtovníčka ju čítajú bez kontextu. */
 export const poznamkaVratenia = (nevycerpane: number) =>
   `vrátenie za ${nevycerpane} nevyčerpaných h — balíček ukončený`;
+
+/**
+ * Je balíček ukončený s vrátením? Pozná sa podľa poznámky, ktorú zapisuje
+ * akcia `ukonci` („ukončené 13. 10. 2026 — vrátené …"), aj keď pred ňou
+ * stála iná poznámka (vtedy je za „ · "). Jedna definícia pre kartu aj os.
+ */
+export const jeUkonceny = (b: { poznamka?: string | null }): boolean =>
+  /(^|·\s*)ukončené \d/.test(String(b.poznamka || ""));
