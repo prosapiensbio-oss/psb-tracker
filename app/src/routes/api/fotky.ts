@@ -333,17 +333,6 @@ export const Route = createFileRoute("/api/fotky")({
           return Response.json({ ok: true });
         }
 
-        const id = kus(b.id, 40);
-        if (!id) return chyba("chýba id");
-
-        if (b.akcia === "popis") {
-          const text = String(b.text ?? "").trim().slice(0, 4000);
-          const r = await DB.prepare("UPDATE klient_fotky SET popis = ?2 WHERE id = ?1")
-            .bind(id, text ? await zasifruj(text, ANAMNEZA_KLUC) : null).run();
-          if (!r.meta.changes) return chyba("Taká fotka nie je.", 404);
-          return Response.json({ ok: true });
-        }
-
         /**
          * PRESUNÚŤ FOTENIE NA INÝ DEŇ (Jerry, 14. 10. 2026 — Radek Baláž).
          * Fotky z roku 2023 sa uložili s dňom nahratia, lebo dátum z EXIF sa
@@ -363,6 +352,17 @@ export const Route = createFileRoute("/api/fotky")({
           if (!cielMa) await DB.prepare("UPDATE klient_fotky_poznamky SET den = ?3 WHERE klient = ?1 AND den = ?2").bind(klient, z, na).run().catch(() => null);
           await audit(DB, { action: "fotky-presun-den", predmet: klient, old: z, neu: { den: na, fotiek: r.meta.changes }, actor: kto || undefined });
           return Response.json({ ok: true, presunute: r.meta.changes });
+        }
+
+        const id = kus(b.id, 40);
+        if (!id) return chyba("chýba id");
+
+        if (b.akcia === "popis") {
+          const text = String(b.text ?? "").trim().slice(0, 4000);
+          const r = await DB.prepare("UPDATE klient_fotky SET popis = ?2 WHERE id = ?1")
+            .bind(id, text ? await zasifruj(text, ANAMNEZA_KLUC) : null).run();
+          if (!r.meta.changes) return chyba("Taká fotka nie je.", 404);
+          return Response.json({ ok: true });
         }
 
         if (b.akcia === "pohlad") {
