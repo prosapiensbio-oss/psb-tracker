@@ -7,6 +7,7 @@ import { PoslaneKlientovi, PoslatKlientovi, type OdkazFotiek, type OdpovedFotky 
 import { OpravitText } from "./OpravitText";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
+import { denZFotky } from "../../lib/psb/exifDatum";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -82,6 +83,13 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   /** Rozpísané poznámky po dňoch — zapisujú sa pri odchode z políčka. */
   const [koncepty, setKoncepty] = useState<Record<string, string>>({});
   const vstup = useRef<HTMLInputElement | null>(null);
+  /**
+   * „+ pridať fotky k tomuto dňu" = človek deň zvolil výslovne a EXIF ho
+   * nesmie prebiť. Pri bežnom nahratí má prednosť dátum z fotky.
+   */
+  const vynutDen = useRef(false);
+  /** Fotenie, ktorému sa práve mení dátum (pôvodný deň) a nový deň. */
+  const [menimDen, setMenimDen] = useState<{ z: string; na: string } | null>(null);
   /** Označené fotky pre editor — najviac dve; tretia vytlačí najstaršie označenie. */
   const [vyber, setVyber] = useState<string[]>([]);
   const oznac = (id: string) => setVyber((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id].slice(-2)));
@@ -148,13 +156,21 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
     setChyba("");
     setHlaska("");
     let hotovo = 0;
+    const vynutene = vynutDen.current;
+    vynutDen.current = false;
+    /** Dni, ktoré sa vzali z fotiek — povie sa nahlas, aby nikto nehľadal. */
+    const zExif = new Set<string>();
     for (let n = 0; n < subory.length; n++) {
       setNahravam(`Nahrávam ${n + 1} z ${subory.length}…`);
       try {
+        // Dátum fotenia sa číta z PÔVODNÉHO súboru — zmenšenie EXIF zahodí.
+        // Jerry, 14. 10. 2026: fotky z 2023 sa uložili s dňom nahratia.
+        const exif = vynutene ? null : denZFotky(await subory[n].slice(0, 262144).arrayBuffer(), dnesPraha());
+        if (exif) zExif.add(exif);
         const { blob, sirka, vyska } = await zmensi(subory[n]);
         const fd = new FormData();
         fd.append("klient", meno);
-        fd.append("den", den);
+        fd.append("den", exif || den);
         fd.append("pohlad", pohlad);
         fd.append("sirka", String(sirka));
         fd.append("vyska", String(vyska));
@@ -171,8 +187,20 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
     }
     setNahravam(null);
     if (vstup.current) vstup.current.value = "";
-    if (hotovo) setHlaska(hotovo === 1 ? "Fotka je v kartotéke." : `${hotovo} fotky sú v kartotéke.`);
+    if (hotovo) {
+      const dni = [...zExif].sort().map(denCz);
+      setHlaska(`${hotovo === 1 ? "Fotka je v kartotéke." : `${hotovo} fotky sú v kartotéke.`}${dni.length ? ` Dátum fotenia z fotky: ${dni.join(", ")}.` : ""}`);
+    }
     await nacitaj();
+  };
+
+  const presunDen = async (z: string, na: string) => {
+    if (!na || na === z) { setMenimDen(null); return; }
+    if (await posli({ akcia: "presun-den", klient: meno, z, na })) {
+      setMenimDen(null);
+      setHlaska(`Fotenie presunuté na ${denCz(na)}.`);
+      await nacitaj();
+    }
   };
 
   const zmenPohlad = async (f: Fotka, p: string) => {
@@ -264,8 +292,8 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
           </label>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-          <label style={{ fontSize: 12, color: C.textMuted }}>
-            deň{" "}
+          <label style={{ fontSize: 12, color: C.textMuted }} title="Keď má fotka v sebe dátum fotenia (EXIF), použije sa ten. Tento deň platí pre fotky bez neho — snímky obrazovky, fotky zo WhatsAppu.">
+            deň (ak ho fotka nemá){" "}
             <input
               type="date" value={den} max={dnesPraha()}
               onChange={(e) => setDen(e.target.value || dnesPraha())}
@@ -467,7 +495,26 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
       {dni.map((x) => (
         <div key={x.den} style={{ borderTop: `1px solid ${mix(C.border, 60)}`, paddingTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{denCz(x.den)}</span>
+            {menimDen?.z === x.den ? (
+              <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="date" value={menimDen.na} max={dnesPraha()} autoFocus
+                  onChange={(e) => setMenimDen({ z: x.den, na: e.target.value })}
+                  style={{ padding: "4px 7px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, colorScheme: "dark" }}
+                />
+                <button type="button" onClick={() => void presunDen(x.den, menimDen.na)} style={{ padding: "4px 10px", borderRadius: 7, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>presunúť</button>
+                <button type="button" onClick={() => setMenimDen(null)} style={{ background: "none", border: "none", color: C.textDim, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
+              </span>
+            ) : (
+              <>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{denCz(x.den)}</span>
+                <button
+                  type="button" onClick={() => setMenimDen({ z: x.den, na: x.den })}
+                  title="Fotky sú z iného dňa — presunúť celé fotenie"
+                  style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
+                >zmeniť dátum</button>
+              </>
+            )}
             <span style={{ fontSize: 11.5, color: C.textDim }}>
               {x.den === prveFotenie ? "prvé fotenie · " : ""}{x.fotky.length} {x.fotky.length === 1 ? "fotka" : x.fotky.length < 5 ? "fotky" : "fotiek"}
             </span>
@@ -475,7 +522,7 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
             {/* Doplniť fotku k už existujúcemu foteniu — deň sa vezme z neho. */}
             <button
               type="button" disabled={!mozeNahrat || !!nahravam}
-              onClick={() => { setDen(x.den); vstup.current?.click(); }}
+              onClick={() => { setDen(x.den); vynutDen.current = true; vstup.current?.click(); }}
               style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: mozeNahrat && !nahravam ? "pointer" : "default", opacity: mozeNahrat && !nahravam ? 1 : 0.5 }}
             >+ pridať fotky k tomuto dňu</button>
           </div>

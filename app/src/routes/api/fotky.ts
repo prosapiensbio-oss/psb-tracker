@@ -344,6 +344,27 @@ export const Route = createFileRoute("/api/fotky")({
           return Response.json({ ok: true });
         }
 
+        /**
+         * PRESUNÚŤ FOTENIE NA INÝ DEŇ (Jerry, 14. 10. 2026 — Radek Baláž).
+         * Fotky z roku 2023 sa uložili s dňom nahratia, lebo dátum z EXIF sa
+         * vtedy nečítal; v uložených fotkách EXIF už nie je (zmenšenie ho
+         * zahodí), takže deň sa dá opraviť len rukou. Presúva sa CELÉ fotenie
+         * (všetky fotky klienta z toho dňa) aj s poznámkou, keď cieľový deň
+         * vlastnú poznámku ešte nemá.
+         */
+        if (b.akcia === "presun-den") {
+          const klient = kus(b.klient, 120);
+          const z = kus(b.z, 10), na = kus(b.na, 10);
+          if (!klient || !jeDenFotenia(z, "9999-12-31") || !jeDenFotenia(na, dnesPraha())) return chyba("Deň nesedí (RRRR-MM-DD, nie v budúcnosti).");
+          if (z === na) return Response.json({ ok: true, presunute: 0 });
+          const r = await DB.prepare("UPDATE klient_fotky SET den = ?3 WHERE klient = ?1 AND den = ?2").bind(klient, z, na).run();
+          if (!r.meta.changes) return chyba("V ten deň tento klient fotky nemá.", 404);
+          const cielMa = await DB.prepare("SELECT 1 x FROM klient_fotky_poznamky WHERE klient = ?1 AND den = ?2").bind(klient, na).first().catch(() => null);
+          if (!cielMa) await DB.prepare("UPDATE klient_fotky_poznamky SET den = ?3 WHERE klient = ?1 AND den = ?2").bind(klient, z, na).run().catch(() => null);
+          await audit(DB, { action: "fotky-presun-den", predmet: klient, old: z, neu: { den: na, fotiek: r.meta.changes }, actor: kto || undefined });
+          return Response.json({ ok: true, presunute: r.meta.changes });
+        }
+
         if (b.akcia === "pohlad") {
           // Fotku tela nejde prerobiť na porovnanie či video (ani naopak).
           if (!jePohlad(b.pohlad) || b.pohlad === POROVNANIE || b.pohlad === VIDEO) return chyba("Neznámy pohľad.");
