@@ -2987,7 +2987,11 @@ export function dnesneTreningy(
         key, category: "6M", tone: "blue",
         title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
         detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
-        ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
+        // Otvorí PROFIL toho klienta, nie zoznam (Jerry, 14. 10. 2026 pri
+        // Knapčokovi: „hodilo ma to na Klient, a ja by som chcel na profil").
+        // Tretí diel cieľa je meno → onNavigate("klienti", —, { client }),
+        // ten istý preklik ako klik na meno kdekoľvek inde.
+        ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti||${u.klient}`,
         oKom: u.klient as string,
         sms,
       });

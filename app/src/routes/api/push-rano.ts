@@ -109,7 +109,10 @@ export const Route = createFileRoute("/api/push-rano")({
         // tabuľky: 658 riadkov navyše by v rannom behu nebolo treba a limit
         // D1 sme už raz minuli.
         const poslednyPohyb = await DB.prepare(
-          "SELECT MAX(substr(date,1,10)) d FROM fio_transactions WHERE typ <> 'hotovosť'",
+          // Posledný VÝDAVOK, ako na obrazovke (`bankaPohyby` v App). Príjmy
+          // sťahuje krok Platby zvlášť — s nimi by ranná správa tvrdila
+          // „5 dní" tam, kde obrazovka hovorí „14" (14. 10. 2026).
+          "SELECT MAX(substr(date,1,10)) d FROM fio_transactions WHERE typ <> 'hotovosť' AND amount_czk < 0",
         ).first<{ d: string | null }>();
         // Guillermo (Jerryho sedenia vo FP Spain) — pár riadkov, dva malé dopyty.
         const [gz, gu] = await DB.batch([

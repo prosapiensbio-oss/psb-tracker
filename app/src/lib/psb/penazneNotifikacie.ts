@@ -28,12 +28,19 @@ export function polozkaZastaranaBanka(poslednyPohyb: string, ack: Ack, dnes = ne
   const key = `banka|${stara.poslednyPohyb}`;
   return {
     key, category: "Zápis", tone: stara.tone,
-    title: `Bankový výpis nedorazil ${stara.dni} dní`,
-    detail: `Posledný pohyb v banke je z ${fmtDMY(stara.poslednyPohyb)}, teda spred ${stara.dni} dní.`
+    /**
+     * VÝDAVKY, NIE „VÝPIS" (Jerry, 14. 10. 2026: „keďže to už ide z Fio API,
+     * je toto potrebná notifikácia?"). Je — API sa samo nespúšťa. Príjmy si
+     * berie krok Platby, výdavky len karta Banka, kde dostávajú kategóriu do
+     * P&L (odhad kategórie nemá tiecť do P&L bez človeka). Text hovoril
+     * „nahráva sa", čo pochádzalo z čias súboru.
+     */
+    title: `Výdavky z banky nie sú stiahnuté ${stara.dni} dní`,
+    detail: `Posledný výdavok z Fio je z ${fmtDMY(stara.poslednyPohyb)}, teda spred ${stara.dni} dní.`
       + (stara.dni >= 30
         ? " Bežiaci mesiac tak má v P&L tržby, ale nie náklady — zisk vyzerá vyšší, než je."
-        : " Kým výpis nenahráš, výdavky bežiaceho mesiaca v P&L chýbajú.")
-      + " Nahráva sa v Upload → Dáta.",
+        : " Kým ich nestiahneš, výdavky bežiaceho mesiaca v P&L chýbajú.")
+      + " Stiahneš ich v Upload → Dáta → Banka (príjmy chodia zvlášť v kroku Platby).",
     priority: 6, client: "udaje|", trener: "Jerry",
     ...stavPolozkyRegistra(key, ack, "banka", dnes),
   };
