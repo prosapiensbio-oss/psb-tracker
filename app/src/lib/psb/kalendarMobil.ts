@@ -74,8 +74,12 @@ export function feedKlienta(
 export function platformaZAgenta(ua: string): string {
   const u = ua || "";
   if (/Google-Calendar-Importer|Google/i.test(u)) return "Google Kalendár";
-  if (/iPhone|iPad|iOS|dataaccessd/i.test(u)) return "iPhone";
-  if (/Macintosh|Mac OS X|CalendarAgent/i.test(u)) return "Mac";
+  // Kalendár na Macu sa hlási „macOS/14.5 (…) dataaccessd/1.0" — rovnaké
+  // dataaccessd ako iPhone, takže Mac sa musí rozpoznať PRED ním (15. 10. 2026
+  // sa odber z Macu zapísal ako „iPhone").
+  if (/iPhone|iPad|^iOS\//i.test(u)) return "iPhone";
+  if (/macOS|Macintosh|Mac OS X|CalendarAgent/i.test(u)) return "Mac";
+  if (/dataaccessd/i.test(u)) return "iPhone";
   if (/Android/i.test(u)) return "Android";
   if (/Microsoft|Outlook/i.test(u)) return "Outlook";
   return "iný";

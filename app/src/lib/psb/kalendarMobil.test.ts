@@ -38,6 +38,8 @@ describe("kalendár v mobile", () => {
   it("platforma z hlavičky a kto ešte odoberá", () => {
     expect(platformaZAgenta("iOS/18.0 (22A3354) dataaccessd/1.0")).toBe("iPhone");
     expect(platformaZAgenta("Google-Calendar-Importer")).toBe("Google Kalendár");
+    expect(platformaZAgenta("macOS/14.5 (23F79) dataaccessd/1.0")).toBe("Mac");
+    expect(platformaZAgenta("Mac OS X/10.15.7 (19H2) CalendarAgent/954")).toBe("Mac");
     const teraz = Date.parse("2026-10-07T12:00:00Z");
     expect(odoberaKalendar("2026-10-06T12:00:00Z", teraz)).toBe(true);
     expect(odoberaKalendar("2026-10-01T12:00:00Z", teraz)).toBe(false);
