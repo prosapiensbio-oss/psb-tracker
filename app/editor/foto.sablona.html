@@ -58,7 +58,7 @@
     <div class="kroky">
       <button class="tl" id="krokSpat" disabled title="Krok späť (⌘Z)">↶ späť</button>
       <button class="tl" id="krokDopredu" disabled title="Znova (⌘⇧Z)">↷ znova</button>
-      <button class="tl" id="ulozitNavrh" title="Uložiť rozrobené hneď (ukladá sa aj samo)">💾 uložiť</button>
+      <button class="tl" id="ulozitNavrh" title="Uloží len do Rozrobených (pracovná verzia, ukladá sa aj sama). Do profilu klienta ukladá tlačidlo dole.">💾 do rozrobených</button>
       <span class="ulozene" id="stavUlozenia"></span>
     </div>
     <div class="skupiny">
@@ -543,7 +543,8 @@
           const nahlad = await sk.vyrobJpeg(320);
           const j = await posliNaServer(aktualny, kt.klient, o, sk.rozmeryFotiek(), nahlad, (src) => fetch(src).then((r) => r.blob()));
           aktualny = j.id;
-          stavText(`uložené ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
+          // „v rozrobených", nie „uložené" — 15. 10. 2026 si to Jerry pomýlil s uložením do profilu.
+          stavText(`v rozrobených ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
           nacitajZoznam();
         } catch (e) {
           stavText("neuložilo sa — skúsim pri ďalšej zmene");
