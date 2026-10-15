@@ -2,6 +2,8 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
+import { bezDiakritiky as textBezDiakritiky } from "../../lib/psb/sms";
+import { SmsKlientovi } from "./SmsKlientovi";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { navrhniKlientaKandidati, vyzeraNaMeno, type ClientAgg } from "../../lib/psb/compute";
@@ -1812,6 +1814,18 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
   const [kopie, setKopie] = useState<string[]>([]);
+  /**
+   * SMS PRED ÚVODNÝM Z KALENDÁRA (Jerry, 15. 10. 2026: „mám nový úvodný cez
+   * referenciu, keďže neprišiel cez mail, nemá žiadny profil — ako mu pošlem
+   * úvodnú SMS?"). Dovtedy sa dala poslať len z notifikácie o dopyte; kto
+   * prišiel cez referenciu alebo telefonát, nemal odkiaľ. Termín a tréner
+   * sú z udalosti, odkaz `/u/` je ten istý ako z dopytu (`/api/uvodny`).
+   */
+  const [uvOtvorene, setUvOtvorene] = useState(false);
+  const [uvCena, setUvCena] = useState("1100");
+  const [uvText, setUvText] = useState("");
+  const [uvChyba, setUvChyba] = useState("");
+  const [uvBusy, setUvBusy] = useState(false);
 
   const sMenom = typ === "trening" || typ === "uvodny";
   const trener = u ? u.trener : trenerNovej;
@@ -1873,6 +1887,19 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     setKopie((k) => [...k, `${den(`${kopiaDen}T${kopiaCas}`)} o ${kopiaCas}`]);
     setKopiaDen((d) => { const [r, m, dd] = d.split("-").map(Number); return new Date(Date.UTC(r, m - 1, dd + 7)).toISOString().slice(0, 10); });
     await onHotovo();
+  };
+  const pripravUvodnuSms = async () => {
+    if (!u || !klientUdalosti || uvBusy) return;
+    setUvBusy(true); setUvChyba("");
+    type Odpoved = { ok?: boolean; odkaz?: string; error?: string };
+    const r = await fetch("/api/uvodny", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "odkaz", klient: klientUdalosti, druh: "pred", trener: u.trener, kedy: u.zaciatok.slice(0, 16), cena: uvCena.trim() === "" ? null : Number(uvCena) }),
+    }).then((x) => x.json() as Promise<Odpoved>).catch((): Odpoved => ({ ok: false, error: "spojenie zlyhalo" }));
+    setUvBusy(false);
+    if (!r.ok || !r.odkaz) { setUvChyba(r.error || "Odkaz sa nepodarilo vyrobiť."); return; }
+    // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov a z jednej správy by boli tri.
+    setUvText(textBezDiakritiky(`Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`));
   };
   const inemuTrenerovi = async () => {
     if (!u || !novyTrener) return;
@@ -2036,6 +2063,12 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             )}
           </>
         )}
+        {u && typ === "uvodny" && !!klientUdalosti && (
+          <button onClick={() => setUvOtvorene(!uvOtvorene)}
+            style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${uvOtvorene ? C.accent : C.border}`, background: uvOtvorene ? C.accentBg : "transparent", color: uvOtvorene ? C.accentLight : C.textMuted }}>
+            ✉ SMS pred úvodným
+          </button>
+        )}
         {u && zGoogle && !potvrdMazanie && (
           <button onClick={() => setPotvrdMazanie(true)}
             style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${mix(C.red, 45)}`, background: "transparent", color: C.red }}>
@@ -2048,6 +2081,29 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       </div>
 
       {hlaska && <div style={{ fontSize: 11.5, color: C.green, lineHeight: 1.5, marginTop: 8 }}>{hlaska}</div>}
+      {u && uvOtvorene && typ === "uvodny" && !!klientUdalosti && (
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 7), display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
+            Odkaz na stránku pred úvodným pre <b style={{ color: C.text }}>{klientUdalosti}</b> · {den(u.zaciatok)} o {u.zaciatok.slice(11, 16)} · vedie {u.trener}. Termín sa na stránke drží podľa kalendára aj po presune.
+          </div>
+          {!uvText ? (
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
+              <label style={popisok}>
+                cena (Kč)
+                <input type="number" min={0} step={50} value={uvCena} onChange={(e) => setUvCena(e.target.value)} style={{ ...pole, width: 90 }} />
+              </label>
+              <button onClick={() => void pripravUvodnuSms()} disabled={uvBusy}
+                style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: uvBusy ? "wait" : "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green }}>
+                {uvBusy ? "Vyrábam…" : "Vyrobiť odkaz a SMS"}
+              </button>
+              <span style={{ fontSize: 10.5, color: C.textDim }}>bežne 1 100 Kč; zľava sa na stránke ukáže aj s pôvodnou cenou</span>
+            </div>
+          ) : (
+            <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene predvolenyText={uvText} />
+          )}
+          {uvChyba && <div style={{ fontSize: 11.5, color: C.red }}>{uvChyba}</div>}
+        </div>
+      )}
       {u && rezim === "kopia" && (
         <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
           <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 6 }}>
