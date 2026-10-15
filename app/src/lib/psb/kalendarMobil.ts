@@ -155,6 +155,8 @@ const escH = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;
 export function teloStrankyKalendara(v: {
   logo: string; oslovenie: string; telefon: Telefon | null;
   webcal: string; google: string; kratka: string; telefonTrenera: string; komu: string;
+  /** Stránka je otvorená na počítači (Mac/Windows) — Android sa tam pridá rovno. */
+  naPocitaci?: boolean;
 }): string {
   const o = v.oslovenie.trim();
   const volba = (t: Telefon, nazov: string, pod: string) =>
@@ -164,7 +166,14 @@ export function teloStrankyKalendara(v: {
 <p class="mala">Telefon se zeptá „Odebírat kalendář?" — stačí potvrdit. V kalendáři uvidíte jen své tréninky.</p>
 <div class="rada">V dalším okně vypněte <b>„Odstranit upozornění"</b>, jinak vás telefon na trénink neupozorní.</div>`;
   const mail = `mailto:?subject=${encodeURIComponent("Tréninky do kalendáře")}&body=${encodeURIComponent(`Otevřít na počítači: ${v.kratka}`)}`;
-  const android = `
+  // Michal Knapčok, 15. 10. 2026: Android v telefóne, odkaz otvoril na
+  // MacBooku a stará stránka ho poslala do Apple Calendar. Na počítači je
+  // Google Kalendár na webe presne tá cesta, ktorá funguje — hneď navrchu.
+  const androidNaPocitaci = `
+<p style="margin-top:18px">Jste na počítači — to je pro Android nejlepší cesta. Klepněte níže a v Google Kalendáři potvrďte <b>Přidat</b>. Buďte přihlášeni stejným Google účtem jako v telefonu — tréninky se do telefonu dostanou samy, poprvé do několika hodin.</p>
+<a class="btn" href="${escH(v.google)}">Přidat do Google Kalendáře</a>
+<p class="mala">Nepoužívejte Kalendář na Macu (Apple) — do telefonu s Androidem se z něj tréninky nedostanou. V kalendáři uvidíte jen své tréninky.</p>`;
+  const android = v.naPocitaci ? androidNaPocitaci : `
 <p style="margin-top:18px">Na Androidu přidá tréninky jen Google Kalendář <b>na webu</b> — aplikace v mobilu odkaz neumí přijmout. Jsou dvě cesty:</p>
 <h2>1 · Na počítači — zdarma, minuta</h2>
 <p>Otevřete na počítači tuto adresu a klepněte na „Přidat přes Google Kalendář“. Buďte přihlášeni stejným Google účtem jako v mobilu — tréninky se do mobilu dostanou samy, poprvé do několika hodin.</p>

@@ -105,6 +105,14 @@ describe("stránka kalendára — otázka na telefón", () => {
     expect(h).toContain("at.bitfire.icsdroid");
     expect(h).not.toContain("Odstranit upozornění");
   });
+  it("Android na počítači: rovno Google Kalendár, nie Apple", () => {
+    // Michal Knapčok, 15. 10. 2026: otvoril na MacBooku, skončil v Apple Calendar.
+    const h = teloStrankyKalendara({ ...v, telefon: "android", naPocitaci: true });
+    expect(h).toContain(`href="${v.google}">Přidat do Google Kalendáře`);
+    expect(h).not.toContain("ICSx");
+    expect(h).not.toContain("mailto:");
+    expect(h).not.toContain(`href="${v.webcal}"`);
+  });
   it("adresa pustí len dve voľby", () => {
     expect(telefonZAdresy("android")).toBe("android");
     expect(telefonZAdresy("iphone")).toBe("iphone");

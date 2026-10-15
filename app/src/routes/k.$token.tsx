@@ -89,6 +89,7 @@ export const Route = createFileRoute("/k/$token")({
           webcal, google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
           kratka: verejnyOdkaz(`/k/${token}`, url.origin),
           telefonTrenera: t.telefon, komu: r.trener === "Terezka" ? "Terezce" : "Filipovi",
+          naPocitaci: platforma === "Mac" || platforma === "Windows",
         }));
       },
     },
