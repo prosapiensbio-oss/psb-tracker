@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { cenaDopytuZReklamy } from "../../lib/psb/cenaDopytu";
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel } from "../../lib/psb/format";
 import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, hodnot } from "../../lib/psb/hodnotenie";
@@ -140,7 +141,9 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
 
   const hDopyty = hodnot(k.dopyty / mes, DOPYTOV_MESACNE);
   const hKonverzia = hodnot(zDopytuPct, KONVERZIA_DOPYTU);
-  const hCenaDopyt = hodnot(reklama.platena.cenaZaDopyt, CENA_ZA_DOPYT);
+  // Cena za dopyt od septembra 2026 a bez súdenia — jedna definícia s pásom
+  // Marketingu (cenaDopytu.ts). Ročné okno by delilo staré boosty septembrovými dopytmi.
+  const cd = cenaDopytuZReklamy(kampane, data.leads);
   const hCenaKlient = hodnot(reklama.platena.cenaZaKlienta, CENA_ZA_DOPYT);
 
   const obdobie = v.mesiace.length
@@ -196,13 +199,13 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
     {
       id: "mp-cena-dopyt",
       label: "Cena za dopyt",
-      hodnota: reklama.platena.cenaZaDopyt === null ? "—" : fmtCZK(reklama.platena.cenaZaDopyt),
-      podnadpis: `${fmtCZK(reklama.spend)} ÷ ${reklama.platena.dopytov} dopytov z reklamy`,
-      pasmo: pasmoZoSkore(hCenaDopyt.skore, hCenaDopyt.bezDat),
-      poznamka: reklama.platena.dopytov === 0
-        ? `Za ${mes} mesiacov sa ani jeden dopyt nezapísal ako z reklamy — bez toho sa cena nedá počítať. Zdroj sa vypĺňa v Dopytoch.`
-        : "Cieľ je pod 1 000 Kč. Nad 2 200 Kč sa klient od Terezky nezaplatí.",
-      vysvetlenie: "Iba PLATENÁ cesta: výdavok delený dopytmi, ktoré prišli z reklamy. Organické dopyty sem nepatria — nič nestáli.",
+      hodnota: cd.cena === null ? "—" : fmtCZK(cd.cena),
+      podnadpis: `${fmtCZK(cd.spend)} ÷ ${cd.dopyty.length} dopytov z reklamy · od 9/2026`,
+      pasmo: cd.cena === null ? "nevie" : "ok",
+      poznamka: cd.cena === null
+        ? "Od septembra sa ešte nikto neozval z reklamy — cena sa nedá počítať."
+        : "Cieľ zatiaľ zámerne nie je — teraz je dobrý každý dopyt, reklamy sa ladia.",
+      vysvetlenie: "Iba PLATENÁ cesta a len od septembra 2026, keď reklama prvýkrát žiadala o dopyt (formulár od 8. 9., UTM od 14. 9.). Staršie boosty kupovali dosah, nie dopyty, a do tejto ceny nepatria.",
       dobreHore: false,
       kam: onNavigate ? () => onNavigate("marketing", "naklady") : undefined,
     },

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { cenaDopytuZReklamy } from "../../lib/psb/cenaDopytu";
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK, monthKey } from "../../lib/psb/format";
-import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, farbaCeny, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
+import { fmtCZK } from "../../lib/psb/format";
+import { DOPYTOV_MESACNE, KONVERZIA_DOPYTU, farbaCeny, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
 import { suhrnKampani, zlucKampane, type Kampan } from "../../lib/psb/kampane";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -53,6 +54,8 @@ type Metrika = {
   h: Hodnotenie;
   /** Jednoriadkový smer: kam sa má číslo hýbať a kde je méta. */
   smer: string;
+  /** Pevná farba čísla, keď sa nesúdi (cena za dopyt bez cieľa). */
+  farba?: string;
   /**
    * Čo hovorí BEŽIACI mesiac.
    *
@@ -125,57 +128,15 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
 
     // ── cena za dopyt ────────────────────────────────────────────────────────
     //
-    // Až do 13. 8. tu bolo `spend / konverzie z Mety` a vychádzalo 20 Kč. Znelo
-    // to ako mimoriadny úspech a bolo to porovnávané so stropom 2 200 Kč za
-    // klienta. Lenže Metina „konverzia" je čokoľvek, čo si pixel odklikol —
-    // pri týchto kampaniach hlavne stiahnutia dokumentu. Za tých istých 12
-    // mesiacov nemá v Kokpite ani JEDEN dopyt zdroj „reklama" ani UTM.
-    //
-    // Číslo, ktoré by viedlo k nákupu ďalšej reklamy, sa nesmie počítať z inej
-    // veličiny, než akú sľubuje jeho nadpis. Menovateľ je preto dopyt zapísaný
-    // v Kokpite; kým reklama žiadny neprivedie, je tu pomlčka — a tá je
-    // pravdivá odpoveď, nie chýbajúca.
-    // Výdavok z TOHO ISTÉHO okna ako dopyty. Kampane prichádzajú po
-    // mesiacoch, ale sčítavali sa celé (19 mesiacov histórie) a delili
-    // dopytmi z 12 — „cena za dopyt" aj „minuté na reklamu" boli nadhodnotené
-    // zhruba o polovicu a verdikt pripisoval celoživotný výdavok dvanástim
-    // mesiacom (revízia 18. 8. 2026).
+    // Až do 13. 8. tu bolo `spend / konverzie z Mety` (20 Kč — stiahnutia
+    // dokumentu, nie ľudia). Potom výdavok 12 mesiacov ÷ dopyty z reklamy —
+    // lenže 15. 10. 2026 to dalo 9 072 Kč, lebo ~20 700 Kč starých boostov sa
+    // delilo tromi septembrovými dopytmi. Odvtedy jedna definícia
+    // `cenaDopytuZReklamy`: od septembra 2026, bez súdenia (cieľ Jerry
+    // zámerne nestanovil). Výdavok za 12 mesiacov ostáva v „Minuté na reklamu".
     const s = suhrnKampani(zlucKampane(kampane.filter((x) => mesiace.includes(x.mesiac))));
-    const jeZReklamy = (l: { source?: string; kampan?: string }) =>
-      l.source === "reklama" || !!l.kampan?.trim();
-    const zReklamy = data.leads.filter((l) =>
-      mesiace.includes(monthKey(l.date)) && jeZReklamy(l)).length;
-    const cenaZaDopyt = zReklamy > 0 ? s.spend / zReklamy : null;
-
-    /**
-     * Bežiaci mesiac ako NÁHRADNÍK, nie ako poznámka pod čiarou.
-     *
-     * Priemery v tomto páse sa rátajú z plných mesiacov — polovičný mesiac by
-     * ich ťahal nadol. Pri cene za dopyt to ale znamenalo pomlčku aj vtedy,
-     * keď reklama práve beží a prvý dopyt už prišiel (20. 9. 2026). Jerry,
-     * 21. 9.: „pomlčka, ktorá by sa dala krásne nahradiť číslom 3 572 —
-     * a je to cena za dopyt, takže tam patrí suma."
-     *
-     * Takže: keď plné mesiace číslo nedajú a bežiaci áno, ukáže sa ten
-     * bežiaci a pod ním stojí, že je z tohto mesiaca. Pomlčka zostáva len
-     * vtedy, keď naozaj niet z čoho počítať.
-     */
-    const mesiacTeraz = monthKey(new Date().toISOString());
-    const spendTeraz = suhrnKampani(zlucKampane(kampane.filter((x) => x.mesiac === mesiacTeraz))).spend;
-    const leadyTeraz = data.leads.filter((l) => monthKey(l.date) === mesiacTeraz && jeZReklamy(l));
-    const dopytyTeraz = leadyTeraz.length;
-    const cenaTeraz = dopytyTeraz > 0 ? spendTeraz / dopytyTeraz : null;
-    const jeTeraz = cenaZaDopyt == null && cenaTeraz != null;
-    const cenaZobrazena = cenaZaDopyt ?? cenaTeraz;
-    // Farba aj verdikt patria k číslu, ktoré je na dlaždici — nie k tomu,
-    // ktoré tam nie je.
-    const hC = hodnot(cenaZobrazena, CENA_ZA_DOPYT);
-    // Keď je na dlaždici číslo z bežiaceho mesiaca, verdikt to musí povedať —
-    // inak by vyzeralo ako ročný priemer a Jerry by podľa neho rozhodoval
-    // o rozpočte s vierou, že za tým stojí dvanásť mesiacov.
-    const poznTeraz = jeTeraz
-      ? ` Pozor, je to číslo z BEŽIACEHO mesiaca: ${fmtCZK(spendTeraz)} ÷ ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt" : "dopyty"}. Dvanásť plných mesiacov predtým nemá ani jeden doložený dopyt z reklamy — meranie (UTM v odkazoch) beží až od 14. 9. 2026, takže toto je prvé obdobie, ktoré sa dá vôbec zmerať. Po uzavretí mesiaca sa číslo prepne na priemer.`
-      : "";
+    const cd = cenaDopytuZReklamy(kampane, data.leads);
+    const neutralne = { skore: 0, slovo: "priemer", bezDat: cd.cena == null } as Hodnotenie;
 
     // Podporné čísla. Nemajú stupnicu — nie je proti čomu ich merať, ich
     // úloha je vysvetliť tie tri hlavné.
@@ -221,29 +182,18 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       {
         kluc: "cena",
         nazov: "Cena za dopyt",
-        hodnota: cenaZobrazena == null ? "—" : fmtCZK(cenaZobrazena),
-        h: hC,
-        smer: jeTeraz
-          ? `tento mesiac · ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt" : dopytyTeraz < 5 ? "dopyty" : "dopytov"} · strop 2 200 Kč`
-          : "čím nižšia, tým lepšia · strop 2 200 Kč",
-        beziaci: !jeTeraz && cenaZaDopyt == null && spendTeraz > 0
-          ? `tento mesiac ${fmtCZK(spendTeraz)} a zatiaľ žiadny dopyt z reklamy`
-          : undefined,
-        preco: "Bez tohto čísla je rozpočet stávka, nie nákup. S ním sa dá povedať vetu, ktorá dnes povedať nejde: „keď mi odíde osem ľudí, za X korún si objednám dvadsať dopytov.“",
-        verdikt: verdikt(hC, {
-          dobre: `Pod stropom aj u klientov, čo pôjdu k Terezke. Toto sa oplatí zopakovať vo väčšom.${poznTeraz}`,
-          priestor: `Nad cieľom 1 000 Kč, ale pod stropom 2 200 Kč. Vráti sa to, len pomaly.${poznTeraz}`,
-          zle: `Nad stropom 2 200 Kč — klient, ktorý pôjde k Terezke, sa z toho nezaplatí.${poznTeraz}`,
-          bezDat: kampane.length === 0
-            ? "Ešte som z Mety nestiahol kampane."
-            : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. UTM v odkazoch bežia od 14. 9. 2026, takže prvý doložený dopyt sa objaví tu.`,
-        }),
-        riadky: jeTeraz
-          ? leadyTeraz.map((l) => ({ meno: l.name || l.email || "(bez mena)", vpravo: `${fmtDen(l.date)}${l.kampan ? ` · ${l.kampan}` : " · reklama"}` }))
-          : rDopyty.filter((x) => /reklama/i.test(x.vpravo)),
-        zoznamNadpis: jeTeraz
-          ? `Dopyty z reklamy za tento mesiac — menovateľ ceny (čitateľ je ${fmtCZK(spendTeraz)} výdavku za ten istý mesiac)`
-          : `Dopyty so zdrojom „reklama“ za ${mes} mesiacov — menovateľ ceny (čitateľ je „Minuté na reklamu“)`,
+        hodnota: cd.cena == null ? "—" : fmtCZK(cd.cena),
+        h: neutralne,
+        farba: cd.cena == null ? undefined : C.text,
+        smer: `od septembra 2026 · ${cd.dopyty.length} ${cd.dopyty.length === 1 ? "dopyt" : cd.dopyty.length > 1 && cd.dopyty.length < 5 ? "dopyty" : "dopytov"} z reklamy · cieľ zatiaľ nie je`,
+        preco: "Koľko stojí jeden človek, ktorý sa ozval z reklamy. Počíta sa od septembra 2026 — vtedy reklama prvýkrát žiadala o dopyt (stránka s formulárom od 8. 9., odkazy s UTM od 14. 9.). Staršie kampane kupovali dosah a interakcie; ich výdavok je v „Minuté na reklamu“ a do tejto ceny nepatrí.",
+        verdikt: cd.cena == null
+          ? `Od septembra ${fmtCZK(cd.spend)} a zatiaľ žiadny dopyt z reklamy.`
+          : `${fmtCZK(cd.spend)} od 1. 9. 2026 ÷ ${cd.dopyty.length} dopytov z reklamy, vrátane bežiaceho mesiaca.`
+            + (cd.bezUtm ? ` ${cd.bezUtm} z nich nemá v odkaze UTM — zdroj „reklama“ je zapísaný ručne.` : "")
+            + " Cieľovú cenu si zatiaľ zámerne nestanovil (15. 10. 2026: teraz je dobrý každý dopyt, reklamy sa ladia), preto číslo nesúdi.",
+        riadky: cd.dopyty.map((l) => ({ meno: l.name || l.email || "(bez mena)", vpravo: `${fmtDen(l.date)}${l.kampan ? ` · ${l.kampan}` : " · reklama, bez UTM"}` })),
+        zoznamNadpis: `Dopyty z reklamy od septembra 2026 — menovateľ ceny (čitateľ je ${fmtCZK(cd.spend)} výdavku za to isté obdobie)`,
       },
       {
         kluc: "uvodne",
@@ -290,14 +240,14 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <Info
           label="Na čom to stojí"
-          text="Čísla, ktoré rozhodujú o marketingu. Prvé tri sú tie, na ktorých všetko stojí; za nimi vpravo sú podporné, ktoré vysvetľujú, prečo tie tri vyzerajú tak, ako vyzerajú — posuň sa k nim. Klik na trojuholník otvorí, prečo to sledujeme a ako to práve teraz stojí. Hranice nie sú z odvetvových priemerov, sú z tvojich vlastných čísel a z marketingového plánu: strop 2 200 Kč za dopyt u Terezkiných klientov, cieľ pod 1 000 Kč, 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka. Počíta sa len z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
+          text="Čísla, ktoré rozhodujú o marketingu. Prvé tri sú tie, na ktorých všetko stojí; za nimi vpravo sú podporné, ktoré vysvetľujú, prečo tie tri vyzerajú tak, ako vyzerajú — posuň sa k nim. Klik na trojuholník otvorí, prečo to sledujeme a ako to práve teraz stojí. Hranice nie sú z odvetvových priemerov, sú z tvojich vlastných čísel a z marketingového plánu: 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka. Cena za dopyt sa nesúdi, kým si nestanovíš cieľ, a počíta sa od septembra 2026, keď reklama prvýkrát žiadala o dopyt. Ostatné sa počítajú z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
         />
         <span style={{ fontSize: 11.5, color: C.textDim }}>posledných 12 plných mesiacov · posuň doprava, je toho viac</span>
       </div>
 
       <div style={{ display: "flex", gap: 12, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
         {m.map((x) => {
-          const farba = x.h.bezDat ? C.textDim : farbaCeny(x.h.skore);
+          const farba = x.farba ?? (x.h.bezDat ? C.textDim : farbaCeny(x.h.skore));
           const je = otvorene === x.kluc;
           return (
             <div key={x.kluc} style={{
