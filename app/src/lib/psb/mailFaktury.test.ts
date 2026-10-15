@@ -121,13 +121,13 @@ describe("mailFakturyHtml — návrh 1, rovnaký šat ako výpis", () => {
   });
 
   it("tykanie oslovuje krstným menom, vykanie bez mena", () => {
-    expect(mailFakturyHtml(f, { vykanie: false })).toContain("Martin, posílám fakturu");
+    expect(mailFakturyHtml(f, { vykanie: false })).toContain("Martine, posílám fakturu");
     expect(mailFakturyHtml(f, { vykanie: true })).toContain("Dobrý den, posílám fakturu č. 20261001");
   });
 
   it("osobná veta prebije predvolenú", () => {
     const h = mailFakturyHtml(f, { uvod: "tady je slíbená faktura, měj se!" });
-    expect(h).toContain("Martin, tady je slíbená faktura");
+    expect(h).toContain("Martine, tady je slíbená faktura");
     expect(h).not.toContain("posílám fakturu —");
   });
 

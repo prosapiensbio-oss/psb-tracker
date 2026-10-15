@@ -26,6 +26,8 @@
  * `cid:` prejde všade. Viac obrázkov než tieto dva sem nepatrí — doména má
  * DMARC `p=none` a obrázkový mail je pre spamový filter horší.
  */
+import { vokativ } from "./oslovenie";
+
 
 /** Farby značky. Tmavá zelená je pozadie, svetlá je platba. */
 /**
@@ -344,7 +346,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
    * tie — textová podoba bola jeden zlepenec bez medzier.
    */
   const text = [
-    `Ahoj ${v.oslovenie},`,
+    `Ahoj${vokativ(v.oslovenie) ? ` ${vokativ(v.oslovenie)}` : ""},`,
     "",
     v.odkaz || null,
     uvod,
@@ -426,7 +428,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
 
   <tr><td style="text-align:center;font-size:32px;font-weight:700;color:${F.biela};line-height:1.15;padding-bottom:8px">${esc(nadpis)}</td></tr>
   <tr><td style="text-align:center;font-size:15px;color:${F.slaba};line-height:1.6;padding-bottom:24px">
-    ${esc(v.oslovenie)}, ${esc(v.odkaz || uvod)}
+    ${esc(vokativ(v.oslovenie) || "Ahoj")}, ${esc(v.odkaz || uvod)}
   </td></tr>
 
   ${staty.length ? `<tr><td style="padding-bottom:20px">

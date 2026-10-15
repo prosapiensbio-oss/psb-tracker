@@ -9,6 +9,8 @@
  * `kal_udalosti.zaciatok` — porovnávajú sa ako reťazce (pamäť „Deň podľa
  * Prahy": nikdy cez Date.parse, server je v UTC).
  */
+import { vokativ } from "./oslovenie";
+
 
 export type CasPonuky = { id: string; trener: string; zaciatok: string; koniec: string };
 export type Obsadene = { trener: string; zaciatok: string; koniec: string };
@@ -145,7 +147,7 @@ export const casHHMM = (s: string) => `${Number(s.slice(11, 13))}:${s.slice(14, 
  * nenesie: ten povie stránka, ktorá je vždy aktuálna.
  */
 export function textSmsPonuky(oslovenie: string, url: string, podpis: string): string {
-  const o = oslovenie.trim();
+  const o = vokativ(oslovenie.trim());
   return `${o ? `${o}, p` : "P"}osílám volné termíny, vyberte si: ${url} ${podpis}`.trim();
 }
 

@@ -1,4 +1,5 @@
 import { SADZBA } from "./klientStranka";
+import { vokativ } from "./oslovenie";
 
 /**
  * STRÁNKA S FOTKAMI PRE KLIENTA — `/f/<token>` (Jerry, 12. 10. 2026).
@@ -21,7 +22,7 @@ import { SADZBA } from "./klientStranka";
  */
 
 export const vychodiskovaSprava = (krstne: string) =>
-  `Ahoj${krstne ? ` ${krstne}` : ""}, posílám ti fotky z dřívějšího a z nedávného focení. Podívej se na ně — věřím, že tam uvidíš alespoň malé zlepšení.`;
+  `Ahoj${vokativ(krstne) ? ` ${vokativ(krstne)}` : ""}, posílám ti fotky z dřívějšího a z nedávného focení. Podívej se na ně — věřím, že tam uvidíš alespoň malé zlepšení.`;
 
 export type CisloKarty = { nazov: string; pred: string; po: string };
 export type KartaFotky = { id: string; popis: string; maCiste: boolean; cisla: CisloKarty[]; dni?: string[] };

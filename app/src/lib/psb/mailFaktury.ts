@@ -1,4 +1,5 @@
 import { FARBY_MAILU as FM, czk } from "./mailKlientovi";
+import { krstne, oslovenieKlienta } from "./oslovenie";
 import { DODAVATEL, den, klientiFaktury, polozkyFaktury, popisFaktury, suma, type Faktura } from "./vydanaFaktura";
 
 /**
@@ -29,11 +30,8 @@ export const TRENERI: Record<string, { krstne: string; formalne: string; telefon
   Terezka: { krstne: "Terezka", formalne: "Terezka", telefon: "+420 702 147 704" },
 };
 
-/** Krstné meno na oslovenie. Pri „Ing. arch. Anna Nová" je to Anna. */
-export function krstne(meno: string): string {
-  const kusy = meno.trim().split(/\s+/).filter((k) => !k.endsWith(".") && k.length > 1);
-  return kusy[0] || meno.trim().split(/\s+/)[0] || "";
-}
+/** Krstné meno na oslovenie — jedna definícia je v `oslovenie.ts`. */
+export { krstne };
 
 export type VolbyMailu = {
   /** „Jerry" | „Terezka"; čokoľvek iné sa berie ako Jerry. */
@@ -129,7 +127,7 @@ export function mailFakturyHtml(f: Faktura, volby: VolbyHtmlMailu = {}): string 
   const t = TRENERI[volby.trener || "Jerry"] || TRENERI.Jerry;
 
   // Oslovenie ako v textovom maili: tykanie krstným menom, vykanie bez mena.
-  const oslovenie = vykanie ? "Dobrý den" : krstne(f.klient);
+  const oslovenie = vykanie ? "Dobrý den" : oslovenieKlienta(f.klient) || "Ahoj";
   const uvod = volby.uvod?.trim() || (vykanie
     ? `posílám fakturu č. ${f.cislo} — PDF je v příloze a platbu předvyplní QR kód níže.`
     : "posílám fakturu — PDF je v příloze a zaplatit můžeš rovnou přes QR níž.");

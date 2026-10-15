@@ -10,6 +10,7 @@
  */
 
 import { FARBY_MAILU } from "./mailKlientovi";
+import { oslovenieKlienta } from "./oslovenie";
 import { OBLASTI, type Formular, type Otazka } from "./anamnezaFormular";
 
 const F = FARBY_MAILU;
@@ -127,13 +128,13 @@ function otazkaHtml(o: Otazka): string {
 
 export function strankaHtml(v: VstupStranky): string {
   const sekcia = v.formular.klient[0];
-  const krstne = esc((v.klient || "").split(" ")[0]);
+  const krstne = esc(oslovenieKlienta(v.klient || ""));
 
   const telo = v.hotovo
     ? `<div class="hotovo">
         <div class="fajka">✓</div>
         <h1 style="margin-top:10px">Máme to</h1>
-        <p class="lead">Díky, ${krstne}. Vidíme se na úvodním tréninku${v.uvodny ? ` — ${esc(v.uvodny)}` : ""}.</p>
+        <p class="lead">Díky${krstne ? `, ${krstne}` : ""}. Vidíme se na úvodním tréninku${v.uvodny ? ` — ${esc(v.uvodny)}` : ""}.</p>
       </div>`
     : `<form method="post" id="f">
         <div class="viem">

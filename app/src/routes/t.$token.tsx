@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { bindings } from "../lib/bindings.server";
 import { dnesPraha, terazPraha } from "../lib/psb/cas";
 import { zapisTrening } from "../lib/psb/nahodTrening.server";
+import { oslovenieKlienta } from "../lib/psb/oslovenie";
 import { ponukaStrankaHtml, type StavStranky } from "../lib/psb/ponukaStranka";
 import { DLZKA_TRENINGU, casHHMM, denCz, icsTerminu, prekryva, stavPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi } from "../lib/psb/ponukaTerminov";
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, pushTrenerovi } from "../lib/psb/ponukaTerminov.server";
@@ -25,7 +26,7 @@ const html = (text: string, status = 200) => new Response(text, {
 });
 const zle = (text: string, status = 404) => html(`<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>ProSapiens</title></head>
 <body style="margin:0;background:#FFFFFF;color:#1A2E24;font-family:Arial,Helvetica,sans-serif"><div style="max-width:420px;margin:80px auto;padding:0 20px;text-align:center;font-size:15px;line-height:1.6">${text}</div></body></html>`, status);
-const krstne = (meno: string) => meno.trim().split(/\s+/)[0] || "";
+const krstne = oslovenieKlienta;
 
 async function stav(DB: NonNullable<ReturnType<typeof bindings>["DB"]>, token: string, chyba?: string) {
   const n = await nacitajPonuku(DB, token);

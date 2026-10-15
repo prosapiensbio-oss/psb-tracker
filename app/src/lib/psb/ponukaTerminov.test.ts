@@ -48,7 +48,7 @@ describe("ponuka termínov", () => {
   it("deň po česky a krátka SMS", () => {
     expect(denCz("2026-10-13")).toBe("Úterý 13. 10.");
     const t = textSmsPonuky("Eva", "https://x.cz/t/abc", "Jerry");
-    expect(t).toBe("Eva, posílám volné termíny, vyberte si: https://x.cz/t/abc Jerry");
+    expect(t).toBe("Evo, posílám volné termíny, vyberte si: https://x.cz/t/abc Jerry");
   });
 });
 

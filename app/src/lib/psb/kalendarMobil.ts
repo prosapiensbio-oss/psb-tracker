@@ -126,3 +126,57 @@ export function stavOdberu(o: {
   if (o.pocet > 0 && o.posledne) return "prestal";
   return o.otvorene ? "otvoril" : "neotvoril";
 }
+
+export type Telefon = "iphone" | "android";
+/** `?telefon=` z adresy → voľba, alebo null (nič iné sa nepúšťa ďalej). */
+export const telefonZAdresy = (x: string | null | undefined): Telefon | null =>
+  x === "iphone" || x === "android" ? x : null;
+
+const escH = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * TELO STRÁNKY `/k/<token>` (Jerry, 15. 10. 2026: „design bude rovnaký ako
+ * bol, ale bude tam otázka, aký máš telefón — iPhone, Android — a keď klikne
+ * na Android, ukáže sa toto").
+ *
+ * Bez JavaScriptu: voľba je odkaz `?telefon=…#telefon`, server pošle stránku
+ * s rozbalenou časťou a zapíše, čo klient zvolil. Kým nezvolí, pod otázkou
+ * nie je nič — hádanie z hlavičky prehliadača sa vie pomýliť a zlá cesta je
+ * presne to, čo Michalovi Knapčokovi ticho zlyhalo.
+ *
+ * Android: Google Kalendár v telefóne odber z odkazu nepridá. Cesta 1 je
+ * počítač (adresa, mail sebe, a keď je stránka práve na počítači, rovno
+ * tlačidlo do Google Kalendára), cesta 2 appka ICSx⁵ (platená).
+ */
+export function teloStrankyKalendara(v: {
+  logo: string; oslovenie: string; telefon: Telefon | null;
+  webcal: string; google: string; kratka: string; telefonTrenera: string; komu: string;
+}): string {
+  const o = v.oslovenie.trim();
+  const volba = (t: Telefon, nazov: string, pod: string) =>
+    `<a class="volba${v.telefon === t ? " zvolena" : ""}" href="?telefon=${t}#telefon">${nazov}<small>${pod}</small></a>`;
+  const iphone = `
+<a class="btn" href="${escH(v.webcal)}">Přidat do kalendáře</a>
+<p class="mala">Telefon se zeptá „Odebírat kalendář?" — stačí potvrdit. V kalendáři uvidíte jen své tréninky.</p>
+<div class="rada">V dalším okně vypněte <b>„Odstranit upozornění"</b>, jinak vás telefon na trénink neupozorní.</div>`;
+  const mail = `mailto:?subject=${encodeURIComponent("Tréninky do kalendáře")}&body=${encodeURIComponent(`Otevřít na počítači: ${v.kratka}`)}`;
+  const android = `
+<p style="margin-top:18px">Na Androidu přidá tréninky jen Google Kalendář <b>na webu</b> — aplikace v mobilu odkaz neumí přijmout. Jsou dvě cesty:</p>
+<h2>1 · Na počítači — zdarma, minuta</h2>
+<p>Otevřete na počítači tuto adresu a klepněte na „Přidat přes Google Kalendář“. Buďte přihlášeni stejným Google účtem jako v mobilu — tréninky se do mobilu dostanou samy, poprvé do několika hodin.</p>
+<div class="adresa">${escH(v.kratka.replace(/^https?:\/\//, ""))}</div>
+<a class="btn" href="${escH(mail)}">Poslat si odkaz do e-mailu</a>
+<a class="druha" href="${escH(v.google)}">Jste právě na počítači? Přidat přes Google Kalendář</a>
+<h2>2 · Přímo v mobilu — aplikace ICSx⁵</h2>
+<p>Je placená (jednorázově kolem 50 Kč). Nainstalujte ji, vraťte se sem a klepněte na „Přidat přes ICSx⁵“.</p>
+<a class="btn svetle" href="https://play.google.com/store/apps/details?id=at.bitfire.icsdroid">Otevřít Google Play</a>
+<a class="btn svetle" href="${escH(v.webcal)}">Přidat přes ICSx⁵</a>
+<p class="mala">V kalendáři uvidíte jen své tréninky.</p>`;
+  return `${v.logo}
+<h1>Vaše tréninky v kalendáři</h1>
+<p>${o ? `${escH(o)}, j` : "J"}edním klepnutím se vám tréninky objeví v kalendáři v mobilu. Když se termín změní, změní se i u vás — sám.</p>
+<div class="otazka" id="telefon">Jaký máte telefon?</div>
+<div class="volby">${volba("iphone", "iPhone", "Apple")}${volba("android", "Android", "Samsung, Xiaomi, Pixel…")}</div>
+${v.telefon === "iphone" ? iphone : v.telefon === "android" ? android : ""}
+<a class="druha" style="margin-top:22px" href="sms:${escH(v.telefonTrenera.replace(/[^\d+]/g, ""))}">Nejde to? Napsat ${escH(v.komu)}</a>`;
+}

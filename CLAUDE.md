@@ -2933,6 +2933,21 @@ v `lib/psb/kalendarMobil.ts`) len z `kal_udalosti` s jeho menom
   migrácia 0117): dlaždica v profile tak rozlíši „stránku neotvoril" od
   „otvoril z Androidu, nepridal". Náhľady odkazov (`jeNahladOdkazu`) sa
   nepočítajú; otvorenie trénerom pri skúške áno.
+- **Stránka sa pýta „Jaký máte telefon?"** (Jerry, 15. 10. 2026) a až podľa
+  voľby ukáže cestu (`teloStrankyKalendara`). Voľba je odkaz `?telefon=`,
+  nie skript; zapíše sa do `zvoleny_telefon` (migrácia 0118). Tlačidlo podľa
+  hlavičky prehliadača zámerne nie je — práve to poslalo Android do appky.
+
+## Oslovenie klienta je v 5. páde — `oslovenie.ts`
+
+Stránky, SMS aj maily pre klientov oslovujú krstným menom a do 15. 10. 2026
+písali 1. pád („Michal, jedním klepnutím…"). Odvtedy `vokativ` /
+`oslovenieKlienta` (Michale, Radku, Jano, Tomáši; mená bez diakritiky zo
+slovníka). Keď si nie je istá (Lucia, Panagiotis, Luky, priezvisko na -ová),
+meno NECHÁ — zlý tvar je horší než 1. pád. Je idempotentná, takže sa smie
+volať vo vrstve textu aj na obrazovke. Nové miesto, kde klientovi píšeme
+menom, ide cez ňu; `krstne()` má jedinú definíciu tam (mailFaktury ju len
+reexportuje). Overené na všetkých 103 krstných menách z databázy.
 
 ## Metricool cez MCP — jedno ťuknutie v uzávierke (8. 10. 2026)
 

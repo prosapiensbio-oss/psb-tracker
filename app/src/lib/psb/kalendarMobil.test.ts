@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, platformaZAgenta, stavOdberu, zalom } from "./kalendarMobil";
+import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, platformaZAgenta, stavOdberu, telefonZAdresy, teloStrankyKalendara, zalom } from "./kalendarMobil";
 
 const T = { Jerry: { krstne: "Filip", telefon: "+420 111 222 333" }, Terezka: { krstne: "Terezka", telefon: "+420 702 147 704" } } as Record<string, { krstne: string; telefon: string }>;
 const tr = (t: string) => T[t] || T.Jerry;
@@ -68,5 +68,45 @@ describe("otvorenie stránky kalendára", () => {
     expect(stavOdberu({ ...z, otvorene: "2026-10-14T14:20:00Z", otvorenePlatforma: "Android" })).toBe("otvoril");
     expect(stavOdberu({ ...z, pocet: 3, posledne: "2026-10-01T00:00:00Z" })).toBe("prestal");
     expect(stavOdberu({ ...z, odobera: true, pocet: 3, posledne: "2026-10-14T00:00:00Z" })).toBe("odobera");
+  });
+});
+
+// Jerry, 15. 10. 2026: „bude tam otázka, aký máš telefón, iPhone, Android,
+// a keď klikne na Android, ukáže sa toto".
+describe("stránka kalendára — otázka na telefón", () => {
+  const v = {
+    logo: "<img>", oslovenie: "Michale", webcal: "webcal://k.dev/k/AbC12345/kalendar.ics",
+    google: "https://calendar.google.com/calendar/r?cid=x", kratka: "https://prosapiens.cz/k/AbC12345",
+    telefonTrenera: "+420 702 090 289", komu: "Filipovi",
+  };
+  it("kým nezvolí, je tam len otázka — žiadne tlačidlo do kalendára", () => {
+    const h = teloStrankyKalendara({ ...v, telefon: null });
+    expect(h).toContain("Michale, jedním klepnutím");
+    expect(h).toContain("Jaký máte telefon?");
+    expect(h).toContain('href="?telefon=iphone#telefon"');
+    expect(h).toContain('href="?telefon=android#telefon"');
+    expect(h).not.toContain("Přidat do kalendáře");
+    expect(h).not.toContain("ICSx");
+  });
+  it("iPhone: webcal a rada o upozorneniach", () => {
+    const h = teloStrankyKalendara({ ...v, telefon: "iphone" });
+    expect(h).toContain(`href="${v.webcal}">Přidat do kalendáře`);
+    expect(h).toContain("Odstranit upozornění");
+    expect(h).not.toContain("ICSx");
+    expect(h).toContain('class="volba zvolena" href="?telefon=iphone');
+  });
+  it("Android: počítač, mail sebe, Google na počítači a ICSx⁵", () => {
+    const h = teloStrankyKalendara({ ...v, telefon: "android" });
+    expect(h).toContain("prosapiens.cz/k/AbC12345</div>");
+    expect(h).toContain("mailto:?subject=");
+    expect(h).toContain("Jste právě na počítači? Přidat přes Google Kalendář");
+    expect(h).toContain("at.bitfire.icsdroid");
+    expect(h).not.toContain("Odstranit upozornění");
+  });
+  it("adresa pustí len dve voľby", () => {
+    expect(telefonZAdresy("android")).toBe("android");
+    expect(telefonZAdresy("iphone")).toBe("iphone");
+    expect(telefonZAdresy("<script>")).toBe(null);
+    expect(telefonZAdresy(null)).toBe(null);
   });
 });

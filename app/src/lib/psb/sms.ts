@@ -18,6 +18,7 @@
  */
 
 import { zostavaHodin } from "./mailKlientovi";
+import { vokativ } from "./oslovenie";
 
 /** Znaky, ktoré sa zmestia do GSM 03.38 — všetko ostatné prepne na UCS-2. */
 const GSM = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
@@ -171,7 +172,8 @@ export function textSms(v: {
       : `ozvi sa mi, prejdeme si hodiny${za}.`;
   // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
   // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.
-  return bezDiakritiky(`Ahoj ${v.oslovenie}, ${telo} ${v.trener}`);
+  const o = vokativ(v.oslovenie);
+  return bezDiakritiky(`Ahoj${o ? ` ${o}` : ""}, ${telo} ${v.trener}`);
 }
 
 /**
