@@ -213,6 +213,20 @@ export const Route = createFileRoute("/api/fotky")({
           }
           const id = povodny?.id || `f${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
           const kluc = povodny?.kluc || klucFotky(id, den);
+          /**
+           * ZÁLOHA PRED PREPÍSANÍM (15. 10. 2026). Radkovi Balážovi prepísalo
+           * druhé uloženie prvý záber a R2 nemá verzie — obrázok bol preč.
+           * Predošlá podoba (obrázok, čistá podoba, popis a stav editora) sa
+           * odloží o úroveň späť pod `<kluc>-predtym*`; zmaže sa s porovnaním.
+           */
+          if (povodny) {
+            const stary = await STORAGE.get(povodny.kluc).catch(() => null);
+            if (stary) await STORAGE.put(`${povodny.kluc}-predtym`, await stary.arrayBuffer(), { httpMetadata: { contentType: "application/octet-stream" } });
+            const staryCisty = povodny.kluc_ciste ? await STORAGE.get(povodny.kluc_ciste).catch(() => null) : null;
+            if (staryCisty) await STORAGE.put(`${povodny.kluc}-predtym-ciste`, await staryCisty.arrayBuffer(), { httpMetadata: { contentType: "application/octet-stream" } });
+            const meta = await DB.prepare("SELECT popis, edit_json FROM klient_fotky WHERE id = ?1").bind(povodny.id).first<{ popis: string | null; edit_json: string | null }>();
+            await STORAGE.put(`${povodny.kluc}-predtym-meta`, JSON.stringify({ ...meta, kedy: new Date().toISOString() }), { httpMetadata: { contentType: "application/json" } });
+          }
           const sifra = await zasifrujBajty(await f.arrayBuffer(), ANAMNEZA_KLUC);
           await STORAGE.put(kluc, sifra, { httpMetadata: { contentType: "application/octet-stream" } });
           // Čistá podoba porovnania (bez čiar a kresby) — len pri porovnaní z editora.
@@ -380,8 +394,10 @@ export const Route = createFileRoute("/api/fotky")({
           if (STORAGE) await STORAGE.delete(r.kluc);
           if (STORAGE && r.kluc_ciste) await STORAGE.delete(r.kluc_ciste);
           if (STORAGE) {
-            const zdroje = await STORAGE.list({ prefix: `${r.kluc}-zdroj-` }).catch(() => null);
-            for (const o of zdroje?.objects || []) await STORAGE.delete(o.key).catch(() => {});
+            for (const prefix of [`${r.kluc}-zdroj-`, `${r.kluc}-predtym`]) {
+              const zoz = await STORAGE.list({ prefix }).catch(() => null);
+              for (const o of zoz?.objects || []) await STORAGE.delete(o.key).catch(() => {});
+            }
           }
           await DB.prepare("DELETE FROM klient_fotky WHERE id = ?1").bind(id).run();
           await audit(DB, { action: "fotka-zmazana", predmet: r.klient, old: { den: r.den, pohlad: r.pohlad }, actor: kto || undefined });

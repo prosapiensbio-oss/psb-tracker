@@ -317,15 +317,24 @@
     const blob = await sk.vyrobJpeg(2000);
     const ciste = sk.maRozbor ? await sk.vyrobJpeg(2000, true) : null;
     const { edit, zdroje } = await stavNaUlozenie();
-    const r = await kt.nahraj({ blob, ciste, edit, zdroje, nahradit: upravovane && !akoNove ? upravovane.id : "", pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
-    akoNove = false;
+    // Prepisuje sa LEN porovnanie otvorené z kartotéky (✎ upraviť) alebo na výslovný
+    // klik „prepísať" — po bežnom uložení ďalšie uloženie robí ĎALŠIE porovnanie.
+    const prepisat = upravovane && (upravovane.zKartoteky ? !akoNove : prepisatUlozene);
+    const r = await kt.nahraj({ blob, ciste, edit, zdroje, nahradit: prepisat ? upravovane.id : "", pohlad: "porovnanie", sirka: 2000, vyska: 2000, nazov: "predtym-potom.jpg", popis: $("popisFotky").value.trim() });
+    akoNove = false; prepisatUlozene = false;
     b.disabled = false;
     st.style.color = r.ok ? "var(--accentLight)" : "#ff8a7a";
     st.textContent = r.ok
       ? (r.prepisane ? `✓ Porovnanie prepísané — ${kt.klient}. Odkaz klientovi už ukazuje novú verziu.` : `✓ Uložené do kartotéky — ${kt.klient} (profil → fotky → Z editora).`)
       : r.error;
-    // Uložené porovnanie sa dá ďalej upravovať a ukladať tým istým tlačidlom.
-    if (r.ok && r.id) nastavUpravovane({ id: r.id, den: upravovane?.den || kt.dnes() });
+    /**
+     * PO ULOŽENÍ SA NEPREPISUJE (Jerry, 15. 10. 2026: „chcel som spraviť viac
+     * záberov zozadu Radka Baláža, uložil som ten druhý a prepísal mi ten
+     * prvý"). Tlačidlo ďalej ukladá ĎALŠIE porovnanie; prepísať to práve
+     * uložené sa dá odkazom pod ním. Porovnanie otvorené z kartotéky
+     * (✎ upraviť) sa prepisuje ako doteraz — tam je to úmysel.
+     */
+    if (r.ok && r.id) nastavUpravovane({ id: r.id, den: upravovane?.den || kt.dnes(), zKartoteky: !!(prepisat && upravovane?.zKartoteky), cas: new Date() });
     else popisTlacidla();
     // Popis patrí tomuto porovnaniu. Keď sa do polovíc dajú iné fotky, začne sa prázdny.
     if (r.ok) ulozeneZdroje = sk.stav.map((x) => x.src || "").join("|");
@@ -338,8 +347,9 @@
    * ako „zdroj:N". Otvorené porovnanie (✎ upraviť v kartotéke) sa tlačidlom
    * PREPÍŠE — odkaz klientovi ukáže novú verziu; „ako nové" urobí ďalšie.
    */
-  let upravovane = null; // { id, den }
+  let upravovane = null; // { id, den, zKartoteky?, cas? }
   let akoNove = false;
+  let prepisatUlozene = false;
   async function stavNaUlozenie() {
     const o = JSON.parse(sk.snimkaStavu());
     const rozmery = sk.rozmeryFotiek();
@@ -363,12 +373,23 @@
   }
   function popisTlacidla() {
     const b = $("ulozitKlientovi");
-    b.textContent = upravovane ? "Prepísať porovnanie" : "Uložiť ku klientovi";
+    const zK = !!upravovane?.zKartoteky;
+    b.textContent = !upravovane ? "Uložiť ku klientovi" : zK ? "Prepísať porovnanie" : "Uložiť ako ďalšie porovnanie";
     $("upravujem").hidden = !upravovane;
-    if (upravovane) $("upravujemText").textContent = `Upravuješ porovnanie z ${sk.denCz(upravovane.den)} — uloženie ho prepíše (aj v odkaze klientovi).`;
+    if (!upravovane) return;
+    const kedy = upravovane.cas ? upravovane.cas.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" }) : "";
+    $("upravujemText").textContent = zK
+      ? `Upravuješ porovnanie z ${sk.denCz(upravovane.den)} — uloženie ho prepíše (aj v odkaze klientovi).`
+      : `Uložené${kedy ? ` o ${kedy}` : ""}. Ďalšie uloženie bude NOVÉ porovnanie.`;
+    $("akoNove").textContent = zK ? "uložiť ako nové" : "radšej prepísať to uložené";
   }
   function nastavUpravovane(u) { upravovane = u; popisTlacidla(); }
-  $("akoNove").onclick = () => { akoNove = true; $("ulozitKlientovi").click(); };
+  $("akoNove").onclick = () => {
+    if (upravovane?.zKartoteky) akoNove = true;
+    else if (!confirm("Prepísať porovnanie, ktoré si práve uložil? Jeho doterajšia podoba sa nahradí.")) return;
+    else prepisatUlozene = true;
+    $("ulozitKlientovi").click();
+  };
   // Otvoriť uložené porovnanie z kartotéky (Kokpit → ✎ upraviť).
   addEventListener("message", async (e) => {
     if (e.origin !== location.origin || e.data?.typ !== "psb-upravit") return;
@@ -381,7 +402,7 @@
     o.popis = j.popis || ""; // popis mohol byť upravený v kartotéke neskôr
     ulozeneZdroje = null;
     sk.nacitajStav(JSON.stringify(o), j.edit.rozmery || {});
-    nastavUpravovane({ id: j.id, den: j.den });
+    nastavUpravovane({ id: j.id, den: j.den, zKartoteky: true });
     st.textContent = "Otvorené — uprav a ulož.";
   });
   const vycistiPopis = () => { $("popisFotky").value = ""; ulozeneZdroje = null; };
