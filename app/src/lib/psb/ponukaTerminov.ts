@@ -101,6 +101,34 @@ export function prekryvVPonuke(casy: { trener: string; zaciatok: string; koniec:
   return casy.some((a, i) => casy.some((b, j) => j > i && a.trener === b.trener && prekryva(a, b)));
 }
 
+/**
+ * KDE ZAČNE TERMÍN PO KLIKU (Jerry, 15. 10. 2026: „dám jeden ráno a druhý
+ * večer, vysvieti sa mi ten deň na červeno a neudeje sa nič").
+ *
+ * Klik určí štvrťhodinu, v ktorej termín ZAČNE. Pri večernej hodine 20:00
+ * to znamenalo, že klik do jej spodnej polovice chcel 20:30–21:30, za koniec
+ * mriežky — a ten istý problém tesne pred obsadenou hodinou (15:30, keď je
+ * o 16:00 tréning). Termín sa preto posunie hore po 15 minútach, najviac
+ * o 45 — tak, aby kliknuté miesto zostalo vnútri hodiny. Keď sa nezmestí
+ * ani tak, vráti dôvod, ktorý obrazovka povie nahlas.
+ */
+export function zaciatokPoKliku(
+  klik: number,
+  o: { odMin: number; doMax: number; dlzka?: number; obsadene: (od: number, doMin: number) => boolean; vMinulosti: (od: number) => boolean },
+): { od: number } | { dovod: string } {
+  const dlzka = o.dlzka ?? DLZKA_TRENINGU;
+  let dovod = "";
+  for (let posun = 0; posun < dlzka; posun += 15) {
+    const od = klik - posun;
+    if (od < o.odMin) break;
+    if (od + dlzka > o.doMax) { dovod ||= `Hodina sa do ${Math.floor(o.doMax / 60)}:${String(o.doMax % 60).padStart(2, "0")} nezmestí.`; continue; }
+    if (o.vMinulosti(od)) { dovod = "Tento čas už bol."; continue; }
+    if (o.obsadene(od, od + dlzka)) { dovod = "V tomto čase je už tréning alebo iný termín."; continue; }
+    return { od };
+  }
+  return { dovod: dovod || "Sem sa hodina nezmestí." };
+}
+
 const DNI_CZ = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
 const DNI_CZ_VELKE = ["Neděle", "Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota"];
 /** „Pondělí 13. 10." — deň v týždni pre stránku klienta. */

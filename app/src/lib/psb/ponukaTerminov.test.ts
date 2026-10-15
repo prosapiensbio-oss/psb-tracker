@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { denCz, icsTerminu, jeRozmedzie, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, stavPonuky, textSmsPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi } from "./ponukaTerminov";
+import { denCz, icsTerminu, jeRozmedzie, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, stavPonuky, textSmsPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi, zaciatokPoKliku } from "./ponukaTerminov";
 
 // Jerry, 7. 10. 2026: „vytukal by som si všetky termíny, ktoré ponúkam,
 // poslal by som mu odkaz… klikol by na ten, ktorý chce."
@@ -93,5 +93,34 @@ describe("ponuka v rozmedzí", () => {
   it("plne obsadené rozmedzie nie je voľné", () => {
     const obs = [{ trener: "Jerry", zaciatok: "2026-10-13T14:00", koniec: "2026-10-13T17:30" }];
     expect(volneCasy([r], obs, "2026-10-12T12:00")).toEqual([]);
+  });
+});
+
+// Jerry, 15. 10. 2026: „dám jeden ráno a druhý večer, vysvieti sa mi ten deň
+// na červeno a neudeje sa nič."
+describe("zaciatokPoKliku", () => {
+  const h = (hh: number, mm = 0) => hh * 60 + mm;
+  // Utorok 20. 10.: tréningy do 20:00, ráno ponuka 10:00–11:00.
+  const obsadeneUseky = [[h(19), h(20)], [h(15, 0), h(16)], [h(10), h(11)]];
+  const zak = { odMin: h(7), doMax: h(21), obsadene: (od: number, doMin: number) => obsadeneUseky.some(([a, b]) => od < b && doMin > a), vMinulosti: () => false };
+
+  it("klik do spodnej polovice hodiny 20:00 dá 20:00–21:00, nie červenú", () => {
+    expect(zaciatokPoKliku(h(20, 30), zak)).toEqual({ od: h(20) });
+    expect(zaciatokPoKliku(h(20, 45), zak)).toEqual({ od: h(20) });
+  });
+  it("tesne pred obsadenou hodinou sa termín posunie hore", () => {
+    expect(zaciatokPoKliku(h(14, 30), zak)).toEqual({ od: h(14) });
+  });
+  it("voľné miesto berie presne kliknutú štvrťhodinu", () => {
+    expect(zaciatokPoKliku(h(12, 15), zak)).toEqual({ od: h(12, 15) });
+  });
+  it("posun najviac o 45 min — kliknuté miesto zostane v hodine", () => {
+    // 16:00–19:00 voľné, klik 18:45 → 18:00–19:00 (posun 45), nie 17:45.
+    expect(zaciatokPoKliku(h(18, 45), zak)).toEqual({ od: h(18) });
+  });
+  it("keď sa nezmestí, povie prečo", () => {
+    expect(zaciatokPoKliku(h(19, 30), zak)).toEqual({ dovod: "V tomto čase je už tréning alebo iný termín." });
+    expect(zaciatokPoKliku(h(20, 30), { ...zak, doMax: h(20, 30) })).toHaveProperty("dovod");
+    expect(zaciatokPoKliku(h(12), { ...zak, vMinulosti: () => true })).toEqual({ dovod: "Tento čas už bol." });
   });
 });

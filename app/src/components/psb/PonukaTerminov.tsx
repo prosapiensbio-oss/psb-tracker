@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
 import { TRENERI } from "../../lib/psb/mailFaktury";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
-import { textSmsPonuky } from "../../lib/psb/ponukaTerminov";
+import { textSmsPonuky, zaciatokPoKliku } from "../../lib/psb/ponukaTerminov";
 import type { Lead } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -63,6 +63,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const [hotovo, setHotovo] = useState<{ url: string; klient: string; telefon: string; trener: string } | null>(null);
   const [ponuky, setPonuky] = useState<Ponuka[]>([]);
   const [blik, setBlik] = useState("");
+  const [dovodBliku, setDovodBliku] = useState("");
   const [dalsieId, setDalsieId] = useState(1);
 
   const treneri = trener ? [trener] : ["Jerry", "Terezka"];
@@ -185,10 +186,18 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
     window.addEventListener("pointercancel", koniec);
   };
 
-  const pridaj = (den: string, tr: string, od: number) => {
+  const pridaj = (den: string, tr: string, klik: number) => {
     if (Date.now() < ignorujKlikDo.current) return;
     const k = `${den}|${tr}`;
-    if (od + 60 > DO_H * 60 || obsadene(den, tr, od, od + 60) || vMinulosti(den, od)) { setBlik(k); setTimeout(() => setBlik(""), 450); return; }
+    // Termín sa posunie hore, kým sa zmestí (klik 20:30 → 20:00–21:00); keď
+    // nie, blik a VETA — samotná červená nehovorila, čo je zle.
+    const miesto = zaciatokPoKliku(klik, {
+      odMin: OD_H * 60, doMax: DO_H * 60,
+      obsadene: (od, doMin) => obsadene(den, tr, od, doMin), vMinulosti: (od) => vMinulosti(den, od),
+    });
+    if (!("od" in miesto)) { setBlik(k); setDovodBliku(miesto.dovod); setTimeout(() => setBlik(""), 450); return; }
+    const od = miesto.od;
+    setDovodBliku("");
     setNavrhy((xs) => [...xs, { id: dalsieId, trener: tr, den, od, minut: 60 }]);
     setDalsieId((x) => x + 1);
     setHotovo(null);
@@ -235,6 +244,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 11.5, color: C.textDim }}>{trener ? `kalendár: ${trener}` : "Jerry vľavo · Terezka vpravo"}</span>
         </div>
+        {dovodBliku && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{dovodBliku}</div>}
         {!udalosti ? <div style={{ fontSize: 13, color: C.textDim, padding: 20 }}>Načítavam kalendár…</div> : (
           <div style={{ display: "grid", gridTemplateColumns: `${uzke ? 26 : 38}px repeat(7, 1fr)`, userSelect: "none" }}>
             <div />
