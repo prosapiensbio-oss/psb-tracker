@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **13. 10. 2026**.
+Stav k **15. 10. 2026**.
 
 ---
 
@@ -56,6 +56,26 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **F · Fronty (práca, nie stavba)** — sekcia 5: 6 dôvodov odchodu, závery po
 termíne, čas prvej odpovede, zmeny v kalendári.
+
+## VYPNUTIE PTMINDERA (Jerry, 15. 10. 2026: „áno, súhlasím")
+
+Tento týždeň je posledný týždeň zápisu do PTmindera; účet sa ruší až po
+uzávierke októbra (prvý mesiac s peniazmi z Kokpitu — keby niečo nesedelo,
+je kde pozrieť).
+
+1. [ ] **Do ne 18. 10.** — posledný týždeň zápisu do PTmindera. Claude: prejsť
+       9 otvorených poplatkov z PTmindera (80 962 Kč) — má každý v Kokpite
+       balíček alebo platbu? (hotovosť zapísaná len v PTminderi by ostala dlhom)
+2. [ ] **Po 19. 10.** — Jerry: posledný úplný export (všetky reporty ako doteraz)
+       + archív rokov 2022–2024 (zo starých rokov sa nič nepočíta, len uložiť).
+3. [ ] **Týždeň od 19. 10.** — Claude:
+       - 6M z balíčkov v Kokpite (předplatné), nie z exportu;
+       - vypnúť porovnania s PTminderom (karta „Vydrží kalendár sám?",
+         peniaze v Prechode, balíčky, „Chýba v PTminderi", poistka
+         `zaplateneVPtminderi`) — inak budú hlásiť rozdiel pri každom tréningu;
+       - zostatok na karte bez zálohy „z PTmindera" (bez balíčka v Kokpite =
+         bez balíčka + notifikácia „bol na tréningu a nemá aktívny balíček").
+4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
 
