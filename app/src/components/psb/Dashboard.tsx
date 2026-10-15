@@ -2966,6 +2966,10 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           ) : (
             <>
               <div style={{ fontSize: 11.5, color: C.textDim, wordBreak: "break-all" }}>{uvOdkaz}</div>
+              {/\/u\/([A-Za-z0-9]+)/.test(uvOdkaz) && (
+                <a href={`/u/${/\/u\/([A-Za-z0-9]+)/.exec(uvOdkaz)![1]}?nahlad=1`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí</a>
+              )}
               <textarea value={uvText} onChange={(e) => setUvText(e.target.value)} rows={3}
                 style={{ width: "100%", padding: "7px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, fontFamily: "inherit", resize: "vertical" }} />
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

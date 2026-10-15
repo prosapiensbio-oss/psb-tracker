@@ -272,6 +272,9 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const novyCudzi = (() => {
     const c = cisloPreBranu(upravaCisla || "");
     if (!c) return false;
+    // „Druhé" má zmysel len vedľa prvého. Klient bez čísla (nový z referencie)
+    // dostal ponuku „uložiť ako druhé" — a pýtal sa, odkiaľ je to prvé (15. 10. 2026).
+    if (!String(vsetkyKontakty.find((x) => x.klient === meno)?.telefon || "").trim()) return false;
     return !vsetkyKontakty.some((x) => cisloPreBranu(x.telefon || "") === c || cisloPreBranu(x.telefon2 || "") === c);
   })();
   const ulozDruhe = async () => {

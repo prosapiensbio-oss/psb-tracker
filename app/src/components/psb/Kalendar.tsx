@@ -1824,6 +1824,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   const [uvOtvorene, setUvOtvorene] = useState(false);
   const [uvCena, setUvCena] = useState("1100");
   const [uvText, setUvText] = useState("");
+  const [uvToken, setUvToken] = useState("");
   const [uvChyba, setUvChyba] = useState("");
   const [uvBusy, setUvBusy] = useState(false);
 
@@ -1891,13 +1892,14 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   const pripravUvodnuSms = async () => {
     if (!u || !klientUdalosti || uvBusy) return;
     setUvBusy(true); setUvChyba("");
-    type Odpoved = { ok?: boolean; odkaz?: string; error?: string };
+    type Odpoved = { ok?: boolean; odkaz?: string; token?: string; error?: string };
     const r = await fetch("/api/uvodny", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
       body: JSON.stringify({ akcia: "odkaz", klient: klientUdalosti, druh: "pred", trener: u.trener, kedy: u.zaciatok.slice(0, 16), cena: uvCena.trim() === "" ? null : Number(uvCena) }),
     }).then((x) => x.json() as Promise<Odpoved>).catch((): Odpoved => ({ ok: false, error: "spojenie zlyhalo" }));
     setUvBusy(false);
     if (!r.ok || !r.odkaz) { setUvChyba(r.error || "Odkaz sa nepodarilo vyrobiť."); return; }
+    setUvToken(r.token || "");
     // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov a z jednej správy by boli tri.
     setUvText(textBezDiakritiky(`Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`));
   };
@@ -2099,7 +2101,13 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
               <span style={{ fontSize: 10.5, color: C.textDim }}>bežne 1 100 Kč; zľava sa na stránke ukáže aj s pôvodnou cenou</span>
             </div>
           ) : (
-            <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene predvolenyText={uvText} />
+            <>
+              {uvToken && (
+                <a href={`/u/${encodeURIComponent(uvToken)}?nahlad=1`} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí (náhľad sa nepočíta ako otvorenie)</a>
+              )}
+              <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene predvolenyText={uvText} />
+            </>
           )}
           {uvChyba && <div style={{ fontSize: 11.5, color: C.red }}>{uvChyba}</div>}
         </div>

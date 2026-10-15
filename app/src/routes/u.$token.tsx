@@ -99,9 +99,12 @@ export const Route = createFileRoute("/u/$token")({
           odpovedPoslana: new URL(request.url).searchParams.get("odpoved") === "1",
         });
 
-        await DB.prepare(
-          "UPDATE uvodne_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2",
-        ).bind(new Date().toISOString(), token).run().catch(() => null);
+        // Náhľad trénera (?nahlad=1) sa do „otvoril" nepočíta.
+        if (new URL(request.url).searchParams.get("nahlad") !== "1") {
+          await DB.prepare(
+            "UPDATE uvodne_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2",
+          ).bind(new Date().toISOString(), token).run().catch(() => null);
+        }
 
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
