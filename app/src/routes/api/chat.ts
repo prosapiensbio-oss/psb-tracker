@@ -1232,8 +1232,11 @@ type Blok = StreamBlok;
               await DBpreDokumenty.prepare(
                 "INSERT INTO vzas_audit (id, at, actor, action, month, old_value, new_value) VALUES (?,?,?,?,?,?,?)",
               ).bind(crypto.randomUUID(), new Date().toISOString(), "app", "jarvis-spotreba", null, deep ? MODEL_DEEP : MODEL, JSON.stringify(spotreba))
-                .run().catch(() => { /* meranie nesmie zhodiť odpoveď */ });
+                .run().catch((e: unknown) => { posli({ ue: String(e).slice(0, 200) }); /* meranie nesmie zhodiť odpoveď */ });
             }
+            // Spotreba ide aj klientovi (kľúč `u`, obrazovka ho ignoruje) —
+            // dá sa overiť cache bez čítania databázy.
+            posli({ u: spotreba });
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           },
