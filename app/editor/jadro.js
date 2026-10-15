@@ -190,8 +190,9 @@
    * export (k = pomer) dopadne rovnako ako obrazovka.
    */
   function odtlacPopisky(texty, k) {
-    const rozmer = (t) => ({ w: (t.text.length * t.velkost * 0.6 + 12) * k, h: (t.velkost + 9) * k });
-    const medzera = 3 * k;
+    // Šírka o trochu väčšia než odhad pozadia — na plátne meria písmo širšie.
+    const rozmer = (t) => ({ w: (t.text.length * t.velkost * 0.65 + 14) * k, h: (t.velkost + 9) * k });
+    const medzera = 6 * k;
     for (let kolo = 0; kolo < 60; kolo++) {
       let pohyb = false;
       for (let i = 0; i < texty.length; i++) for (let j = i + 1; j < texty.length; j++) {
