@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { bindings } from "../lib/bindings.server";
 import { audit } from "../lib/psb/audit.server";
-import { dniZEditu, fotkyNeplati, fotkyStranka, type CisloKarty, type KartaFotky } from "../lib/psb/fotkyStranka";
+import { dniZEditu, fotkyNeplati, fotkyStranka, parZEditu, type CisloKarty, type KartaFotky } from "../lib/psb/fotkyStranka";
 import { TRENERI } from "../lib/psb/mailFaktury";
 import { pushTrenerovi } from "../lib/psb/ponukaTerminov.server";
 import { odsifruj, odsifrujBajty, zasifruj } from "../lib/psb/sifra.server";
@@ -97,7 +97,9 @@ export const Route = createFileRoute("/f/$token")({
           const r = riadky.find((y) => y.id === p.id);
           if (!r) continue; // fotku medzitým zmazal — zo stránky zmizne
           // Dni PŘEDTÍM/POTOM zo stavu editora — z nich nadpis „N týdnů práce".
-          karty.push({ id: p.id, popis: await rozbal(r.popis), maCiste: !!r.kluc_ciste, cisla: p.cisla || [], dni: dniZEditu(await rozbal(r.edit_json)) });
+          const edit = await rozbal(r.edit_json);
+          // Pár fotiek → porovnania z tých istých fotiek sa na stránke spoja do jednej karty.
+          karty.push({ id: p.id, popis: await rozbal(r.popis), maCiste: !!r.kluc_ciste, cisla: p.cisla || [], dni: dniZEditu(edit), par: parZEditu(edit) });
         }
         const odpovede = ((await DB.prepare("SELECT vytvorene_at FROM fotky_odpovede WHERE token = ?1 ORDER BY vytvorene_at").bind(token).all()).results as { vytvorene_at: string }[])
           .map((r) => ({ kedy: r.vytvorene_at }));

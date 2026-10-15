@@ -25,7 +25,11 @@ export const vychodiskovaSprava = (krstne: string) =>
   `Ahoj${vokativ(krstne) ? ` ${vokativ(krstne)}` : ""}, posílám ti fotky z dřívějšího a z nedávného focení. Podívej se na ně — věřím, že tam uvidíš alespoň malé zlepšení.`;
 
 export type CisloKarty = { nazov: string; pred: string; po: string };
-export type KartaFotky = { id: string; popis: string; maCiste: boolean; cisla: CisloKarty[]; dni?: string[] };
+export type KartaFotky = {
+  id: string; popis: string; maCiste: boolean; cisla: CisloKarty[]; dni?: string[];
+  /** Z ktorých dvoch fotiek je porovnanie zložené (`parZEditu`) — rovnaký pár = jedna karta. */
+  par?: string;
+};
 export type FotkyStrankaVstup = {
   token: string;
   trener: string;
@@ -67,6 +71,37 @@ export function dniZEditu(edit: string | null | undefined): string[] {
   } catch { return []; }
 }
 
+/**
+ * Pár fotiek, z ktorých je porovnanie zložené (adresy PŘEDTÍM a POTOM zo
+ * stavu editora). Dve porovnania z toho istého páru sú dva rozbory tej istej
+ * fotky — stránka ich spojí do jednej karty (Jerry, 15. 10. 2026: „2× fotka
+ * zozadu neupravená pôsobí mätúco… ideálne 3 na jednom mieste"). Prázdne =
+ * nespájať (staré porovnania bez uloženého stavu).
+ */
+export function parZEditu(edit: string | null | undefined): string {
+  if (!edit) return "";
+  try {
+    const vonku = JSON.parse(edit) as { stav?: unknown };
+    const vnutri = (typeof vonku.stav === "string" ? JSON.parse(vonku.stav) : vonku.stav) as { stav?: { src?: unknown }[] };
+    const srcs = (vnutri?.stav || []).map((x) => (typeof x?.src === "string" ? x.src : ""));
+    return srcs.filter(Boolean).length === 2 ? srcs.join("|") : "";
+  } catch { return ""; }
+}
+
+/** Karty v poradí prvého výskytu; porovnania z rovnakého páru fotiek spolu. */
+export function skupinyKariet(karty: KartaFotky[]): KartaFotky[][] {
+  const skupiny: KartaFotky[][] = [];
+  const podlaParu = new Map<string, KartaFotky[]>();
+  for (const k of karty) {
+    const g = k.par ? podlaParu.get(k.par) : undefined;
+    if (g) { g.push(k); continue; }
+    const nova = [k];
+    skupiny.push(nova);
+    if (k.par) podlaParu.set(k.par, nova);
+  }
+  return skupiny;
+}
+
 const tvar = (n: number, jeden: string, dva: string, pat: string) => (n === 1 ? jeden : n >= 2 && n <= 4 ? dva : pat);
 /**
  * NADPIS „36 týdnů práce" + „30. 1. 2026 → 11. 10. 2026" (Jerry, 13. 10. 2026:
@@ -96,22 +131,55 @@ export function fotkyStranka(v: FotkyStrankaVstup): string {
     ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="190" style="width:190px;max-width:60%;height:auto;display:block;filter:brightness(0) invert(.88)">`
     : `<div class="znacka">PROSAPIENS BIOMECHANIC</div>`;
 
-  const karty = v.karty.map((k, i) => {
-    const cisla = vyplneneCisla(k.cisla);
-    const obrazok = (ciste: boolean, stitok = "") =>
-      `<a class="foto" href="${adresa(k.id, ciste)}" target="_blank" rel="noopener"><img src="${adresa(k.id, ciste)}" alt="Srovnání předtím a potom ${i + 1}${stitok ? ` — ${stitok}` : ""}" loading="${i ? "lazy" : "eager"}"><span class="zvacsit" aria-hidden="true">⤢</span>${stitok ? `<span class="stitok">${stitok}</span>` : ""}</a>`;
-    // Dve podoby: čistá prvá, s rozborom za ňou — posun prstom alebo šípkou.
-    const snimky = k.maCiste
-      ? `<div class="listovanie"><div class="snimky" onscroll="psbBodky(this)">${obrazok(true, "bez čar")}${obrazok(false, "s rozborem")}</div>
-<button type="button" class="dalsia" aria-label="S rozborem" onclick="psbListuj(this)">›</button>
-<div class="bodky"><span class="on"></span><span></span></div></div>`
-      : obrazok(false);
-    return `<div class="karta">
+  const cislaHtml = (cisla: CisloKarty[]) => cisla.length
+    ? `<div class="cisla">${cisla.map((c) => `<span class="cislo">${esc(c.nazov)} ${c.pred ? `<b>${esc(c.pred)}</b>` : ""}${c.pred && c.po ? `<span class="sip">→</span>` : ""}${c.po ? `<b>${esc(c.po)}</b>` : ""}</span>`).join("")}</div>`
+    : "";
+  let poradie = 0;
+  const karty = skupinyKariet(v.karty).map((g) => {
+    const obrazok = (k: KartaFotky, ciste: boolean, stitok = "") => {
+      const i = poradie++;
+      return `<a class="foto" href="${adresa(k.id, ciste)}" target="_blank" rel="noopener"><img src="${adresa(k.id, ciste)}" alt="Srovnání předtím a potom${stitok ? ` — ${stitok}` : ""}" loading="${i ? "lazy" : "eager"}"><span class="zvacsit" aria-hidden="true">⤢</span>${stitok ? `<span class="stitok">${stitok}</span>` : ""}</a>`;
+    };
+    const listovanie = (snimky: string[], prva: string) => `<div class="listovanie"><div class="snimky" onscroll="psbBodky(this)">${snimky.join("")}</div>
+<button type="button" class="dalsia" aria-label="${prva}" onclick="psbListuj(this)">›</button>
+<div class="bodky">${snimky.map((_, n) => `<span${n ? "" : ' class="on"'}></span>`).join("")}</div></div>`;
+
+    // Jedno porovnanie: čistá prvá, s rozborom za ňou; text pod fotkou stále.
+    if (g.length === 1) {
+      const k = g[0], cisla = vyplneneCisla(k.cisla);
+      const snimky = k.maCiste ? listovanie([obrazok(k, true, "bez čar"), obrazok(k, false, "s rozborem")], "S rozborem") : obrazok(k, false);
+      return `<div class="karta">
 ${snimky}
 ${k.popis || cisla.length ? `<div class="telo">
 ${k.popis ? `<p>${esc(k.popis).replace(/\n/g, "<br>")}</p>` : ""}
-${cisla.length ? `<div class="cisla">${cisla.map((c) => `<span class="cislo">${esc(c.nazov)} ${c.pred ? `<b>${esc(c.pred)}</b>` : ""}${c.pred && c.po ? `<span class="sip">→</span>` : ""}${c.po ? `<b>${esc(c.po)}</b>` : ""}</span>`).join("")}</div>` : ""}
+${cislaHtml(cisla)}
 </div>` : ""}
+</div>`;
+    }
+
+    /**
+     * VIAC ROZBOROV TEJ ISTEJ FOTKY: čistá fotka raz, potom rozbor za
+     * rozborom a text pod fotkou sa mení s listovaním (psbBodky). Bez
+     * skriptu sa ukážu všetky texty pod sebou s číslom rozboru.
+     */
+    const cista = g.find((k) => k.maCiste);
+    const snimky = [
+      ...(cista ? [obrazok(cista, true, "bez čar")] : []),
+      ...g.map((k, n) => obrazok(k, false, `rozbor ${n + 1} z ${g.length}`)),
+    ];
+    const posun = cista ? 1 : 0;
+    const texty = g.map((k, n) => {
+      const cisla = vyplneneCisla(k.cisla);
+      return `<div class="telo rozbor" data-snimka="${n + posun}"><div class="rozbor-cislo">Rozbor ${n + 1} z ${g.length}</div>
+${k.popis ? `<p>${esc(k.popis).replace(/\n/g, "<br>")}</p>` : ""}
+${cislaHtml(cisla)}
+</div>`;
+    }).join("\n");
+    const navod = cista ? `<div class="telo rozbor navod" data-snimka="0"><p>Posuň fotku doprava — ukážu ti ${g.length} ${tvar(g.length, "rozbor", "rozbory", "rozborů")}, ke každému pár slov.</p></div>` : "";
+    return `<div class="karta skupina">
+${listovanie(snimky, cista ? "Rozbor 1" : "Další rozbor")}
+${navod}
+${texty}
 </div>`;
   }).join("\n");
 
@@ -171,6 +239,12 @@ h1{margin:6px 0 0;font-family:Raleway,sans-serif;font-weight:700;font-size:32px;
 .bodky{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:6px;pointer-events:none}
 .bodky span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.5)}
 .bodky span.on{background:#fff}
+.rozbor-cislo{font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;color:${s.tlmeny};font-weight:600;margin-bottom:6px}
+.navod p{color:${s.tlmeny};font-size:14px}
+.js .skupina .rozbor{display:none}
+.js .skupina .rozbor.on{display:block}
+.skupina .rozbor + .rozbor{border-top:1px solid ${s.ramik}}
+.js .skupina .rozbor + .rozbor{border-top:0}
 .karta{margin-top:16px;border-radius:18px;overflow:hidden;background:${s.plocha}}
 .foto{position:relative;display:block}
 .foto img{display:block;width:100%;height:auto;background:#fff}
@@ -225,8 +299,10 @@ ${odpovedBlok}
 ${suhlasBlok}
 ${v.karty.length ? `<details class="stiahnut"><summary>↓ Stáhnout fotky</summary><div class="zoznam">${stiahnut}</div></details>` : ""}
 <script>
-function psbListuj(b){var s=b.parentNode.querySelector('.snimky');var na=s.scrollLeft<s.clientWidth/2;s.scrollTo({left:na?s.clientWidth:0,behavior:'smooth'});}
-function psbBodky(s){var i=Math.round(s.scrollLeft/s.clientWidth);var w=s.parentNode;var b=w.querySelectorAll('.bodky span');for(var k=0;k<b.length;k++)b[k].className=k===i?'on':'';var t=w.querySelector('.dalsia');t.textContent=i?'‹':'›';t.setAttribute('aria-label',i?'Bez čar':'S rozborem');}
+function psbListuj(b){var s=b.parentNode.querySelector('.snimky');var n=s.children.length;var i=Math.round(s.scrollLeft/s.clientWidth);var d=i+1<n?i+1:0;s.scrollTo({left:d*s.clientWidth,behavior:'smooth'});}
+function psbBodky(s){var i=Math.round(s.scrollLeft/s.clientWidth);var n=s.children.length;var w=s.parentNode;var b=w.querySelectorAll('.bodky span');for(var k=0;k<b.length;k++)b[k].className=k===i?'on':'';var t=w.querySelector('.dalsia');var posl=i>=n-1;t.textContent=posl?'‹':'›';t.setAttribute('aria-label',posl?'Zpět na začátek':'Další');var c=w.parentNode;var r=c.querySelectorAll('.rozbor');for(var j=0;j<r.length;j++){r[j].className=r[j].className.replace(/ on/g,'')+(String(i)===r[j].getAttribute('data-snimka')?' on':'');}}
+document.documentElement.className+=' js';
+(function(){var l=document.querySelectorAll('.skupina .snimky');for(var i=0;i<l.length;i++)psbBodky(l[i]);})();
 </script>
 <div class="pata">Fotky vidíš jen ty přes tento odkaz. Jsou zašifrované a bez tvého souhlasu je nikde nezveřejníme. Odkaz platí do ${esc(den(v.platiDo))}.</div>
 </div>

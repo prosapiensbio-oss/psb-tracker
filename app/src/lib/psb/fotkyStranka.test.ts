@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { dniZEditu, fotkyStranka, obdobieSrovnani, vychodiskovaSprava, vyplneneCisla, type FotkyStrankaVstup } from "./fotkyStranka";
+import { dniZEditu, fotkyStranka, obdobieSrovnani, parZEditu, skupinyKariet, vychodiskovaSprava, vyplneneCisla, type FotkyStrankaVstup } from "./fotkyStranka";
 
 const vstup = (o: Partial<FotkyStrankaVstup> = {}): FotkyStrankaVstup => ({
   token: "abc123XYZ789", trener: "Jerry", poslane: "2026-10-12", platiDo: "2026-11-11",
@@ -8,6 +8,27 @@ const vstup = (o: Partial<FotkyStrankaVstup> = {}): FotkyStrankaVstup => ({
 });
 
 describe("stránka s fotkami pre klienta", () => {
+  it("porovnania z tých istých dvoch fotiek sú jedna karta: čistá raz, rozbory za ňou, text sa mení", () => {
+    const edit = (a: string, b: string) => JSON.stringify({ stav: JSON.stringify({ stav: [{ src: a }, { src: b }] }) });
+    expect(parZEditu(edit("/api/fotky?id=p", "/api/fotky?id=q"))).toBe("/api/fotky?id=p|/api/fotky?id=q");
+    expect(parZEditu(JSON.stringify({ stav: JSON.stringify({ stav: [{ src: "x" }, { src: null }] }) }))).toBe("");
+    const karty = [
+      { id: "a", popis: "Hrudník.", maCiste: true, cisla: [], par: "p|q" },
+      { id: "b", popis: "Bok.", maCiste: true, cisla: [], par: "r|s" },
+      { id: "c", popis: "Lopatky.", maCiste: true, cisla: [], par: "p|q" },
+      { id: "d", popis: "Kompresia.", maCiste: true, cisla: [], par: "p|q" },
+      { id: "e", popis: "Staré.", maCiste: false, cisla: [] },
+    ];
+    expect(skupinyKariet(karty).map((g) => g.map((k) => k.id))).toEqual([["a", "c", "d"], ["b"], ["e"]]);
+    const h = fotkyStranka(vstup({ karty }));
+    // čistá fotka skupiny len raz (z prvého), potom tri rozbory
+    expect(h.split("foto=a&ciste=1").length - 1).toBe(2); // odkaz + obrázok
+    expect(h).not.toContain("foto=c&ciste=1");
+    expect(h).toContain("rozbor 3 z 3");
+    expect(h).toContain('data-snimka="3"');
+    expect(h).toContain("ukážu ti 3 rozbory");
+    expect((h.match(/class="karta/g) || []).length).toBe(3);
+  });
   it("nadpis z dní odfotenia: týždne, pri dlhšom mesiace, bez dvoch dní nič", () => {
     expect(obdobieSrovnani(["2026-10-11", "2026-01-30"])).toEqual({ od: "2026-01-30", do: "2026-10-11", nadpis: "36 týdnů práce" });
     expect(obdobieSrovnani(["2026-10-11", "2026-10-11"])).toBeNull();
