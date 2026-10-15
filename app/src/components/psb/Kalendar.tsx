@@ -1787,6 +1787,30 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   style: React.CSSProperties;
 }) {
   const u = vyber.u;
+  /**
+   * OKNO SA ZMESTÍ DO KALENDÁRA (Jerry, 15. 10. 2026: „keď robím udalosť
+   * večer, časť okna sa schová pod hranicu kalendára"). Poloha počítala
+   * s oknom vysokým 300 px; s panelmi kópie, iného trénera a SMS je vyššie.
+   * Výška sa preto meria (aj keď sa panel otvorí) a okno sa posunie nahor;
+   * keď je vyššie než celá mriežka, roluje sa vnútri.
+   */
+  const oknoRef = useRef<HTMLDivElement>(null);
+  const [oknoHore, setOknoHore] = useState<number | null>(null);
+  const [oknoMax, setOknoMax] = useState<number | undefined>(undefined);
+  const zelanyTop = style.position === "absolute" && typeof style.top === "number" ? style.top : null;
+  useEffect(() => {
+    const el = oknoRef.current, rodic = el?.offsetParent as HTMLElement | null;
+    if (!el || !rodic || zelanyTop === null) return;
+    const sprav = () => {
+      const H = rodic.clientHeight, h = Math.min(el.offsetHeight, H - 8);
+      setOknoMax(H - 8);
+      setOknoHore(Math.max(0, Math.min(zelanyTop, H - h - 4)));
+    };
+    sprav();
+    const ro = new ResizeObserver(sprav);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [zelanyTop]);
   const navrh = useMemo(() => (u ? navrhni(u.nazov, clients) : null), [u, clients]);
   const [klient, setKlient] = useState(u ? (u.klient || "") : "");
   const [typ, setTyp] = useState(u ? (u.typ || navrh?.typ || "trening") : "trening");
@@ -1925,9 +1949,12 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
 
   return (
     <div
+      ref={oknoRef}
       onClick={(e) => e.stopPropagation()}
       style={{
         ...style,
+        ...(zelanyTop !== null && oknoHore !== null ? { top: oknoHore } : {}),
+        ...(zelanyTop !== null && oknoMax ? { maxHeight: oknoMax, overflowY: "auto" as const } : {}),
         /**
          * NEPRIEHĽADNÉ. Pod sklenenými paletami je `C.bg` priesvitná a okno
          * na telefóne stálo nad mriežkou, takže sa cezeň čítali mená
