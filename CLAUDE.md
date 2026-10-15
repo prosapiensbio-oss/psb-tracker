@@ -65,6 +65,10 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   (root /app) → nasadené za ~2 min. POZOR: CI deploy NEMÁ stráž migrácií ani
   testovú bránu z nasad.sh — migrácie aplikuj VŽDY pred pushom a testy pusti
   lokálne; nasad.sh zostáva primárna cesta, buildy sú poistka.
+  **Pasca (15. 10. 2026):** CI build zo STARŠIEHO pushu vie doraziť sekundu
+  po nasad.sh a prepísať ho starším kódom — nasad.sh hlási úspech, naživo
+  beží predošlá verzia. Pri dvoch pushoch tesne po sebe over zmenu naživo
+  (nie len verziu) a prípadne `nasad.sh --bez-buildu` zopakuj.
 - **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
   je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
 - **Meno klienta je v siedmich tabuľkách** a v troch z nich aj v `dedup_key`.
