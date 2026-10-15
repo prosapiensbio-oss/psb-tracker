@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { feedKlienta, odoberaKalendar, platformaZAgenta, zalom } from "./kalendarMobil";
+import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, platformaZAgenta, stavOdberu, zalom } from "./kalendarMobil";
 
 const T = { Jerry: { krstne: "Filip", telefon: "+420 111 222 333" }, Terezka: { krstne: "Terezka", telefon: "+420 702 147 704" } } as Record<string, { krstne: string; telefon: string }>;
 const tr = (t: string) => T[t] || T.Jerry;
@@ -42,5 +42,31 @@ describe("kalendár v mobile", () => {
     expect(odoberaKalendar("2026-10-06T12:00:00Z", teraz)).toBe(true);
     expect(odoberaKalendar("2026-10-01T12:00:00Z", teraz)).toBe(false);
     expect(odoberaKalendar(null, teraz)).toBe(false);
+  });
+});
+
+// Jerry, 15. 10. 2026: Michal Knapčok (Android) odkaz dostal, kalendár sa mu
+// neukázal a z Kokpitu sa nedalo zistiť, či stránku vôbec otvoril.
+describe("otvorenie stránky kalendára", () => {
+  it("platforma zo skutočných prehliadačov", () => {
+    expect(platformaStranky("Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36")).toBe("Android");
+    expect(platformaStranky("Mozilla/5.0 (Linux; Android 13; SAMSUNG SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0 Mobile Safari/537.36")).toBe("Android");
+    expect(platformaStranky("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1")).toBe("iPhone");
+    expect(platformaStranky("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15")).toBe("Mac");
+  });
+  it("náhľad odkazu sa za otvorenie nepočíta", () => {
+    expect(jeNahladOdkazu("facebookexternalhit/1.1 Facebot Twitterbot/1.0")).toBe(true);
+    expect(jeNahladOdkazu("WhatsApp/2.23.20.0 A")).toBe(true);
+    expect(jeNahladOdkazu("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")).toBe(true);
+    expect(jeNahladOdkazu("curl/8.7.1")).toBe(true);
+    expect(jeNahladOdkazu("Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36")).toBe(false);
+    expect(jeNahladOdkazu("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1")).toBe(false);
+  });
+  it("stav rozlíši, kde sa to zaseklo", () => {
+    const z = { odobera: false, pocet: 0, posledne: null, platforma: null, otvorene: null, otvorenePlatforma: null };
+    expect(stavOdberu(z)).toBe("neotvoril");
+    expect(stavOdberu({ ...z, otvorene: "2026-10-14T14:20:00Z", otvorenePlatforma: "Android" })).toBe("otvoril");
+    expect(stavOdberu({ ...z, pocet: 3, posledne: "2026-10-01T00:00:00Z" })).toBe("prestal");
+    expect(stavOdberu({ ...z, odobera: true, pocet: 3, posledne: "2026-10-14T00:00:00Z" })).toBe("odobera");
   });
 });

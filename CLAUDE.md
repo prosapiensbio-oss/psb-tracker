@@ -2923,6 +2923,16 @@ v `lib/psb/kalendarMobil.ts`) len z `kal_udalosti` s jeho menom
   workera, aby odber v telefóne nemusel prejsť presmerovaním.
 - **Neoverené na skutočnom telefóne**: či iPhone pri odbere nevypne
   upozornenia a ako rýchlo Google Kalendár obnovuje.
+- **Android Google Kalendár odber z odkazu NEPRIDÁ** (15. 10. 2026, Michal
+  Knapčok — prvý ostrý klient: SMS odišla, kalendár si nestiahol ani raz).
+  Odkaz `calendar.google.com/…?cid=` na telefóne otvorí appku a ticho ho
+  zahodí; pridať kalendár z adresy vie len web na počítači. Stránka preto
+  na Androide ukazuje dve cesty: počítač (krátka adresa + „Poslať si odkaz
+  do e-mailu“) a appku ICSx⁵ (platená, ~50 Kč) s `webcal://`.
+- **Otvorenie stránky sa zapisuje** (`otvorene_at/_pocet/_platforma`,
+  migrácia 0117): dlaždica v profile tak rozlíši „stránku neotvoril" od
+  „otvoril z Androidu, nepridal". Náhľady odkazov (`jeNahladOdkazu`) sa
+  nepočítajú; otvorenie trénerom pri skúške áno.
 
 ## Metricool cez MCP — jedno ťuknutie v uzávierke (8. 10. 2026)
 

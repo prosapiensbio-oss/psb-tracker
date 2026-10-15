@@ -87,3 +87,42 @@ export function platformaZAgenta(ua: string): string {
  */
 export const odoberaKalendar = (posledne: string | null | undefined, teraz = Date.now()) =>
   !!posledne && teraz - Date.parse(posledne) < 3 * 86400000;
+
+/**
+ * Z čoho klient otvoril STRÁNKU `/k/<token>` (nie feed — ten sťahuje
+ * kalendár, nie človek). Android je tu to podstatné: Google Kalendár
+ * v telefóne odber z odkazu nepridá a klient musí ísť inou cestou.
+ */
+export function platformaStranky(ua: string): string {
+  const u = ua || "";
+  if (/iPhone|iPad|iPod/i.test(u)) return "iPhone";
+  if (/Android/i.test(u)) return "Android";
+  if (/Macintosh|Mac OS X/i.test(u)) return "Mac";
+  if (/Windows/i.test(u)) return "Windows";
+  return "iný";
+}
+
+/**
+ * Náhľad odkazu (správy, WhatsApp, Messenger) stránku stiahne bez človeka —
+ * taký prístup sa za otvorenie nepočíta. Prehliadač človeka sa hlási ako
+ * „Mozilla/…" a nenesie meno robota.
+ */
+export function jeNahladOdkazu(ua: string): boolean {
+  const u = ua || "";
+  if (!/^Mozilla\//.test(u)) return true;
+  return /bot|crawler|spider|preview|facebookexternalhit|WhatsApp|Slack|Telegram|Discord|Viber|Skype|SkypeUriPreview|Google-|GoogleOther|HeadlessChrome|curl|python|okhttp/i.test(u);
+}
+
+/**
+ * Veta o stave odberu pre dlaždicu v profile. Rozlišuje, kde sa to zaseklo:
+ * stránku neotvoril / otvoril, ale kalendár si nepridal (a pri Androide
+ * prečo) / odoberá.
+ */
+export function stavOdberu(o: {
+  odobera: boolean; pocet: number; posledne: string | null; platforma: string | null;
+  otvorene: string | null; otvorenePlatforma: string | null;
+}): "odobera" | "prestal" | "otvoril" | "neotvoril" {
+  if (o.odobera) return "odobera";
+  if (o.pocet > 0 && o.posledne) return "prestal";
+  return o.otvorene ? "otvoril" : "neotvoril";
+}

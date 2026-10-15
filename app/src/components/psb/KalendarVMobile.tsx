@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { stavOdberu } from "../../lib/psb/kalendarMobil";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { TRENERI } from "../../lib/psb/mailFaktury";
 import { C, mix } from "../../lib/psb/theme";
@@ -13,7 +14,8 @@ import { SmsKlientovi } from "./SmsKlientovi";
  * kedy naposledy a čím (iPhone, Google Kalendár…). Klient vidí LEN svoje
  * tréningy — kalendár trénera sa nezdieľa.
  */
-type Odkaz = { token: string; url: string; createdAt: string; posledne: string | null; pocet: number; platforma: string | null; odobera: boolean };
+type Odkaz = { token: string; url: string; createdAt: string; posledne: string | null; pocet: number; platforma: string | null; odobera: boolean;
+  otvorene: string | null; otvorenePocet: number; otvorenePlatforma: string | null };
 
 const dm = (iso: string) => { const d = new Date(iso); return `${d.getDate()}. ${d.getMonth() + 1}.`; };
 const predKolko = (iso: string) => {
@@ -63,13 +65,24 @@ export function KalendarVMobile({ meno, trener }: { meno: string; trener: string
   };
 
   if (odkaz === undefined) return null;
+  // Kde sa to zaseklo (15. 10. 2026, Michal Knapčok): neotvoril stránku,
+  // alebo ju otvoril a kalendár si nepridal — pri Androide to má dôvod.
+  const kde = odkaz ? stavOdberu({ ...odkaz, otvorene: odkaz.otvorene ?? null, otvorenePlatforma: odkaz.otvorenePlatforma ?? null }) : null;
   const stav = !odkaz
     ? { text: "neodoberá", farba: C.textDim, veta: "" }
-    : odkaz.odobera
+    : kde === "odobera"
       ? { text: "● odoberá", farba: C.green, veta: `od ${dm(odkaz.createdAt)}${odkaz.platforma ? ` · ${odkaz.platforma}` : ""}${odkaz.posledne ? ` · obnovené ${predKolko(odkaz.posledne)}` : ""}` }
-      : odkaz.pocet > 0 && odkaz.posledne
+      : kde === "prestal" && odkaz.posledne
         ? { text: "prestal odoberať?", farba: C.orange, veta: `naposledy ${predKolko(odkaz.posledne)}${odkaz.platforma ? ` · ${odkaz.platforma}` : ""}` }
-        : { text: "poslané", farba: C.accentLight, veta: `odkaz z ${dm(odkaz.createdAt)} · ešte si ho nepridal` };
+        : kde === "otvoril" && odkaz.otvorene
+          ? {
+            text: "otvoril, nepridal", farba: C.orange,
+            veta: `stránku otvoril ${predKolko(odkaz.otvorene)}${odkaz.otvorenePlatforma ? ` z ${odkaz.otvorenePlatforma === "iný" ? "iného zariadenia" : odkaz.otvorenePlatforma}` : ""}, kalendár si ešte nestiahol`
+              + (odkaz.otvorenePlatforma === "Android"
+                ? " — na Androide to ide len cez Google Kalendár na počítači alebo appku ICSx⁵; stránka mu obe cesty ukazuje."
+                : odkaz.otvorenePlatforma === "iPhone" ? " — asi nepotvrdil „Odebírat kalendář“." : ""),
+          }
+          : { text: "poslané", farba: C.accentLight, veta: `odkaz z ${dm(odkaz.createdAt)} · stránku ešte neotvoril` };
   const maly = { padding: "4px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" } as const;
 
   return (

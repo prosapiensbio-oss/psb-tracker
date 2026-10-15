@@ -16,7 +16,8 @@ import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
  * Klient otvára `/k/<token>` (stránka B1); telefón si sťahuje
  * `/k/<token>/kalendar.ics` — len jeho tréningy, nie kalendár trénera.
  */
-type Riadok = { token: string; klient: string; created_at: string; posledne_stiahnutie: string | null; pocet: number; platforma: string | null };
+type Riadok = { token: string; klient: string; created_at: string; posledne_stiahnutie: string | null; pocet: number; platforma: string | null;
+  otvorene_at?: string | null; otvorene_pocet?: number; otvorene_platforma?: string | null };
 const chyba = (error: string, status = 400) => Response.json({ ok: false, error }, { status });
 const novyToken = () => {
   const abc = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/api/kalendar-mobil")({
           odkaz: r ? {
             token: r.token, url: verejnyOdkaz(`/k/${r.token}`, origin), createdAt: r.created_at,
             posledne: r.posledne_stiahnutie, pocet: r.pocet, platforma: r.platforma, odobera: odoberaKalendar(r.posledne_stiahnutie),
+            otvorene: r.otvorene_at ?? null, otvorenePocet: r.otvorene_pocet ?? 0, otvorenePlatforma: r.otvorene_platforma ?? null,
           } : null,
         }, { headers: { "cache-control": "no-store" } });
       },
