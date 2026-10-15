@@ -1803,7 +1803,9 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     if (!el || !rodic || zelanyTop === null) return;
     const sprav = () => {
       const H = rodic.clientHeight, h = Math.min(el.offsetHeight, H - 8);
-      setOknoMax(H - 8);
+      // Rolovanie vnútri len keď je okno vyššie než mriežka — inak by
+      // `overflow` orezal rozbaľovací zoznam mien pod políčkom klienta.
+      setOknoMax(el.scrollHeight > H - 8 ? H - 8 : undefined);
       setOknoHore(Math.max(0, Math.min(zelanyTop, H - h - 4)));
     };
     sprav();
