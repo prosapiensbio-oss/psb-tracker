@@ -1002,7 +1002,11 @@ export const Route = createFileRoute("/api/chat")({
             : []),
           ...(algo ? [{ type: "text", text: algo }] : []),
           ...(mailing ? [{ type: "text", text: mailing }] : []),
-          { type: "text", text: `<data>\n${context}\n</data>` },
+          // Druhý bod cache. Dáta (~50k tokenov) sú v rámci jednej otázky
+          // rovnaké v každom kole nástrojov a pri doplňujúcej otázke do 5 min
+          // tiež. Bez bodu sa platili celé pri KAŽDOM kole — Anthropic 15. 10.
+          // 2026 hlásil nízku úspešnosť cache a ~20 USD dobitie každé 2–3 dni.
+          { type: "text", text: `<data>\n${context}\n</data>`, cache_control: { type: "ephemeral" } },
           // Pravidlo o dĺžke prvej odpovede platí presne raz za rozhovor —
           // a model nemá ako vedieť, že je práve tam. Kým to bola jedna veta
           // medzi štyridsiatimi, odpovede na stratégiu mali 140–180 slov
@@ -1054,6 +1058,10 @@ export const Route = createFileRoute("/api/chat")({
               konverzacia.push({ role: m.role, content: await toContent(m, DBpreDokumenty) });
             }
             let vypisaneZnaky = 0;
+            // Tokeny celej otázky (všetky kolá). Zapisujú sa do vzas_audit
+            // (action `jarvis-spotreba`) — inak sa cena a úspešnosť cache
+            // dala vidieť len v konzole Anthropicu, bez väzby na otázku.
+            const spotreba = { kola: 0, vstup: 0, zapis: 0, citanie: 0, vystup: 0 };
             // Keď model vybrala appka, treba to povedať — inak sa nedá
             // pochopiť, prečo tá istá otázka raz trvá päť a raz dvadsať sekúnd.
             if (samVybral) posli({ s: "Otázka na rozmyslenie — beriem silnejší model." });
@@ -1080,7 +1088,14 @@ export const Route = createFileRoute("/api/chat")({
                     thinking: { type: "adaptive" },
                     output_config: { effort: deep ? EFFORT_DEEP : EFFORT },
                     system,
-                    ...(uzLenOdpoved ? {} : { tools: TOOLS }),
+                    // Nástroje ostávajú aj v poslednom kole — ich odobratie
+                    // zneplatnilo cache celého promptu (nástroje sú na jeho
+                    // začiatku). `tool_choice: none` cache nástrojov a systému drží.
+                    tools: TOOLS,
+                    ...(uzLenOdpoved ? { tool_choice: { type: "none" } } : {}),
+                    // Tretí bod: rastúca konverzácia (výsledky nástrojov) sa
+                    // v ďalšom kole číta z cache, nie platí znova.
+                    cache_control: { type: "ephemeral" },
                     messages: konverzacia,
                   }),
                 });
@@ -1113,7 +1128,13 @@ type Blok = StreamBlok;
                     let evt: Record<string, any>;
                     try { evt = JSON.parse(data); } catch { continue; }
 
-                    if (evt.type === "content_block_start") {
+                    if (evt.type === "message_start") {
+                      const u = evt.message?.usage || {};
+                      spotreba.kola++;
+                      spotreba.vstup += u.input_tokens || 0;
+                      spotreba.zapis += u.cache_creation_input_tokens || 0;
+                      spotreba.citanie += u.cache_read_input_tokens || 0;
+                    } else if (evt.type === "content_block_start") {
                       const cb = evt.content_block || {};
                       // `_raw` je celý blok tak, ako prišiel. Serverové bloky
                       // (hľadanie na webe) sa musia vrátiť BEZ ZMENY — nedajú
@@ -1146,6 +1167,7 @@ type Blok = StreamBlok;
                       else if (d.type === "input_json_delta") { b._json = (b._json || "") + (d.partial_json || ""); }
                     } else if (evt.type === "message_delta") {
                       stopReason = evt.delta?.stop_reason || stopReason;
+                      spotreba.vystup += evt.usage?.output_tokens || 0;
                     } else if (evt.type === "ping") {
                       ping();
                     }
@@ -1205,6 +1227,12 @@ type Blok = StreamBlok;
             // nemá ako vedieť, že stačí otázku zopakovať užšie.
             if (!vypisaneZnaky) {
               posli({ t: "Prepáč — pri hľadaní v dátach som minul rozpočet odpovede a nezostalo miesto na jej napísanie. Skús otázku položiť užšie (napr. na jednu vec naraz)." });
+            }
+            if (spotreba.kola && DBpreDokumenty) {
+              await DBpreDokumenty.prepare(
+                "INSERT INTO vzas_audit (id, at, actor, action, month, old_value, new_value) VALUES (?,?,?,?,?,?,?)",
+              ).bind(crypto.randomUUID(), new Date().toISOString(), "app", "jarvis-spotreba", null, deep ? MODEL_DEEP : MODEL, JSON.stringify(spotreba))
+                .run().catch(() => { /* meranie nesmie zhodiť odpoveď */ });
             }
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
