@@ -172,17 +172,30 @@ export function dlhyKlientov(v: VstupDlhov): {
     xs.push({ suma: p.suma, datum: den(p.datum), zruseneAt: p.zruseneAt ?? null, vopred: p.vopred });
     pl.set(k, xs);
   }
-  const podlaKokpitu = [...bal.entries()].flatMap(([k, bs]) =>
-    nezaplateneZKokpitu(bs, pl.get(k) || []).map((b) => ({ ...(b as typeof b & { id?: string }), klient: meno.get(k) || k })));
-
   // 3. Poistka: čo PTminder pozná ako zaplatené, dlhom nie je.
-  const kokpit = zaplateneVPtminderi(
-    podlaKokpitu,
-    v.ptPlatby,
-    v.ptHistoria,
-    otvorene.map((p) => ({ klient: p.klient, datum: den(p.datum) })),
-    normName,
-  );
+  //    Poistka sa pýta len na balíčky, ktoré platby z Kokpitu nepokryli
+  //    (ako vždy — nad všetkými by si zaplatené balíčky brali platby
+  //    PTmindera patriace ďalším). Keď niektorý odpustí, rozdelenie sa
+  //    zopakuje: odpustený balíček si z platieb Kokpitu nechá len tie zo
+  //    svojho obdobia a zvyšok ide novším (Gažo 15. 10. 2026, viď
+  //    `nezaplateneZKokpitu`). Novším sa tak peňazí len pridá, nikdy neuberie.
+  const kokpit = [...bal.entries()].flatMap(([k, bsPovodne]) => {
+    const klient = meno.get(k) || k;
+    // Poradové číslo, nie obsah: dva rovnaké balíčky (deň, cena, názov) sú
+    // dva predaje a odpustenie jedného nesmie zasiahnuť druhý.
+    const bs = bsPovodne.map((b, i) => ({ ...b, poradie: i }));
+    const prve = nezaplateneZKokpitu(bs, pl.get(k) || []).map((b) => ({ ...b, klient }));
+    const nezaplatene = zaplateneVPtminderi(
+      prve, v.ptPlatby, v.ptHistoria,
+      otvorene.map((p) => ({ klient: p.klient, datum: den(p.datum) })),
+      normName,
+    );
+    if (nezaplatene.length === prve.length) return nezaplatene;
+    const ostali = new Set(nezaplatene.map((b) => b.poradie));
+    const odpustene = new Set(prve.filter((b) => !ostali.has(b.poradie)).map((b) => b.poradie));
+    return nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie))
+      .map((b) => ({ ...b, klient }));
+  });
 
   // 4. Ten istý predaj v oboch systémoch je jeden — poplatok ustúpi balíčku.
   const poKlientoch = new Map<string, VstupDlhov["poplatky"]>();

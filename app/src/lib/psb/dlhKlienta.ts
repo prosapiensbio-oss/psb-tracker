@@ -78,18 +78,60 @@ const zapocitanePlatby = (platby: PlatbaDlh[], od: string): PlatbaDlh[] =>
  * veľkosť je zlá"). Prebytok ide na ďalší balíček, aj na ten, čo vznikne až
  * neskôr: to je platba vopred.
  */
-export function nezaplateneZKokpitu(balicky: BalicekDlh[], platby: PlatbaDlh[]): (BalicekDlh & { doplatit: number })[] {
-  const nase = balickyKokpitu(balicky);
+export function nezaplateneZKokpitu<B extends BalicekDlh>(
+  balicky: B[],
+  platby: PlatbaDlh[],
+  /**
+   * Balíček, ktorý PTminder pozná ako zaplatený (`zaplateneVPtminderi`).
+   * Berie si z platieb Kokpitu len tie zo SVOJHO obdobia (do 45 dní od
+   * začiatku) — novšie peniaze patria novšiemu predaju.
+   *
+   * Peter Gažo, 15. 10. 2026: bitcoinová platba z 11. 10. (19 682 Kč) sa
+   * položila na jeho májové členstvo, lebo je najstaršie — to bolo dávno
+   * zaplatené v PTminderi. Poistka potom staré členstvo odpustila, ale
+   * peniaze už boli „minuté" a októbrový balíček ostal ako dlh v plnej výške.
+   */
+  zaplatenyInde?: (b: B) => boolean,
+): (B & { doplatit: number })[] {
+  const nase = balickyKokpitu(balicky) as B[];
   if (!nase.length) return [];
-  let zostava = zapocitanePlatby(platby, nase[0].platnostOd).reduce((s, p) => s + p.suma, 0);
-  const out: (BalicekDlh & { doplatit: number })[] = [];
+  const zasoba = zapocitanePlatby(platby, nase[0].platnostOd)
+    .map((p) => ({ datum: p.datum, zostava: p.suma }))
+    .sort((a, b) => a.datum.localeCompare(b.datum));
+  // Vrátenie (záporná platba, `ukoncenieBalicka`) zmenší platby od
+  // najnovšej — peniaze, ktoré odišli späť, nič nezaplatia (súčet ako predtým).
+  for (const v of zasoba.filter((p) => p.zostava < 0)) {
+    let dlh = -v.zostava;
+    v.zostava = 0;
+    for (const p of [...zasoba].reverse()) {
+      if (dlh <= 0) break;
+      if (p.zostava <= 0) continue;
+      const k = Math.min(dlh, p.zostava);
+      p.zostava -= k;
+      dlh -= k;
+    }
+  }
+  const zober = (kolko: number, smie: (datum: string) => boolean) => {
+    let ostava = kolko;
+    for (const p of zasoba) {
+      if (ostava <= 0) break;
+      if (p.zostava <= 0 || !smie(p.datum)) continue;
+      const k = Math.min(ostava, p.zostava);
+      p.zostava -= k;
+      ostava -= k;
+    }
+    return kolko - ostava;
+  };
+  const posun = (d: string, dni: number) => new Date(Date.parse(`${d.slice(0, 10)}T00:00:00Z`) + dni * 86400000).toISOString().slice(0, 10);
+  const out: (B & { doplatit: number })[] = [];
   for (const b of nase) {
     const cena = b.cena || 0;
+    if (zaplatenyInde?.(b)) { const hranica = posun(b.platnostOd, 45); zober(cena, (d) => d <= hranica); continue; }
+    const vzate = zober(cena, () => true);
     // Koruna tolerancie na zaokrúhlenie, ako pri rozdelení platby.
-    if (zostava + 1 >= cena) { zostava -= cena; continue; }
+    if (vzate + 1 >= cena) continue;
     // Koľko na balíček ešte chýba — pri čiastočnej platbe menej než cena.
-    out.push({ ...b, doplatit: Math.round(cena - Math.max(0, zostava)) });
-    zostava = 0;
+    out.push({ ...b, doplatit: Math.round(cena - vzate) });
   }
   return out;
 }

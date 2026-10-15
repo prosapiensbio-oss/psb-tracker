@@ -63,16 +63,23 @@ Tento týždeň je posledný týždeň zápisu do PTmindera; účet sa ruší a�
 uzávierke októbra (prvý mesiac s peniazmi z Kokpitu — keby niečo nesedelo,
 je kde pozrieť).
 
-1. [ ] **Do ne 18. 10.** — posledný týždeň zápisu do PTmindera. Claude: prejsť
-       9 otvorených poplatkov z PTmindera (80 962 Kč) — má každý v Kokpite
-       balíček alebo platbu? (hotovosť zapísaná len v PTminderi by ostala dlhom)
+1. [ ] **Do ne 18. 10.** — posledný týždeň zápisu do PTmindera.
+       [x] 9 otvorených poplatkov z PTmindera prejdených 15. 10.: 7 má balíček
+       v Kokpite, Dominika a Gerich nie sú dlhom (zaplatené / kredit vopred),
+       Monika Schonwalderová stojí len na poplatku z PTmindera (7 790, 9. 10.)
+       — platba 27. 9. 7 790 v Kokpite pravdepodobne patrí jej, rozhodne Jerry.
+       Pri tom sa našla chyba: Gažova BTC platba z 11. 10. sa položila na májové
+       členstvo zaplatené v PTminderi (oprava v `dlhyKlientov`, nasadená 15. 10.;
+       ostáva 411 Kč = rozdiel kurzu BTC, rozhodne Jerry).
 2. [ ] **Po 19. 10.** — Jerry: posledný úplný export (všetky reporty ako doteraz)
        + archív rokov 2022–2024 (zo starých rokov sa nič nepočíta, len uložiť).
 3. [ ] **Týždeň od 19. 10.** — Claude:
-       - 6M z balíčkov v Kokpite (předplatné), nie z exportu;
+       - [x] 6M z balíčkov v Kokpite (předplatné) — hotové 15. 10. (tá istá
+         množina 12+ klientov ako zo snímky; `sixMClientSet`);
        - vypnúť porovnania s PTminderom (karta „Vydrží kalendár sám?",
          peniaze v Prechode, balíčky, „Chýba v PTminderi", poistka
-         `zaplateneVPtminderi`) — inak budú hlásiť rozdiel pri každom tréningu;
+         `zaplateneVPtminderi` NEVYPÍNAŤ — po poslednom exporte ostanú jej dáta
+         zamrznuté a staré členstvá zaplatené v PTminderi musí odpúšťať ďalej);
        - zostatok na karte bez zálohy „z PTmindera" (bez balíčka v Kokpite =
          bez balíčka + notifikácia „bol na tréningu a nemá aktívny balíček").
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.

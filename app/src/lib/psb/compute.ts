@@ -187,13 +187,28 @@ export type ClientAgg = {
 };
 
 // A client is in the 6M process if a "S viazanostou" service was sold to them
-// OR their current membership (Packages report) is a "S viazanostou" product.
+// OR their current membership is a předplatné (Kokpit balíčky, else the
+// PTminder Packages snapshot).
 // The service report attributes all such sales to the seller (Jerry), so the
 // packages source is essential to catch the other trainer's 6M clients.
 export function sixMClientSet(data: PSBData): Set<string> {
   const set = new Set<string>();
   for (const s of data.services) if (s.is6m) set.add(s.client);
-  for (const p of data.packages) if (jePredplatne(p.package)) set.add(p.client);
+  /**
+   * Bežiace předplatné: z balíčkov v Kokpite, keď ich appka má (Jerry,
+   * 15. 10. 2026 — vypínanie PTmindera). `balicky` nesú aj členstvá naliate
+   * z PTmindera, takže sú nadmnožinou snímky `packages`; snímka by po
+   * poslednom exporte zamrzla a nového predplatiteľa by nikdy nepoznala.
+   * Zmerané nad ostrými dátami: tá istá množina 6M klientov ako zo snímky.
+   */
+  if (data.balickyKokpit?.length) {
+    const dnes = dnesPraha();
+    for (const b of data.balickyKokpit) {
+      if (!b.zruseneAt && jePredplatne(b.nazov) && (!b.platnostDo || b.platnostDo >= dnes)) set.add(b.klient);
+    }
+  } else {
+    for (const p of data.packages) if (jePredplatne(p.package)) set.add(p.client);
+  }
   // Ručná oprava má posledné slovo. Pravidlo hore je správne a zostáva
   // (balíček „S viazanostou" a platba 6 990 Kč SÚ 6M členstvo — Jerry to
   // potvrdil 9. 8. 2026), ale odvodenie je stále len odvodenie: klient si

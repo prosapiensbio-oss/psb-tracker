@@ -111,6 +111,53 @@ describe("ten istý predaj v oboch systémoch", () => {
 });
 
 describe("poistka z PTmindera", () => {
+  it("staré členstvo zaplatené v PTminderi si nezoberie novú platbu z Kokpitu (Gažo 15. 10. 2026)", () => {
+    const v = dlhy({
+      balicky: [bal("Gažo", "2026-05-18", 21150, "ptminder"), bal("Gažo", "2026-10-09", 20093)],
+      platby: [{ klient: "Gažo", suma: 20093, datum: "2026-10-11" }],
+      ptPlatby: [{ klient: "Gažo", suma: 21150, datum: "2026-05-20" }],
+    });
+    expect(v).toEqual([]);
+  });
+  it("platba z obdobia starého členstva sa naň započíta aj keď ho PTminder pozná — nezaplatí nový predaj", () => {
+    const v = dlhy({
+      balicky: [bal("Kral", "2026-09-10", 6990, "ptminder"), bal("Kral", "2026-10-09", 6990)],
+      platby: [{ klient: "Kral", suma: 6990, datum: "2026-09-12" }],
+      ptPlatby: [{ klient: "Kral", suma: 6990, datum: "2026-09-12" }],
+    });
+    expect(v.map((x) => [x.den, x.doplatit])).toEqual([["2026-10-09", 6990]]);
+  });
+  it("dva rovnaké balíčky, PTminder pozná platbu len za jeden — druhý ostáva dlhom raz (nezávislá kontrola 15. 10.)", () => {
+    const v = dlhy({
+      balicky: [bal("X", "2026-05-10", 6990), bal("X", "2026-05-10", 6990)],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-05-11" }],
+    });
+    expect(v.map((x) => x.doplatit)).toEqual([6990]);
+  });
+  it("dva rovnaké staré balíčky a jedna platba v PTminderi — nová platba z Kokpitu nezmaže dlh za druhý (nezávislá kontrola 15. 10.)", () => {
+    const v = dlhy({
+      balicky: [bal("X", "2026-05-10", 6990), bal("X", "2026-05-10", 6990), bal("X", "2026-10-09", 6990)],
+      platby: [{ klient: "X", suma: 6990, datum: "2026-10-10" }],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-05-11" }],
+    });
+    expect(v.reduce((a, x) => a + x.doplatit, 0)).toBe(6990);
+  });
+  it("zrušený balíček nezoberie platbu PTmindera náhradnému (nezávislá kontrola 15. 10.)", () => {
+    const v = dlhy({
+      balicky: [{ ...bal("X", "2026-10-02", 6990), zruseneAt: "2026-10-02" }, bal("X", "2026-10-02", 6990)],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-10-02" }],
+    });
+    expect(v).toEqual([]);
+  });
+  it("balíček zaplatený v Kokpite nezoberie platbu PTmindera, ktorá patrí ďalšiemu (nezávislá kontrola 15. 10.)", () => {
+    const v = dlhy({
+      balicky: [bal("X", "2026-09-10", 6990), bal("X", "2026-10-09", 6990)],
+      platby: [{ klient: "X", suma: 6990, datum: "2026-09-12" }],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-10-10" }],
+    });
+    expect(v).toEqual([]);
+  });
+
   it("balíček, ktorý PTminder pozná ako zaplatený, dlhom nie je", () => {
     const d = dlhy({ balicky: [bal("Vítězslav Papiež", "2026-09-29", 6990)], ptPlatby: [{ klient: "Vitezslav Papiež", datum: "2026-09-29", suma: 6990 }] });
     expect(d).toHaveLength(0);
