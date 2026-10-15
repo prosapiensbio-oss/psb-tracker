@@ -1231,7 +1231,7 @@ type Blok = StreamBlok;
             if (spotreba.kola && DBpreDokumenty) {
               await DBpreDokumenty.prepare(
                 "INSERT INTO vzas_audit (id, at, actor, action, month, old_value, new_value) VALUES (?,?,?,?,?,?,?)",
-              ).bind(crypto.randomUUID(), new Date().toISOString(), "app", "jarvis-spotreba", null, deep ? MODEL_DEEP : MODEL, JSON.stringify(spotreba))
+              ).bind(crypto.randomUUID(), new Date().toISOString(), "app", "jarvis-spotreba", null, deep ? MODEL_DEEP : MODEL, JSON.stringify({ ...spotreba, vyber: samVybral ? "sam" : deep ? "rucne" : "zakladny", kategoria: kategoria || null }))
                 .run().catch((e: unknown) => { posli({ ue: String(e).slice(0, 200) }); /* meranie nesmie zhodiť odpoveď */ });
             }
             // Spotreba ide aj klientovi (kľúč `u`, obrazovka ho ignoruje) —

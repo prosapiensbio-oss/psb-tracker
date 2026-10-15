@@ -336,6 +336,15 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
+- **Jarvis: Sonnet vs Opus — vyhodnotiť 22. 10. 2026 (Jerry, 15. 10.:
+  „nechaj to týždeň merať a potom mi povedz, koľko otázok išlo na Opus
+  a za koľko“).** Meranie: `vzas_audit` action `jarvis-spotreba`
+  (old_value = model, new_value = tokeny + `vyber` sam/rucne/zakladny +
+  kategória; `vyber` až od druhého nasadenia 15. 10.). Vyhodnotiť počet
+  a cenu podľa modelu a kto ho vybral; potom rozhodnúť o eskalácii
+  „Sonnet začne, Opus len keď sám uzná“ a o prepínači, ktorý si pamätá
+  voľbu (`psb-ai-deep` v localStorage). Cache opravený 15. 10.
+
 - **Strižňa 1.0 – hranica, aby sa nestavalo donekonečna (13. 10. 2026,
   Jerry: „musíme to nejako zadefinovať“):** Strižňa je hotová, keď Terezka
   na svojom Macu prejde celý kruh BEZ Clauda: nahrá deň → priradí klipy
