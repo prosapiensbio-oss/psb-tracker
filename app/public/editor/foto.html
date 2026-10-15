@@ -739,7 +739,7 @@ window.kartotekaKlienta = (() => {
         tvary.push({ typ: "text", x: V.x + bx * (r + 20 * k), y: V.y + by * (r + 20 * k), text: `${desatinne(uhol)}°`, velkost: 15, tucne: true, farba: p.c.farba });
       }
     }
-    odtlacPopisky(tvary.filter((t) => t.typ === "text"), k);
+    odtlacPopisky(tvary.filter((t) => t.typ === "text"), k, vsetky.map(({ A, B }) => ({ A, B })));
     return tvary;
   }
 
@@ -751,11 +751,28 @@ window.kartotekaKlienta = (() => {
    * a viac pri sebe. Rozmer je ten istý odhad, akým sa kreslí pozadie štítku;
    * export (k = pomer) dopadne rovnako ako obrazovka.
    */
-  function odtlacPopisky(texty, k) {
+  function odtlacPopisky(texty, k, usecky = []) {
     // Šírka o trochu väčšia než odhad pozadia — na plátne meria písmo širšie.
     const rozmer = (t) => ({ w: (t.text.length * t.velkost * 0.65 + 14) * k, h: (t.velkost + 9) * k });
     const medzera = 6 * k;
-    for (let kolo = 0; kolo < 60; kolo++) {
+    /**
+     * ŠTÍTOK NESMIE LEŽAŤ NA ČIARE (Jerry, 15. 10. 2026: „stupne nejdú cez
+     * seba, ale idú cez čiary, a tým pádom nie je vidieť stupne"). Ktorá
+     * čiara prechádza obdĺžnikom štítku (Liang–Barsky orezanie úsečky),
+     * od tej sa štítok posunie kolmo preč — po malých krokoch, kým je voľný.
+     */
+    const cezStitok = (A, B, t, r, pad) => {
+      const x0 = t.x - r.w / 2 - pad, x1 = t.x + r.w / 2 + pad, y0 = t.y - r.h / 2 - pad, y1 = t.y + r.h / 2 + pad;
+      const dx = B.x - A.x, dy = B.y - A.y;
+      let u0 = 0, u1 = 1;
+      for (const [p, q] of [[-dx, A.x - x0], [dx, x1 - A.x], [-dy, A.y - y0], [dy, y1 - A.y]]) {
+        if (p === 0) { if (q < 0) return false; continue; }
+        const u = q / p;
+        if (p < 0) { if (u > u1) return false; if (u > u0) u0 = u; } else { if (u < u0) return false; if (u < u1) u1 = u; }
+      }
+      return true;
+    };
+    for (let kolo = 0; kolo < 120; kolo++) {
       let pohyb = false;
       for (let i = 0; i < texty.length; i++) for (let j = i + 1; j < texty.length; j++) {
         const a = texty[i], b = texty[j], ra = rozmer(a), rb = rozmer(b);
@@ -771,9 +788,22 @@ window.kartotekaKlienta = (() => {
           a.x -= sm * ox / 2; b.x += sm * ox / 2;
         }
       }
+      for (const t of texty) {
+        const r = rozmer(t);
+        for (const { A, B } of usecky) {
+          if (!cezStitok(A, B, t, r, 4 * k)) continue;
+          // Kolmo od čiary, na stranu, kde štítok už je (stred štítku vs. čiara).
+          const ddx = B.x - A.x, ddy = B.y - A.y, d = Math.hypot(ddx, ddy) || 1;
+          let nx = -ddy / d, ny = ddx / d;
+          if ((t.x - A.x) * nx + (t.y - A.y) * ny < 0) { nx = -nx; ny = -ny; }
+          t.x += nx * 3 * k; t.y += ny * 3 * k;
+          pohyb = true;
+        }
+      }
       if (!pohyb) break;
     }
   }
+
 
   /** Hrot šípky v bode B (smer A → B): tri body trojuholníka, veľkosť v px × k. */
   function hrotSipky(A, B, k) {
