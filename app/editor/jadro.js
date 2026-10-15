@@ -90,7 +90,16 @@
    * súradniciach fotky — ide s ňou pri posune, zväčšení aj zrkadle, ako čiary.
    */
   let kresby = [];      // { id, okno, body: [{u,v}], farba, hrubka }
-  let nastroj = "ciara"; // "ciara" | "sipka" | "uhol" | "kresba"
+  /**
+   * KRÚŽOK SO ZVÄČŠENINOU (Jerry, 15. 10. 2026: „vyznačil by som oblasť
+   * a v ňom by sa objavilo vyzoomované miesto"). Miesto (zdroj) je v
+   * súradniciach fotky — ide s ňou ako čiary. Veľký krúžok so zväčšeninou
+   * stojí v okne (kam, 0–1 okna), dá sa odložiť nabok a za okraj zväčšiť.
+   * Polomer zdroja je zlomok šírky okna, takže export ho zväčší rovnako.
+   */
+  let detaily = [];     // { id, okno, zdroj: {u,v}, r, kam: {x,y}, zoom, farba }
+  let vybranyDetail = null;
+  let nastroj = "ciara"; // "ciara" | "sipka" | "uhol" | "kresba" | "detail"
   /** Uhol: prvé rameno je hotové, druhé začne vo vrchole. { okno, vrchol: {u,v} } */
   let cakaUhol = null;
   let hrubkaKresby = 4;
@@ -99,6 +108,10 @@
   let farbaCiar = "#ff8a1f";
   let dalsieId = 1;
   const svgCiary = document.getElementById("ciary");
+  const platnoDetailov = document.createElement("canvas");
+  platnoDetailov.className = "detaily";
+  platnoDetailov.setAttribute("aria-hidden", "true");
+  stvorec.insertBefore(platnoDetailov, svgCiary);
   const desatinne = (n) => n.toFixed(1).replace(".", ",");
   /** Obdĺžniky okien na obrazovke (px od rohu štvorca). */
   const oknaNaObrazovke = () => okna.map((el) => ({ x: el.offsetLeft, y: el.offsetTop, w: el.clientWidth, h: el.clientHeight }));
@@ -224,8 +237,9 @@
     const un = document.getElementById("uholNapoveda");
     if (un) un.hidden = !cakaUhol;
     svgCiary.innerHTML = html.join("");
-    document.getElementById("zmazVybranu").disabled = vybrana == null;
-    document.getElementById("zmazVsetky").disabled = !ciary.length && !kresby.length;
+    kresliDetaily();
+    document.getElementById("zmazVybranu").disabled = vybrana == null && vybranyDetail == null;
+    document.getElementById("zmazVsetky").disabled = !ciary.length && !kresby.length && !detaily.length;
     window.poZmene?.();
     zmena();
   }
@@ -273,6 +287,70 @@
       }
       x.restore();
     }
+  }
+
+  /** Geometria krúžku v px štvorca (obrazovka aj export — podľa R). */
+  const geomDetailu = (d, R) => {
+    const o = R[d.okno], P = bodVOkne(d.okno, d.zdroj, R), rs = d.r * o.w;
+    return { P, rs, C: { x: o.x + d.kam.x * o.w, y: o.y + d.kam.y * o.h }, rc: rs * d.zoom };
+  };
+  function fotkaOknaNaPlatno(x, i, R, orezat) {
+    const t = stav[i], img = okna[i].querySelector("img");
+    if (!t.src || !img || !img.complete) return;
+    const r = rozlozenie(t.v, t.fw, t.fh, R[i].w, R[i].h);
+    x.save();
+    if (orezat) { x.beginPath(); x.rect(R[i].x, R[i].y, R[i].w, R[i].h); x.clip(); }
+    if (rozdelenie === "cez" && i === 1) x.globalAlpha = priehladnost;
+    fotkaNaPlatno(x, img, t, R[i].x, R[i].y, r);
+    x.restore();
+  }
+  /** Krúžky so zväčšeninou — tie isté pre obrazovku (k = 1) aj export (k = pomer). */
+  function detailyNaPlatno(x, R, k) {
+    const kruh = (C, r) => { x.beginPath(); x.arc(C.x, C.y, r, 0, Math.PI * 2); };
+    for (const d of detaily) {
+      if (!stav[d.okno]?.src) continue;
+      const { P, rs, C, rc } = geomDetailu(d, R);
+      x.save();
+      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[d.okno].x, R[d.okno].y, R[d.okno].w, R[d.okno].h); x.clip(); }
+      const dx = C.x - P.x, dy = C.y - P.y, dl = Math.hypot(dx, dy);
+      if (dl > rs + rc + 2) {
+        const ux = dx / dl, uy = dy / dl;
+        x.strokeStyle = "rgba(0,0,0,.45)"; x.lineWidth = 4 * k;
+        x.beginPath(); x.moveTo(P.x + ux * rs, P.y + uy * rs); x.lineTo(C.x - ux * rc, C.y - uy * rc); x.stroke();
+        x.strokeStyle = d.farba; x.lineWidth = 2 * k;
+        x.beginPath(); x.moveTo(P.x + ux * rs, P.y + uy * rs); x.lineTo(C.x - ux * rc, C.y - uy * rc); x.stroke();
+      }
+      x.strokeStyle = "rgba(0,0,0,.45)"; x.lineWidth = 4 * k; kruh(P, rs); x.stroke();
+      x.strokeStyle = d.farba; x.lineWidth = 2 * k; kruh(P, rs); x.stroke();
+      // Zväčšenina: to isté miesto fotky (aj s čiarami), zväčšené okolo stredu krúžku.
+      x.save();
+      kruh(C, rc); x.clip();
+      x.fillStyle = "#fff"; x.fillRect(C.x - rc, C.y - rc, 2 * rc, 2 * rc);
+      x.translate(C.x, C.y); x.scale(d.zoom, d.zoom); x.translate(-P.x, -P.y);
+      if (rozdelenie === "cez") { fotkaOknaNaPlatno(x, 0, R, false); fotkaOknaNaPlatno(x, 1, R, false); }
+      else fotkaOknaNaPlatno(x, d.okno, R, true);
+      ciaryNaPlatno(x, R, k / d.zoom);
+      x.restore();
+      x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 10 * k;
+      x.strokeStyle = "#fff"; x.lineWidth = 5 * k; kruh(C, rc); x.stroke();
+      x.shadowBlur = 0;
+      x.strokeStyle = d.farba; x.lineWidth = (d.id === vybranyDetail ? 3 : 2) * k;
+      if (d.id === vybranyDetail) x.setLineDash([8 * k, 5 * k]);
+      kruh(C, rc); x.stroke();
+      x.setLineDash([]);
+      x.restore();
+    }
+  }
+  function kresliDetaily() {
+    const dpr = window.devicePixelRatio || 1, W = stvorec.clientWidth, H = stvorec.clientHeight;
+    const w = Math.round(W * dpr), h = Math.round(H * dpr);
+    if (platnoDetailov.width !== w || platnoDetailov.height !== h) { platnoDetailov.width = w; platnoDetailov.height = h; }
+    const x = platnoDetailov.getContext("2d");
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, w, h);
+    if (!detaily.length) return;
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    detailyNaPlatno(x, oknaNaObrazovke(), 1);
   }
 
   /**
@@ -398,9 +476,39 @@
     stvorec.addEventListener("pointerdown", (e) => {
       if (e.target.closest?.(".roh, .otoc")) return;
       const R = oknaNaObrazovke(), P = miesto(e);
+      // Krúžok so zväčšeninou: chytiť ho (posunúť), za okraj zväčšiť; to isté miesto na fotke.
+      const tol = polomer(e).koniec * 0.7;
+      for (const d of [...detaily].reverse()) {
+        if (!stav[d.okno]?.src) continue;
+        const g = geomDetailu(d, R), dC = Math.hypot(P.x - g.C.x, P.y - g.C.y), dP = Math.hypot(P.x - g.P.x, P.y - g.P.y);
+        const cast = Math.abs(dC - g.rc) < tol ? "okrajKruhu" : dC < g.rc ? "kruh"
+          : Math.abs(dP - g.rs) < tol ? "okrajZdroja" : dP < g.rs ? "zdroj" : null;
+        if (!cast) continue;
+        e.preventDefault(); e.stopPropagation();
+        vybranyDetail = d.id; vybrana = null; cakaUhol = null;
+        zacniTah({ druh: "detail", cast, d, okno: d.okno, P0: P, povodne: { zdroj: { ...d.zdroj }, kam: { ...d.kam } } }, e);
+        return;
+      }
+      vybranyDetail = null;
       const pod = coPodPrstom(P, R, e);
       // Mimo kreslenia: len úprava toho, čo už je; inak nechať fotku.
-      if (!rezimCiar && !pod.koniec && !pod.ciara) return;
+      if (!rezimCiar && !pod.koniec && !pod.ciara) { kresliCiary(); return; }
+      if (rezimCiar && nastroj === "detail" && !pod.koniec) {
+        const okno = oknoPodBodom(P, R);
+        if (okno < 0 || !stav[okno].src) return;
+        e.preventDefault(); e.stopPropagation();
+        const o = R[okno];
+        const d = { id: dalsieId++, okno, zdroj: bodZOkna(okno, P.x, P.y, R), r: 4 / o.w, kam: { x: (P.x - o.x) / o.w, y: (P.y - o.y) / o.h }, zoom: 2.5, farba: farbaCiar };
+        detaily.push(d);
+        vybranyDetail = d.id; vybrana = null;
+        zacniTah({ druh: "detail", cast: "novy", d, okno, P0: P }, e);
+        return;
+      }
+      // Uhol čakal na druhé rameno, ale ťuklo sa do INEJ fotky — to je nová
+      // čiara tam, nie pokračovanie odtiaľto (Jerry, 15. 10. 2026: „klik na
+      // začiatok, označím koniec a je to koniec, nie že mi to pokračuje do
+      // ďalšej fotky").
+      if (cakaUhol && oknoPodBodom(P, R) !== cakaUhol.okno) cakaUhol = null;
       if (rezimCiar && nastroj === "kresba" && !pod.koniec) {
         const okno = oknoPodBodom(P, R);
         if (okno < 0 || !stav[okno].src) return;
@@ -451,6 +559,21 @@
       if (!tah) return;
       const R = oknaNaObrazovke(), r = R[tah.okno];
       let P = miesto(e);
+      if (tah.druh === "detail") {
+        const d = tah.d, o = R[d.okno], g = geomDetailu(d, R);
+        if (tah.cast === "novy" || tah.cast === "okrajZdroja") d.r = Math.max(4, Math.hypot(P.x - g.P.x, P.y - g.P.y)) / o.w;
+        else if (tah.cast === "zdroj") {
+          const A = bodVOkne(d.okno, tah.povodne.zdroj, R);
+          d.zdroj = bodZOkna(d.okno, A.x + P.x - tah.P0.x, A.y + P.y - tah.P0.y, R);
+        } else if (tah.cast === "kruh") {
+          d.kam = {
+            x: Math.max(0, Math.min(1, tah.povodne.kam.x + (P.x - tah.P0.x) / o.w)),
+            y: Math.max(0, Math.min(1, tah.povodne.kam.y + (P.y - tah.P0.y) / o.h)),
+          };
+        } else if (tah.cast === "okrajKruhu") d.zoom = Math.max(1.2, Math.min(8, Math.hypot(P.x - g.C.x, P.y - g.C.y) / (g.rs || 1)));
+        kresliCiary();
+        return;
+      }
       if (tah.druh === "cela") {
         const dx = P.x - tah.P.x, dy = P.y - tah.P.y;
         for (const x of tah.povodne) {
@@ -494,6 +617,22 @@
     const pusti = () => {
       skryLupu();
       if (!tah) return;
+      if (tah.druh === "detail") {
+        if (tah.cast === "novy") {
+          const R = oknaNaObrazovke(), d = tah.d, o = R[d.okno];
+          if (d.r * o.w < 8) d.r = 0.06; // ťuknutie = krúžok predvolenej veľkosti
+          const g = geomDetailu(d, R);
+          // Zväčšenina ide vedľa — na stranu bližšie k stredu okna, celá v okne.
+          const smer = g.P.x < o.x + o.w / 2 ? 1 : -1;
+          let cx = g.P.x + smer * (g.rs + g.rc + 16), cy = g.P.y;
+          cx = Math.max(o.x + g.rc, Math.min(o.x + o.w - g.rc, cx));
+          cy = Math.max(o.y + g.rc, Math.min(o.y + o.h - g.rc, cy));
+          d.kam = { x: (cx - o.x) / o.w, y: (cy - o.y) / o.h };
+        }
+        tah = null;
+        kresliCiary();
+        return;
+      }
       if (tah.druh === "kresba") {
         if (tah.kresba.body.length < 2) kresby = kresby.filter((k) => k !== tah.kresba); // ťuknutie nie je kresba
         tah = null;
@@ -543,7 +682,11 @@
     }
     return { sklon, uhly, farba: c.farba };
   }
-  const zmazVybranu = () => { ciary = ciary.filter((c) => c.id !== vybrana); vybrana = null; cakaUhol = null; kresliCiary(); };
+  const zmazVybranu = () => {
+    ciary = ciary.filter((c) => c.id !== vybrana);
+    detaily = detaily.filter((d) => d.id !== vybranyDetail);
+    vybrana = null; vybranyDetail = null; cakaUhol = null; kresliCiary();
+  };
 
   const denCz = (d) => { if (!d) return ""; const [r, m, dd] = d.split("-"); return `${Number(dd)}. ${Number(m)}. ${r}`; };
   // Po česky: hotová fotka ide klientovi alebo na sociálne siete (Jerry vybral
@@ -681,6 +824,7 @@
     if (den) s.den = den;
     ciary = ciary.filter((c) => c.okno !== i); // čiary patrili starej fotke
     kresby = kresby.filter((k) => k.okno !== i);
+    detaily = detaily.filter((d) => d.okno !== i);
     if (cakaUhol?.okno === i) cakaUhol = null;
     aktivne = i;
     kresli();
@@ -851,7 +995,7 @@
   document.getElementById("kreslit").onclick = () => nastavRezim(!rezimCiar);
   document.getElementById("zmazVybranu").onclick = zmazVybranu;
   // Krok späť vie vrátiť aj „zmazať všetky" — preto sa už nepýta.
-  document.getElementById("zmazVsetky").onclick = () => { ciary = []; kresby = []; vybrana = null; cakaUhol = null; kresliCiary(); };
+  document.getElementById("zmazVsetky").onclick = () => { ciary = []; kresby = []; detaily = []; vybrana = null; vybranyDetail = null; cakaUhol = null; kresliCiary(); };
   document.querySelectorAll("#nastroj button").forEach((b) => b.onclick = () => {
     nastroj = b.dataset.v;
     cakaUhol = null;
@@ -871,13 +1015,15 @@
     farbaCiar = b.dataset.v;
     const c = ciary.find((q) => q.id === vybrana);
     if (c) c.farba = farbaCiar; // farba sa dá zmeniť aj vybranej čiare
+    const d = detaily.find((q) => q.id === vybranyDetail);
+    if (d) d.farba = farbaCiar;
     kresliCiary();
   });
   addEventListener("keydown", (e) => {
     if (e.target.closest?.("input, textarea")) return;
     if (e.key === "Escape" && cakaUhol) { cakaUhol = null; kresliCiary(); return; }
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
-    if ((e.key === "Delete" || e.key === "Backspace") && vybrana != null) { e.preventDefault(); zmazVybranu(); }
+    if ((e.key === "Delete" || e.key === "Backspace") && (vybrana != null || vybranyDetail != null)) { e.preventDefault(); zmazVybranu(); }
     // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10) — na presné zarovnanie.
     const posun = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (posun && !e.metaKey && !e.ctrlKey && !e.altKey && stav[aktivne].src) {
@@ -1010,11 +1156,12 @@
       for (const t of zvisle) { x.beginPath(); x.moveTo(t * N, 0); x.lineTo(t * N, N); x.stroke(); }
       for (const t of vodorovne) { x.beginPath(); x.moveTo(0, t * N); x.lineTo(N, t * N); x.stroke(); }
     }
-    if (!ciste && document.getElementById("ciaryExport").checked && (ciary.length || kresby.length)) {
+    if (!ciste && document.getElementById("ciaryExport").checked && (ciary.length || kresby.length || detaily.length)) {
       const R = [0, 1].map((i) => ({ x: cez ? 0 : vedla ? i * (ow + g) : 0, y: cez ? 0 : vedla ? 0 : i * (oh + g), w: ow, h: oh }));
-      const predVyber = vybrana; vybrana = null; // vybraná (prerušovaná) čiara nemá ísť do fotky
+      const predVyber = vybrana, predDetail = vybranyDetail; vybrana = null; vybranyDetail = null; // vybrané (prerušované) nemá ísť do fotky
       ciaryNaPlatno(x, R, pomer, N);
-      vybrana = predVyber;
+      detailyNaPlatno(x, R, pomer);
+      vybrana = predVyber; vybranyDetail = predDetail;
     }
   }
   /** Hotový štvorec ako JPEG — na stiahnutie aj do kartotéky klienta. */
@@ -1161,7 +1308,6 @@
       const w = t.fw * sc, hh = t.fh * sc;
       const ox = kotva.sx === "p" ? w / 2 : -w / 2, oy = kotva.sy === "d" ? hh / 2 : -hh / 2;
       nastavStred(aktivne, kotva.x + ox * c - oy * n, kotva.y + ox * n + oy * c, w);
-      ukazLupuRohu(P);
     });
     const pusti = () => { kotva = null; skryLupu(); };
     h.addEventListener("pointerup", pusti);
@@ -1194,8 +1340,6 @@
     otocUchyt.addEventListener("pointerup", pusti);
     otocUchyt.addEventListener("pointercancel", pusti);
   }
-  // Roh je zväčša mimo okna — lupa kreslí celú fotku, inak ukazuje len tmu.
-  const ukazLupuRohu = (P) => { try { ukazLupu(P, rozdelenie === "cez" ? -1 : aktivne, true); } catch { /* lupa nie je podmienka */ } };
 
   // ── POHĽAD NA PLOCHU: priblížiť / oddialiť bez zmeny fotky ──
   /**
@@ -1339,7 +1483,7 @@
   function snimkaStavu() {
     return JSON.stringify({
       stav: stav.map((t) => ({ src: t.src, den: t.den, v: t.v, zrkadlo: t.zrkadlo, vlastny: !!t.vlastny })),
-      ciary, kresby, rozdelenie, priehladnost, mriezka, stitok,
+      ciary, kresby, detaily, rozdelenie, priehladnost, mriezka, stitok,
       medzera: Number(document.getElementById("medzera").value),
       sklon: zaskrtnute("sklon"), ciaryExport: zaskrtnute("ciaryExport"), mriezkaExport: zaskrtnute("mriezkaExport"),
       popis: document.getElementById("popisFotky")?.value || "",
@@ -1372,8 +1516,10 @@
     });
     ciary = o.ciary || [];
     kresby = o.kresby || [];
+    detaily = o.detaily || [];
+    vybranyDetail = null;
     cakaUhol = null;
-    dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1), ...kresby.map((k) => k.id + 1));
+    dalsieId = Math.max(dalsieId, ...ciary.map((c) => c.id + 1), ...kresby.map((k) => k.id + 1), ...detaily.map((d) => d.id + 1));
     vybrana = null;
     rozdelenie = o.rozdelenie || "vedla";
     priehladnost = o.priehladnost ?? 0.5;
@@ -1444,7 +1590,7 @@
     get pocetKresieb() { return kresby.length; },
     /** Je v exporte niečo navyše oproti čistej fotke (čiary, kresba, mriežka)? */
     get maRozbor() {
-      return (document.getElementById("ciaryExport").checked && (ciary.length > 0 || kresby.length > 0))
+      return (document.getElementById("ciaryExport").checked && (ciary.length > 0 || kresby.length > 0 || detaily.length > 0))
         || (document.getElementById("mriezkaExport").checked && mriezka.druh !== "ziadna");
     },
     get rozdelenie() { return rozdelenie; },

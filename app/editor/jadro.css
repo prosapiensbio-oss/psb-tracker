@@ -15,6 +15,7 @@
   .mriezka { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
   /* Čiary a uhly: vrstva nad celým štvorcom. Keď je kreslenie zapnuté, berie
      myš/prst ona a fotky sa nehýbu. */
+  .detaily { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
   .ciary { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; touch-action: none; overflow: visible; }
   .ciary.kreslim { pointer-events: all; cursor: crosshair; }
   .ciary .vrchol-caka { animation: vrcholCaka 1s ease-in-out infinite; }
