@@ -83,7 +83,7 @@ const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
   ptPlatby: payments.map((p: any) => ({ klient: String(p.client || ""), datum: den(p.date), suma: Number(p.amount) || 0 })),
   ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
 });
-const bezHodin = [...dlhy.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata];
+const bezHodin = [...dlhy.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata.map((d) => ({ ...d, dvojca: true }))];
 const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
   .map((p: any) => ({ klient: String(p.klient), datum: den(p.datum), suma: Number(p.suma_czk) || 0, sposob: String(p.sposob || "") }));
 

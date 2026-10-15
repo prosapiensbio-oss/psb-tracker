@@ -248,7 +248,7 @@ export function osCasuKlienta(
      * o príznaku nezaplateného balíčka on — `poplatky` a `nezaplateneKokpit`
      * sa na to nepoužijú.
      */
-    bezHodin?: { klient: string; den: string }[];
+    bezHodin?: { klient: string; den: string; dvojca?: boolean }[];
     /** Platby zapísané v Kokpite (`data.platbyKokpit`) — zlúčia sa s `payments`. */
     platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
     /**
@@ -331,6 +331,11 @@ export function osCasuKlienta(
       // Balíček z Kokpitu bez platby — viď `nezaplateneZKokpitu`.
       ...(zdroj.nezaplateneKokpit || []).filter((b) => normName(b.klient) === k).map((b) => den(b.den)),
     ]);
+  // Balíček z Kokpitu blokuje len skutočný dlh, nie dvojča z PTmindera
+  // (to patrí riadku z exportu, ktorý tomuto balíčku aj tak ustúpi).
+  const nezaplateneDniKokpit = new Set(zdroj.bezHodin
+    ? zdroj.bezHodin.filter((d) => normName(d.klient) === k && !d.dvojca).map((d) => den(d.den))
+    : nezaplateneDni);
   /** Kľúče `deň|názov` a `deň|hhodiny` balíčkov z Kokpitu — PTminder im ustúpi. */
   const zKokpitu = new Set<string>();
   /**
@@ -398,7 +403,7 @@ export function osCasuKlienta(
       hodin: hodinRucne,
       doDna: den(b.platnost_do || "") || undefined,
       zaplatene: b.cena_czk || undefined,
-      nezaplatene: nezaplateneDni.has(d) || undefined,
+      nezaplatene: nezaplateneDniKokpit.has(d) || undefined,
       zKokpitu: true,
     });
   }
@@ -533,7 +538,7 @@ export function osCasuKlienta(
   }
   // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
   for (const u of out) {
-    if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;
+    if (u.druh === "balicekOd" && (u.zKokpitu ? nezaplateneDniKokpit : nezaplateneDni).has(u.den)) u.nezaplatene = true;
   }
 
   /**

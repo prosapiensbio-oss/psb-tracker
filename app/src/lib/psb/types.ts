@@ -199,7 +199,7 @@ export type PSBData = {
    * a deň poplatku z PTmindera, ktorý ustúpil balíčku z Kokpitu ako ten istý
    * predaj (hodiny dáva len balíček z Kokpitu, a to keď je zaplatený).
    */
-  bezHodin?: { klient: string; den: string }[];
+  bezHodin?: { klient: string; den: string; dvojca?: boolean }[];
   /**
    * Platby zapísané v Kokpite (tabuľka `platby`, nezrušené). Na osi času sa
    * zlučujú s platbami z PTmindera — tá istá platba v oboch je raz.

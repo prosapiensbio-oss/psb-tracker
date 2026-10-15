@@ -132,6 +132,14 @@ describe("balíčky nahodené v Kokpite", () => {
     expect(b).toMatchObject({ nazov: "OFF - 6h BEZ viazanosti", hodin: 6, doDna: "2026-11-20", zKokpitu: true });
   });
 
+  it("dvojča z PTmindera nezablokuje hodiny balíčku z Kokpitu v ten istý deň (Gažo, Dominika 15. 10. 2026)", () => {
+    const z = { ...zdroj, balicky: [kokpitovy] };
+    const dvojca = osCasuKlienta("Barbora Vankova", { ...z, bezHodin: [{ klient: "Barbora Vankova", den: "2026-09-20", dvojca: true }] } as never, DNES);
+    expect(dvojca.find((x) => x.druh === "balicekOd" && x.den === "2026-09-20")).not.toMatchObject({ nezaplatene: true });
+    const dlh = osCasuKlienta("Barbora Vankova", { ...z, bezHodin: [{ klient: "Barbora Vankova", den: "2026-09-20" }] } as never, DNES);
+    expect(dlh.find((x) => x.druh === "balicekOd" && x.den === "2026-09-20")).toMatchObject({ nezaplatene: true });
+  });
+
   it("zrušený balíček ani ten s budúcou platnosťou na os nejde", () => {
     const z = {
       ...zdroj,

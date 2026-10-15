@@ -299,7 +299,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   // nezaplatených predajov a dvojčiat predaja z Kokpitu v PTminderi.
   // Bez neho (testy, staré volania) platí pôvodné skladanie.
   const nezaplateneBalicky = new Set(data.bezHodin
-    ? data.bezHodin.map((d) => klucNezaplateneho(d.klient, d.den))
+    ? data.bezHodin.filter((d) => !d.dvojca).map((d) => klucNezaplateneho(d.klient, d.den))
     : [
       ...(data.poplatky || []).map((p) => klucNezaplateneho(p.klient, p.datum)),
       ...(data.nezaplateneKokpit || []).map((b) => klucNezaplateneho(b.klient, b.den)),

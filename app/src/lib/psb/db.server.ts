@@ -381,7 +381,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       })), data.peniazeOd);
       // Dni balíčkov, ktoré hodiny nedávajú: nezaplatené predaje a dvojča
       // predaja z Kokpitu v PTminderi (viď `dvojcata`).
-      data.bezHodin = [...polozky.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata];
+      // Dvojča (poplatok PTmindera, ktorý ustúpil balíčku z Kokpitu) blokuje
+      // hodiny LEN riadku z PTmindera — balíček z Kokpitu v ten deň je ten
+      // istý predaj a o jeho zaplatení rozhoduje dlh (Gažo, Dominika, Gerich
+      // 15. 10. 2026: zaplatené balíčky nedávali hodiny).
+      data.bezHodin = [...polozky.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata.map((d) => ({ ...d, dvojca: true }))];
       // Odvodený pohľad na ten istý zoznam (párovanie platieb vo Workspace).
       data.nezaplateneKokpit = polozky.filter((d) => d.zdroj === "kokpit")
         .map((d) => ({ klient: d.klient, den: d.den, cena: d.cena, nazov: d.nazov, doplatit: d.doplatit }));
