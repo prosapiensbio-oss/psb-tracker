@@ -304,14 +304,18 @@
     fotkaNaPlatno(x, img, t, R[i].x, R[i].y, r);
     x.restore();
   }
-  /** Krúžky so zväčšeninou — tie isté pre obrazovku (k = 1) aj export (k = pomer). */
-  function detailyNaPlatno(x, R, k) {
+  /** Úchyt na zväčšenie: bodka na okraji krúžku vpravo dole (na obrazovke, nie v exporte). */
+  const UCHYT = Math.PI / 4;
+  const bodUchytu = (S, r) => ({ x: S.x + r * Math.cos(UCHYT), y: S.y + r * Math.sin(UCHYT) });
+  /** Krúžky so zväčšeninou — tie isté pre obrazovku (k = 1, s úchytmi) aj export (k = pomer). */
+  function detailyNaPlatno(x, R, k, uchopy = false) {
     const kruh = (C, r) => { x.beginPath(); x.arc(C.x, C.y, r, 0, Math.PI * 2); };
     for (const d of detaily) {
       if (!stav[d.okno]?.src) continue;
       const { P, rs, C, rc } = geomDetailu(d, R);
+      // Bez orezania oknom: zväčšenina sa smie odložiť aj cez deliacu čiaru
+      // alebo k okraju (Jerry, 15. 10. 2026: „prečo sa nedá s krúžkom pohybovať").
       x.save();
-      if (rozdelenie !== "cez") { x.beginPath(); x.rect(R[d.okno].x, R[d.okno].y, R[d.okno].w, R[d.okno].h); x.clip(); }
       const dx = C.x - P.x, dy = C.y - P.y, dl = Math.hypot(dx, dy);
       if (dl > rs + rc + 2) {
         const ux = dx / dl, uy = dy / dl;
@@ -338,6 +342,12 @@
       if (d.id === vybranyDetail) x.setLineDash([8 * k, 5 * k]);
       kruh(C, rc); x.stroke();
       x.setLineDash([]);
+      if (uchopy) {
+        for (const U of [bodUchytu(C, rc), bodUchytu(P, rs)]) {
+          x.fillStyle = "#fff"; x.strokeStyle = d.farba; x.lineWidth = 2;
+          x.beginPath(); x.arc(U.x, U.y, 6, 0, Math.PI * 2); x.fill(); x.stroke();
+        }
+      }
       x.restore();
     }
   }
@@ -350,7 +360,7 @@
     x.clearRect(0, 0, w, h);
     if (!detaily.length) return;
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    detailyNaPlatno(x, oknaNaObrazovke(), 1);
+    detailyNaPlatno(x, oknaNaObrazovke(), 1, true);
   }
 
   /**
@@ -472,18 +482,36 @@
       if (P) ukazLupu(P, t.okno);
     };
 
+    /** Ktorá časť ktorého krúžku je pod bodom (zväčšenina má prednosť). */
+    const detailPodBodom = (P, R, tol) => {
+      for (const d of [...detaily].reverse()) {
+        if (!stav[d.okno]?.src) continue;
+        const g = geomDetailu(d, R), dC = Math.hypot(P.x - g.C.x, P.y - g.C.y), dP = Math.hypot(P.x - g.P.x, P.y - g.P.y);
+        const blizko = (U) => Math.hypot(P.x - U.x, P.y - U.y) < Math.max(10, tol);
+        // Zväčšuje sa LEN za bodku na okraji; celý krúžok sa chytá na posun
+        // (keď bol na zväčšenie celý okraj, ťah ho často zväčšil namiesto posunu).
+        const cast = blizko(bodUchytu(g.C, g.rc)) ? "okrajKruhu" : dC <= g.rc + 2 ? "kruh"
+          : blizko(bodUchytu(g.P, g.rs)) ? "okrajZdroja" : dP <= g.rs + 2 ? "zdroj" : null;
+        if (cast) return { d, cast };
+      }
+      return null;
+    };
+    // Kurzor povie, že krúžok sa dá chytiť — bez neho nebolo vidno, kde.
+    stvorec.addEventListener("pointermove", (e) => {
+      if (tah || e.buttons || e.pointerType === "touch") return;
+      const hit = detaily.length ? detailPodBodom(miesto(e), oknaNaObrazovke(), 8) : null;
+      const k = !hit ? "" : hit.cast.startsWith("okraj") ? "nwse-resize" : "move";
+      if (stvorec.style.cursor !== k) { stvorec.style.cursor = k; svgCiary.style.cursor = k; }
+    });
+
     // Zachytávanie na štvorci: čiara má prednosť pred fotkou pod ňou.
     stvorec.addEventListener("pointerdown", (e) => {
       if (e.target.closest?.(".roh, .otoc")) return;
       const R = oknaNaObrazovke(), P = miesto(e);
       // Krúžok so zväčšeninou: chytiť ho (posunúť), za okraj zväčšiť; to isté miesto na fotke.
-      const tol = polomer(e).koniec * 0.7;
-      for (const d of [...detaily].reverse()) {
-        if (!stav[d.okno]?.src) continue;
-        const g = geomDetailu(d, R), dC = Math.hypot(P.x - g.C.x, P.y - g.C.y), dP = Math.hypot(P.x - g.P.x, P.y - g.P.y);
-        const cast = Math.abs(dC - g.rc) < tol ? "okrajKruhu" : dC < g.rc ? "kruh"
-          : Math.abs(dP - g.rs) < tol ? "okrajZdroja" : dP < g.rs ? "zdroj" : null;
-        if (!cast) continue;
+      const hit = detailPodBodom(P, R, polomer(e).koniec * 0.7);
+      if (hit) {
+        const { d, cast } = hit;
         e.preventDefault(); e.stopPropagation();
         vybranyDetail = d.id; vybrana = null; cakaUhol = null;
         zacniTah({ druh: "detail", cast, d, okno: d.okno, P0: P, povodne: { zdroj: { ...d.zdroj }, kam: { ...d.kam } } }, e);
@@ -566,10 +594,11 @@
           const A = bodVOkne(d.okno, tah.povodne.zdroj, R);
           d.zdroj = bodZOkna(d.okno, A.x + P.x - tah.P0.x, A.y + P.y - tah.P0.y, R);
         } else if (tah.cast === "kruh") {
-          d.kam = {
-            x: Math.max(0, Math.min(1, tah.povodne.kam.x + (P.x - tah.P0.x) / o.w)),
-            y: Math.max(0, Math.min(1, tah.povodne.kam.y + (P.y - tah.P0.y) / o.h)),
-          };
+          // Kamkoľvek po štvorci (aj do druhej polovice), stred zostane na ňom.
+          const W = stvorec.clientWidth, H = stvorec.clientHeight;
+          const cx = Math.max(0, Math.min(W, o.x + tah.povodne.kam.x * o.w + P.x - tah.P0.x));
+          const cy = Math.max(0, Math.min(H, o.y + tah.povodne.kam.y * o.h + P.y - tah.P0.y));
+          d.kam = { x: (cx - o.x) / o.w, y: (cy - o.y) / o.h };
         } else if (tah.cast === "okrajKruhu") d.zoom = Math.max(1.2, Math.min(8, Math.hypot(P.x - g.C.x, P.y - g.C.y) / (g.rs || 1)));
         kresliCiary();
         return;
@@ -625,8 +654,9 @@
           // Zväčšenina ide vedľa — na stranu bližšie k stredu okna, celá v okne.
           const smer = g.P.x < o.x + o.w / 2 ? 1 : -1;
           let cx = g.P.x + smer * (g.rs + g.rc + 16), cy = g.P.y;
-          cx = Math.max(o.x + g.rc, Math.min(o.x + o.w - g.rc, cx));
-          cy = Math.max(o.y + g.rc, Math.min(o.y + o.h - g.rc, cy));
+          const W = stvorec.clientWidth, H = stvorec.clientHeight;
+          cx = Math.max(g.rc, Math.min(W - g.rc, cx));
+          cy = Math.max(g.rc, Math.min(H - g.rc, cy));
           d.kam = { x: (cx - o.x) / o.w, y: (cy - o.y) / o.h };
         }
         tah = null;
