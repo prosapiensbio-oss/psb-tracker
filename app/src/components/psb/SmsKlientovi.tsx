@@ -302,7 +302,13 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu), ...(druhAuditu ? { druh: druhAuditu } : {}) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setBezi(false);
-    if (r?.ok) { setHotovo(true); setHlaska("odoslané"); onOdoslane?.(); if (!druhAuditu) oznam("sms"); return; }
+    if (r?.ok) {
+      const n = Number(r.zmazaneNavrhy) || 0;
+      if (n) window.dispatchEvent(new CustomEvent("psb-navrhy-zmazane", { detail: { klient: meno } }));
+      setHotovo(true);
+      setHlaska(n ? `odoslané · ${n === 1 ? "rozrobený návrh zmazaný" : n < 5 ? `${n} rozrobené návrhy zmazané` : `${n} rozrobených návrhov zmazaných`} (hotové porovnania ostávajú v profile)` : "odoslané");
+      onOdoslane?.(); if (!druhAuditu) oznam("sms"); return;
+    }
     setHlaska(r?.error || "nepodarilo sa");
   };
 

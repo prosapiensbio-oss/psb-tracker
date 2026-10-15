@@ -66,6 +66,15 @@ export function EditorKarta({ mena }: { mena: string[] }) {
     posliKlienta();
     try { sessionStorage.setItem(KLUC_KLIENTA, platny); } catch { /* len pohodlie */ }
   }, [posliKlienta, platny]);
+  // Fotky klientovi odišli a server zmazal jeho rozrobené — editor obnoví zoznam.
+  useEffect(() => {
+    const f = (e: Event) => {
+      const klient = (e as CustomEvent<{ klient: string }>).detail?.klient || "";
+      for (const el of Object.values(ramiky.current)) el?.contentWindow?.postMessage({ typ: "psb-navrhy-zmazane", klient }, location.origin);
+    };
+    window.addEventListener("psb-navrhy-zmazane", f);
+    return () => window.removeEventListener("psb-navrhy-zmazane", f);
+  }, []);
   // Editor po uložení ku klientovi ohlási zmenu — kartotéka v profile sa obnoví.
   useEffect(() => {
     const na = (e: MessageEvent) => {

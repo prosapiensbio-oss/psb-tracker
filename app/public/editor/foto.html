@@ -2594,6 +2594,14 @@ window.kartotekaKlienta = (() => {
       stavText("ukladám…");
       await uloz(sk.snimkaStavu());
     };
+    // Kokpit ohlási, že fotky klientovi odišli a jeho rozrobené sú zmazané.
+    // Otvorený návrh už na serveri nie je — ďalšie uloženie by ho pod tým
+    // istým id založilo znova, preto ho editor púšťa (nová úprava = nový návrh).
+    addEventListener("message", (e) => {
+      if (e.origin !== location.origin || e.data?.typ !== "psb-navrhy-zmazane") return;
+      if (aktualny && (kt.klient || "") === e.data.klient) aktualny = null;
+      nacitajZoznam();
+    });
     // Návrat na stránku (iné zariadenie medzitým mohlo uložiť) → čerstvý zoznam.
     document.addEventListener("visibilitychange", () => { if (!document.hidden) nacitajZoznam(); });
     nacitajZoznam();

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { odsifruj, odsifrujBajty, zasifruj, zasifrujBajty } from "../../lib/psb/sifra.server";
+import { zmazNavrh } from "../../lib/psb/editorNavrhy.server";
 
 /**
  * ROZROBENÉ NÁVRHY EDITORA FOTIEK NA SERVERI (Jerry, 12. 10. 2026: „prečo
@@ -30,11 +31,6 @@ const chyba = (error: string, status = 400) => Response.json({ ok: false, error 
 const platneId = (s: unknown) => /^n[a-z0-9]{6,20}$/.test(String(s || ""));
 const predpona = (id: string) => `editor/navrhy/${id}/`;
 
-async function zmazNavrh(env: Required<Pick<Env, "DB" | "STORAGE">>, id: string) {
-  const zoznam = await env.STORAGE.list({ prefix: predpona(id) }).catch(() => null);
-  for (const o of zoznam?.objects || []) await env.STORAGE.delete(o.key).catch(() => {});
-  await env.DB.prepare("DELETE FROM editor_navrhy WHERE id = ?1").bind(id).run();
-}
 
 export const Route = createFileRoute("/api/editor-navrhy")({
   server: {

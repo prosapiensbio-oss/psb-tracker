@@ -5,6 +5,7 @@ import { obsahOdkazu } from "../../lib/psb/obsahOdkazu.server";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { zmazNavrhyKlienta } from "../../lib/psb/editorNavrhy.server";
 import { bindings } from "../../lib/bindings.server";
 import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
@@ -223,7 +224,14 @@ export const Route = createFileRoute("/api/sms")({
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,
         });
-        return Response.json({ ok: true, cislo, sprav: kolko.sprav });
+        // Fotky odišli → rozrobené návrhy k tomuto klientovi už netreba (hotové sú v kartotéke).
+        let zmazaneNavrhy = 0;
+        const { STORAGE } = bindings() as { STORAGE?: import("@cloudflare/workers-types").R2Bucket };
+        if (b.druh === "fotky" && klient && STORAGE) {
+          zmazaneNavrhy = await zmazNavrhyKlienta({ DB, STORAGE }, kto, klient).catch(() => 0);
+          if (zmazaneNavrhy) await audit(DB, { action: "editor-navrhy-zmazane", predmet: klient, neu: `${zmazaneNavrhy} po odoslaní fotiek`, actor: kto });
+        }
+        return Response.json({ ok: true, cislo, sprav: kolko.sprav, zmazaneNavrhy });
       },
     },
   },
