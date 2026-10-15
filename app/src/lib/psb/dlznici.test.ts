@@ -110,6 +110,30 @@ describe("ten istý predaj v oboch systémoch", () => {
   });
 });
 
+describe("bitcoin — rozhoduje suma v korunách, nie kurz", () => {
+  it("platba bitcoinom o pár percent nižšia (kurz) zaplatí balíček celý (Gažo 15. 10. 2026)", () => {
+    expect(dlhy({ balicky: [bal("Gažo", "2026-10-09", 20093)], platby: [{ klient: "Gažo", suma: 19682, datum: "2026-10-11", sposob: "bitcoin" }] })).toEqual([]);
+  });
+  it("Gažo naostro: staré členstvá zaplatené v PTminderi, októbrová BTC platba o 411 Kč nižšia → bez dlhu", () => {
+    const v = dlhy({
+      balicky: [bal("Gažo", "2026-05-18", 21150, "ptminder"), bal("Gažo", "2026-07-24", 20093, "ptminder"), bal("Gažo", "2026-10-09", 20093)],
+      platby: [{ klient: "Gažo", suma: 19682, datum: "2026-10-11", sposob: "bitcoin" }],
+      ptPlatby: [{ klient: "Gažo", suma: 21150, datum: "2026-05-19" }, { klient: "Gažo", suma: 8000, datum: "2026-08-07" }, { klient: "Gažo", suma: 12081, datum: "2026-08-17" }],
+    });
+    expect(v).toEqual([]);
+  });
+  it("prebytok z rastúceho kurzu sa neprenesie na ďalší balíček", () => {
+    const v = dlhy({ balicky: [bal("X", "2026-09-01", 6990), bal("X", "2026-10-01", 6990)], platby: [{ klient: "X", suma: 7300, datum: "2026-09-02", sposob: "bitcoin" }] });
+    expect(v.map((x) => x.doplatit)).toEqual([6990]);
+  });
+  it("polovičná platba bitcoinom nie je kurz — dlh svieti", () => {
+    expect(dlhy({ balicky: [bal("X", "2026-10-01", 6990)], platby: [{ klient: "X", suma: 3500, datum: "2026-10-02", sposob: "bitcoin" }] }).map((x) => x.doplatit)).toEqual([3490]);
+  });
+  it("bankový prevod o 411 Kč nižší ostáva dlhom — kurz je len pri bitcoine", () => {
+    expect(dlhy({ balicky: [bal("X", "2026-10-09", 20093)], platby: [{ klient: "X", suma: 19682, datum: "2026-10-11", sposob: "banka" }] }).map((x) => x.doplatit)).toEqual([411]);
+  });
+});
+
 describe("poistka z PTmindera", () => {
   it("staré členstvo zaplatené v PTminderi si nezoberie novú platbu z Kokpitu (Gažo 15. 10. 2026)", () => {
     const v = dlhy({

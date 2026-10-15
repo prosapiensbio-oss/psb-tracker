@@ -169,7 +169,7 @@ export function dlhyKlientov(v: VstupDlhov): {
   for (const p of v.platby) {
     const k = normName(p.klient);
     const xs = pl.get(k) || [];
-    xs.push({ suma: p.suma, datum: den(p.datum), zruseneAt: p.zruseneAt ?? null, vopred: p.vopred });
+    xs.push({ suma: p.suma, datum: den(p.datum), zruseneAt: p.zruseneAt ?? null, vopred: p.vopred, sposob: p.sposob });
     pl.set(k, xs);
   }
   // 3. Poistka: čo PTminder pozná ako zaplatené, dlhom nie je.

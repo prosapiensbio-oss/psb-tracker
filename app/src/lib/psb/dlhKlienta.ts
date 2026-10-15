@@ -38,7 +38,23 @@ export type PlatbaDlh = {
    * Počíta sa aj vtedy, keď je staršia než prvý balíček z Kokpitu.
    */
   vopred?: boolean | number | null;
+  /** Spôsob úhrady — pri bitcoine rozhoduje suma v korunách, nie kurz (viď `KURZ_BTC`). */
+  sposob?: string;
 };
+
+/**
+ * BITCOIN: KLIENT PLATÍ KORUNY, SATY SÚ LEN KURZ (Jerry, 15. 10. 2026:
+ * „klient platí vždy rovnako v českej korune a množstvo sats sa len
+ * prispôsobí aktuálnemu kurzu… ak prišla platba, dlh sa maže").
+ *
+ * Peter Gažo zaplatil 11. 10. svojich 20 093 Kč z QR kódu; BTC kniha mu
+ * platbu prepočítala svojím kurzom na 19 682 Kč a Kokpit z rozdielu 411 Kč
+ * spravil dlh, ktorý by balíček držal nezaplatený a bez hodín. Bitcoinová
+ * platba do 10 % od ceny balíčka ho preto zaplatí CELÝ — a ani prebytok pri
+ * rastúcom kurze sa neprenáša ďalej. Väčší rozdiel už nie je kurz, ale iná
+ * suma (polovičná platba, iný balíček) — tam dlh svieti ďalej.
+ */
+export const KURZ_BTC = 0.1;
 
 
 /**
@@ -96,7 +112,7 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
   const nase = balickyKokpitu(balicky) as B[];
   if (!nase.length) return [];
   const zasoba = zapocitanePlatby(platby, nase[0].platnostOd)
-    .map((p) => ({ datum: p.datum, zostava: p.suma }))
+    .map((p) => ({ datum: p.datum, zostava: p.suma, bitcoin: p.sposob === "bitcoin", cela: true }))
     .sort((a, b) => a.datum.localeCompare(b.datum));
   // Vrátenie (záporná platba, `ukoncenieBalicka`) zmenší platby od
   // najnovšej — peniaze, ktoré odišli späť, nič nezaplatia (súčet ako predtým).
@@ -118,6 +134,7 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
       if (p.zostava <= 0 || !smie(p.datum)) continue;
       const k = Math.min(ostava, p.zostava);
       p.zostava -= k;
+      p.cela = false;
       ostava -= k;
     }
     return kolko - ostava;
@@ -127,6 +144,12 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
   for (const b of nase) {
     const cena = b.cena || 0;
     if (zaplatenyInde?.(b)) { const hranica = posun(b.platnostOd, 45); zober(cena, (d) => d <= hranica); continue; }
+    // Len platba z obdobia balíčka (14 dní pred až 45 po začiatku) — inak by
+    // októbrová platba Gaža „sedela" aj na májové členstvo s podobnou cenou.
+    const od = posun(b.platnostOd, -14), po = posun(b.platnostOd, 45);
+    const btc = zasoba.find((p) => p.bitcoin && p.cela && p.zostava > 0 && p.datum >= od && p.datum <= po
+      && Math.abs(p.zostava - cena) <= cena * KURZ_BTC);
+    if (btc) { btc.zostava = 0; btc.cela = false; continue; }
     const vzate = zober(cena, () => true);
     // Koruna tolerancie na zaokrúhlenie, ako pri rozdelení platby.
     if (vzate + 1 >= cena) continue;
