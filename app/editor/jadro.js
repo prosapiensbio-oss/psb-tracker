@@ -177,7 +177,39 @@
         tvary.push({ typ: "text", x: V.x + bx * (r + 20 * k), y: V.y + by * (r + 20 * k), text: `${desatinne(uhol)}°`, velkost: 15, tucne: true, farba: p.c.farba });
       }
     }
+    odtlacPopisky(tvary.filter((t) => t.typ === "text"), k);
     return tvary;
+  }
+
+  /**
+   * POPISKY SA ODTLÁČAJÚ (Jerry, 15. 10. 2026: „čísla uhlov sa prekrývajú —
+   * môžeme to nastaviť tak, že sa budú navzájom odpudzovať?"). Dva štítky,
+   * ktoré sa prekrývajú, sa rozídu po kratšej osi prekryvu — každý o polovicu.
+   * Opakuje sa, kým sa niečo hýbe (najviac 60 kôl), takže sa rozídu aj tri
+   * a viac pri sebe. Rozmer je ten istý odhad, akým sa kreslí pozadie štítku;
+   * export (k = pomer) dopadne rovnako ako obrazovka.
+   */
+  function odtlacPopisky(texty, k) {
+    const rozmer = (t) => ({ w: (t.text.length * t.velkost * 0.6 + 12) * k, h: (t.velkost + 9) * k });
+    const medzera = 3 * k;
+    for (let kolo = 0; kolo < 60; kolo++) {
+      let pohyb = false;
+      for (let i = 0; i < texty.length; i++) for (let j = i + 1; j < texty.length; j++) {
+        const a = texty[i], b = texty[j], ra = rozmer(a), rb = rozmer(b);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const ox = (ra.w + rb.w) / 2 + medzera - Math.abs(dx), oy = (ra.h + rb.h) / 2 + medzera - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) continue;
+        pohyb = true;
+        if (oy <= ox) {
+          const sm = dy > 0 ? 1 : dy < 0 ? -1 : (i % 2 ? -1 : 1);
+          a.y -= sm * oy / 2; b.y += sm * oy / 2;
+        } else {
+          const sm = dx > 0 ? 1 : dx < 0 ? -1 : 1;
+          a.x -= sm * ox / 2; b.x += sm * ox / 2;
+        }
+      }
+      if (!pohyb) break;
+    }
   }
 
   /** Hrot šípky v bode B (smer A → B): tri body trojuholníka, veľkosť v px × k. */
