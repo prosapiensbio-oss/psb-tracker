@@ -108,11 +108,11 @@ describe("klientStranka", () => {
     expect(h).not.toContain("Rozbalit celý balíček");
   });
 
-  it("odpočet ide najstaršie hore — ako sa číta príbeh", () => {
+  it("odpočet ide najnovšie hore, dole do minulosti (Jerry 16. 10. 2026)", () => {
     const h = klientStranka(zaklad);
     // Len samotný blok osi: slovo „trénink" je aj v nadpise stránky.
     const os = h.slice(h.indexOf("Poslední balíček"));
-    expect(os.indexOf("Balíček 8 h")).toBeLessThan(os.indexOf("trénink"));
+    expect(os.indexOf("trénink")).toBeLessThan(os.indexOf("Balíček 8 h"));
   });
 
   it("os stojí rozbalená vždy, aj pri dlhu — stránka má jednu podobu", () => {

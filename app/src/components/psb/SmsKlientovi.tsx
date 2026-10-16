@@ -545,7 +545,9 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
                 key={verzia}
                 src={verzia ? `${nahlad}&v=${verzia}` : nahlad}
                 title={`Stránka klienta — ${meno}`}
-                style={{ width: 400, height: 560, border: 0, transform: "scale(.75)", transformOrigin: "0 0" }}
+                // Šírka telefónu (375 px), zmenšená na 300 px okna — pri 400 px
+                // vyzeral náhľad širší než stránka u klienta (Jerry, 16. 10. 2026).
+                style={{ width: 375, height: 525, border: 0, transform: "scale(.8)", transformOrigin: "0 0" }}
               />
             </div>
             <a

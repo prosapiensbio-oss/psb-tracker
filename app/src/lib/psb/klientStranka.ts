@@ -405,7 +405,7 @@ ${karty}</div></div>
 <div style="font-size:11.5px;color:${s.slabsia};margin-top:10px">← posouvej doprava, jdeš do minulosti</div>`;
 }
 
-/** Zvislý rozpis: najstaršie hore, čísla vľavo, popisy vpravo. */
+/** Zvislý rozpis v poradí, v akom ho dostane (blokOsi ho podáva najnovšie hore); čísla vľavo, popisy vpravo. */
 function osZvisla(os: BodOsi[]): string {
   const s = SADZBA;
   return os.map((b, i) => {
@@ -456,9 +456,17 @@ function nazovRozsahu(balickov: number | undefined): string {
  * bez druhého rozbaľovania. `osVodorovna` ostáva v kóde nepoužitá zámerne:
  * je to jedna z troch podôb v návrhoch a môže sa vrátiť.
  */
-function blokOsi(v: VypisKlienta, zlozena: boolean): string {
+function blokOsi(vstup: VypisKlienta, zlozena: boolean): string {
   const s = SADZBA;
-  if (!v.os.length) return "";
+  if (!vstup.os.length) return "";
+  /**
+   * NAJNOVŠIE HORE (Jerry, 16. 10. 2026: „navrchu je najbližší deň
+   * k aktuálnemu dátumu a dole to ide do minulosti — Jan Kral má navrchu
+   * september"). Klient otvára odkaz kvôli tomu, čo bolo naposledy; príbeh
+   * od vzniku balíčka sa číta zdola. Prvé riadky nad „…a dalších N" sú
+   * tak tie najčerstvejšie.
+   */
+  const v = { ...vstup, os: [...vstup.os].reverse() };
   const nazov = nazovRozsahu(v.balickov);
   if (zlozena) {
     return `<div style="margin-top:28px">
