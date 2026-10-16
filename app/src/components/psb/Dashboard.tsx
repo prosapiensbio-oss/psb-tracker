@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -2968,6 +2969,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               <div style={{ fontSize: 11.5, color: C.textDim, wordBreak: "break-all" }}>{uvOdkaz}</div>
               {/\/u\/([A-Za-z0-9]+)/.test(uvOdkaz) && (
                 <a href={`/u/${/\/u\/([A-Za-z0-9]+)/.exec(uvOdkaz)![1]}?nahlad=1`} target="_blank" rel="noreferrer"
+                  onClick={(e) => otvorNahlad(e, `/u/${/\/u\/([A-Za-z0-9]+)/.exec(uvOdkaz)![1]}?nahlad=1`)}
                   style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí</a>
               )}
               <textarea value={uvText} onChange={(e) => setUvText(e.target.value)} rows={3}

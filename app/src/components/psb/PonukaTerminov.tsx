@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { otvorNahlad } from "../../lib/psb/nahladOkno";
 
 import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
 import { TRENERI } from "../../lib/psb/mailFaktury";
@@ -346,7 +347,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
         {chyba && <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>}
         {hotovo && (
           <div style={{ padding: 10, borderRadius: 10, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 8), display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 12.5, color: C.green }}>Odkaz je hotový — <a href={hotovo.url} target="_blank" rel="noreferrer" style={{ color: C.green }}>pozrieť, čo uvidí</a>.</div>
+            <div style={{ fontSize: 12.5, color: C.green }}>Odkaz je hotový — <a href={hotovo.url} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, hotovo.url)} style={{ color: C.green }}>pozrieť, čo uvidí</a>.</div>
             <SmsKlientovi
               meno={hotovo.klient} trener={hotovo.trener} vlozene druhAuditu="ponuka"
               cisloNovehoCloveka={hotovo.telefon || undefined}

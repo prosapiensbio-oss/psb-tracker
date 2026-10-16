@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { otvorNahlad } from "../../lib/psb/nahladOkno";
 
 import { vychodiskovaSprava, type CisloKarty } from "../../lib/psb/fotkyStranka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
@@ -72,7 +73,7 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 8, fontSize: 12.5 }}>
           <code style={{ padding: "4px 8px", borderRadius: 6, background: C.bg, color: C.text, wordBreak: "break-all" }}>{hotovo.url}</code>
           <button type="button" onClick={() => void doSchranky(hotovo.url)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>kopírovať</button>
-          <a href={hotovo.nahlad} target="_blank" rel="noreferrer" style={{ color: C.accentLight }}>pozrieť, čo uvidí</a>
+          <a href={hotovo.nahlad} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, hotovo.nahlad)} style={{ color: C.accentLight }}>pozrieť, čo uvidí</a>
         </div>
         <div style={{ marginTop: 12 }}>
           <SmsKlientovi
@@ -194,7 +195,7 @@ export function PoslaneKlientovi({ odkazy, odpovede, onZmena }: { odkazy: OdkazF
                 {o.zrusene ? <span style={{ color: C.textDim }}>zrušený</span> : neplati ? <span style={{ color: C.textDim }}>po platnosti</span> : (
                   <>
                     <button type="button" onClick={() => void doSchranky(o.url)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>kopírovať</button>
-                    <a href={`${o.url.replace(/^https:\/\/prosapiens\.cz/, "")}?nahlad=1`} target="_blank" rel="noreferrer" style={{ color: C.accentLight, fontSize: 12 }}>náhľad</a>
+                    <a href={`${o.url.replace(/^https:\/\/prosapiens\.cz/, "")}?nahlad=1`} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, `${o.url.replace(/^https:\/\/prosapiens\.cz/, "")}?nahlad=1`)} style={{ color: C.accentLight, fontSize: 12 }}>náhľad</a>
                     <button type="button" onClick={() => void zrus(o)} style={{ background: "none", border: "none", padding: 0, color: C.red, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
                   </>
                 )}

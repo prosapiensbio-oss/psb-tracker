@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { VyberMena } from "./VyberMena";
 
@@ -542,7 +543,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
             </div>
             <NahladTelefonu key={verzia} src={verzia ? `${nahlad}&v=${verzia}` : nahlad} title={`Stránka klienta — ${meno}`} />
             <a
-              href={nahlad} target="_blank" rel="noreferrer"
+              href={nahlad} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, nahlad)}
               style={{ display: "inline-block", marginTop: 7, fontSize: 11.5, color: C.accentLight }}
             >otvoriť celú stránku ↗</a>
           </div>
@@ -560,8 +561,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
  * nech je okienko akékoľvek široké — pevná mierka nechávala vpravo prázdny
  * pás, keď bolo okienko širšie než 300 px, a pôsobilo to ako iná stránka.
  */
-function NahladTelefonu({ src, title }: { src: string; title: string }) {
-  const SIRKA = 375, VYSKA = 420;
+export function NahladTelefonu({ src, title, vyska = 420 }: { src: string; title: string; vyska?: number }) {
+  const SIRKA = 375, VYSKA = vyska;
   const obal = useRef<HTMLDivElement>(null);
   const [mierka, setMierka] = useState(0.8);
   useEffect(() => {

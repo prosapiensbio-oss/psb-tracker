@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
@@ -2133,6 +2134,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             <>
               {uvToken && (
                 <a href={`/u/${encodeURIComponent(uvToken)}?nahlad=1`} target="_blank" rel="noreferrer"
+                  onClick={(e) => otvorNahlad(e, `/u/${encodeURIComponent(uvToken)}?nahlad=1`)}
                   style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí (náhľad sa nepočíta ako otvorenie)</a>
               )}
               <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene predvolenyText={uvText} />

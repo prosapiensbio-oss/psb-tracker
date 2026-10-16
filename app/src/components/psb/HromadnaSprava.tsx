@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { NahladTelefonu } from "./SmsKlientovi";
 import type { ClientAgg } from "../../lib/psb/compute";
 import { normName } from "../../lib/psb/format";
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -200,8 +201,9 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
             </button>
             {nahladDotaznika && (
               // Ten istý obsah ako skutočný odkaz, len odoslanie nič neuloží.
-              <iframe title="Náhľad dotazníka" src={`/d/${NAHLAD_DOTAZNIKA}`}
-                style={{ display: "block", marginTop: 8, width: "100%", maxWidth: 400, height: 640, border: `1px solid ${C.border}`, borderRadius: 12, background: "#232b1c" }} />
+              <div style={{ marginTop: 8, maxWidth: 375 }}>
+                <NahladTelefonu src={`/d/${NAHLAD_DOTAZNIKA}`} title="Náhľad dotazníka" vyska={640} />
+              </div>
             )}
           </div>
         )}
