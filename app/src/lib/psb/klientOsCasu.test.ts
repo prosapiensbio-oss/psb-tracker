@@ -161,6 +161,26 @@ describe("balíčky nahodené v Kokpite", () => {
     expect(osCasuKlienta("Barbora Vankova", z as never, DNES).some((x) => x.druh === "balicekOd" && x.zKokpitu)).toBe(false);
   });
 
+  it("naliaty balíček opravený v Kokpite prebije export aj knihu predajov (Dominika 16. 10. 2026)", () => {
+    // Export: „OFF - 6h S viazanostou" 18. 8. V Kokpite ten istý riadok
+    // (zdroj ptminder) opravený na 18 h — na osi má byť jeden balíček s 18 h.
+    const z = {
+      ...zdroj,
+      services: [{ client: "Barbora Vankova", date: "2026-08-18", serviceType: "Membership", description: "OFF - 6h S viazanostou", price: 6990 }],
+      balicky: [{ ...kokpitovy, nazov: "18h Balíček", hodiny: 18, platnost_od: "2026-08-18", cena_czk: 17978, zdroj: "ptminder" }],
+    };
+    const bal = osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd");
+    expect(bal).toHaveLength(1);
+    expect(bal[0]).toMatchObject({ nazov: "18h Balíček", hodin: 18, zKokpitu: true });
+  });
+
+  it("naliaty balíček zhodný s exportom ostáva vonku", () => {
+    const z = { ...zdroj, balicky: [{ ...kokpitovy, nazov: "OFF - 6h S viazanostou", platnost_od: "2026-08-18", zdroj: "ptminder" }] };
+    const bal = osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd");
+    expect(bal).toHaveLength(1);
+    expect(bal[0].zKokpitu).toBeUndefined();
+  });
+
   it("bez zapísaných hodín ich vezme z názvu", () => {
     const z = { ...zdroj, balicky: [{ ...kokpitovy, hodiny: null, nazov: "OFF - 18 hodín offline" }] };
     const b = osCasuKlienta("Barbora Vankova", z as never, DNES).find((x) => x.druh === "balicekOd" && x.den === "2026-09-20");

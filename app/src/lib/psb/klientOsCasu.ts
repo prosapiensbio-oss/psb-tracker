@@ -376,11 +376,42 @@ export function osCasuKlienta(
       zrusene_at: r.zrusene_at ?? r.zruseneAt ?? null,
     };
   });
+  /**
+   * NALIATY BALÍČEK, KTORÝ SA V KOKPITE OPRAVIL, TIEŽ PATRÍ NA OS.
+   *
+   * Jerry, 16. 10. 2026 pri Dominike Križovej: „v odkaze mi ukazuje, že má
+   * 6 h, prečo?" PTminder má „OFF - 6h BEZ viazanosti" z 18. 9., v Kokpite
+   * je ten istý predaj opravený na „18h Balíček" za 17 978 Kč (a toľko aj
+   * zaplatila). Riadok má ale `zdroj = "ptminder"`, lebo ho nalial import —
+   * os ho preto preskočila a kreslila šesťhodinový balíček s mínusmi, kým
+   * karta (tá berie všetky balíčky z Kokpitu) hovorila správnych 14 h.
+   *
+   * Naliaty riadok sa berie, keď sa jeho HODINY líšia od exportu v ten istý
+   * deň — vtedy ho niekto v Kokpite opravil a export je stará pravda.
+   * Riadky zhodné s exportom ostávajú vonku (pravidlo vyššie), doplnenia
+   * tiež. Opravený deň nesie kľúč `deň|oprava` a export aj kniha predajov
+   * z toho dňa ustúpia — názov aj hodiny sa totiž už nezhodujú.
+   */
+  const hodinExportu = new Map<string, number[]>();
+  for (const b of moje(zdroj.packages)) {
+    const od = den(b.validFrom || "");
+    if (!od || jeDoplnenie(b.package)) continue;
+    const h = b.total || b.naObdobie || hodinZNazvuBalicka(b.package);
+    hodinExportu.set(od, [...(hodinExportu.get(od) || []), h]);
+  }
+  const opravenyNaliaty = (b: { zdroj?: string | null; nazov: string; hodiny?: number | null }, d: string) => {
+    if (b.zdroj !== "ptminder" || jeDoplnenie(b.nazov)) return false;
+    const exp = hodinExportu.get(d);
+    const h = Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov);
+    return !!exp && h > 0 && !exp.includes(h);
+  };
   for (const b of riadky) {
-    if (b.zdroj !== "rucne") continue;
     if (normName(b.klient) !== k || b.zrusene_at) continue;
     const d = den(b.platnost_od);
     if (!d || d > dnes) continue;
+    const oprava = opravenyNaliaty(b, d);
+    if (b.zdroj !== "rucne" && !oprava) continue;
+    if (oprava) zKokpitu.add(`${d}|oprava`);
     /**
      * ZDVOJENIE SA POZNÁ PO DNI A HODINÁCH, NIE PO NÁZVE.
      *
@@ -432,6 +463,7 @@ export function osCasuKlienta(
     const od = den(b.validFrom || "");
     const doDna = den(b.validTo || "");
     // Ten istý predaj zapísaný v Kokpite má prednosť — viď vyššie.
+    if (od && zKokpitu.has(`${od}|oprava`)) continue;
     if (od && (zKokpitu.has(`${od}|${normName(b.package)}`) || zKokpitu.has(`${od}|h${b.total || hodinZNazvuBalicka(b.package)}`))) continue;
     // Doplnenie členstva nemá v exporte dátumy — na os ho položiť nejde,
     // lebo sa nevie kam. Radšej vynechať než hádať deň.
@@ -514,6 +546,7 @@ export function osCasuKlienta(
      * odkaze mu svietilo 12 h namiesto 6.
      */
     if (uzJe.has(kluc) || (zNazvu > 0 && uzJe.has(`${d}|h${zNazvu}`))) continue;
+    if (uzJe.has(`${d}|oprava`) && !jeDoplnenie(sl.description)) continue;
     uzJe.add(kluc);
     // Kľúč po hodinách drží aj tu: ten istý predaj môže mať v Kokpite iné
     // meno než v exporte (Balíček 6 h vs. OFF - 6h BEZ viazanosti).
