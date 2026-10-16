@@ -188,6 +188,17 @@ function tlacidloUlozQr(qrUrl: string, subor: string, farba: string): string {
 <div style="margin-top:7px;font-size:12px;line-height:1.5;color:#4d5940">Na iPhonu zvol v nabídce „Uložit obrázek". Jde to i podržením prstu na QR.</div>`;
 }
 
+/**
+ * „AKTUALIZOVAT KURZ" (Jerry, 16. 10. 2026: „aby si klient pred platbou
+ * aktualizoval kurz sám"). Obyčajný odkaz na tú istú stránku s `?kurz=1` —
+ * server vezme kurz najviac minútu starý a vyrobí novú faktúru. Bez
+ * skriptu, ako celá stránka; `#platba` vráti klienta rovno ku QR.
+ */
+function tlacidloKurzu(farba: string): string {
+  return `<a href="?kurz=1#platba" data-psb-kurz style="display:inline-block;margin-top:12px;text-decoration:none;border:2px solid ${farba};border-radius:999px;padding:10px 20px;font-size:14px;font-weight:700;color:${farba}">↻ Aktualizovat kurz</a>
+<div style="margin-top:6px;font-size:12px;line-height:1.5;color:#4d5940">Přepočítá satoshi podle aktuálního kurzu a vytvoří novou fakturu. Korunová částka zůstává stejná.</div>`;
+}
+
 function blokLightning(v: VypisKlienta, qrUrl?: string): string {
   const s = SADZBA;
   const l = v.lightning;
@@ -229,6 +240,7 @@ ${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:$
 ${l.bolt11 ? "" : `<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#4d5940">Částku ${esc(l.sats)} sats zadej v peněžence sám.</div>`}
 ${ulozQr}
 <div style="margin-top:14px;font-size:11.5px;line-height:1.5;color:#4d5940">Částka je ${esc(kc(l.czk))}; satoshi jsou přepočet kurzem ${esc(l.kurz)} Kč/BTC${l.kurzKedy ? ` v ${esc(l.kurzKedy)}` : ""}. Peněženka může ukázat o pár korun jinak — platí korunová částka.</div>
+${tlacidloKurzu(s.pozadie)}
 </div>`;
 }
 

@@ -53,3 +53,11 @@ describe("základ pre zľavu je cenník, nie zaplatená suma", () => {
     expect(katalogovaCena("")).toBe(null);
   });
 });
+
+describe("čas kurzu je pražský", () => {
+  it("UTC 12:05 v lete je 14:05", async () => {
+    const { casKurzu } = await import("./lightning");
+    expect(casKurzu("2026-10-16T12:05:00.000Z")).toBe("14:05");
+    expect(casKurzu("2026-12-16T12:05:00.000Z")).toBe("13:05");
+  });
+});

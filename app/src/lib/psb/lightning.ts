@@ -61,6 +61,12 @@ export function satsZaCzk(czk: number, kurzCzkZaBtc: number): number | null {
   return Math.ceil((czk / kurzCzkZaBtc) * 100_000_000);
 }
 
+/** Čas kurzu pre klienta — pražský, nie UTC (do 16. 10. 2026 bol o dve hodiny pozadu). */
+export const casKurzu = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("cs-CZ", { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit", hour12: false });
+};
+
 /** „73 450" — satoshi sa píšu po tisícoch, inak sa nedajú prečítať. */
 export const satsText = (s: number) => String(Math.round(s)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
@@ -76,13 +82,20 @@ type Kurz = { czkZaBtc: number; kedy: string };
 export async function kurzBtc(
   DB: import("@cloudflare/workers-types").D1Database,
   dnesMs = Date.now(),
+  /**
+   * Ako starý kurz ešte stačí. Bežné otvorenie 10 minút; tlačidlo
+   * „Aktualizovat kurz" na stránke klienta (16. 10. 2026) chce čerstvý,
+   * ale nie častejšie než raz za minútu — inak by opakované klepanie
+   * vyčerpalo verejné zdroje a brána by nás odstrihla.
+   */
+  maxVekMs = 10 * 60_000,
 ): Promise<Kurz | null> {
   const ulozeny = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'btc_kurz'")
     .first<{ value: string }>().catch(() => null);
   if (ulozeny?.value) {
     try {
       const k = JSON.parse(ulozeny.value) as Kurz;
-      if (k?.czkZaBtc > 0 && dnesMs - Date.parse(k.kedy) < 10 * 60_000) return k;
+      if (k?.czkZaBtc > 0 && dnesMs - Date.parse(k.kedy) < Math.max(60_000, maxVekMs)) return k;
     } catch { /* pokazený zápis sa prepíše novým */ }
   }
   /**

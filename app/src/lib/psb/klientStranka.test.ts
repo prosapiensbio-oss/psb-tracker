@@ -428,6 +428,13 @@ describe("QR so značkou a sumou (12. 10. 2026)", () => {
     expect(skript).toContain("sats");
     expect(skript).toContain("20 093");
   });
+
+  it("bitcoin: tlačidlo Aktualizovat kurz, pri banke nie", () => {
+    const btc = klientStranka({ ...sQr, lightning: { sats: "1 102 956", czk: 20093, plnaCena: 21150, zlava: 5, kurz: "1 819 299", kurzKedy: "08:40", adresa: "a@b.c" } });
+    expect(btc).toContain('href="?kurz=1#platba"');
+    expect(btc).toContain("Aktualizovat kurz");
+    expect(klientStranka(sQr)).not.toContain("Aktualizovat kurz");
+  });
 });
 
 describe("os ukáže začiatok a zvyšok schová", () => {

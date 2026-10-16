@@ -14,7 +14,7 @@ import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
-import { cenaPoZlave, katalogovaCena, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import { casKurzu, cenaPoZlave, katalogovaCena, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -147,7 +147,9 @@ export const Route = createFileRoute("/v/$token")({
           // Bez katalógovej ceny sa zľava neuplatňuje — nevedno, či v sume už nie je.
           const zlava = katalog ? zlavaKlienta : 0;
           const czk = cenaPoZlave(plna, zlava);
-          const kurz = await kurzBtc(DB).catch(() => null);
+          // „Aktualizovat kurz" (?kurz=1) chce kurz najviac minútu starý.
+          const obnovKurz = new URL(request.url).searchParams.get("kurz") === "1";
+          const kurz = await kurzBtc(DB, Date.now(), obnovKurz ? 60_000 : undefined).catch(() => null);
           const sats = kurz ? satsZaCzk(czk, kurz.czkZaBtc) : null;
           if (sats) {
             // Faktúra sa pýta priamo Lightning adresy (LNURL-pay) — kľúč ani
@@ -158,7 +160,7 @@ export const Route = createFileRoute("/v/$token")({
               sats: satsText(sats),
               czk, plnaCena: plna, zlava,
               kurz: Math.round(kurz!.czkZaBtc).toLocaleString("cs-CZ").replace(/\u00a0/g, " "),
-              kurzKedy: kurz!.kedy.slice(11, 16),
+              kurzKedy: casKurzu(kurz!.kedy),
               adresa: LIGHTNING_ADRESA,
               bolt11: faktura?.bolt11,
             };
@@ -274,7 +276,9 @@ export const Route = createFileRoute("/v/$token")({
          * počítadlo neobíde.
          */
         const jeNahlad = new URL(request.url).searchParams.get("nahlad") === "1" && await isAuthed(request);
-        if (!jeNahlad) {
+        // Klepnutie na „Aktualizovat kurz" je to isté otvorenie, nie ďalšie.
+        const jeObnovaKurzu = new URL(request.url).searchParams.get("kurz") === "1";
+        if (!jeNahlad && !jeObnovaKurzu) {
           await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
             .bind(new Date().toISOString(), token).run().catch(() => null);
         }
