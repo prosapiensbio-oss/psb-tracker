@@ -540,16 +540,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
               ))}
               {rozsahBezi && <span style={{ fontSize: 10.5, color: C.textDim }}>…</span>}
             </div>
-            <div style={{ height: 420, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#232b1c" }}>
-              <iframe
-                key={verzia}
-                src={verzia ? `${nahlad}&v=${verzia}` : nahlad}
-                title={`Stránka klienta — ${meno}`}
-                // Šírka telefónu (375 px), zmenšená na 300 px okna — pri 400 px
-                // vyzeral náhľad širší než stránka u klienta (Jerry, 16. 10. 2026).
-                style={{ width: 375, height: 525, border: 0, transform: "scale(.8)", transformOrigin: "0 0" }}
-              />
-            </div>
+            <NahladTelefonu key={verzia} src={verzia ? `${nahlad}&v=${verzia}` : nahlad} title={`Stránka klienta — ${meno}`} />
             <a
               href={nahlad} target="_blank" rel="noreferrer"
               style={{ display: "inline-block", marginTop: 7, fontSize: 11.5, color: C.accentLight }}
@@ -559,6 +550,36 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         </div>
       )}
     </div>
+    </div>
+  );
+}
+
+/**
+ * NÁHĽAD STRÁNKY V ŠÍRKE TELEFÓNU (Jerry, 16. 10. 2026: „stále to a šírka
+ * nesedí"). Stránka sa kreslí na 375 px a zmenší sa PRESNE na šírku okienka,
+ * nech je okienko akékoľvek široké — pevná mierka nechávala vpravo prázdny
+ * pás, keď bolo okienko širšie než 300 px, a pôsobilo to ako iná stránka.
+ */
+function NahladTelefonu({ src, title }: { src: string; title: string }) {
+  const SIRKA = 375, VYSKA = 420;
+  const obal = useRef<HTMLDivElement>(null);
+  const [mierka, setMierka] = useState(0.8);
+  useEffect(() => {
+    const el = obal.current;
+    if (!el) return;
+    const sprav = () => { const w = el.clientWidth; if (w > 0) setMierka(w / SIRKA); };
+    sprav();
+    const ro = new ResizeObserver(sprav);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={obal} style={{ height: VYSKA, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#232b1c" }}>
+      <iframe
+        src={src}
+        title={title}
+        style={{ width: SIRKA, height: VYSKA / mierka, border: 0, transform: `scale(${mierka})`, transformOrigin: "0 0", display: "block" }}
+      />
     </div>
   );
 }
