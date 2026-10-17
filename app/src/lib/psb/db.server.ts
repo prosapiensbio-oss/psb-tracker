@@ -7,7 +7,7 @@ import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
-import { dlhyKlientov } from "./zaplatene";
+import { dlhyKlientov, bezHodinZDlhov } from "./zaplatene";
 import { jeUkonceny } from "./ukoncenieBalicka";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
@@ -385,7 +385,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       // hodiny LEN riadku z PTmindera — balíček z Kokpitu v ten deň je ten
       // istý predaj a o jeho zaplatení rozhoduje dlh (Gažo, Dominika, Gerich
       // 15. 10. 2026: zaplatené balíčky nedávali hodiny).
-      data.bezHodin = [...polozky.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata.map((d) => ({ ...d, dvojca: true }))];
+      // Hodiny nedáva len balíček, na ktorý neprišlo NIČ. Čiastočne zaplatený
+      // (splátky — Markéta Lozias, Jerry 17. 10. 2026) hodiny dáva a zvyšok
+      // ostáva v `dlhy` ako dlh. Jedno miesto: `bezHodinZDlhov`.
+      data.bezHodin = bezHodinZDlhov(polozky, dvojcata);
       // Odvodený pohľad na ten istý zoznam (párovanie platieb vo Workspace).
       data.nezaplateneKokpit = polozky.filter((d) => d.zdroj === "kokpit")
         .map((d) => ({ klient: d.klient, den: d.den, cena: d.cena, nazov: d.nazov, doplatit: d.doplatit }));

@@ -18,6 +18,8 @@
  * nie je, a umazala by dlh, ktorý naozaj je.
  */
 
+import { KOKPIT_OD } from "./sedeniaZKalendara";
+
 export type BalicekDlh = { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; nazov?: string; poznamka?: string | null };
 
 /**
@@ -196,6 +198,11 @@ export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
   ptHistoria: { klient: string; od: string }[],
   ptOtvorene: { klient: string; datum: string }[],
   meno: (s: string) => string,
+  /**
+   * Platby z Kokpitu (banka, zošit) — len na rozpoznanie SPLÁTKY. Bez nich
+   * sa splátka nerozpoznáva a poistka sa správa ako do 17. 10. 2026.
+   */
+  kokpitPlatby: { klient: string; datum: string; suma: number }[] = [],
 ): T[] {
   const dni = (a: string, b: string) => (Date.parse(`${b.slice(0, 10)}T00:00:00Z`) - Date.parse(`${a.slice(0, 10)}T00:00:00Z`)) / 86400000;
   const pouzite = new Set<number>();
@@ -223,6 +230,32 @@ export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
           if (sedi([kand[a], kand[c], kand[d]])) { pouzite.add(kand[a]); pouzite.add(kand[c]); pouzite.add(kand[d]); return false; }
         }
       }
+    }
+    /**
+     * ČIASTOČNÁ PLATBA V KOKPITE = DLH JE ZVYŠOK, PTMINDER HO NEZMAŽE
+     * (Jerry, 17. 10. 2026 pri Markéte Lozias: „platí balíky na dvakrát…
+     * ak platí 7 790 na 2× a zaplatí 3 000, zostane dlžoba 4 790").
+     * Bod 3 (členstvo bez otvoreného poplatku) je poistka pre prípad, že
+     * Kokpit banku nevidí. Keď na balíček už prišla časť peňazí, banku vidí
+     * — a PTminder pri splátke poplatok často vôbec nezaloží, takže by
+     * zvyšok ticho odpustil. Body 1 a 2 (skutočné platby v PTminderi, ktoré
+     * sa na cenu zložia) platia ďalej.
+     */
+    // Len balíčky od prechodu na Kokpit (1. 10. 2026). Staršie súdil PTminder
+    // a jeho „zaplatené" platí: Kateřina Stoklásková zaplatila za júlové
+    // členstvo 6 990 namiesto 7 790 a PTminder ho má ako vyrovnané — bez
+    // tejto hranice by jej vznikol dlh 800 Kč, o ktorom nikto nevie.
+    //
+    // Splátka sa NEBERIE z `doplatit`: FIFO vie položiť októbrovú platbu na
+    // starší balíček zaplatený v PTminderi a nový by potom vyzeral čiastočne
+    // zaplatený, hoci peniaze naň prišli celé (nález nezávislej kontroly,
+    // 17. 10. 2026). Splátka = platby z Kokpitu v okne balíčka (−14 až +45
+    // dní), ktoré dajú aspoň 30 % ceny a menej než celú cenu.
+    if (b.platnostOd >= KOKPIT_OD && cena > 0) {
+      const vOkneKokpit = kokpitPlatby
+        .filter((p) => meno(p.klient) === k && dni(b.platnostOd, p.datum) >= -14 && dni(b.platnostOd, p.datum) <= 45)
+        .reduce((a, p) => a + (Number(p.suma) || 0), 0);
+      if (vOkneKokpit >= cena * 0.3 && vOkneKokpit < cena - 1) return true;
     }
     const vHistorii = ptHistoria.some((h) => meno(h.klient) === k && Math.abs(dni(b.platnostOd, h.od)) <= 3);
     const otvoreny = ptOtvorene.some((o) => meno(o.klient) === k && Math.abs(dni(b.platnostOd, o.datum)) <= 3);

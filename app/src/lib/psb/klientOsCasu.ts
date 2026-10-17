@@ -413,6 +413,14 @@ export function osCasuKlienta(
     if (b.zdroj !== "rucne" && !oprava) continue;
     if (oprava) zKokpitu.add(`${d}|oprava`);
     /**
+     * BALÍČOK Z KOKPITU PREBÍJA ČLENSTVO Z EXPORTU V TEN ISTÝ DEŇ, aj keď
+     * nesedí názov ani hodiny (Markéta Lozias 9. 10. 2026: Kokpit „6h
+     * Balíček", PTminder „OFF - 8 hodín offline" — na osi stáli oba a rad
+     * išiel od 14 h). Pravidlo z 3. 10. 2026: v rovnaký deň platí Kokpit.
+     * Úvodný sa nepočíta — ten stojí vedľa bežného balíčka zámerne (Luky Kríž).
+     */
+    if (b.nazov !== "Úvodní trénink") zKokpitu.add(`${d}|oprava`);
+    /**
      * ZDVOJENIE SA POZNÁ PO DNI A HODINÁCH, NIE PO NÁZVE.
      *
      * Kým Kokpit aj PTminder hovorili „OFF - 6h BEZ viazanosti", stačil
@@ -463,7 +471,8 @@ export function osCasuKlienta(
     const od = den(b.validFrom || "");
     const doDna = den(b.validTo || "");
     // Ten istý predaj zapísaný v Kokpite má prednosť — viď vyššie.
-    if (od && zKokpitu.has(`${od}|oprava`)) continue;
+    // Samostatná hodina iného druhu (1 h, ON/OFF) stojí vedľa balíčka zámerne.
+    if (od && zKokpitu.has(`${od}|oprava`) && (b.total || b.naObdobie || hodinZNazvuBalicka(b.package)) > 1) continue;
     if (od && (zKokpitu.has(`${od}|${normName(b.package)}`) || zKokpitu.has(`${od}|h${b.total || hodinZNazvuBalicka(b.package)}`))) continue;
     // Doplnenie členstva nemá v exporte dátumy — na os ho položiť nejde,
     // lebo sa nevie kam. Radšej vynechať než hádať deň.
@@ -546,7 +555,7 @@ export function osCasuKlienta(
      * odkaze mu svietilo 12 h namiesto 6.
      */
     if (uzJe.has(kluc) || (zNazvu > 0 && uzJe.has(`${d}|h${zNazvu}`))) continue;
-    if (uzJe.has(`${d}|oprava`) && !jeDoplnenie(sl.description)) continue;
+    if (uzJe.has(`${d}|oprava`) && !jeDoplnenie(sl.description) && hodinZNazvuBalicka(sl.description) !== 1) continue;
     uzJe.add(kluc);
     // Kľúč po hodinách drží aj tu: ten istý predaj môže mať v Kokpite iné
     // meno než v exporte (Balíček 6 h vs. OFF - 6h BEZ viazanosti).

@@ -50,6 +50,7 @@
 
 import { jeOtvaraciZostatok, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
+import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { poplatkyPoOdrataniPlatieb, type Platba } from "./platbyEvidencia";
 
 export type DlhPolozka = {
@@ -189,6 +190,7 @@ export function dlhyKlientov(v: VstupDlhov): {
       prve, v.ptPlatby, v.ptHistoria,
       otvorene.map((p) => ({ klient: p.klient, datum: den(p.datum) })),
       normName,
+      v.platby.filter((p) => !p.zruseneAt).map((p) => ({ klient: p.klient, datum: den(p.datum), suma: p.suma })),
     );
     if (nezaplatene.length === prve.length) return nezaplatene;
     const ostali = new Set(nezaplatene.map((b) => b.poradie));
@@ -220,6 +222,30 @@ export function dlhyKlientov(v: VstupDlhov): {
     .sort((a, b) => a.den.localeCompare(b.den) || a.klient.localeCompare(b.klient));
 
   return { polozky, otvorenePoplatky: otvorene, dvojcata };
+}
+
+/**
+ * DNI, KTORÉ HODINY NEDÁVAJÚ — z položiek dlhu a dvojčiat.
+ *
+ * Do 17. 10. 2026 sem šla každá položka dlhu, aj čiastočne zaplatený balíček.
+ * Jerry pri Markéte Lozias, ktorá platí balíčky na dvakrát: platba sa má
+ * z balíčka odpočítať čiastočne a dlžoba má zostať. Balíček, na ktorý prišla
+ * časť peňazí (aspoň 30 %), preto hodiny DÁVA; zvyšok je dlh v `dlhy`
+ * (karta dlžníkov, QR na odkaze). Platí od 1. 10. 2026 (KOKPIT_OD).
+ */
+export function bezHodinZDlhov(
+  polozky: DlhPolozka[],
+  dvojcata: { klient: string; den: string }[],
+): { klient: string; den: string; dvojca?: boolean }[] {
+  return [
+    // Čiastočne zaplatený dáva hodiny len od prechodu na Kokpit (1. 10. 2026);
+    // staršie obdobia ostávajú tak, ako ich súdil PTminder (Tomáš Dvořák:
+    // septembrový balíček so zaplatenými 1 100 z 7 790 hodiny nedostane).
+    // A len keď prišlo aspoň 30 % ceny — zvyšok 10 Kč z preplatku na
+    // predošlom balíčku nie je splátka a hodiny dávať nesmie.
+    ...polozky.filter((d) => d.doplatit > d.cena * 0.7 || d.den < KOKPIT_OD).map((d) => ({ klient: d.klient, den: d.den })),
+    ...dvojcata.map((d) => ({ ...d, dvojca: true })),
+  ];
 }
 
 /** Dlh jedného klienta zo spoločného zoznamu. */

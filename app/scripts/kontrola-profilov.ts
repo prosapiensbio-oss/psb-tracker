@@ -20,7 +20,7 @@ import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
 import { historiaPreMail } from "../src/lib/psb/historiaMail";
 import { dlhJednehoKlienta, dlznici } from "../src/lib/psb/dlznici";
-import { dlhyKlientov } from "../src/lib/psb/zaplatene";
+import { bezHodinZDlhov, dlhyKlientov } from "../src/lib/psb/zaplatene";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.KONTROLA_DATA;
@@ -83,7 +83,7 @@ const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
   ptPlatby: payments.map((p: any) => ({ klient: String(p.client || ""), datum: den(p.date), suma: Number(p.amount) || 0 })),
   ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
 });
-const bezHodin = [...dlhy.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata.map((d) => ({ ...d, dvojca: true }))];
+const bezHodin = bezHodinZDlhov(dlhy, dvojcata);
 const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
   .map((p: any) => ({ klient: String(p.klient), datum: den(p.datum), suma: Number(p.suma_czk) || 0, sposob: String(p.sposob || "") }));
 

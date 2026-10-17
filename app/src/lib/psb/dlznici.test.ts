@@ -193,7 +193,59 @@ describe("hodiny čítajú to isté pravidlo", () => {
     const zdroj = require("fs").readFileSync(require("path").join(__dirname, "db.server.ts"), "utf8") as string;
     // Bez `id` v SELECTe by otázka „suma nesedí" nevznikla nikdy (nález 5. 10. 2026).
     expect(zdroj).toMatch(/SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky/);
-    expect(zdroj).toContain("data.bezHodin = [...polozky.map(");
+    expect(zdroj).toContain("data.bezHodin = bezHodinZDlhov(polozky, dvojcata);");
+  });
+});
+
+describe("splátky — Markéta Lozias, 17. 10. 2026", () => {
+  // Balíček 7 790 Kč, v Kokpite prvá polovica 3 895. PTminder má členstvo
+  // bez otvoreného poplatku — poistka ho nesmie odpustiť; dlh je zvyšok.
+  const vstup = {
+    poplatky: [],
+    balicky: [{ id: "b1", klient: "Marketa Lozias", nazov: "6h Balíček", cena: 7790, platnostOd: "2026-10-09", zdroj: "rucne" }],
+    platby: [{ klient: "Marketa Lozias", datum: "2026-10-06", suma: 3895, vopred: 1 }],
+    ptPlatby: [{ klient: "Marketa Lozias", datum: "2026-10-06", suma: 3895 }],
+    ptHistoria: [{ klient: "Marketa Lozias", od: "2026-10-09" }],
+  };
+
+  it("zvyšok ostáva dlhom aj keď PTminder poplatok nemá", () => {
+    const { polozky } = dlhyKlientov(vstup as never);
+    expect(polozky.map((p) => [p.klient, p.doplatit])).toEqual([["Marketa Lozias", 3895]]);
+  });
+
+  it("čiastočne zaplatený balíček hodiny dáva, nezaplatený nie", async () => {
+    const { bezHodinZDlhov } = await import("./zaplatene");
+    const { polozky, dvojcata } = dlhyKlientov(vstup as never);
+    expect(bezHodinZDlhov(polozky, dvojcata)).toEqual([]);
+    const nic = dlhyKlientov({ ...vstup, platby: [], ptPlatby: [], ptHistoria: [] } as never);
+    expect(bezHodinZDlhov(nic.polozky, nic.dvojcata)).toEqual([{ klient: "Marketa Lozias", den: "2026-10-09" }]);
+  });
+
+  it("celá platba položená FIFO na starší balíček nevyrobí falošnú splátku", () => {
+    // Nález kontroly 17. 10.: A (25. 9., 3 990) zaplatený len v PTminderi,
+    // B (10. 10., 7 790) zaplatený celý v Kokpite. FIFO dá peniaze na A,
+    // B vyzerá čiastočne zaplatený — poistka ho musí ďalej odpustiť.
+    const { polozky } = dlhyKlientov({
+      poplatky: [],
+      balicky: [
+        { id: "a", klient: "X Y", nazov: "A", cena: 3990, platnostOd: "2026-09-25", zdroj: "ptminder" },
+        { id: "b", klient: "X Y", nazov: "B", cena: 7790, platnostOd: "2026-10-10", zdroj: "rucne" },
+      ],
+      platby: [{ klient: "X Y", datum: "2026-10-10", suma: 7790 }],
+      ptPlatby: [{ klient: "X Y", datum: "2026-09-25", suma: 3990 }],
+      ptHistoria: [{ klient: "X Y", od: "2026-09-25" }, { klient: "X Y", od: "2026-10-10" }],
+    } as never);
+    expect(polozky).toEqual([]);
+  });
+
+  it("zvyšok 10 Kč z preplatku hodiny nedá", async () => {
+    const { bezHodinZDlhov } = await import("./zaplatene");
+    expect(bezHodinZDlhov([{ klient: "X", den: "2026-10-20", nazov: "6h", cena: 7790, doplatit: 7780, zdroj: "kokpit" }], [])).toHaveLength(1);
+  });
+
+  it("dve polovice v PTminderi poistka uzná ďalej", () => {
+    const { polozky } = dlhyKlientov({ ...vstup, platby: [], ptPlatby: [{ klient: "Marketa Lozias", datum: "2026-10-06", suma: 3895 }, { klient: "Marketa Lozias", datum: "2026-11-03", suma: 3895 }] } as never);
+    expect(polozky).toEqual([]);
   });
 });
 
