@@ -157,6 +157,15 @@ describe("úvodný tréning je vlastný balíček", () => {
   });
 });
 
+describe("po úvodnom nevznikne druhý úvodný (Lenka Divinová 16. 10. 2026)", () => {
+  it("prvý riadny tréning po úvodnom nemá vzor — balíček zakladá tréner", () => {
+    const uv = { druh: "trening", den: "2026-08-28", cas: "09:00", uvodny: true } as Udalost;
+    const os = zorad([balicek("2026-08-28", 1, "Úvodní trénink", "2026-08-28"), uv, trening("2026-10-16")]);
+    const { stavy } = priebehBalickov(os, null, "2026-10-16");
+    expect(navrhNovehoBalicka("Lenka Divinova", os, stavy, [{ den: "2026-08-28", cena: 1100 }])).toBe(null);
+  });
+});
+
 describe("úvodný v deň, keď začína bežný balíček", () => {
   // Luky Kríž: prvý tréning 28. 9. a v ten istý deň kúpených 6 h. Keď Jerry
   // ten tréning prepne na úvodný, hodina nesmie padnúť zo šiestich — úvodný

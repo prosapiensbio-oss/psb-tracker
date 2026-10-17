@@ -152,8 +152,16 @@ export function navrhNovehoBalicka(
   if (!nekryte.length) return null;
   const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
 
-  const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> =>
-    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna);
+  /**
+   * ÚVODNÝ NIE JE VZOR PRE ĎALŠÍ BALÍČEK (Lenka Divinová, 16. 10. 2026).
+   * Po úvodnom z 28. 8. prišiel prvý riadny tréning a appka založila
+   * „podľa posledného" — teda znova úvodný za 1 100 Kč. Klient, ktorý mal
+   * len úvodný, je nový: prvý balíček zakladá tréner (Jerry, 14. 10. 2026),
+   * appka ho len pripomenie, že trénoval bez balíčka.
+   */
+  const jeVzor = (u: Udalost): u is Extract<Udalost, { druh: "balicekOd" }> =>
+    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO;
+  const posledny = os.find(jeVzor);
   if (!posledny) return null;
 
   const predtym = os.find((u) => u.druh === "trening" && u.den < odDna && stavy.get(u)?.buduca == null);
@@ -165,7 +173,7 @@ export function navrhNovehoBalicka(
 
   const cenaDna = (d: string) => ceny.find((c) => den(c.den) === den(d))?.cena ?? null;
   const cenaPoslednych = os
-    .filter((u): u is Extract<Udalost, { druh: "balicekOd" }> => u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna)
+    .filter(jeVzor)
     .slice(0, 2)
     .map((u) => cenaDna(u.den));
   const katalog = sablona?.cena ?? null;
