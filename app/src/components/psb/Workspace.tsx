@@ -1675,7 +1675,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             </button>
             {vsetkyMesiace && (
               <div style={{ marginTop: 8 }}>
-                <Uzavierky prekazky={prekazkyUzavierky} kroky={krokyUzavierky as never} podklady={podkladyUzavierky} onNavigate={onNavigate as never} chat={chat} />
+                <Uzavierky prekazky={prekazkyUzavierky} kroky={krokyUzavierky as never} podklady={podkladyUzavierky} onNavigate={onNavigate as never} chat={chat} reportVstup={reportUzavierky} />
               </div>
             )}
           </div>

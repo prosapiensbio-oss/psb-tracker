@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { dalej, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
+import { dalej, plnyKrok, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
 import type { Report, Semafor } from "../../lib/psb/mesacnyReport";
 
 /**
@@ -318,7 +318,7 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   const slajdy = useMemo(() => postavPrezentaciu(report), [report]);
   // Slajd a krok v JEDNOM stave — posúvajú sa vždy spolu a dva settery by sa
   // pri rýchlom klikaní prečítali navzájom staré.
-  const [kde, setKde] = useState({ i: 0, krok: 0 });
+  const [kde, setKde] = useState(() => ({ i: 0, krok: plnyKrok(slajdy, 0) }));
   const [mierka, setMierka] = useState(1);
   /** Úzka obrazovka na výšku — telefón. Slajd je 16:9, takže na výšku z neho zostane pásik. */
   const [naVysku, setNaVysku] = useState(false);
@@ -363,7 +363,7 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
     const k = (e: KeyboardEvent) => {
       if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); vpred(); return; }
       if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); vzad(); return; }
-      if (e.key === "Home") { setKde({ i: 0, krok: 0 }); return; }
+      if (e.key === "Home") { setKde({ i: 0, krok: plnyKrok(slajdy, 0) }); return; }
       if (e.key === "End") { setKde({ i: slajdy.length - 1, krok: Math.max(0, (slajdy[slajdy.length - 1]?.kroky || 1) - 1) }); return; }
       if (e.key === "f" || e.key === "F") { void prepniCeluObrazovku(); return; }
       if (e.key === "Escape" && !document.fullscreenElement) onZavri();
@@ -409,7 +409,7 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
         <button onClick={onZavri} style={tlacidlo}>Zavrieť ✕</button>
       </div>
       <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 2, alignItems: "center" }}>
-        <button onClick={vzad} disabled={i === 0 && krok === 0} style={{ ...tlacidlo, opacity: i === 0 && krok === 0 ? 0.4 : 1 }}>‹ Späť</button>
+        <button onClick={vzad} disabled={i === 0} style={{ ...tlacidlo, opacity: i === 0 ? 0.4 : 1 }}>‹ Späť</button>
         <button onClick={vpred} disabled={naKonci} style={{ ...tlacidlo, opacity: naKonci ? 0.4 : 1 }}>Ďalej ›</button>
         {!naVysku && <span style={{ fontSize: 12.5, color: "rgba(234,241,236,.6)", marginLeft: 10 }}>šípky · medzerník · F = celá obrazovka</span>}
       </div>

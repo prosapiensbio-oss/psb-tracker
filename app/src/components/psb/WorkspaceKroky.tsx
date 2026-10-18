@@ -8,8 +8,8 @@
  * Pravidlá (kto patrí do zoznamu, aký balíček vznikne, kedy sa pýtať na
  * sumu) sú v `lib/psb/workspaceKroky.ts` a majú testy. Tu je len obrazovka.
  */
-import { koniecKvartalu, kvartalMesiaca, navrhyReportu, postavReport, type ExtraReportu, type MesiacReportu } from "../../lib/psb/mesacnyReport";
-import { ReportMesiaca } from "./ReportMesiaca";
+import { navrhyReportu, postavReport, type ExtraReportu, type MesiacReportu } from "../../lib/psb/mesacnyReport";
+import { ReportyMesiaca } from "./ReportyMesiaca";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { useEffect, useMemo, useState } from "react";
 
@@ -1025,7 +1025,6 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
   const [bezi, setBezi] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
-  const [report, setReport] = useState<"mesiac" | "kvartal" | null>(null);
   useEffect(() => { if (trener === "Terezka") setOtvoreny((x) => x || "otazky"); }, [trener]);
 
   useEffect(() => {
@@ -1211,32 +1210,12 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
         </div>
       )}
       {/* Report: po zamknutí naostro, predtým ako náhľad (čísla sa ešte môžu
-          zmeniť). Kvartálny len za marec, jún, september a december. */}
+          zmeniť). Ten istý kúsok je pri každom mesiaci v zozname mesiacov. */}
       {(!trener || trener === "Jerry") && reportVstup && (
-        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button style={zamknuty ? hlavne(true) : vedlajsie} onClick={() => setReport("mesiac")}>
-            📄 {zamknuty ? "Report" : "Náhľad reportu"} za {nazovMesiaca(mesiac)}
-          </button>
-          {koniecKvartalu(mesiac) && (
-            <button style={zamknuty ? hlavne(true) : vedlajsie} onClick={() => setReport("kvartal")}>
-              📊 {zamknuty ? "Kvartálny report" : "Náhľad kvartálneho reportu"} Q{kvartalMesiaca(mesiac)} {mesiac.slice(0, 4)}
-            </button>
-          )}
+        <div style={{ marginTop: 12 }}>
+          <ReportyMesiaca mesiac={mesiac} zamknuty={!!zamknuty} reportVstup={reportVstup} />
         </div>
       )}
-      {report && reportVstup && (() => {
-        const v = reportVstup(mesiac, report);
-        // Pri kvartáli aj návrhy všetkých troch mesiacov — štvrtá otázka.
-        const plnenie = report === "kvartal"
-          ? [2, 1, 0].map((k) => {
-            const [y, mm] = mesiac.split("-").map(Number);
-            const m = new Date(Date.UTC(y, mm - 1 - k, 1)).toISOString().slice(0, 7);
-            const vm = reportVstup(m, "mesiac");
-            return { m, nazov: nazovMesiaca(m), navrhy: navrhyReportu(postavReport(vm.mesiace, m, "mesiac", vm.extra)) };
-          })
-          : undefined;
-        return <ReportMesiaca report={postavReport(v.mesiace, mesiac, report, v.extra)} nahlad={!zamknuty} onZavri={() => setReport(null)} plnenie={plnenie} />;
-      })()}
     </>
   );
 }

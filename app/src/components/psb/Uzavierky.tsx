@@ -1,10 +1,11 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { fmtDMY, monthLabel } from "../../lib/psb/format";
 import type { AssistantChat } from "./Assistant";
 import type { KrokUzavierky, NavFocus } from "./App";
 import { SpravaMesiaca } from "./SpravaMesiaca";
+import { ReportyMesiaca, type ReportVstup } from "./ReportyMesiaca";
 import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
@@ -137,7 +138,7 @@ function Konta() {
   );
 }
 
-export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
+export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat, reportVstup }: {
   /** Čo za daný mesiac ešte nie je hotové. Prázdne pole = dá sa zamknúť. */
   prekazky?: (mesiac: string) => string[];
   /** To isté ako kroky s fajkami — pre kokpit uzávierky. */
@@ -146,12 +147,16 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   podklady?: (mesiac: string) => string;
   onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void;
   chat?: AssistantChat;
+  /** Report a prezentácia mesiaca — rozbalia sa pod zamknutým mesiacom. */
+  reportVstup?: ReportVstup;
 } = {}) {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
   const [log, setLog] = useState<AuditRiadok[]>([]);
   const [auditOtvoreny, setAuditOtvoreny] = useState(false);
   const [nacitava, setNacitava] = useState(true);
   const [prebieha, setPrebieha] = useState<string | null>(null);
+  /** Zamknutý mesiac rozbalený pod dlaždicou — report, prezentácia, odomknutie. */
+  const [rozbaleny, setRozbaleny] = useState<string | null>(null);
 
   const nacitaj = () => {
     void fetchPeriods().then(({ periods, audit }) => {
@@ -383,25 +388,54 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
             {mesiace.map((m) => {
               const o = zamky.get(m);
               const zamknuty = !!o?.locked;
+              const otvoreny = zamknuty && rozbaleny === m;
+              /**
+               * KLIK NA ZAMKNUTÝ MESIAC HO ROZBALÍ, NEODOMKNE (Jerry,
+               * 18. 10. 2026: „reporty a prezentácie nájdem pri každom
+               * zamknutom mesiaci — keď naň kliknem, rozbalí sa"). Odomknutie
+               * je odvtedy tlačidlo v rozbalenom paneli — jedným klikom sa
+               * zámok už omylom nepustí. Otvorený mesiac sa klikom zamyká ako
+               * doteraz.
+               */
               return (
-                <button
-                  key={m}
-                  onClick={() => void prepni(m, !zamknuty)}
-                  disabled={prebieha === m}
-                  title={zamknuty ? `Uzavreté ${o?.lockedAt?.slice(0, 10) || ""} — klik odomkne` : "Klik uzavrie mesiac"}
-                  style={{
-                    padding: "9px 11px", borderRadius: 9, cursor: "pointer", textAlign: "left",
-                    border: `1px solid ${zamknuty ? mix(C.green, 45) : C.border}`,
-                    background: zamknuty ? mix(C.green, 10) : "transparent",
-                    color: zamknuty ? C.text : C.textMuted, fontSize: 12.5,
-                    opacity: prebieha === m ? 0.5 : 1,
-                  }}
-                >
-                  <div style={{ fontWeight: 600 }}>{zamknuty ? "🔒" : "🔓"} {label(m)}</div>
-                  <div style={{ fontSize: 10.5, color: zamknuty ? C.green : C.textDim, marginTop: 2 }}>
-                    {zamknuty ? "uzavretý" : "otvorený"}
-                  </div>
-                </button>
+                <Fragment key={m}>
+                  <button
+                    onClick={() => zamknuty ? setRozbaleny(otvoreny ? null : m) : void prepni(m, true)}
+                    disabled={prebieha === m}
+                    aria-expanded={zamknuty ? otvoreny : undefined}
+                    title={zamknuty ? `Uzavreté ${o?.lockedAt?.slice(0, 10) || ""} — klik ukáže report` : "Klik uzavrie mesiac"}
+                    style={{
+                      padding: "9px 11px", borderRadius: 9, cursor: "pointer", textAlign: "left",
+                      border: `1px solid ${otvoreny ? C.green : zamknuty ? mix(C.green, 45) : C.border}`,
+                      background: otvoreny ? mix(C.green, 20) : zamknuty ? mix(C.green, 10) : "transparent",
+                      color: zamknuty ? C.text : C.textMuted, fontSize: 12.5,
+                      opacity: prebieha === m ? 0.5 : 1,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{zamknuty ? "🔒" : "🔓"} {label(m)}</div>
+                    <div style={{ fontSize: 10.5, color: zamknuty ? C.green : C.textDim, marginTop: 2 }}>
+                      {zamknuty ? (otvoreny ? "uzavretý ▾" : "uzavretý ▸") : "otvorený"}
+                    </div>
+                  </button>
+                  {otvoreny && (
+                    <div style={{ gridColumn: "1 / -1", border: `1px solid ${mix(C.green, 40)}`, borderRadius: 10, padding: "12px 14px", background: mix(C.green, 6), display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+                        {monthLabel(m)} <span style={{ fontSize: 11.5, fontWeight: 400, color: C.textDim }}>· uzavretý {o?.lockedAt ? fmtDMY(o.lockedAt.slice(0, 10)) : ""}</span>
+                      </div>
+                      {reportVstup
+                        ? <ReportyMesiaca mesiac={m} zamknuty reportVstup={reportVstup} />
+                        : <div style={{ fontSize: 12, color: C.textDim }}>Report tu nie je k dispozícii.</div>}
+                      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", borderTop: `1px solid ${mix(C.border, 50)}`, paddingTop: 10 }}>
+                        <button
+                          onClick={() => { setRozbaleny(null); void prepni(m, false); }}
+                          disabled={prebieha === m}
+                          style={{ padding: "5px 12px", borderRadius: 8, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+                        >🔓 Odomknúť {label(m)}</button>
+                        <span style={{ fontSize: 11, color: C.textDim }}>Po odomknutí sa do mesiaca dá znova importovať; v audite ostane záznam.</span>
+                      </div>
+                    </div>
+                  )}
+                </Fragment>
               );
             })}
           </div>

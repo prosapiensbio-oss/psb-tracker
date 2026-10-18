@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { postavReport, type MesiacReportu } from "./mesacnyReport";
-import { dalej, krokovSpolu, postavPrezentaciu, spat, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "./prezentacia";
+import { dalej, plnyKrok, postavPrezentaciu, spat, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "./prezentacia";
 
 const m = (mm: string, o: Partial<MesiacReportu> = {}): MesiacReportu => ({ m: mm, hodiny: 200, aktivni: 55, novi: 5, dopyty: 6, prijmy: 200000, naklady: 150000, zisk: 50000, prirastokIg: 10, dosahReels: 450, reklama: 2000, prestali: 3, ...o });
 const mesiace = [
@@ -75,22 +75,21 @@ describe("prezentácia z reportu", () => {
     }
   });
 
-  it("kroky prejdú celú prezentáciu dopredu aj dozadu a na okrajoch stoja", () => {
+  it("šípka ide po celých slajdoch a každý slajd je hneď celý (18. 10. 2026)", () => {
     const s = postavPrezentaciu(report);
     expect(spat(s, 0, 0)).toBeNull();
-    let kde = { i: 0, krok: 0 };
+    let kde = { i: 0, krok: plnyKrok(s, 0) };
     let n = 1;
     for (;;) {
       const d = dalej(s, kde.i, kde.krok);
       if (!d) break;
       kde = d;
       n++;
+      expect(kde.krok).toBe(s[kde.i].kroky - 1);
       expect(n).toBeLessThan(500);
     }
     expect(kde.i).toBe(s.length - 1);
-    expect(kde.krok).toBe(s[s.length - 1].kroky - 1);
-    expect(n).toBe(krokovSpolu(s));
-    // a presne tou istou cestou späť
+    expect(n).toBe(s.length);
     let z = 1;
     for (;;) {
       const p = spat(s, kde.i, kde.krok);
@@ -99,7 +98,7 @@ describe("prezentácia z reportu", () => {
       z++;
     }
     expect(z).toBe(n);
-    expect(kde).toEqual({ i: 0, krok: 0 });
+    expect(kde).toEqual({ i: 0, krok: plnyKrok(s, 0) });
   });
 
   it("kvartálny report má vlastný nadpis titulky aj akcií", () => {

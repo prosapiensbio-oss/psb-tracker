@@ -165,17 +165,22 @@ export function postavPrezentaciu(r: Report): Slajd[] {
 /** Spolu krokov — na ukazovateľ postupu a na „som na konci“. */
 export const krokovSpolu = (s: Slajd[]) => s.reduce((a, x) => a + x.kroky, 0);
 
-/** Krok dopredu: najprv v rámci slajdu, potom na ďalší. `null` = koniec. */
-export function dalej(s: Slajd[], i: number, krok: number): { i: number; krok: number } | null {
-  if (!s[i]) return null;
-  if (krok < s[i].kroky - 1) return { i, krok: krok + 1 };
-  if (i + 1 < s.length) return { i: i + 1, krok: 0 };
-  return null;
+/**
+ * CELÝ SLAJD NARAZ (Jerry, 18. 10. 2026: „po prepnutí na ďalší slide tam
+ * budú všetky dáta hneď a zaraz"). Krok vnútri slajdu sa už nepoužíva —
+ * slajd sa vždy ukáže na svojom poslednom kroku, teda so všetkým.
+ * `kroky` v slajde ostávajú len ako počet blokov, ktoré sa ukážu spolu.
+ */
+export const plnyKrok = (s: Slajd[], i: number) => Math.max(0, (s[i]?.kroky || 1) - 1);
+
+/** Ďalší slajd, celý. `null` = koniec. */
+export function dalej(s: Slajd[], i: number, _krok?: number): { i: number; krok: number } | null {
+  if (!s[i] || i + 1 >= s.length) return null;
+  return { i: i + 1, krok: plnyKrok(s, i + 1) };
 }
 
-/** Krok dozadu. Z prvého slajdu sa nevracia nikam. `null` = začiatok. */
-export function spat(s: Slajd[], i: number, krok: number): { i: number; krok: number } | null {
-  if (krok > 0) return { i, krok: krok - 1 };
-  if (i > 0) return { i: i - 1, krok: Math.max(0, (s[i - 1]?.kroky || 1) - 1) };
-  return null;
+/** Predošlý slajd, celý. Z prvého sa nevracia nikam. `null` = začiatok. */
+export function spat(s: Slajd[], i: number, _krok?: number): { i: number; krok: number } | null {
+  if (i <= 0) return null;
+  return { i: i - 1, krok: plnyKrok(s, i - 1) };
 }
