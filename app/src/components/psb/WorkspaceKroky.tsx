@@ -633,12 +633,27 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
         // Posuvník ide od doplnenia (vľavo) k prepadnutiu (vpravo) — Jerry,
         // 5. 10. 2026: „napravo musí byť prepadne". Hodnota je prepadnutie,
         // predvolene 0, teda doplnenie všetkých hodín.
-        const prepadne = Math.max(0, Math.min(x.hodin, hodnoty[kluc] ?? 0));
-        const doplnit = Math.round((x.hodin - prepadne) * 100) / 100;
+        /**
+         * JEDNO TLAČIDLO, VÝSLEDOK AKO POZNÁMKA (Jerry, 18. 10. 2026: „tu je
+         * 2× Potvrdiť, nechaj tam iba jedno… prenesie sa 1 h do balíčka,
+         * prípadne 2 prepadnú a 1 ostane — to tam nechaj len ako poznámku,
+         * nie ako CTA"). Posuvník rozhoduje, koľko hodín ostane a koľko
+         * prepadne; ČO sa so zvyškom stane, určuje druh členstva:
+         * balíček → doplnenie, předplatné → presun do ďalšieho balíčka
+         * (najviac 2 h, pravidlo z 28. 9. 2026 — viac posuvník nepustí).
+         */
         const predplatne = x.predplatne || /předplatn|predplatn|s viazanost/i.test(x.membership);
-        const presun = predplatne ? Math.min(2, doplnit) : 0;
+        const maxOstane = predplatne ? Math.min(2, x.hodin) : x.hodin;
+        const minPrepadne = Math.round((x.hodin - maxOstane) * 100) / 100;
+        const prepadne = Math.max(minPrepadne, Math.min(x.hodin, hodnoty[kluc] ?? minPrepadne));
+        const ostane = Math.round((x.hodin - prepadne) * 100) / 100;
+        const doplnit = predplatne ? 0 : ostane;
+        const presun = predplatne ? ostane : 0;
         const farba = predplatne ? C.blue : C.accent;
-        const stav = [doplnit ? `${doplnit} h doplnenie` : "", prepadne ? `${prepadne} h prepadne` : ""].filter(Boolean).join(" · ");
+        const poznamka = [
+          ostane ? (predplatne ? `${ostane} h sa prenesie do ďalšieho balíčka` : `${ostane} h ostane ako doplnenie`) : "",
+          prepadne ? `${prepadne} h prepadne` : "",
+        ].filter(Boolean).join(" · ");
         return (
           <div key={kluc} style={{ ...riadok, alignItems: "center" }}>
             <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 150 }}>
@@ -657,31 +672,21 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
               </span>
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 11.5, color: C.green }}>doplnenie</span>
+              <span style={{ fontSize: 11.5, color: C.green }}>{predplatne ? "preniesť" : "doplnenie"}</span>
               <input
-                type="range" min={0} max={x.hodin} step={1} value={prepadne}
+                type="range" min={minPrepadne} max={x.hodin} step={1} value={prepadne}
+                disabled={minPrepadne >= x.hodin}
                 onChange={(e) => setHodnoty((s) => ({ ...s, [kluc]: Number(e.target.value) }))}
                 style={{ width: 110, accentColor: C.orange }}
                 aria-label={`Koľko hodín z ${x.hodin} prepadne — ${x.meno}`}
               />
               <span style={{ fontSize: 11.5, color: C.orange }}>prepadne</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, minWidth: 150 }}>
-                {doplnit ? <span style={{ color: C.green }}>{doplnit} h doplnenie</span> : null}
-                {doplnit && prepadne ? " · " : ""}
-                {prepadne ? <span style={{ color: C.orange }}>{prepadne} h prepadne</span> : null}
-              </span>
+              <span style={{ fontSize: 12, color: C.textMuted, minWidth: 190 }}>{poznamka}</span>
             </span>
             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
-              <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} title={stav} onClick={() => void odpovedz(x, doplnit, 0)}>
-                {bezi === kluc ? "…" : doplnit ? `Potvrdiť: ${doplnit} h doplnenie` : `Potvrdiť: ${x.hodin} h prepadne`}
+              <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} title={poznamka} onClick={() => void odpovedz(x, doplnit, presun)}>
+                {bezi === kluc ? "…" : "Potvrdiť"}
               </button>
-              {predplatne && presun > 0 && (
-                <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)}
-                  title="Hodiny sa pridajú k ďalšiemu balíčku — 6h Předplatné bude mať o toľko viac."
-                  onClick={() => void odpovedz(x, 0, presun)}>
-                  Preniesť {presun} h do ďalšieho balíčka
-                </button>
-              )}
             </span>
           </div>
         );
