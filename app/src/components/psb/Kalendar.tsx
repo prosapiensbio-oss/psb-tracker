@@ -1317,9 +1317,10 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   /** Čísla nad mriežkou aj výška mriežky hovoria o TOM, ČO JE VIDNO — nie o týždni. */
   const vZobrazeni = vTyzdni.filter((u) => viditelne.includes(u.zaciatok.slice(0, 10)));
   /** Pás hodín a medzery — na telefóne užšie, aby na stĺpce zostalo viac. */
+  // Formát Termínov (Jerry, 18. 10. 2026) — jedna definícia v kalendarRozmer.ts.
   const ROZMER = rozmerKalendara(uzke);
   const PAS = ROZMER.pas;
-  const GAP = ROZMER.medzera;
+  const GAP = 0; // súvislá mriežka s čiarami, nie oddelené dlaždice dní
 
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
   // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
@@ -1334,7 +1335,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
     vyberMin == null ? 0 : Math.min(24, Math.ceil((vyberMin + (vyber?.minut || 60)) / 60)),
   );
   const hodin = Math.max(1, doH - od);
-  const VYSKA = ROZMER.hodina; // jedna definícia s Termínmi (kalendarRozmer.ts)
+  const VYSKA = ROZMER.hodina;
 
   const dnesIso = dnesPraha();
   const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
@@ -1597,22 +1598,20 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       )}
 
       <ScrollX>
-        <div style={{ minWidth: ROZMER.minSirka, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
+        <div style={{ minWidth: uzke ? 0 : 620, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
           {/* Hlavička dní */}
-          <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, marginBottom: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP }}>
             <div />
             {viditelne.map((d) => {
               const i = dni.indexOf(d);
               const jeDnes = d === dnesIso;
               return (
                 <div key={d} style={{
-                  textAlign: "center", fontSize: uzke ? 10 : 11.5, padding: "3px 0", borderRadius: 6,
-                  fontWeight: jeDnes ? 700 : 600,
+                  textAlign: "center", fontSize: 11.5, paddingBottom: 5,
                   color: jeDnes ? C.accentLight : C.textMuted,
-                  background: jeDnes ? mix(C.accent, 12) : "transparent",
-                  lineHeight: uzke ? 1.15 : undefined,
+                  borderBottom: `1px solid ${mix(C.border, 60)}`,
                 }}>
-                  {uzke ? <>{DNI_SK[i].slice(0, 1)}<br /><b style={{ fontSize: 12 }}>{Number(d.slice(8, 10))}</b></> : `${DNI_SK[i]} ${Number(d.slice(8, 10))}.`}
+                  {DNI_SK[i]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.accentLight : C.text }}>{Number(d.slice(8, 10))}</b>
                 </div>
               );
             })}
@@ -1622,8 +1621,8 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           <div ref={nastavMriezku} style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, position: "relative", touchAction: "pan-y" }}>
             <div style={{ position: "relative", height: hodin * VYSKA }}>
               {Array.from({ length: hodin }, (_, i) => (
-                <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: uzke ? 2 : 4, fontSize: uzke ? 9.5 : 10.5, color: C.textDim }}>
-                  {uzke ? `${od + i}` : `${String(od + i).padStart(2, "0")}:00`}
+                <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: 4, fontSize: 10, color: C.textDim }}>
+                  {uzke ? `${od + i}` : `${od + i}:00`}
                 </div>
               ))}
             </div>
@@ -1640,13 +1639,13 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                   setVyber({ u: null, den: d, cas: `${p2(Math.floor(z / 60))}:${p2(z % 60)}`, minut: 60 });
                 }}
                 style={{
-                  position: "relative", height: hodin * VYSKA, borderRadius: 7,
-                  background: d === dnesIso ? mix(C.accent, 5) : mix(C.border, 14),
+                  position: "relative", height: hodin * VYSKA,
+                  borderLeft: `1px solid ${mix(C.border, 60)}`,
                   overflow: "hidden", cursor: "copy",
                 }}
               >
                 {Array.from({ length: hodin }, (_, i) => (
-                  <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}` }} />
+                  <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 45)}` }} />
                 ))}
                 {((vDni) => {
                   // Prekrývajúce sa hodiny vedľa seba, nie na sebe.
