@@ -17,6 +17,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
+import { rozmerKalendara } from "../../lib/psb/kalendarRozmer";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { VyberMena } from "./VyberMena";
 import { PonukaTerminov } from "./PonukaTerminov";
@@ -1316,8 +1317,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   /** Čísla nad mriežkou aj výška mriežky hovoria o TOM, ČO JE VIDNO — nie o týždni. */
   const vZobrazeni = vTyzdni.filter((u) => viditelne.includes(u.zaciatok.slice(0, 10)));
   /** Pás hodín a medzery — na telefóne užšie, aby na stĺpce zostalo viac. */
-  const PAS = uzke ? 22 : 42;
-  const GAP = uzke ? 1 : 3;
+  const ROZMER = rozmerKalendara(uzke);
+  const PAS = ROZMER.pas;
+  const GAP = ROZMER.medzera;
 
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
   // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
@@ -1332,7 +1334,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
     vyberMin == null ? 0 : Math.min(24, Math.ceil((vyberMin + (vyber?.minut || 60)) / 60)),
   );
   const hodin = Math.max(1, doH - od);
-  const VYSKA = uzke ? 58 : 46; // px na hodinu; na telefóne vyšší kvôli zalomeným menám
+  const VYSKA = ROZMER.hodina; // jedna definícia s Termínmi (kalendarRozmer.ts)
 
   const dnesIso = dnesPraha();
   const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
@@ -1595,7 +1597,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       )}
 
       <ScrollX>
-        <div style={{ minWidth: uzke ? 0 : 620, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
+        <div style={{ minWidth: ROZMER.minSirka, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
           {/* Hlavička dní */}
           <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, marginBottom: 3 }}>
             <div />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 
 import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
+import { rozmerKalendara } from "../../lib/psb/kalendarRozmer";
 import { TRENERI } from "../../lib/psb/mailFaktury";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { textSmsPonuky, zaciatokPoKliku } from "../../lib/psb/ponukaTerminov";
@@ -48,7 +49,9 @@ const PODPIS: Record<string, string> = { Jerry: TRENERI.Jerry?.krstne || "Filip"
 
 export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads: Lead[]; trener: string | null }) {
   const uzke = useUzke();
-  const PX = uzke ? 30 : 40;
+  // Rovnaký rozmer ako týždeň v Kalendári (Jerry, 18. 10. 2026).
+  const ROZMER = rozmerKalendara(uzke);
+  const PX = ROZMER.hodina;
   // Od soboty sa ponúka budúci týždeň — tento už skoro nemá čo ponúknuť.
   const [pondelok, setPondelok] = useState(() => {
     const dnes = dnesPraha();
@@ -235,9 +238,11 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const STAV: Record<Ponuka["stav"], string> = { caka: "čaká na výber", vybrane: "vybral(a)", zrusene: "zrušená", vyprsala: "vypršala", obsadene: "všetko obsadené" };
 
   return (
-    <div style={{ display: "flex", gap: 16, flexWrap: uzke ? "wrap" : "nowrap", alignItems: "flex-start" }}>
+    // Týždeň má plnú šírku ako v Kalendári; panel je pod ním (predtým vedľa
+    // a týždeň bol o 340 px užší).
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* ── TÝŽDEŇ ── */}
-      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+      <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <button type="button" onClick={() => { setPondelok(posunDen(pondelok, -7)); }} style={tl}>‹</button>
           <b style={{ fontSize: 14 }}>{dm(pondelok)} – {dm(nedela)} {nedela.slice(0, 4)}</b>
@@ -247,80 +252,107 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
         </div>
         {dovodBliku && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{dovodBliku}</div>}
         {!udalosti ? <div style={{ fontSize: 13, color: C.textDim, padding: 20 }}>Načítavam kalendár…</div> : (
-          <div style={{ display: "grid", gridTemplateColumns: `${uzke ? 26 : 38}px repeat(7, 1fr)`, userSelect: "none" }}>
-            <div />
-            {dni.map((den, i) => (
-              <div key={den} style={{ textAlign: "center", fontSize: 11.5, color: den === dnesPraha() ? C.accentLight : C.textMuted, paddingBottom: 5, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
-                {DNI[i]}<b style={{ display: "block", fontSize: 14, color: den === dnesPraha() ? C.accentLight : C.text }}>{Number(den.slice(8, 10))}</b>
-              </div>
-            ))}
-            <div>
-              {Array.from({ length: DO_H - OD_H }, (_, h) => (
-                <div key={h} style={{ height: PX, fontSize: 10, color: C.textDim, textAlign: "right", paddingRight: 4, transform: "translateY(-6px)" }}>{OD_H + h}{uzke ? "" : ":00"}</div>
-              ))}
+          <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+          <div style={{ minWidth: ROZMER.minSirka, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0, userSelect: "none" }}>
+            {/* Hlavička dní — rovnaká ako v Kalendári. */}
+            <div style={{ display: "grid", gridTemplateColumns: `${ROZMER.pas}px repeat(7, 1fr)`, gap: ROZMER.medzera, marginBottom: 3 }}>
+              <div />
+              {dni.map((den, i) => {
+                const jeDnes = den === dnesPraha();
+                return (
+                  <div key={den} style={{
+                    textAlign: "center", fontSize: uzke ? 10 : 11.5, padding: "3px 0", borderRadius: 6,
+                    fontWeight: jeDnes ? 700 : 600, color: jeDnes ? C.accentLight : C.textMuted,
+                    background: jeDnes ? mix(C.accent, 12) : "transparent", lineHeight: uzke ? 1.15 : undefined,
+                  }}>
+                    {uzke ? <>{DNI[i].slice(0, 1)}<br /><b style={{ fontSize: 12 }}>{Number(den.slice(8, 10))}</b></> : `${DNI[i]} ${Number(den.slice(8, 10))}.`}
+                  </div>
+                );
+              })}
             </div>
-            {dni.map((den) => (
-              <div key={den} style={{ display: "grid", gridTemplateColumns: `repeat(${treneri.length}, 1fr)`, borderLeft: `1px solid ${mix(C.border, 60)}`, height: (DO_H - OD_H) * PX, backgroundImage: `linear-gradient(${mix(C.border, 45)} 1px, transparent 1px)`, backgroundSize: `100% ${PX}px` }}>
-                {treneri.map((tr, ti) => (
-                  <div
-                    key={tr}
-                    data-pol={`${den}|${tr}`}
-                    onClick={(e) => {
-                      const r = e.currentTarget.getBoundingClientRect();
-                      pridaj(den, tr, OD_H * 60 + Math.floor(((e.clientY - r.top) / PX) * 4) * 15);
-                    }}
-                    style={{
-                      position: "relative", cursor: "copy", borderLeft: ti ? `1px dashed ${mix(C.border, 40)}` : undefined,
-                      background: blik === `${den}|${tr}` ? mix(C.red, 22) : undefined, transition: "background .2s",
-                    }}
-                  >
-                    {(udalosti || []).filter((u) => u.trener === tr && u.zaciatok.slice(0, 10) === den).map((u) => {
-                      const od = minuty(u.zaciatok), doMin = u.koniec ? minuty(u.koniec) : od + 60;
-                      if (doMin <= OD_H * 60 || od >= DO_H * 60) return null;
-                      return (
-                        <div key={u.uid} title={`${u.zaciatok.slice(11, 16)} ${u.klient || u.nazov || ""}`} style={{
-                          position: "absolute", left: 1, right: 1, top: (Math.max(od, OD_H * 60) - OD_H * 60) / 60 * PX, height: Math.max(10, (Math.min(doMin, DO_H * 60) - Math.max(od, OD_H * 60)) / 60 * PX - 2),
-                          borderRadius: 5, background: mix(farba(tr), 16), borderLeft: `3px solid ${mix(farba(tr), 55)}`, fontSize: 10, lineHeight: 1.2, padding: "2px 4px",
-                          color: C.textMuted, overflow: "hidden", pointerEvents: "none",
-                        }}>{uzke ? "" : `${u.zaciatok.slice(11, 16)} `}{u.klient || u.nazov}</div>
-                      );
-                    })}
-                    {navrhy.filter((n) => n.den === den && n.trener === tr).map((n) => (
-                      <div key={n.id} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => zacniTah(e, n)} title="Chyť a posuň · × zmaže" style={{
-                        position: "absolute", left: 1, right: 1, top: (n.od - OD_H * 60) / 60 * PX, height: n.minut / 60 * PX - 2, zIndex: 2,
-                        borderRadius: 6, border: `2px dashed ${farba(tr)}`, background: mix(farba(tr), 12), color: tr === "Terezka" ? C.blue : C.accentLight,
-                        fontSize: 10.5, fontWeight: 700, padding: "2px 3px", display: "flex", flexDirection: "column", justifyContent: "space-between",
-                        cursor: tahany === n.id ? "grabbing" : "grab", touchAction: "none", pointerEvents: tahany === n.id ? "none" : undefined,
-                        boxShadow: tahany === n.id ? "0 6px 18px rgba(0,0,0,.45)" : undefined,
-                      }}>
-                        <span style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
-                          <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
-                          <button type="button" title="Zmazať termín" onClick={() => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))} style={{ padding: "0 4px", border: 0, borderRadius: 3, background: "rgba(0,0,0,.35)", color: "inherit", font: "inherit", fontSize: 10, cursor: "pointer", lineHeight: 1.4 }}>×</button>
-                        </span>
-                        {n.minut > 60 && !uzke && <span style={{ fontWeight: 600, opacity: 0.85 }}>klient si vyberie</span>}
-                        {/* Úchyt na natiahnutie — rozmedzie, v ktorom si klient vyberie začiatok. */}
-                        <div
-                          onPointerDown={(e) => zacniNatahovanie(e, n)}
-                          title="Potiahni — rozmedzie, v ktorom si klient vyberie začiatok"
-                          style={{
-                            position: "absolute", left: 0, right: 0, bottom: -4, height: 12, cursor: "ns-resize", touchAction: "none",
-                            display: "flex", justifyContent: "center", alignItems: "center",
-                          }}
-                        >
-                          <span style={{ width: 22, height: 4, borderRadius: 2, background: farba(tr), opacity: natahovany === n.id ? 1 : 0.7 }} />
-                        </div>
-                      </div>
-                    ))}
+            <div style={{ display: "grid", gridTemplateColumns: `${ROZMER.pas}px repeat(7, 1fr)`, gap: ROZMER.medzera }}>
+              <div style={{ position: "relative", height: (DO_H - OD_H) * PX }}>
+                {Array.from({ length: DO_H - OD_H }, (_, h) => (
+                  <div key={h} style={{ position: "absolute", top: h * PX - 6, right: uzke ? 2 : 4, fontSize: uzke ? 9.5 : 10.5, color: C.textDim }}>
+                    {uzke ? `${OD_H + h}` : `${String(OD_H + h).padStart(2, "0")}:00`}
                   </div>
                 ))}
               </div>
-            ))}
+              {dni.map((den) => (
+                <div key={den} style={{
+                  position: "relative", display: "grid", gridTemplateColumns: `repeat(${treneri.length}, 1fr)`,
+                  height: (DO_H - OD_H) * PX, borderRadius: 7, overflow: "hidden",
+                  background: den === dnesPraha() ? mix(C.accent, 5) : mix(C.border, 14),
+                }}>
+                  {Array.from({ length: DO_H - OD_H }, (_, h) => (
+                    <div key={`l${h}`} style={{ position: "absolute", top: h * PX, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}`, pointerEvents: "none" }} />
+                  ))}
+                  {treneri.map((tr, ti) => (
+                    <div
+                      key={tr}
+                      data-pol={`${den}|${tr}`}
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        pridaj(den, tr, OD_H * 60 + Math.floor(((e.clientY - r.top) / PX) * 4) * 15);
+                      }}
+                      style={{
+                        position: "relative", cursor: "copy", borderLeft: ti ? `1px dashed ${mix(C.border, 40)}` : undefined,
+                        background: blik === `${den}|${tr}` ? mix(C.red, 22) : undefined, transition: "background .2s",
+                      }}
+                    >
+                      {(udalosti || []).filter((u) => u.trener === tr && u.zaciatok.slice(0, 10) === den).map((u) => {
+                        const od = minuty(u.zaciatok), doMin = u.koniec ? minuty(u.koniec) : od + 60;
+                        if (doMin <= OD_H * 60 || od >= DO_H * 60) return null;
+                        return (
+                          <div key={u.uid} title={`${u.zaciatok.slice(11, 16)} ${u.klient || u.nazov || ""}`} style={{
+                            position: "absolute", left: 1, right: 1, top: (Math.max(od, OD_H * 60) - OD_H * 60) / 60 * PX, height: Math.max(10, (Math.min(doMin, DO_H * 60) - Math.max(od, OD_H * 60)) / 60 * PX - 2),
+                            borderRadius: 5, background: mix(farba(tr), 16), borderLeft: `${uzke ? 2 : 3}px solid ${farba(tr)}`, fontSize: uzke ? 9.5 : 10.5, lineHeight: uzke ? 1.1 : 1.25, padding: uzke ? "2px 2px" : "2px 4px",
+                            color: C.text, overflow: "hidden", pointerEvents: "none",
+                          }}>
+                            <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.klient || u.nazov}</div>
+                            {!uzke && (doMin - od) / 60 * PX > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{u.zaciatok.slice(11, 16)}</div>}
+                          </div>
+                        );
+                      })}
+                      {navrhy.filter((n) => n.den === den && n.trener === tr).map((n) => (
+                        <div key={n.id} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => zacniTah(e, n)} title="Chyť a posuň · × zmaže" style={{
+                          position: "absolute", left: 1, right: 1, top: (n.od - OD_H * 60) / 60 * PX, height: n.minut / 60 * PX - 2, zIndex: 2,
+                          borderRadius: 6, border: `2px dashed ${farba(tr)}`, background: mix(farba(tr), 12), color: tr === "Terezka" ? C.blue : C.accentLight,
+                          fontSize: 10.5, fontWeight: 700, padding: "2px 3px", display: "flex", flexDirection: "column", justifyContent: "space-between",
+                          cursor: tahany === n.id ? "grabbing" : "grab", touchAction: "none", pointerEvents: tahany === n.id ? "none" : undefined,
+                          boxShadow: tahany === n.id ? "0 6px 18px rgba(0,0,0,.45)" : undefined,
+                        }}>
+                          <span style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+                            <span>{hhmm(n.od)}–{hhmm(n.od + n.minut)}</span>
+                            <button type="button" title="Zmazať termín" onClick={() => setNavrhy((xs) => xs.filter((x) => x.id !== n.id))} style={{ padding: "0 4px", border: 0, borderRadius: 3, background: "rgba(0,0,0,.35)", color: "inherit", font: "inherit", fontSize: 10, cursor: "pointer", lineHeight: 1.4 }}>×</button>
+                          </span>
+                          {n.minut > 60 && !uzke && <span style={{ fontWeight: 600, opacity: 0.85 }}>klient si vyberie</span>}
+                          {/* Úchyt na natiahnutie — rozmedzie, v ktorom si klient vyberie začiatok. */}
+                          <div
+                            onPointerDown={(e) => zacniNatahovanie(e, n)}
+                            title="Potiahni — rozmedzie, v ktorom si klient vyberie začiatok"
+                            style={{
+                              position: "absolute", left: 0, right: 0, bottom: -4, height: 12, cursor: "ns-resize", touchAction: "none",
+                              display: "flex", justifyContent: "center", alignItems: "center",
+                            }}
+                          >
+                            <span style={{ width: 22, height: 4, borderRadius: 2, background: farba(tr), opacity: natahovany === n.id ? 1 : 0.7 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
           </div>
         )}
       </div>
 
       {/* ── PANEL ── */}
-      <div style={{ width: uzke ? "100%" : 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: uzke ? "1fr" : "minmax(280px, 420px) minmax(260px, 1fr)", gap: 18, alignItems: "start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={stitok}>Komu</div>
         <VyberMena hodnota={klient} mena={ponukaMena} onZmen={(v) => { setKlient(v); setHotovo(null); }} placeholder="klient alebo nový z dopytu…" />
         {klient.trim() && !jeKlient && (
@@ -357,9 +389,10 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           </div>
         )}
 
+      </div>
         {/* ── POSLANÉ PONUKY ── */}
         {ponuky.length > 0 && (
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={stitok}>Poslané ponuky</div>
             {ponuky.filter((p) => !trener || p.casy.some((c) => c.trener === trener)).slice(0, 12).map((p) => {
               const vybranyRozsah = p.casy.find((c) => c.id === p.vybranyId);
