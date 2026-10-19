@@ -42,6 +42,25 @@
   };
 
   // ── STAV ──
+  /**
+   * JEMNÝ POSUN (Jerry, 19. 10. 2026: „posuny sú o veľa pixelov naraz, skáče
+   * to, často potrebujem posunúť len o milimetríky"). Pri zapnutom „jemne"
+   * (alebo drž Alt/Option) ide ťahanie fotky, rohov aj ⟳ 10× pomalšie.
+   * jemnyTah() premieta skutočný bod prsta na účinný; pri prepnutí režimu
+   * uprostred ťahu sa základ presunie, takže nič neodskočí.
+   */
+  let jemneZap = false;
+  const jemne = (e) => jemneZap || !!e?.altKey;
+  const jemnyTah = () => {
+    let ref = null;
+    return (P, f) => {
+      const k = f ? 0.1 : 1;
+      if (!ref || ref.k !== k) ref = { P, E: ref ? ref.E2 : P, k };
+      const E = { x: ref.E.x + (P.x - ref.P.x) * k, y: ref.E.y + (P.y - ref.P.y) * k };
+      ref.E2 = E;
+      return E;
+    };
+  };
   const okna = [...document.querySelectorAll(".okno")];
   // Polovice začínajú prázdne — klik do nich (alebo pretiahnutie) vloží fotku.
   const stav = [0, 1].map(() => ({ src: null, den: "", v: { zoom: 1, x: 0, y: 0 }, zrkadlo: false, fw: 1, fh: 1 }));
@@ -889,7 +908,8 @@
       const teraz = stredPrstov();
       const s = stav[i];
       const { ow, oh } = rozmerOkna(el);
-      const v = { ...s.v, x: s.v.x + (teraz.x - posledne.x) / ow, y: s.v.y + (teraz.y - posledne.y) / oh };
+      const k = jemne(e) ? 0.1 : 1;
+      const v = { ...s.v, x: s.v.x + (teraz.x - posledne.x) * k / ow, y: s.v.y + (teraz.y - posledne.y) * k / oh };
       s.v = obmedz(v, s.fw, s.fh, ow, oh);
       posledne = teraz;
       kresli();
@@ -1120,13 +1140,20 @@
     if (e.key === "Escape" && cakaUhol) { cakaUhol = null; kresliCiary(); return; }
     if (e.key === "Escape" && rezimCiar) nastavRezim(false);
     if ((e.key === "Delete" || e.key === "Backspace") && (vybrana != null || vybranyDetail != null)) { e.preventDefault(); zmazVybranu(); }
-    // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10) — na presné zarovnanie.
+    // Šípky posúvajú vybranú fotku po 1 bode obrazovky (Shift = 10, Alt/Option
+    // alebo „jemne" = 0,2) — na presné zarovnanie.
     const posun = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    if (posun && !e.metaKey && !e.ctrlKey && !e.altKey && stav[aktivne].src) {
+    if (posun && !e.metaKey && !e.ctrlKey && stav[aktivne].src) {
       e.preventDefault();
-      const s = stav[aktivne], { ow, oh } = rozmerOkna(okna[aktivne]), n = e.shiftKey ? 10 : 1;
+      const s = stav[aktivne], { ow, oh } = rozmerOkna(okna[aktivne]), n = e.shiftKey ? 10 : jemne(e) ? 0.2 : 1;
       s.v = obmedz({ ...s.v, x: s.v.x + (posun[0] * n) / ow, y: s.v.y + (posun[1] * n) / oh }, s.fw, s.fh, ow, oh);
       kresli();
+    }
+    // Čiarka a bodka otáčajú vybranú fotku po 0,1° (Shift = 1°).
+    const otoc = { Comma: -1, Period: 1 }[e.code];
+    if (otoc && !e.metaKey && !e.ctrlKey && stav[aktivne].src) {
+      e.preventDefault();
+      nastavOtocenie(aktivne, (stav[aktivne].v.rot || 0) + otoc * (e.shiftKey ? 1 : 0.1));
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) krokDopredu(); else krokSpat(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); krokDopredu(); }
@@ -1402,8 +1429,9 @@
    * ŤAH ZA ROH (Jerry, 19. 10. 2026: „za hociktorý roh chytím tú fotku a môžem
    * ju nakloniť hocijako"). Chytený roh ide presne za prstom, protiľahlý stojí,
    * pomer strán ostáva — jedným ťahom sa fotka zväčší aj nakloní. Uhol sa
-   * prichytí k pôvodnému a k 0°/90°/180°, keď je do 1,5° (aby samé zväčšenie
-   * fotku omylom nenaklonilo). Shift = len zväčšiť, uhol sa nemení.
+   * NEPRICHYTÁVA (prichytenie do 1,5° skákalo a malé naklonenie nešlo).
+   * Shift = len zväčšiť, uhol sa nemení. Roh sa hýbe o toľko, o koľko prst —
+   * kde presne ho prst chytil, nevadí (inak by pri prvom pohybe odskočil).
    */
   uchopy?.querySelectorAll(".roh").forEach((h) => {
     let kotva = null;
@@ -1411,22 +1439,21 @@
       e.preventDefault(); e.stopPropagation();
       const o = obdlznikFotky(aktivne), [sx, sy] = h.dataset.roh;
       const A = zFotky(o, sx === "p" ? -o.w / 2 : o.w / 2, sy === "d" ? -o.h / 2 : o.h / 2);
-      kotva = { ...A, sx, sy, rot: o.rot };
+      const B = zFotky(o, sx === "p" ? o.w / 2 : -o.w / 2, sy === "d" ? o.h / 2 : -o.h / 2), M = miestoVoStvorci(e);
+      kotva = { ...A, sx, sy, rot: o.rot, off: { x: B.x - M.x, y: B.y - M.y }, efekt: jemnyTah() };
+      kotva.efekt(M, jemne(e)); // základ = miesto stlačenia
       try { h.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
     });
     h.addEventListener("pointermove", (e) => {
       if (!kotva) return;
-      const t = stav[aktivne], P = miestoVoStvorci(e);
-      const dx = P.x - kotva.x, dy = P.y - kotva.y;
+      const t = stav[aktivne], E = kotva.efekt(miestoVoStvorci(e), jemne(e));
+      const dx = E.x + kotva.off.x - kotva.x, dy = E.y + kotva.off.y - kotva.y;
       // Uhlopriečka od kotvy k chytenému rohu vo vlastných osiach fotky.
       const ux = kotva.sx === "p" ? t.fw : -t.fw, uy = kotva.sy === "d" ? t.fh : -t.fh;
       let u = kotva.rot;
       if (!e.shiftKey) {
         u = (Math.atan2(dy, dx) - Math.atan2(uy, ux)) / RAD;
         u = ((u + 180) % 360 + 360) % 360 - 180;
-        const blizko = (k) => Math.abs(((u - k + 540) % 360) - 180) < 1.5;
-        if (blizko(kotva.rot)) u = kotva.rot;
-        else { const k = Math.round(u / 90) * 90; if (blizko(k)) u = k; }
       }
       const a = u * RAD, c = Math.cos(a), n = Math.sin(a);
       const lx = dx * c + dy * n, ly = -dx * n + dy * c;
@@ -1444,8 +1471,8 @@
   });
   /**
    * OTÁČANIE ŤAHOM (Jerry, 12. 10. 2026: „pridaj aj otáčanie fotky ťahom").
-   * Úchyt nad fotkou; uhol sa prichytí k 0°/90°/180°, keď je do 1,5°
-   * (rovná fotka je najčastejší cieľ), Shift = po 15°. Presné doladenie je
+   * Úchyt nad fotkou; Shift = po 15°. Prichytenie k 0°/90° (do 1,5°) bolo
+   * zrušené 19. 10. 2026 — skákalo a malé naklonenie okolo nuly nešlo. Presné doladenie je
    * v paneli Fotky (◀ ▶ po 0,1°).
    */
   if (otocUchyt) {
@@ -1453,15 +1480,15 @@
     otocUchyt.addEventListener("pointerdown", (e) => {
       e.preventDefault(); e.stopPropagation();
       const o = obdlznikFotky(aktivne), P = miestoVoStvorci(e);
-      zac = { uhol: Math.atan2(P.y - o.cy, P.x - o.cx), rot: o.rot, cx: o.cx, cy: o.cy };
+      zac = { uhol: Math.atan2(P.y - o.cy, P.x - o.cx), rot: o.rot, cx: o.cx, cy: o.cy, efekt: jemnyTah() };
+      zac.efekt(P, jemne(e));
       try { otocUchyt.setPointerCapture(e.pointerId); } catch { /* bez zachytenia ide ťah aj tak */ }
     });
     otocUchyt.addEventListener("pointermove", (e) => {
       if (!zac) return;
-      const P = miestoVoStvorci(e);
+      const P = zac.efekt(miestoVoStvorci(e), jemne(e));
       let u = zac.rot + (Math.atan2(P.y - zac.cy, P.x - zac.cx) - zac.uhol) / RAD;
       if (e.shiftKey) u = Math.round(u / 15) * 15;
-      else { const k = Math.round(u / 90) * 90; if (Math.abs(u - k) < 1.5) u = k; }
       nastavOtocenie(aktivne, u);
     });
     const pusti = () => { zac = null; };
@@ -1525,6 +1552,11 @@
   }
   document.getElementById("pohladViac")?.addEventListener("click", () => nastavPohlad(pohlad * 1.25));
   document.getElementById("pohladMenej")?.addEventListener("click", () => nastavPohlad(pohlad / 1.25));
+  document.getElementById("jemne")?.addEventListener("click", (e) => {
+    jemneZap = !jemneZap;
+    e.currentTarget.classList.toggle("on", jemneZap);
+    e.currentTarget.setAttribute("aria-pressed", String(jemneZap));
+  });
   document.getElementById("pohladCely")?.addEventListener("click", () => { pohlad = 1; nastavPohlad(1); vycentruj(); });
   addEventListener("resize", () => nastavPohlad(pohlad));
   // Skrytá karta, celá obrazovka, otočenie iPadu — mení sa platno, nie okno.
@@ -1567,8 +1599,8 @@
         const P = miestoVoStvorci(e), t = stav[aktivne];
         const o = t?.src && !rezimCiar ? obdlznikFotky(aktivne) : null;
         const naFotke = o && jeNaFotke(o, P);
-        tah = naFotke ? { druh: "fotka", P, o } : { druh: "plocha", x: e.clientX, y: e.clientY, sl: platno.scrollLeft, st: platno.scrollTop };
-        if (naFotke) drzi = true; // posun fotky je jeden krok späť, nie desať
+        tah = naFotke ? { druh: "fotka", P, o, efekt: jemnyTah() } : { druh: "plocha", x: e.clientX, y: e.clientY, sl: platno.scrollLeft, st: platno.scrollTop };
+        if (naFotke) { drzi = true; tah.efekt(P, jemne(e)); } // posun fotky je jeden krok späť, nie desať
       } else if (prsty.size === 2) {
         // Dva prsty = plocha, aj keď prvý držal fotku (veľkosť fotky len za rohy).
         stipZaciatok(...prstyObr.values());
@@ -1583,7 +1615,7 @@
         platno.scrollLeft = tah.sl - (e.clientX - tah.x);
         platno.scrollTop = tah.st - (e.clientY - tah.y);
       } else if (tah.druh === "fotka") {
-        const P = miestoVoStvorci(e);
+        const P = tah.efekt(miestoVoStvorci(e), jemne(e));
         nastavStred(aktivne, tah.o.cx + P.x - tah.P.x, tah.o.cy + P.y - tah.P.y, tah.o.w);
       } else if (tah.druh === "stipnutie" && prsty.size === 2) {
         stipPohyb(...prstyObr.values());

@@ -15,6 +15,8 @@
   .pohlad { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(20,24,18,.82); border: 1px solid var(--line2); z-index: 20; }
   .pohlad button { min-width: 30px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font: inherit; font-size: 15px; cursor: pointer; }
   .pohlad button:hover { background: var(--accentBg); color: var(--accentLight); }
+  .pohlad button.jemne { font-size: 12px; padding: 0 8px; margin-left: 4px; border: 1px solid var(--line2); }
+  .pohlad button.jemne.on { background: var(--accent, #e8893a); color: #fff; border-color: transparent; }
   .pohlad span { min-width: 48px; text-align: center; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   @media (max-width: 860px) { .platno-obal { height: calc(min(100vw, 680px) + 10px); flex: none; } }
 /*jadro-css*//*/jadro-css*/
@@ -51,6 +53,7 @@
     <span id="pohladH">100 %</span>
     <button type="button" id="pohladViac" title="Priblížiť plochu (fotka sa nemení)">+</button>
     <button type="button" id="pohladCely" title="Celý štvorec na obrazovku">⤢</button>
+    <button type="button" id="jemne" class="jemne" aria-pressed="false" title="Jemný posun: ťahanie fotky, rohov aj ⟳ 10× pomalšie. Na Macu stačí počas ťahu držať Alt/Option.">jemne</button>
   </div>
   </div>
 
@@ -106,7 +109,7 @@
             <button class="tl" id="reset">na stred</button>
             <button class="tl" id="vymenit" title="Vymeniť ľavú a pravú">⇄</button>
           </div>
-          <div class="napoveda"><b>Doladenie:</b> ◀ ▶ pri zväčšení po 0,1 %, šípky na klávesnici posúvajú vybranú fotku po 1 bode (so Shiftom po 10). <b>Nakloníš</b> ju ťahom za hociktorý roh — roh ide za prstom, protiľahlý stojí (Shift = len zväčšiť), alebo za oranžové ⟳ (Shift = po 15°); presne ◀ ▶ pri otočení. <b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
+          <div class="napoveda"><b>Doladenie:</b> ◀ ▶ pri zväčšení po 0,1 %, šípky na klávesnici posúvajú vybranú fotku po 1 bode (so Shiftom po 10). <b>Nakloníš</b> ju ťahom za hociktorý roh — protiľahlý stojí (Shift = len zväčšiť), alebo za oranžové ⟳ (Shift = po 15°); presne ◀ ▶ pri otočení alebo klávesmi <b>, .</b> po 0,1°. <b>Po milimetroch:</b> zapni „jemne" vľavo dole alebo drž počas ťahu Alt/Option — všetko ide 10× pomalšie. <b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
         </div>
       </details>
 
