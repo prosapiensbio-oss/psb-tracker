@@ -1021,6 +1021,9 @@
     for (const u of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(u, stop);
   }
   document.getElementById("otocNula")?.addEventListener("click", () => { if (stav[aktivne].src) nastavOtocenie(aktivne, 0); });
+  // Fotka z mobilu nabok: celé štvrťotočky.
+  document.getElementById("otoc90l")?.addEventListener("click", () => otocO(-90));
+  document.getElementById("otoc90p")?.addEventListener("click", () => otocO(90));
   for (const [id, smer] of [["zoomMenej", -1], ["zoomViac", 1]]) {
     const b = document.getElementById(id);
     if (!b) continue;
@@ -1355,11 +1358,24 @@
     }
     if (otocUchyt) {
       // Úchyt na otáčanie nad horným okrajom (v osi fotky), aby ho nezakryl prst pri rohu.
-      const P = zFotky(o, 0, -o.h / 2 - 34);
+      // Jerry, 19. 10. 2026: „potrebujem tú fotku aj otáčať" — fotka, ktorá vypĺňa
+      // polovicu, mala úchyt nad štvorcom, mimo obrazovky. Keď nad fotkou nie je
+      // vidno, úchyt ide dovnútra polovice, k jej hornému okraju (uhol sa ráta
+      // okolo stredu fotky, na mieste úchytu nezáleží).
+      let P = zFotky(o, 0, -o.h / 2 - 34);
+      const b = stvorec.getBoundingClientRect(), pl = (document.getElementById("platno") || stvorec).getBoundingClientRect();
+      const vid = { x: pl.left - b.left, y: pl.top - b.top, r: pl.right - b.left, d: pl.bottom - b.top };
+      const vidno = (Q) => Q.x >= vid.x + 16 && Q.x <= vid.r - 16 && Q.y >= vid.y + 16 && Q.y <= vid.d - 16;
+      const vonku = vidno(P);
+      if (!vonku) {
+        // Stred viditeľnej časti polovice, pri jej hornom okraji.
+        const l = Math.max(o.R.x, vid.x), r = Math.min(o.R.x + o.R.w, vid.r);
+        P = { x: (l + r) / 2, y: Math.max(o.R.y, vid.y) + 26 };
+      }
       otocUchyt.style.left = `${P.x}px`; otocUchyt.style.top = `${P.y}px`;
       const hrana = zFotky(o, 0, -o.h / 2);
       const st = uchopy.querySelector(".otoc-stopka");
-      if (st) Object.assign(st.style, { left: `${hrana.x}px`, top: `${hrana.y}px`, transform: `rotate(${o.rot}deg)` });
+      if (st) Object.assign(st.style, { left: `${hrana.x}px`, top: `${hrana.y}px`, transform: `rotate(${o.rot}deg)`, display: vonku ? "" : "none" });
     }
   }
   const miestoVoStvorci = (e) => {
@@ -1494,6 +1510,8 @@
   addEventListener("resize", () => nastavPohlad(pohlad));
   // Skrytá karta, celá obrazovka, otočenie iPadu — mení sa platno, nie okno.
   if (platno && window.ResizeObserver) new ResizeObserver(() => nastavPohlad(pohlad)).observe(platno);
+  // Úchyt na otáčanie sa drží viditeľnej časti — po posune plochy sa prekreslí.
+  platno?.addEventListener("scroll", () => kresliUchopy(), { passive: true });
   if (platno) {
     const bodPlatna = (e) => { const b = platno.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
     /**
