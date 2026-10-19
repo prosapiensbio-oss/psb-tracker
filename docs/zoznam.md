@@ -37,10 +37,6 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9. [ ] Upload do Higgsfieldu (SSL pri PUT).
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
 9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
-9d. [ ] r6 „Bolest, která patří k procesu“ (14. 10.): farby celého videa majú expozíciu +61, jas +71, svetlá +61,
-    tiene +16, kontrast 1 – zrejme mienené len pre kameru B (chyba opravená 18. 10.). Čaká na Jerryho: presunúť na kameru B?
-9e. [ ] C0019 (14. 10.) nemá takmer žiadny zvuk (−70 LUFS), appka ho dala ako cvičenie do r3. Čaká na Jerryho:
-    kamera B k inému klipu, alebo cvik?
 9f. [ ] Ahsoka v Strižni ako druhá značka (vlastné štýly, titulky, farby), alebo len PSB? Otázka od 15. 10.
 9g. [ ] ✦ AI záber: prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
 9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
@@ -721,6 +717,9 @@ vyriešené opravami 5. 10. vyššie, ponechané ako história):
   od 16. 10. Video 4+ pri prekrytí), 9 štýlov titulkov, štúdiový zvuk (DeepFilterNet), vloženie videa do strihu,
   ✦ AI záber, „zvýš zvuk a uprav celé nanovo“ v príkaze Claudovi, Zverejniť príbeh hneď, po nahratí rovno do strižne,
   nahrávanie navrchu Produkčného dňa, farby/poloha menia označené video.
+
+- **r6 farby celého videa a C0019 bez zvuku — NECHAŤ TAK (Jerry 19. 10. 2026: „vymaž a nech to tak“).**
+  r6 ostáva s farbami na celom videu, C0019 ostáva cvik v r3. Neponúkať znova.
 
 - **Strižňa na iPhone a Mac mini ako server — OPUSTENÉ 13. 10. 2026**
   (Jerry: „tento nápad opúšťame“). Strižňa beží na Macoch (Jerry, Terezka);
