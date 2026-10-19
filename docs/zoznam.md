@@ -40,8 +40,12 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9f. [x] Ďalšie profily v Strižni – hotové 19. 10. 2026 (Jerry: „priprav Strižňu pre tie ďalšie naše profily“): PSB,
     @philipjerry, @filip_stranavsky, @ahsoka.the.whippet vo vlastných značkách Metricoolu, Terezka ručne; farby grafík,
     tón Clauda, výber účtu pri nahrávaní. Commit c14f3d2 v strizna.
-9j. [ ] Výsledky z Metricoolu pre osobné značky (Jerry, Filip, Ahsoka) – `server/vysledky.ts` sťahuje len PSB; dovtedy
-    sa čísla osobných profilov nahrávajú (snímka / CSV). Aj feed, memy, infografiky a kalendár z Metricoolu sú len PSB.
+9j. [x] Prepínač profilov – každý účet autonómny, hotové 19. 10. 2026 (Jerry: „prepínač profilov na úvodnej stránke…
+    každý profil je autonómny“). Prehľad + ľavé menu; Produkčný deň, reposty, memy, infografiky (aj Jarvis), karty,
+    kalendár a výsledky z Metricoolu pre každú značku zvlášť. Commity de7464a, 0a15b29, 29de5c6, b3b5670 v strizna.
+    Ostáva len PSB: feed z Metricoolu; Jarvis pri inom účte vidí karty a výsledky PSB.
+9l. [ ] Prepínač profilov naostro: prvé stiahnutie výsledkov @philipjerry / @filip_stranavsky / @ahsoka (Metricool, nikdy
+    neoverené) a prvý mem/infografika plánovaná do inej značky.
 9k. [ ] Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
 9g. [ ] ✦ AI záber: prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
 9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
