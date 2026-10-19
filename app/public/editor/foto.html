@@ -244,7 +244,7 @@
             <button class="tl" id="reset">na stred</button>
             <button class="tl" id="vymenit" title="Vymeniť ľavú a pravú">⇄</button>
           </div>
-          <div class="napoveda"><b>Doladenie:</b> ◀ ▶ pri zväčšení po 0,1 %, šípky na klávesnici posúvajú vybranú fotku po 1 bode (so Shiftom po 10). <b>Otočíš</b> ju ťahom za oranžové ⟳ nad fotkou (Shift = po 15°), presne ◀ ▶ pri otočení. <b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
+          <div class="napoveda"><b>Doladenie:</b> ◀ ▶ pri zväčšení po 0,1 %, šípky na klávesnici posúvajú vybranú fotku po 1 bode (so Shiftom po 10). <b>Nakloníš</b> ju ťahom za hociktorý roh — roh ide za prstom, protiľahlý stojí (Shift = len zväčšiť), alebo za oranžové ⟳ (Shift = po 15°); presne ◀ ▶ pri otočení. <b>Ťahaj</b> fotku priamo v štvorci, <b>zväčši</b> dvoma prstami alebo Ctrl + koliesko. Dvojklik = na stred. Fotku môžeš aj <b>pretiahnuť z Findera</b> do polovice.</div>
         </div>
       </details>
 
@@ -1962,7 +1962,13 @@ window.kartotekaKlienta = (() => {
     t.v = obmedz({ ...t.v, rot: Math.round(u * 100) / 100 }, t.fw, t.fh, R.w, R.h);
     kresli();
   }
-  // Ťah za roh: protiľahlý roh stojí, pomer strán ostáva — aj pri otočenej fotke.
+  /**
+   * ŤAH ZA ROH (Jerry, 19. 10. 2026: „za hociktorý roh chytím tú fotku a môžem
+   * ju nakloniť hocijako"). Chytený roh ide presne za prstom, protiľahlý stojí,
+   * pomer strán ostáva — jedným ťahom sa fotka zväčší aj nakloní. Uhol sa
+   * prichytí k pôvodnému a k 0°/90°/180°, keď je do 1,5° (aby samé zväčšenie
+   * fotku omylom nenaklonilo). Shift = len zväčšiť, uhol sa nemení.
+   */
   uchopy?.querySelectorAll(".roh").forEach((h) => {
     let kotva = null;
     h.addEventListener("pointerdown", (e) => {
@@ -1975,11 +1981,24 @@ window.kartotekaKlienta = (() => {
     h.addEventListener("pointermove", (e) => {
       if (!kotva) return;
       const t = stav[aktivne], P = miestoVoStvorci(e);
-      const a = kotva.rot * RAD, c = Math.cos(a), n = Math.sin(a), dx = P.x - kotva.x, dy = P.y - kotva.y;
+      const dx = P.x - kotva.x, dy = P.y - kotva.y;
+      // Uhlopriečka od kotvy k chytenému rohu vo vlastných osiach fotky.
+      const ux = kotva.sx === "p" ? t.fw : -t.fw, uy = kotva.sy === "d" ? t.fh : -t.fh;
+      let u = kotva.rot;
+      if (!e.shiftKey) {
+        u = (Math.atan2(dy, dx) - Math.atan2(uy, ux)) / RAD;
+        u = ((u + 180) % 360 + 360) % 360 - 180;
+        const blizko = (k) => Math.abs(((u - k + 540) % 360) - 180) < 1.5;
+        if (blizko(kotva.rot)) u = kotva.rot;
+        else { const k = Math.round(u / 90) * 90; if (blizko(k)) u = k; }
+      }
+      const a = u * RAD, c = Math.cos(a), n = Math.sin(a);
       const lx = dx * c + dy * n, ly = -dx * n + dy * c;
-      const sc = Math.max(Math.abs(lx) / t.fw, Math.abs(ly) / t.fh);
-      const w = t.fw * sc, hh = t.fh * sc;
-      const ox = kotva.sx === "p" ? w / 2 : -w / 2, oy = kotva.sy === "d" ? hh / 2 : -hh / 2;
+      const sc = Math.max(1e-3, (lx * ux + ly * uy) / (ux * ux + uy * uy));
+      const w = t.fw * sc;
+      t.v = { ...t.v, rot: Math.round(u * 100) / 100 };
+      // Stred = kotva + polovica uhlopriečky v novom uhle a mierke.
+      const ox = ux * sc / 2, oy = uy * sc / 2;
       nastavStred(aktivne, kotva.x + ox * c - oy * n, kotva.y + ox * n + oy * c, w);
     });
     const pusti = () => { kotva = null; skryLupu(); };
