@@ -205,6 +205,8 @@ export type PSBData = {
    * zlučujú s platbami z PTmindera — tá istá platba v oboch je raz.
    */
   platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
+  /** Client List z PTmindera — dátumy, z ktorých sa ráta začiatok spolupráce (spolupraca.ts). */
+  ptminderKlienti?: Record<string, { vytvoreny: string; registracia: string; neaktivnyOd: string }>;
   /** Dozor nad reklamou — bežiace kampane, dni, rozhodnutia (lib/psb/reklamaDozor.ts). */
   reklamaDozor?: import("./reklamaDozor").DozorData;
   /** Odpovede a súhlasy klientov z odkazu s fotkami `/f/` (posledných 60 dní). */

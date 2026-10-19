@@ -53,6 +53,7 @@ import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
 import { dnesPraha } from "./cas";
+import { trvanieText, zaciatokSpoluprace } from "./spolupraca";
 import { metrikyDozoru, suhrnDozoru } from "./reklamaDozor";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -895,6 +896,15 @@ export function buildAiContext(
       dochadzkaPct: r0(c.attendance * 100),
       prveSedenie: c.firstSession || null,
       posledneSedenie: c.lastSession || null,
+      // Odkedy je klientom — aj spred 2025, z Client Listu PTmindera
+      // (spolupraca.ts). prveSedenie je len prvé sedenie v DÁTACH (od 2025).
+      ...(() => {
+        const pt = (data.ptminderKlienti || {})[c.name];
+        const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnesPraha());
+        if (!z) return {};
+        const koniec = c.status === "Neaktívny" ? ((c.lastSession || "").slice(0, 10) || pt?.neaktivnyOd || dnesPraha()) : dnesPraha();
+        return { klientOd: z.den, spolupraca: trvanieText(z.den, koniec) };
+      })(),
     }));
 
   return {

@@ -2953,6 +2953,20 @@ volať vo vrstve textu aj na obrazovke. Nové miesto, kde klientovi píšeme
 menom, ide cez ňu; `krstne()` má jedinú definíciu tam (mailFaktury ju len
 reexportuje). Overené na všetkých 103 krstných menách z databázy.
 
+## Odkedy je klient klientom — Client List z PTmindera (19. 10. 2026)
+
+Jerry: „ako dlho s klientom spolupracujeme — 1r 3m 16d". Kokpit má sedenia
+od 3. 1. 2025, takže „prvé sedenie" pri klientoch spred roku 2025 klamalo.
+Import Client Listu (Upload, typ `klienti`) odteraz ukladá aj zrkadlo
+`ptminder_klienti` (migrácia 0119) s registráciou (Sign up date), vytvorením
+a „neaktívny od". `zaciatokSpoluprace` (`lib/psb/spolupraca.ts`) berie
+NAJSKORŠÍ z prvého tréningu v Kokpite, registrácie a vytvorenia; dátum pred
+2021 ignoruje (Iva Stoklasková má v registrácii 1965 = dátum narodenia).
+Profil ukazuje „spolupracujeme 4r 0m 20d · od 29. 9. 2022" (pri neaktívnom
+„spolupráca trvala … do posledného tréningu"), štítky „klient od" a odpočet do
+narodenín podľa pražského dňa. Jarvis má `klientOd` a `spolupraca`
+v klientiDetail.
+
 ## Metricool cez MCP — jedno ťuknutie v uzávierke (8. 10. 2026)
 
 API Metricoolu je len v pláne Advanced; MCP server `ai.metricool.com/mcp` je na

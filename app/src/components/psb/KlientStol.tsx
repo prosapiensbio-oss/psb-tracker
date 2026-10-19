@@ -33,6 +33,7 @@ import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
+import { dniDoNarodenin, trvanieText, zaciatokSpoluprace } from "../../lib/psb/spolupraca";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -588,10 +589,27 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     });
   }, [c, meno, zruseneKal, priemery, dni]);
 
+  /**
+   * Odkedy je klientom a ako dlho spolupracujeme (Jerry, 19. 10. 2026:
+   * „1r 3m 16d"). Kokpit má sedenia od 2025 — skorší začiatok je z Client
+   * Listu PTmindera (spolupraca.ts). Pri neaktívnom sa ráta po posledný tréning.
+   */
+  const spolu = useMemo(() => {
+    if (!c) return null;
+    const pk = data.ptminderKlienti || {};
+    const pt = pk[meno] || Object.entries(pk).find(([k]) => normName(k) === normName(meno))?.[1];
+    const dnes = dnesPraha();
+    const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnes);
+    if (!z) return null;
+    const skoncila = c.status === "Neaktívny";
+    const koniec = skoncila ? ((c.lastSession || "").slice(0, 10) || pt?.neaktivnyOd || dnes) : dnes;
+    return { od: z.den, zdroj: z.zdroj, text: trvanieText(z.den, koniec), skoncila, koniec };
+  }, [c, data.ptminderKlienti, meno]);
+
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
-    () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).length : 0),
-    [c, dopyt, priviedol, poplatkyKlienta, btcSats, meno],
+    () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu).length : 0),
+    [c, dopyt, priviedol, poplatkyKlienta, btcSats, meno, spolu],
   );
 
   const zaplatene = platby.reduce((a, p) => a + p.amount, 0);
@@ -1297,6 +1315,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             ) : (
               <div style={{ color: C.textDim }}>narodeniny nezapísané</div>
             )}
+            {spolu && spolu.text && (
+              <div title={spolu.zdroj === "ptminder" ? "Začiatok z registrácie v PTminderi — Kokpit má tréningy až od roku 2025." : "Od prvého tréningu v Kokpite."}>
+                <span style={{ color: C.textDim }}>{spolu.skoncila ? "spolupráca trvala" : "spolupracujeme"}</span> {spolu.text}
+                <span style={{ color: C.textDim }}> · od {fmtDMY(spolu.od)}{spolu.skoncila ? ` do ${fmtDMY(spolu.koniec)}` : ""}</span>
+              </div>
+            )}
             {/* Dni od posledného tréningu sem z tabuľky zdravia (Jerry,
                 23. 9. 2026). Je to prvé, na čo sa človek pozerá, a v tabuľke
                 to bolo až štvrté. Dochádzka a hodinovka išli opačným smerom —
@@ -1340,7 +1364,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         </button>
         {detaily && c && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).map((x) => (
+            {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu).map((x) => (
               <span key={x.k} title={x.info} style={{
                 fontSize: 10.5, padding: "3px 7px", borderRadius: 6,
                 background: mix(x.farba || C.border, 20), color: x.farba || C.textMuted,
@@ -2110,14 +2134,9 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
   );
 }
 
+/** Pražský deň, nie UTC — medzi polnocou a 2:00 by inak hlásilo včerajšok. */
 function doNarodenin(narodeniny: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narodeniny);
-  if (!m) return null;
-  const dnes = new Date();
-  const dnesUTC = Date.UTC(dnes.getUTCFullYear(), dnes.getUTCMonth(), dnes.getUTCDate());
-  let d = Date.UTC(dnes.getUTCFullYear(), Number(m[2]) - 1, Number(m[3]));
-  if (d < dnesUTC) d = Date.UTC(dnes.getUTCFullYear() + 1, Number(m[2]) - 1, Number(m[3]));
-  return Math.round((d - dnesUTC) / 86400000);
+  return dniDoNarodenin(narodeniny, dnesPraha());
 }
 
 /**
@@ -2697,6 +2716,7 @@ function stitky(
   priviedol: string[],
   poplatky: unknown[],
   satoshi?: number,
+  spolu?: { od: string; zdroj: string; text: string; skoncila: boolean } | null,
 ): { k: string; v: string; farba?: string; info?: string }[] {
   const out: { k: string; v: string; farba?: string; info?: string }[] = [];
   const pridaj = (k: string, v: string | number | undefined | null | false, farba?: string, info?: string) => {
@@ -2704,13 +2724,16 @@ function stitky(
     out.push({ k, v: String(v), farba, info });
   };
 
-  pridaj("od", c.firstSession ? fmtDMY(c.firstSession) : "", undefined, "prvé sedenie v dátach");
+  pridaj("klient od", spolu ? fmtDMY(spolu.od) : c.firstSession ? fmtDMY(c.firstSession) : "", undefined,
+    spolu?.zdroj === "ptminder" ? "z registrácie v PTminderi — Kokpit má tréningy až od roku 2025" : "prvý tréning v Kokpite");
+  pridaj(spolu?.skoncila ? "spolupráca trvala" : "spolupracujeme", spolu?.text);
   pridaj("naposledy", c.lastSession ? fmtDMY(c.lastSession) : "");
   pridaj("segment", c.segment);
   pridaj("dochádzka", c.attendance ? `${Math.round(c.attendance * 100)} %` : "");
   pridaj("hodín", c.totalHours ? c.totalHours.toFixed(0) : "");
   pridaj("Ø hodina", c.avgPrice ? fmtCZK(Math.round(c.avgPrice)) : "");
-  pridaj("narodeniny", c.narodeniny ? fmtDMY(c.narodeniny) : "", C.accentLight);
+  const doNar = c.narodeniny ? dniDoNarodenin(c.narodeniny, dnesPraha()) : null;
+  pridaj("narodeniny", c.narodeniny ? `${fmtDMY(c.narodeniny)}${doNar == null ? "" : doNar === 0 ? " · dnes!" : ` · o ${doNar} dní`}` : "", C.accentLight);
   pridaj("členstvo", c.membership);
   if (c.packageTotal) {
     pridaj("balíček", `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}`,

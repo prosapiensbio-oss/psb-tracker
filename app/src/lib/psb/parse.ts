@@ -449,6 +449,8 @@ export function parseIdoklad(text: string): IdokladFaktura[] {
 export type KlientRow = {
   meno: string; email: string; telefon: string; stav: string;
   trener: string; narodeniny: string; vytvoreny: string; neaktivnyOd: string;
+  /** „Sign up date“ — kedy sa stal klientom; býva ručne a vie byť dátum narodenia. */
+  registracia: string;
 };
 
 export function parseClientList(text: string): KlientRow[] {
@@ -459,7 +461,7 @@ export function parseClientList(text: string): KlientRow[] {
   const idx = (...m: string[]) => hlavicka.findIndex((x) => m.some((y) => x === y || x.includes(y)));
   const iMeno = idx("name"), iMail = idx("email"), iTel = idx("mobile number");
   const iStav = idx("client status"), iTrener = idx("assigned trainer");
-  const iNar = idx("birthday"), iVzn = idx("created date"), iNeaktiv = idx("inactive from");
+  const iNar = idx("birthday"), iVzn = idx("created date"), iNeaktiv = idx("inactive from"), iReg = idx("sign up");
   if (iMeno < 0) return [];
 
   const out: KlientRow[] = [];
@@ -477,6 +479,7 @@ export function parseClientList(text: string): KlientRow[] {
       narodeniny: iNar >= 0 ? datumNarodenia(p[iNar] || "") : "",
       vytvoreny: iVzn >= 0 ? ptDatum(p[iVzn] || "") : "",
       neaktivnyOd: iNeaktiv >= 0 ? ptDatum(p[iNeaktiv] || "") : "",
+      registracia: iReg >= 0 ? ptDatum(p[iReg] || "") : "",
     });
   }
   return out;

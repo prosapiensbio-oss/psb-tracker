@@ -321,6 +321,13 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * Pred migráciou tabuľka nie je; prázdna história = os sa správa ako
      * doteraz (hodiny z názvu), nič sa nerozbije.
      */
+    // Odkedy je klient klientom — Client List z PTmindera (migrácia 0119).
+    // Bez tabuľky je mapa prázdna a profil berie prvé sedenie v Kokpite.
+    const ptk = await DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od FROM ptminder_klienti")
+      .all().catch(() => ({ results: [] }));
+    data.ptminderKlienti = Object.fromEntries((ptk.results as any[]).map((r) => [String(r.meno), {
+      vytvoreny: r.vytvoreny || "", registracia: r.registracia || "", neaktivnyOd: r.neaktivny_od || "",
+    }]));
     const hist = await DB.prepare(
       "SELECT klient, nazov, druh, stav, hodiny, zostatok, od, do, pridane, platba FROM ptminder_historia",
     ).all().catch(() => ({ results: [] }));
@@ -812,6 +819,18 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
           "INSERT INTO client_overrides (name, narodeniny, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(name) DO UPDATE SET narodeniny = ?2, updated_at = ?3 WHERE narodeniny = ''",
         ).bind(r.meno, r.narodeniny, new Date().toISOString()));
       }
+    }
+    // Zrkadlo Client Listu (migrácia 0119) — odkiaľ Kokpit vie, odkedy je
+    // človek klientom aj spred roku 2025 (spolupraca.ts). Prepisuje sa celé.
+    const teraz = new Date().toISOString();
+    for (const r of rows) {
+      stmts.push(DB.prepare(
+        `INSERT INTO ptminder_klienti (meno, email, telefon, stav, trener, narodeniny, vytvoreny, registracia, neaktivny_od, importovane)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+         ON CONFLICT(meno) DO UPDATE SET email = ?2, telefon = ?3, stav = ?4, trener = ?5, narodeniny = ?6,
+           vytvoreny = ?7, registracia = ?8, neaktivny_od = ?9, importovane = ?10`,
+      ).bind(r.meno, r.email || null, r.telefon || null, r.stav || null, r.trener || null, r.narodeniny || null,
+        r.vytvoreny || null, r.registracia || null, r.neaktivnyOd || null, teraz));
     }
     if (stmts.length) await DB.batch(stmts);
   } else if (type === "idoklad") {

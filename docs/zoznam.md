@@ -23,7 +23,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **A · Kým beží PTminder (po vypnutí sú dáta preč)**
 1. [ ] Export rokov pred 2025 → archív (Jerry stiahne, ja naleje) — sekcia 2.
-2. [ ] Maily a telefóny klientov z PTmindera k profilom — sekcia 4.
+2. [x] Maily a telefóny klientov z PTmindera k profilom — sekcia 4. (19. 10. 2026: Client List naliaty — 234 klientov, súčasní mali kontakty už skoro všetci; pribudli staré kontakty a dátumy registrácie → „klient od“ a „spolupracujeme“ v profile.)
 
 **B · Čaká len na Jerryho slovo (minúty)**
 3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 2 otázky — NDA a overovací odkaz; otázka o reakčných videách zrušená 13. 10.).
