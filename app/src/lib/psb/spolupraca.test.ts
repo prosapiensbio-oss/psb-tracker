@@ -6,10 +6,17 @@ import { dniDoNarodenin, trvanieText, zaciatokSpoluprace } from "./spolupraca";
 describe("spolupráca s klientom", () => {
   const dnes = "2026-10-19";
 
-  it("klient spred roku 2025 má začiatok z PTmindera, nie z prvého sedenia v Kokpite", () => {
-    // Michal Knapčok: Kokpit má sedenia od 2025, PTminder registráciu 29. 9. 2022.
-    expect(zaciatokSpoluprace({ prvyTrening: "2025-01-06", registracia: "2022-09-29", vytvoreny: "2022-09-29" }, dnes))
-      .toEqual({ den: "2022-09-29", zdroj: "ptminder" });
+  it("klient spred roku 2025 má začiatok z prvého tréningu v archíve PTmindera", () => {
+    // Michal Knapčok: Kokpit má sedenia od 2025, archív prvý tréning 5. 10. 2022.
+    expect(zaciatokSpoluprace({ prvyTrening: "2025-01-06", prvyTreningArchiv: "2022-10-05", registracia: "2022-09-29" }, dnes))
+      .toEqual({ den: "2022-10-05", zdroj: "ptminder" });
+  });
+  it("registrácia nepredbehne známy prvý tréning", () => {
+    // Anna Nová: registrácia 10. 1. 2024, prvý tréning 9. 10. 2024.
+    expect(zaciatokSpoluprace({ prvyTreningArchiv: "2024-10-09", registracia: "2024-01-10" }, dnes)?.den).toBe("2024-10-09");
+  });
+  it("bez známeho tréningu je záloha registrácia", () => {
+    expect(zaciatokSpoluprace({ registracia: "2022-09-29", vytvoreny: "2022-10-01" }, dnes)).toEqual({ den: "2022-09-29", zdroj: "ptminder" });
   });
   it("dátum narodenia v poli registrácie sa neberie", () => {
     // Iva Stoklasková: Sign up date 24. 5. 1965, vytvorená 3. 3. 2023.

@@ -323,10 +323,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      */
     // Odkedy je klient klientom — Client List z PTmindera (migrácia 0119).
     // Bez tabuľky je mapa prázdna a profil berie prvé sedenie v Kokpite.
-    const ptk = await DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od FROM ptminder_klienti")
-      .all().catch(() => ({ results: [] }));
+    // lekcie_pred / prvy_trening (migrácia 0121) = súhrn archívu sedení
+    // PTmindera pred 3. 1. 2025; bez stĺpcov padne dopyt na starý tvar.
+    const ptk = await DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od, lekcie_pred, prvy_trening FROM ptminder_klienti")
+      .all().catch(() => DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od FROM ptminder_klienti").all())
+      .catch(() => ({ results: [] }));
     data.ptminderKlienti = Object.fromEntries((ptk.results as any[]).map((r) => [String(r.meno), {
       vytvoreny: r.vytvoreny || "", registracia: r.registracia || "", neaktivnyOd: r.neaktivny_od || "",
+      lekciePred: Number(r.lekcie_pred) || 0, prvyTrening: r.prvy_trening || "",
     }]));
     const hist = await DB.prepare(
       "SELECT klient, nazov, druh, stav, hodiny, zostatok, od, do, pridane, platba FROM ptminder_historia",

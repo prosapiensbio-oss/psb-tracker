@@ -599,11 +599,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     const pk = data.ptminderKlienti || {};
     const pt = pk[meno] || Object.entries(pk).find(([k]) => normName(k) === normName(meno))?.[1];
     const dnes = dnesPraha();
-    const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnes);
-    if (!z) return null;
+    const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, prvyTreningArchiv: pt?.prvyTrening, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnes);
+    // Lekcie spolu = sedenia v Kokpite (od 3. 1. 2025) + archív PTmindera pred nimi.
+    const lekciePred = pt?.lekciePred || 0;
+    const lekcie = c.sessionCount + lekciePred;
+    if (!z) return lekcie ? { od: "", zdroj: "kokpit", text: "", skoncila: false, koniec: dnes, lekcie, lekciePred } : null;
     const skoncila = c.status === "Neaktívny";
     const koniec = skoncila ? ((c.lastSession || "").slice(0, 10) || pt?.neaktivnyOd || dnes) : dnes;
-    return { od: z.den, zdroj: z.zdroj, text: trvanieText(z.den, koniec), skoncila, koniec };
+    return { od: z.den, zdroj: z.zdroj, text: trvanieText(z.den, koniec), skoncila, koniec, lekcie, lekciePred };
   }, [c, data.ptminderKlienti, meno]);
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
@@ -1319,6 +1322,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               <div title={spolu.zdroj === "ptminder" ? "Začiatok z registrácie v PTminderi — Kokpit má tréningy až od roku 2025." : "Od prvého tréningu v Kokpite."}>
                 <span style={{ color: C.textDim }}>{spolu.skoncila ? "spolupráca trvala" : "spolupracujeme"}</span> {spolu.text}
                 <span style={{ color: C.textDim }}> · od {fmtDMY(spolu.od)}{spolu.skoncila ? ` do ${fmtDMY(spolu.koniec)}` : ""}</span>
+              </div>
+            )}
+            {spolu && spolu.lekcie > 0 && (
+              <div title={spolu.lekciePred ? `${spolu.lekciePred} z nich pred rokom 2025 — z archívu PTmindera; Kokpit má tréningy od 3. 1. 2025.` : "Tréningy v Kokpite."}>
+                <span style={{ color: C.textDim }}>lekcií spolu</span> {spolu.lekcie}
+                {spolu.lekciePred > 0 && <span style={{ color: C.textDim }}> · z toho {spolu.lekciePred} pred rokom 2025</span>}
               </div>
             )}
             {/* Dni od posledného tréningu sem z tabuľky zdravia (Jerry,
@@ -2716,7 +2725,7 @@ function stitky(
   priviedol: string[],
   poplatky: unknown[],
   satoshi?: number,
-  spolu?: { od: string; zdroj: string; text: string; skoncila: boolean } | null,
+  spolu?: { od: string; zdroj: string; text: string; skoncila: boolean; lekcie?: number } | null,
 ): { k: string; v: string; farba?: string; info?: string }[] {
   const out: { k: string; v: string; farba?: string; info?: string }[] = [];
   const pridaj = (k: string, v: string | number | undefined | null | false, farba?: string, info?: string) => {
@@ -2724,8 +2733,9 @@ function stitky(
     out.push({ k, v: String(v), farba, info });
   };
 
-  pridaj("klient od", spolu ? fmtDMY(spolu.od) : c.firstSession ? fmtDMY(c.firstSession) : "", undefined,
-    spolu?.zdroj === "ptminder" ? "z registrácie v PTminderi — Kokpit má tréningy až od roku 2025" : "prvý tréning v Kokpite");
+  pridaj("klient od", spolu?.od ? fmtDMY(spolu.od) : c.firstSession ? fmtDMY(c.firstSession) : "", undefined,
+    spolu?.zdroj === "ptminder" ? "prvý tréning z archívu PTmindera (Kokpit má tréningy až od roku 2025)" : "prvý tréning v Kokpite");
+  pridaj("lekcií spolu", spolu?.lekcie || "");
   pridaj(spolu?.skoncila ? "spolupráca trvala" : "spolupracujeme", spolu?.text);
   pridaj("naposledy", c.lastSession ? fmtDMY(c.lastSession) : "");
   pridaj("segment", c.segment);

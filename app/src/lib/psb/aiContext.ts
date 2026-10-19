@@ -900,10 +900,11 @@ export function buildAiContext(
       // (spolupraca.ts). prveSedenie je len prvé sedenie v DÁTACH (od 2025).
       ...(() => {
         const pt = (data.ptminderKlienti || {})[c.name];
-        const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnesPraha());
-        if (!z) return {};
+        const z = zaciatokSpoluprace({ prvyTrening: c.firstSession, prvyTreningArchiv: pt?.prvyTrening, registracia: pt?.registracia, vytvoreny: pt?.vytvoreny }, dnesPraha());
+        const lekcieSpolu = c.sessionCount + (pt?.lekciePred || 0);
+        if (!z) return { lekcieSpolu };
         const koniec = c.status === "Neaktívny" ? ((c.lastSession || "").slice(0, 10) || pt?.neaktivnyOd || dnesPraha()) : dnesPraha();
-        return { klientOd: z.den, spolupraca: trvanieText(z.den, koniec) };
+        return { klientOd: z.den, spolupraca: trvanieText(z.den, koniec), lekcieSpolu };
       })(),
     }));
 

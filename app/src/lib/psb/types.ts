@@ -206,7 +206,13 @@ export type PSBData = {
    */
   platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
   /** Client List z PTmindera — dátumy, z ktorých sa ráta začiatok spolupráce (spolupraca.ts). */
-  ptminderKlienti?: Record<string, { vytvoreny: string; registracia: string; neaktivnyOd: string }>;
+  ptminderKlienti?: Record<string, {
+    vytvoreny: string; registracia: string; neaktivnyOd: string;
+    /** Lekcie pred 3. 1. 2025 (archív PTmindera) — Kokpit ich v sedeniach nemá. */
+    lekciePred?: number;
+    /** Prvý tréning podľa archívu PTmindera (od 1/2022). */
+    prvyTrening?: string;
+  }>;
   /** Dozor nad reklamou — bežiace kampane, dni, rozhodnutia (lib/psb/reklamaDozor.ts). */
   reklamaDozor?: import("./reklamaDozor").DozorData;
   /** Odpovede a súhlasy klientov z odkazu s fotkami `/f/` (posledných 60 dní). */

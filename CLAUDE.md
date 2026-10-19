@@ -2960,12 +2960,19 @@ od 3. 1. 2025, takže „prvé sedenie" pri klientoch spred roku 2025 klamalo.
 Import Client Listu (Upload, typ `klienti`) odteraz ukladá aj zrkadlo
 `ptminder_klienti` (migrácia 0119) s registráciou (Sign up date), vytvorením
 a „neaktívny od". `zaciatokSpoluprace` (`lib/psb/spolupraca.ts`) berie
-NAJSKORŠÍ z prvého tréningu v Kokpite, registrácie a vytvorenia; dátum pred
-2021 ignoruje (Iva Stoklasková má v registrácii 1965 = dátum narodenia).
-Profil ukazuje „spolupracujeme 4r 0m 20d · od 29. 9. 2022" (pri neaktívnom
+PRVÝ TRÉNING (Kokpit, alebo `prvy_trening` z archívu sedení PTmindera);
+registrácia a vytvorenie sú len záloha, lebo registrácia predbieha tréning
+aj o mesiace (Anna Nová 1/2024 vs. 10/2024). Dátum pred 2021 ignoruje
+(Iva Stoklasková má v registrácii 1965 = dátum narodenia).
+**Lekcie spolu** = sedenia v Kokpite + `lekcie_pred` (migrácia 0121): počet
+lekcií pred 3. 1. 2025 zrátaný 19. 10. 2026 z archívu exportu sedení
+(`~/Downloads/PTminder archív 2026-10-19/`, 4 791 lekcií u 151 klientov).
+Do Kokpitu nešiel report, len tento súhrn na klienta — Jerry staré roky do
+Kokpitu zaraďovať nechce. Nový klient má lekcie len z Kokpitu.
+Profil ukazuje „spolupracujeme 4r 0m 14d · od 5. 10. 2022", pod tým „lekcií spolu" (pri neaktívnom
 „spolupráca trvala … do posledného tréningu"), štítky „klient od" a odpočet do
-narodenín podľa pražského dňa. Jarvis má `klientOd` a `spolupraca`
-v klientiDetail.
+narodenín podľa pražského dňa. Jarvis má `klientOd`, `spolupraca`
+a `lekcieSpolu` v klientiDetail.
 
 ## Metricool cez MCP — jedno ťuknutie v uzávierke (8. 10. 2026)
 

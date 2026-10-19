@@ -5,12 +5,13 @@
  * dní má do narodenín aj ako dlho s klientom spolupracujeme — 1r 3m 16d."
  *
  * Kokpit má sedenia až od 3. 1. 2025, takže „prvé sedenie v dátach" pri
- * klientoch spred roku 2025 klamalo (Michal Knapčok chodí od 29. 9. 2022).
- * Začiatok sa preto berie ako NAJSKORŠÍ z: prvého tréningu v Kokpite,
- * dátumu registrácie (Sign up date) a vytvorenia (Created Date) z Client List
- * PTmindera. Registrácia býva vyplnená ručne a niekedy je to dátum narodenia
- * (Iva Stoklasková 1965, Peťa Nováková 1994) — dátum pred rokom 2021 sa preto
- * neberie (PTminder beží od 2022, PSB krátko predtým).
+ * klientoch spred roku 2025 klamalo (Michal Knapčok chodí od októbra 2022).
+ * Začiatok = PRVÝ TRÉNING: v Kokpite, alebo z archívu sedení PTmindera
+ * (`ptminder_klienti.prvy_trening`, export od 1/2022). Registrácia (Sign up
+ * date) a vytvorenie (Created Date) z Client Listu sú len záloha, keď tréning
+ * nepoznáme — registrácia predbieha tréning aj o mesiace (Anna Nová: 1/2024
+ * vs. prvý tréning 10/2024) a niekedy je to dátum narodenia (Iva Stoklasková
+ * 1965) — dátum pred rokom 2021 sa preto neberie vôbec.
  */
 
 /** Skorší dátum už nie je spolupráca, ale preklep (dátum narodenia v poli registrácie). */
@@ -21,17 +22,18 @@ const jeDen = (s?: string | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.t
 export type ZaciatokSpoluprace = { den: string; zdroj: "kokpit" | "ptminder" };
 
 export function zaciatokSpoluprace(
-  v: { prvyTrening?: string | null; registracia?: string | null; vytvoreny?: string | null },
+  v: { prvyTrening?: string | null; prvyTreningArchiv?: string | null; registracia?: string | null; vytvoreny?: string | null },
   dnes: string,
 ): ZaciatokSpoluprace | null {
-  const kandidati: ZaciatokSpoluprace[] = [];
+  const najskorsi = (xs: ZaciatokSpoluprace[]) => (xs.length ? xs.reduce((a, b) => (b.den < a.den ? b : a)) : null);
+  const ok = (d: string) => jeDen(d) && d >= SPOLUPRACA_NAJSKOR && d <= dnes;
+  const treningy: ZaciatokSpoluprace[] = [];
   const prvy = (v.prvyTrening || "").slice(0, 10);
-  if (jeDen(prvy) && prvy <= dnes) kandidati.push({ den: prvy, zdroj: "kokpit" });
-  for (const d of [v.registracia, v.vytvoreny]) {
-    if (jeDen(d) && d >= SPOLUPRACA_NAJSKOR && d <= dnes) kandidati.push({ den: d, zdroj: "ptminder" });
-  }
-  if (!kandidati.length) return null;
-  return kandidati.reduce((a, b) => (b.den < a.den ? b : a));
+  if (ok(prvy)) treningy.push({ den: prvy, zdroj: "kokpit" });
+  const archiv = (v.prvyTreningArchiv || "").slice(0, 10);
+  if (ok(archiv)) treningy.push({ den: archiv, zdroj: "ptminder" });
+  if (treningy.length) return najskorsi(treningy);
+  return najskorsi([v.registracia, v.vytvoreny].filter((d): d is string => !!d && ok(d)).map((den) => ({ den, zdroj: "ptminder" as const })));
 }
 
 /** Kalendárny rozdiel dvoch dní: roky, mesiace, dni (ako vek, nie 30-dňové mesiace). */
