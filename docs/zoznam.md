@@ -45,6 +45,11 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9g. [ ] ✦ AI záber: prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
 9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
 9i. [ ] Nestabilný test `server/vyhladavac.test.ts` pod záťažou (18. 10.; samostatne prechádza) – ako prispevky.test.ts (opravený e9b54bc).
+9j. [ ] Zostaviť video: klip bez reči (WhatsApp, −70 LUFS) sa nedá dať ako kamera B (voľba je vypnutá) – zladenie podľa zvuku nemá z čoho. (Overené v kóde 19. 10.)
+9k. [ ] Kľúčové snímky farieb ◆ aj na časovej osi (teraz len ‹ ◇ › v paneli Farby) + plynulý (lineárny) prechod. (Overené 19. 10.)
+9l. [ ] Kľúčové snímky polohy aj pre B-roll / kameru B.
+9m. [ ] Kalendár: presun príspevku ťahaním na iný deň. (Overené 19. 10.: ťahanie nie je.)
+9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
