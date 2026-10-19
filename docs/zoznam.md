@@ -44,6 +44,8 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
     každý profil je autonómny“). Prehľad + ľavé menu; Produkčný deň, reposty, memy, infografiky (aj Jarvis), karty,
     kalendár a výsledky z Metricoolu pre každú značku zvlášť. Commity de7464a, 0a15b29, 29de5c6, b3b5670 v strizna.
     Ostáva len PSB: feed z Metricoolu; Jarvis pri inom účte vidí karty a výsledky PSB.
+9m. [ ] Okno príspevku v Kalendári (19. 10. 2026, commit 54a3ea8 v strizna) naostro: prvá zmena textu/titulky cez Metricool
+    (updateScheduledPost s novou titulkou je neoverený) a prvá kópia strihu na iný účet.
 9l. [ ] Prepínač profilov naostro: prvé stiahnutie výsledkov @philipjerry / @filip_stranavsky / @ahsoka (Metricool, nikdy
     neoverené) a prvý mem/infografika plánovaná do inej značky.
 9k. [ ] Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
