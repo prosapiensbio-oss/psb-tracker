@@ -9,6 +9,7 @@ import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 import { MIN_DENNE_KC, POPIS_DORUCOVANIA, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
+import { type Kreativa, type Medium, type Prispevok, type Video, jePrispevokId, mediumZKreativy, mediumZPrispevku, nahladVidea, pageIdZStory } from "../../lib/psb/reklamaMedium";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
@@ -1290,8 +1291,20 @@ export const Route = createFileRoute("/api/meta")({
         }
 
         /**
-         * Nová reklama s novým textom do BEŽIACEJ sady — obrázok alebo video
-         * sa prevezme z existujúcej reklamy (Kokpit médiá z chatu nenahráva).
+         * Nová reklama s novým textom do BEŽIACEJ sady — médium sa prevezme
+         * z toho, čo v účte UŽ JE (Kokpit médiá z chatu nenahráva).
+         *
+         * NEKOPÍRUJE sa kreatíva, berie sa SAMOTNÉ MÉDIUM a kreatíva vzniká
+         * nová: vlastný text, nadpis, odkaz, CTA aj UTM. Preto je zdrojom
+         * rovnako dobre BOOSTNUTÝ PRÍSPEVOK — do 19. 10. 2026 ho appka
+         * odmietala („Zdrojová reklama nemá stránku"), lebo médium hľadala len
+         * v `object_story_spec` a boost ho drží inde (`reklamaMedium.ts`).
+         *
+         * `mediaZReklamy` prijme tri tvary:
+         *   • ID reklamy v účte ProSapiens (odtiaľ sa médium prečíta),
+         *   • ID príspevku „<stránka>_<príspevok>" (médium sa dočíta z postu),
+         *   • ID videa, ktoré patrí stránke alebo reklamnému účtu.
+         *
          * Odkaz ide s UTM, kde `utm_term` = ID sady — podľa neho dozor priradí
          * dopyt kampani (reklamaDozor.ts `kampanDopytu`).
          */
@@ -1308,19 +1321,116 @@ export const Route = createFileRoute("/api/meta")({
           if (text.length < 20) return Response.json({ ok: false, error: "Text reklamy chýba alebo je prikrátky." }, { status: 400 });
           if (!nazov) return Response.json({ ok: false, error: "Chýba názov reklamy." }, { status: 400 });
           if (!/^https:\/\/(www\.)?prosapiens\.cz\//.test(odkaz)) return Response.json({ ok: false, error: "Odkaz musí viesť na prosapiens.cz." }, { status: 400 });
+          if (!jePrispevokId(zdroj) && !/^[0-9]{5,}$/.test(zdroj)) {
+            return Response.json({ ok: false, error: "Chýba zdroj média — ID reklamy, príspevku („stránka_príspevok“) alebo videa." }, { status: 400 });
+          }
           const sada = await patriUctu(sadaId, "account_id,name,campaign_id,campaign{name}");
           if (!sada.ok) return Response.json({ ok: false, error: `Sada: ${sada.error}` }, { status: 400 });
-          const src = await patriUctu(zdroj, "account_id,name,creative{object_story_spec,thumbnail_url}");
-          if (!src.ok) return Response.json({ ok: false, error: `Zdrojová reklama: ${src.error}` }, { status: 400 });
-          const oss = ((src.d.creative as { object_story_spec?: Record<string, unknown>; thumbnail_url?: string } | undefined) || {});
-          const spec = oss.object_story_spec || {};
-          const ld = (spec.link_data as Record<string, unknown> | undefined) || {};
-          const vd = (spec.video_data as Record<string, unknown> | undefined) || {};
-          const pageId = String(spec.page_id || "");
-          if (!pageId) return Response.json({ ok: false, error: "Zdrojová reklama nemá stránku (asi boost príspevku) — vyber reklamu s vlastnou kreatívou." }, { status: 400 });
+
+          /** Stránka, ktorú appka používa aj inde: podľa napojeného Instagramu. */
+          const strankaAppky = async () => {
+            const str = await graph("me/accounts?fields=id,name,instagram_business_account{id}&limit=25", n.token);
+            const zoz = ((str.data as { data?: { id: string; instagram_business_account?: { id: string } }[] })?.data) || [];
+            return (zoz.find((x) => x.instagram_business_account?.id === n.igUser) || zoz[0])?.id || "";
+          };
+
+          /**
+           * Video z knižnice — a kontrola, že je naše.
+           *
+           * Púšťame len video, ktoré patrí stránke PSB alebo reklamnému účtu;
+           * cudzie médium appka nepropaguje. `from` pri videách z Instagramu
+           * chýba, preto druhá cesta cez knižnicu účtu.
+           */
+          const mediumZVidea = async (videoId: string, stranka: string): Promise<{ ok: true; medium: Medium } | { ok: false; error: string }> => {
+            const v = await graph(`${videoId}?fields=id,from,picture,thumbnails{uri,is_preferred,width,height}`, n.token);
+            if (!v.ok) return { ok: false, error: `Video ${videoId} sa nedá prečítať: ${v.chyba}` };
+            const d = (v.data as { id?: string; from?: { id?: string } } | undefined) || {};
+            if (!d.id) return { ok: false, error: `Objekt ${videoId} nie je video.` };
+            let patri = Boolean(stranka) && String(d.from?.id || "") === stranka;
+            if (!patri) {
+              const kniznica = await graph(`act_${UCET_REKLAM}/advideos?fields=id&limit=200`, n.token);
+              const zoz = ((kniznica.data as { data?: { id?: string }[] })?.data) || [];
+              patri = zoz.some((x) => String(x.id || "") === videoId);
+            }
+            if (!patri) return { ok: false, error: `Video ${videoId} nepatrí stránke PSB ani reklamnému účtu ProSapiens — Kokpit ho nepropaguje.` };
+            const nahlad = nahladVidea(v.data as Video);
+            return { ok: true, medium: { druh: "video", videoId, ...(nahlad ? { obrazok: nahlad } : {}) } };
+          };
+
+          let medium: Medium | null = null;
+          let pageId = "";
+          let igZdroja = "";
+          let prispevokId = jePrispevokId(zdroj) ? zdroj : "";
+          let odkazZdroja = "";
+          let odkial = "";
+          let preco = "";
+
+          if (prispevokId) {
+            pageId = pageIdZStory(prispevokId);
+            odkial = `príspevok ${prispevokId}`;
+          } else {
+            // Najprv reklama účtu — to je bežná cesta aj pri booste.
+            const polia = "account_id,name,creative{object_story_spec,thumbnail_url,video_id,image_hash,image_url,object_story_id,effective_object_story_id,asset_feed_spec}";
+            const src = await patriUctu(zdroj, polia);
+            if (src.ok) {
+              const kreativa = (src.d.creative as Kreativa | undefined) || {};
+              const spec = (kreativa.object_story_spec as Record<string, unknown> | undefined) || {};
+              const ld = (spec.link_data as Record<string, unknown> | undefined) || {};
+              const vd = (spec.video_data as Record<string, unknown> | undefined) || {};
+              odkazZdroja = String(ld.link || (vd.call_to_action as { value?: { link?: string } } | undefined)?.value?.link || "");
+              const z = mediumZKreativy(kreativa);
+              medium = z.medium; pageId = z.pageId; igZdroja = z.igUser; prispevokId = z.prispevokId; preco = z.preco;
+              odkial = `reklama ${zdroj}`;
+            } else {
+              // Nie je to reklama účtu — môže to byť priamo ID videa z knižnice.
+              pageId = await strankaAppky();
+              const v = await mediumZVidea(zdroj, pageId);
+              if (!v.ok) return Response.json({ ok: false, error: `Zdroj ${zdroj} nie je reklama účtu (${src.error}). ${v.error}` }, { status: 400 });
+              medium = v.medium;
+              odkial = `video ${zdroj}`;
+            }
+          }
+
+          /**
+           * Kreatíva médium nenesie (časť boostov) — dočíta sa z príspevku.
+           *
+           * Čítanie postov je za povolením `pages_read_engagement`, ktoré token
+           * Kokpitu nemá (overené 19. 10. 2026). Preto je tu druhá cesta: pri
+           * VIDEO príspevku je prípona ID príspevku zároveň ID videa
+           * („134954005386935_3949632315333321" → video 3949632315333321), a to
+           * sa prečítať dá. Keď zlyhá aj to, povieme OBE príčiny.
+           */
+          if (!medium && prispevokId) {
+            if (!pageId) pageId = pageIdZStory(prispevokId);
+            const p = await graph(`${prispevokId}?fields=attachments{media_type,media,target,subattachments{media_type,media,target}},full_picture,object_id`, n.token);
+            if (p.ok) medium = mediumZPrispevku(p.data as Prispevok);
+            if (!medium) {
+              const zPripony = await mediumZVidea(prispevokId.split("_")[1] || "", pageId);
+              if (zPripony.ok) medium = zPripony.medium;
+              else return Response.json({ ok: false, error: `Z príspevku ${prispevokId} sa médium nedá prečítať${p.ok ? "" : `: ${p.chyba}`} — a ani ako video to nejde: ${zPripony.error}` }, { status: 400 });
+            }
+          }
+          if (!medium) return Response.json({ ok: false, error: `Zo zdroja (${odkial}) sa nedá prevziať obrázok ani video. ${preco}`.trim() }, { status: 400 });
+          if (!pageId) pageId = await strankaAppky();
+          if (!pageId) return Response.json({ ok: false, error: "Nenašla sa facebooková stránka napojená na Instagram — kreatíva bez stránky neprejde." }, { status: 400 });
+
+          /**
+           * Náhľad videa. Meta bez neho `video_data` neprijme a `thumbnail_url`
+           * z kreatívy je orezaný na 64 × 64 — preto sa pýtame videa na jeho
+           * vlastné náhľady a ikonku z kreatívy berieme až ako poslednú.
+           */
+          if (medium.druh === "video") {
+            const vt = await graph(`${medium.videoId}?fields=picture,thumbnails{uri,is_preferred,width,height}`, n.token);
+            const nahlad = nahladVidea(vt.ok ? (vt.data as Video) : null, medium.obrazok || "");
+            if (!nahlad) return Response.json({ ok: false, error: `K videu ${medium.videoId} sa nenašiel náhľad${vt.ok ? "" : `: ${vt.chyba}`} — Meta kreatívu bez náhľadu neprijme.` }, { status: 400 });
+            medium = { ...medium, obrazok: nahlad };
+          }
+
           const kampanNazov = String(((sada.d.campaign as { name?: string } | undefined)?.name) || "");
-          const utmCampaign = /uvodni-trenink-brno-\d{4}-\d{2}/.exec(String(ld.link || (vd.call_to_action as { value?: { link?: string } } | undefined)?.value?.link || ""))?.[0]
-            || kampanNazov.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+          const utmCampaign = /uvodni-trenink-brno-\d{4}-\d{2}/.exec(odkazZdroja)?.[0]
+            // NFD rozloží „ú" na „u" + dĺžeň; bez zmazania dĺžňov by z „úvodní"
+            // vzniklo „u-vodni" (19. 10. 2026 to tak naozaj bolo v odkaze).
+            || kampanNazov.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
           const u = new URL(odkaz);
           u.searchParams.set("utm_source", "meta"); u.searchParams.set("utm_medium", "paid_social");
           u.searchParams.set("utm_campaign", utmCampaign);
@@ -1328,15 +1438,11 @@ export const Route = createFileRoute("/api/meta")({
           u.searchParams.set("utm_term", sadaId);
           const link = u.toString();
           const ctaObj = { type: cta, value: { link } };
-          const ig = spec.instagram_user_id ? { instagram_user_id: spec.instagram_user_id } : {};
-          let storySpec: Record<string, unknown>;
-          if (vd.video_id) {
-            storySpec = { page_id: pageId, ...ig, video_data: { video_id: vd.video_id, image_url: vd.image_url || oss.thumbnail_url, message: text, ...(nadpis ? { title: nadpis } : {}), call_to_action: ctaObj } };
-          } else if (ld.image_hash || ld.picture) {
-            storySpec = { page_id: pageId, ...ig, link_data: { link, message: text, ...(ld.image_hash ? { image_hash: ld.image_hash } : { picture: ld.picture }), ...(nadpis ? { name: nadpis } : {}), call_to_action: ctaObj } };
-          } else {
-            return Response.json({ ok: false, error: "Zo zdrojovej reklamy sa nedá prevziať obrázok ani video." }, { status: 400 });
-          }
+          const igUser = igZdroja || n.igUser;
+          const ig = igUser ? { instagram_user_id: igUser } : {};
+          const storySpec: Record<string, unknown> = medium.druh === "video"
+            ? { page_id: pageId, ...ig, video_data: { video_id: medium.videoId, image_url: medium.obrazok, message: text, ...(nadpis ? { title: nadpis } : {}), call_to_action: ctaObj } }
+            : { page_id: pageId, ...ig, link_data: { link, message: text, ...(medium.imageHash ? { image_hash: medium.imageHash } : { picture: medium.obrazok }), ...(nadpis ? { name: nadpis } : {}), call_to_action: ctaObj } };
           const ucet = `act_${UCET_REKLAM}`;
           const kreativa = await graphPost(`${ucet}/adcreatives`, { name: `${nazov} — kreatíva`, object_story_spec: storySpec }, n.token);
           if (!kreativa.ok) return Response.json({ ok: false, error: `Kreatíva neprešla: ${kreativa.chyba}` }, { status: 502 });
@@ -1345,8 +1451,9 @@ export const Route = createFileRoute("/api/meta")({
           const reklama = await graphPost(`${ucet}/ads`, { name: nazov, adset_id: sadaId, creative: { creative_id: kreativaId }, status: spustit ? "ACTIVE" : "PAUSED" }, n.token);
           if (!reklama.ok) return Response.json({ ok: false, error: `Reklama neprešla: ${reklama.chyba}` }, { status: 502 });
           const reklamaId = String((reklama.data as { id?: string }).id || "");
-          await audit(DB, { action: "reklama", predmet: `nova ${reklamaId}`, neu: `${nazov} v sade ${sada.d.name} (${spustit ? "ZAPNUTÁ" : "pozastavená"}), médium z ${zdroj}, ${link}`, actor: (await currentUser(request)) || undefined });
-          return Response.json({ ok: true, reklamaId, veta: `Reklama „${nazov}“ založená v sade „${sada.d.name}“ — ${spustit ? "zapnutá, Meta ju schvaľuje" : "pozastavená"}. Odkaz: ${link}`, odkaz: adsManagerOdkaz(String(sada.d.campaign_id || "")) });
+          const popisMedia = medium.druh === "video" ? `video ${medium.videoId}` : `obrázok ${medium.imageHash || medium.obrazok || ""}`;
+          await audit(DB, { action: "reklama", predmet: `nova ${reklamaId}`, neu: `${nazov} v sade ${sada.d.name} (${spustit ? "ZAPNUTÁ" : "pozastavená"}), ${popisMedia} z ${odkial}, ${link}`, actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, reklamaId, veta: `Reklama „${nazov}“ založená v sade „${sada.d.name}“ — ${spustit ? "zapnutá, Meta ju schvaľuje" : "pozastavená"}. Médium: ${popisMedia} z ${odkial}. Odkaz: ${link}`, odkaz: adsManagerOdkaz(String(sada.d.campaign_id || "")) });
         }
 
         /** Mesačný strop a cieľová cena za dopyt — prázdne = bez nich. */

@@ -166,7 +166,9 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "reklama-rozpocet", label, data: o });
         } else if (o?.type === "reklama-cielenie" && /^[0-9]{5,}$/.test(String(o.sadaId))) {
           actions.push({ type: "reklama-cielenie", label, data: o });
-        } else if (o?.type === "reklama-nova" && /^[0-9]{5,}$/.test(String(o.sadaId)) && /^[0-9]{5,}$/.test(String(o.mediaZReklamy)) && String(o.text || "").trim().length >= 20) {
+        // Zdroj média: ID reklamy, videa, alebo príspevku „stránka_príspevok“
+        // (od 19. 10. 2026 — boostnutý príspevok je zdroj ako každý iný).
+        } else if (o?.type === "reklama-nova" && /^[0-9]{5,}$/.test(String(o.sadaId)) && /^[0-9]{5,}(_[0-9]{5,})?$/.test(String(o.mediaZReklamy)) && String(o.text || "").trim().length >= 20) {
           actions.push({ type: "reklama-nova", label, data: o });
         } else if (o?.type === "reklama-stav" && /^[0-9]{5,}$/.test(String(o.objektId)) && (o.stav === "ACTIVE" || o.stav === "PAUSED")) {
           actions.push({ type: "reklama-stav", label, data: o });
