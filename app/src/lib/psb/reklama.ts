@@ -27,6 +27,7 @@
 
 import { monthKey, normName } from "./format";
 import { najdiKlienta } from "./compute";
+import { klucKampane } from "./utm";
 
 export type ReklamaVstup = {
   /** Mesiace, za ktoré sa počíta — jedno okno pre VŠETKY čísla na karte. */
@@ -242,13 +243,14 @@ export function reklamaSuhrn(v: ReklamaVstup): ReklamaSuhrn {
     // nej by súčet stĺpca vedel prevýšiť číslo nad ním (revízia 19. 8. 2026).
     const videneKampan = new Set<string>();
     for (const l of platene) {
-      const kluc = (l.kampan || "").trim().toLowerCase();
+      // Rovnaké pravidlo ako v kampanRetazec: slug na oboch stranách.
+      const kluc = klucKampane(l.kampan || "");
       if (!kluc) continue;
       const menoKluc = `${kluc}|${normName(l.name || "")}`;
       if (normName(l.name || "") && videneKampan.has(menoKluc)) continue;
       videneKampan.add(menoKluc);
       for (const e of m.values()) {
-        if (e.nazov.trim().toLowerCase() !== kluc) continue;
+        if (klucKampane(e.nazov) !== kluc) continue;
         e.dopytov++;
         if (najdiKlienta(v.menaKlientov, l.name || "")) e.klientov++;
       }

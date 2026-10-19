@@ -42,6 +42,20 @@ export function slug(text: string): string {
 }
 
 /**
+ * Kľúč, pod ktorým sa dopyt páruje na kampaň — JEDNO pravidlo pre celú appku.
+ *
+ * PREČO NIE HOLÉ MENO
+ *
+ * V adrese reklamy je `utm_campaign` slug (`slug()` vyššie: bez diakritiky,
+ * spojovníky), v Mete sa kampaň volá „PSB 2026-09 — úvodní trénink — návštěvy
+ * (grafika A)". Párovalo sa doteraz presnou zhodou mena, takže sa nespárovalo
+ * NIKDY a karta Kampane ukazovala 0 dopytov pri kampani, ktorá dopyty mala
+ * (19. 10. 2026). Slug na oboch stranách to zrovná a pritom nezlúči
+ * „IG_Reels_2025_1" s „IG_Reels_2025_10" — číslice v ňom ostávajú.
+ */
+export const klucKampane = (s: string): string => slug(s);
+
+/**
  * Značkovaný odkaz do reklamy.
  *
  * Vracia null, keď sa značkovať nemá (Google) alebo keď chýba adresa.

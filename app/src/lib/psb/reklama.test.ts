@@ -126,6 +126,17 @@ describe("rozpad po kampaniach", () => {
     expect(k1.klientov).toBe(1);
     expect(k2.dopytov).toBe(0);
   });
+
+  it("slug z adresy sedí na meno kampane s diakritikou", () => {
+    // Reklamy zakladané Kokpitom nesú v utm_campaign slug. Presná zhoda mena
+    // nesadla nikdy a karta ukazovala nulu pri kampani, ktorá dopyt mala.
+    const v = reklamaSuhrn(zaklad({
+      kampane: [{ id: "k1", nazov: "PSB 2026-07 — úvodní trénink — návštěvy (A)", mesiac: "2026-07", ciel: "traffic", spend: 1800 }],
+      dopyty: [{ date: "2026-07-05", name: "Jan Novak", source: "reklama", kampan: "psb-2026-07-uvodni-trenink-navstevy-a" }],
+      menaKlientov: ["Jan Novak"],
+    }));
+    expect(v.poKampaniach.find((k) => k.id === "k1")!.dopytov).toBe(1);
+  });
 });
 
 describe("zReklamy", () => {

@@ -9,6 +9,7 @@ import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 import { MIN_DENNE_KC, POPIS_DORUCOVANIA, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
+import { slug } from "../../lib/psb/utm";
 import { type Kreativa, type Medium, type Prispevok, type Video, jePrispevokId, mediumZKreativy, mediumZPrispevku, nahladVidea, pageIdZStory } from "../../lib/psb/reklamaMedium";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
@@ -1361,7 +1362,6 @@ export const Route = createFileRoute("/api/meta")({
           let pageId = "";
           let igZdroja = "";
           let prispevokId = jePrispevokId(zdroj) ? zdroj : "";
-          let odkazZdroja = "";
           let odkial = "";
           let preco = "";
 
@@ -1373,12 +1373,7 @@ export const Route = createFileRoute("/api/meta")({
             const polia = "account_id,name,creative{object_story_spec,thumbnail_url,video_id,image_hash,image_url,object_story_id,effective_object_story_id,asset_feed_spec}";
             const src = await patriUctu(zdroj, polia);
             if (src.ok) {
-              const kreativa = (src.d.creative as Kreativa | undefined) || {};
-              const spec = (kreativa.object_story_spec as Record<string, unknown> | undefined) || {};
-              const ld = (spec.link_data as Record<string, unknown> | undefined) || {};
-              const vd = (spec.video_data as Record<string, unknown> | undefined) || {};
-              odkazZdroja = String(ld.link || (vd.call_to_action as { value?: { link?: string } } | undefined)?.value?.link || "");
-              const z = mediumZKreativy(kreativa);
+              const z = mediumZKreativy((src.d.creative as Kreativa | undefined) || {});
               medium = z.medium; pageId = z.pageId; igZdroja = z.igUser; prispevokId = z.prispevokId; preco = z.preco;
               odkial = `reklama ${zdroj}`;
             } else {
@@ -1426,14 +1421,21 @@ export const Route = createFileRoute("/api/meta")({
             medium = { ...medium, obrazok: nahlad };
           }
 
+          /**
+           * `utm_campaign` = MENO KAMPANE, nie odkaz prevzatý zo zdroja.
+           *
+           * Do 19. 10. 2026 sa prednostne vyzobal `uvodni-trenink-brno-2026-09`
+           * z odkazu zdrojovej reklamy — ten istý reťazec niesli VŠETKY tri
+           * septembrové kampane, takže sa dopyt nedal pripísať kampani (dozor
+           * ho zachránil cez `utm_term`, karta Kampane ukazovala nuly). Teraz
+           * sa skladá `slug()`om z mena kampane a páruje sa tým istým kľúčom
+           * (`klucKampane`), aký číta karta Kampane aj reťazec od koruny.
+           */
           const kampanNazov = String(((sada.d.campaign as { name?: string } | undefined)?.name) || "");
-          const utmCampaign = /uvodni-trenink-brno-\d{4}-\d{2}/.exec(odkazZdroja)?.[0]
-            // NFD rozloží „ú" na „u" + dĺžeň; bez zmazania dĺžňov by z „úvodní"
-            // vzniklo „u-vodni" (19. 10. 2026 to tak naozaj bolo v odkaze).
-            || kampanNazov.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+          const utmCampaign = slug(kampanNazov);
           const u = new URL(odkaz);
           u.searchParams.set("utm_source", "meta"); u.searchParams.set("utm_medium", "paid_social");
-          u.searchParams.set("utm_campaign", utmCampaign);
+          if (utmCampaign) u.searchParams.set("utm_campaign", utmCampaign);
           if (utmContent) u.searchParams.set("utm_content", utmContent);
           u.searchParams.set("utm_term", sadaId);
           const link = u.toString();

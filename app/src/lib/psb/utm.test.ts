@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { slug, znackovanyOdkaz } from "./utm";
+import { klucKampane, slug, znackovanyOdkaz } from "./utm";
 
 describe("slug", () => {
   it("zbaví názov diakritiky a medzier", () => {
@@ -44,5 +44,22 @@ describe("znackovanyOdkaz", () => {
     expect(znackovanyOdkaz("", "meta", "x")).toBeNull();
     expect(znackovanyOdkaz("javascript:alert(1)", "meta", "x")).toBeNull();
     expect(znackovanyOdkaz("toto nie je adresa", "meta", "x")).toBeNull();
+  });
+});
+
+describe("klucKampane", () => {
+  it("slug v adrese sa páruje s menom kampane z Mety", () => {
+    // Presne tá dvojica, ktorá sa do 19. 10. 2026 nespárovala nikdy.
+    expect(klucKampane("psb-2026-09-uvodni-trenink-navstevy-grafika-a"))
+      .toBe(klucKampane("PSB 2026-09 — úvodní trénink — návštěvy (grafika A)"));
+  });
+
+  it("nezlúči kampane, ktoré sa líšia číslom", () => {
+    expect(klucKampane("IG_Reels_2025_1")).not.toBe(klucKampane("IG_Reels_2025_10"));
+  });
+
+  it("prázdne meno dá prázdny kľúč", () => {
+    expect(klucKampane("")).toBe("");
+    expect(klucKampane("   ")).toBe("");
   });
 });

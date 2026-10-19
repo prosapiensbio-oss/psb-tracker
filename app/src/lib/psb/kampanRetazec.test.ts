@@ -21,6 +21,19 @@ describe("retazecKampani", () => {
     expect(v.prekazky).toEqual([]);
   });
 
+  it("slug v utm sa spáruje s menom kampane z Mety", () => {
+    // Reklamný agent dáva do adresy slug; Meta má meno s diakritikou a
+    // pomlčkami. Do 19. 10. 2026 sa to porovnávalo presne a nesadlo nikdy.
+    const v = retazecKampani(
+      [k({ id: "1", nazov: "PSB 2026-09 — úvodní trénink — návštěvy (grafika A)", spend: 4000 })],
+      [d({ id: "a", name: "Jan Kral", kampan: "psb-2026-09-uvodni-trenink-navstevy-grafika-a" })],
+      { "Jan Kral": { zaplatil: true, trzba: 7790 } },
+    );
+    expect(v.spolu.dopytov).toBe(1);
+    expect(v.clanky[0].dopyty).toHaveLength(1);
+    expect(v.prekazky).toEqual([]);
+  });
+
   it("klient je ten, kto ZAPLATIL — nie ten, kto prišiel", () => {
     // Inak by cena za klienta bola cena za úvodný tréning.
     const v = retazecKampani(

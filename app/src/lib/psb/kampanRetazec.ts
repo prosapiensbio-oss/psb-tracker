@@ -22,6 +22,7 @@
  */
 
 import { normName } from "./format";
+import { klucKampane } from "./utm";
 
 export type KampanRiadok = {
   id: string;
@@ -64,15 +65,16 @@ export type Retazec = {
 };
 
 /** Kampaň sa páruje podľa `utm_campaign`, nie podľa mena — meno sa v Mete mení. */
-const kluc = (s: string) => s.trim().toLowerCase();
+const kluc = (s: string) => klucKampane(s);
 
 export function retazecKampani(
   kampane: KampanRiadok[],
   dopyty: DopytRiadok[],
   klienti: Record<string, { zaplatil: boolean; trzba: number }>,
 ): Retazec {
-  // Kampaň v UTM sa páruje na meno kampane z Mety. Zhoda musí byť presná (po
-  // orezaní a malých písmenách): keby sa hľadalo podreťazcom, „IG_Reels_2025_1"
+  // Kampaň v UTM sa páruje na meno kampane z Mety cez `klucKampane` — slug na
+  // oboch stranách (v adrese je slug, v Mete meno s diakritikou a pomlčkami).
+  // Zhoda musí byť celá: keby sa hľadalo podreťazcom, „IG_Reels_2025_1"
   // by chytilo aj „IG_Reels_2025_10".
   const podlaKampane = new Map<string, DopytRiadok[]>();
   for (const d of dopyty) {
@@ -126,7 +128,9 @@ export function retazecKampani(
   if (sKampanou > 0 && dopytov === 0) {
     prekazky.push(
       "Dopyty kampaň nesú, ale ani jedna sa nezhoduje s menom kampane z Mety. " +
-      "Skontroluj, či utm_campaign v adrese sedí s názvom kampane v Ads Manageri.",
+      "Skontroluj, či utm_campaign v adrese sedí s názvom kampane v Ads Manageri " +
+      "(porovnáva sa bez diakritiky a s pomlčkami — „PSB 2026-09 — úvodní trénink“ " +
+      "sedí s „psb-2026-09-uvodni-trenink“).",
     );
   }
   if (dopytov > 0 && klientov === 0) {
