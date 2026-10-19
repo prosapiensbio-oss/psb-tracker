@@ -37,12 +37,17 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9. [ ] Upload do Higgsfieldu (SSL pri PUT).
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
 9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
+9d. [ ] r6 „Bolest, která patří k procesu“ (14. 10.): farby celého videa majú expozíciu +61, jas +71, svetlá +61,
+    tiene +16, kontrast 1 – zrejme mienené len pre kameru B (chyba opravená 18. 10.). Čaká na Jerryho: presunúť na kameru B?
+9e. [ ] C0019 (14. 10.) nemá takmer žiadny zvuk (−70 LUFS), appka ho dala ako cvičenie do r3. Čaká na Jerryho:
+    kamera B k inému klipu, alebo cvik?
+9f. [ ] Ahsoka v Strižni ako druhá značka (vlastné štýly, titulky, farby), alebo len PSB? Otázka od 15. 10.
+9g. [ ] ✦ AI záber: prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
+9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
+9i. [ ] Nestabilný test `server/vyhladavac.test.ts` pod záťažou (18. 10.; samostatne prechádza) – ako prispevky.test.ts (opravený e9b54bc).
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
-10. [ ] Vyhľadávač tém na reakčné videá — zranenia sú len jedna téma; 15 okruhov tém z 77 Naudiho streamov je v `docs/temy-reakcie.md` (bez čakania na FP).
-11. [ ] Šablóna reakčného videa v Strižni (stojí na 10).
 12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
-13. [ ] Memy.
 14. [ ] Osobné profily — SAMOSTATNÝ projekt, nie súčasť Strižne (Jerry 13. 10.; otvorené otázky v sekcii 2).
 
 **E · Keď bude čas / keď sa niečo ukáže**
@@ -704,6 +709,13 @@ vyriešené opravami 5. 10. vyššie, ponechané ako história):
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **Strižňa – body 10, 11, 13 z poradia 13. 10. hotové:** vyhľadávač tém na reakčné videá (obrazovka Reakcie),
+  šablóna reakčného videa / repost, memy s bankou šablón (14. 10.). Overené v kóde 19. 10. 2026.
+- **Strižňa 15.–18. 10. 2026 (z rozhovoru, aby sa neponúkali znova):** pripomienky v appke, Vrstvy β (Video 1/2/3…,
+  od 16. 10. Video 4+ pri prekrytí), 9 štýlov titulkov, štúdiový zvuk (DeepFilterNet), vloženie videa do strihu,
+  ✦ AI záber, „zvýš zvuk a uprav celé nanovo“ v príkaze Claudovi, Zverejniť príbeh hneď, po nahratí rovno do strižne,
+  nahrávanie navrchu Produkčného dňa, farby/poloha menia označené video.
 
 - **Strižňa na iPhone a Mac mini ako server — OPUSTENÉ 13. 10. 2026**
   (Jerry: „tento nápad opúšťame“). Strižňa beží na Macoch (Jerry, Terezka);
