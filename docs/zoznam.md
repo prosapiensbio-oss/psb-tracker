@@ -22,7 +22,7 @@ Staré poradie z 5. 10. je celé hotové (nižšie). Toto je všetko, čo je
 otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na čom stojí.
 
 **A · Kým beží PTminder (po vypnutí sú dáta preč)**
-1. [ ] Export rokov pred 2025 → archív (Jerry stiahne, ja naleje) — sekcia 2.
+1. [x] Export rokov pred 2025 → archív. (19. 10. 2026: Jerry stiahol všetky reporty — sedenia od 1/2022, predaje od 8/2022, platby 2023 a 2024, balíčky, transakcie, Client List. Uložené v `~/Downloads/PTminder archív 2026-10-19/`; do Kokpitu sa NEZARAĎUJÚ (Jerry: „nebudeme tieto reporty zaraďovať do Kokpitu“). Z nich prezentácia porovnania rokov: https://claude.ai/artifact/7onH5VTCJwxkrSJCWkt2EX. Platby za 2022 v exporte nie sú.)
 2. [x] Maily a telefóny klientov z PTmindera k profilom — sekcia 4. (19. 10. 2026: Client List naliaty — 234 klientov, súčasní mali kontakty už skoro všetci; pribudli staré kontakty a dátumy registrácie → „klient od“ a „spolupracujeme“ v profile.)
 
 **B · Čaká len na Jerryho slovo (minúty)**
@@ -76,7 +76,7 @@ je kde pozrieť).
        Pri tom sa našla chyba: Gažova BTC platba z 11. 10. sa položila na májové
        členstvo zaplatené v PTminderi (oprava v `dlhyKlientov`, nasadená 15. 10.;
        ostáva 411 Kč = rozdiel kurzu BTC, rozhodne Jerry).
-2. [ ] **Po 19. 10.** — Jerry: posledný úplný export (všetky reporty ako doteraz)
+2. [x] **Po 19. 10.** — Jerry: posledný úplný export (všetky reporty ako doteraz) — stiahnuté 19. 10., v archíve; do Kokpitu ešte nenaliate (Packages/Sessions/Payments za október treba nahrať cez Upload, ak má október sedieť)
        + archív rokov 2022–2024 (zo starých rokov sa nič nepočíta, len uložiť).
 3. [ ] **Týždeň od 19. 10.** — Claude:
        - [x] 6M z balíčkov v Kokpite (předplatné) — hotové 15. 10. (tá istá
