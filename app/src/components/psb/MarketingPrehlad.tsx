@@ -60,7 +60,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
   clients: Record<string, ClientAgg>;
   onNavigate?: (tab: string, sub?: string) => void;
 }) {
-  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number }[]>([]);
+  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number; sady?: string | null }[]>([]);
   useEffect(() => {
     void fetch("/api/meta", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -93,7 +93,9 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
     const reklama = reklamaSuhrn({
       mesiace, kanaly: KANALY, kampane,
       mktMesacne: MKT_MESACNE.map((r) => ({ m: r.m, spend: r.spend })),
-      dopyty: data.leads.map((l) => ({ date: l.date, name: l.name, source: l.source, kampan: l.kampan })),
+      // `utm` nesie ID sady (utm_term) — bez neho by karta nevedela pripísať
+      // dopyt kampani, keď majú všetky reklamy rovnaký utm_campaign.
+      dopyty: data.leads.map((l) => ({ date: l.date, name: l.name, source: l.source, kampan: l.kampan, utm: l.utm })),
       menaKlientov,
       trzbaKlienta: (meno) => data.payments
         .filter((p) => p.client === meno && okno.has(monthKey(p.date)))

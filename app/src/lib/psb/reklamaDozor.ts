@@ -62,6 +62,8 @@ export type NastavenieDozoru = {
   cielDopyt: number | null;
 };
 
+import { termZUtm } from "./utm";
+
 export type DozorData = {
   kampane: DozorKampan[];
   dni: DozorDen[];
@@ -125,7 +127,7 @@ export const jeDopytZReklamy = (d: DopytPreDozor): boolean => d.source === "rekl
  * septembrových kampaniach rovnaký, takže kampaň nerozlíši.
  */
 export function kampanDopytu(d: DopytPreDozor, kampane: Pick<DozorKampan, "id" | "sady">[]): string | null {
-  const term = /(?:^|[\s·])term=(\d{6,})/.exec(d.utm || "")?.[1];
+  const term = termZUtm(d.utm || "");
   if (!term) return null;
   for (const k of kampane) {
     if (k.id === term || k.sady.some((s) => s.id === term)) return k.id;

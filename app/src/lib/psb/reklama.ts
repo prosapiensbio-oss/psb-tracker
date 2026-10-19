@@ -27,7 +27,7 @@
 
 import { monthKey, normName } from "./format";
 import { najdiKlienta } from "./compute";
-import { klucKampane } from "./utm";
+import { klucKampane, termZUtm } from "./utm";
 
 export type ReklamaVstup = {
   /** Mesiace, za ktoré sa počíta — jedno okno pre VŠETKY čísla na karte. */
@@ -42,8 +42,12 @@ export type ReklamaVstup = {
    * rozdiel medzi nimi je jediné miesto, kde appka vidí, koľko zaplatených
    * klikov sa na web NEDOSTALO.
    */
-  kampane: { id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null }[];
-  dopyty: { date: string; name: string; source: string; kampan?: string }[];
+  kampane: { id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null; sady?: string | null }[];
+  /**
+   * Dopyty. `utm` je celý uložený reťazec značiek („… · term=52603024092275") —
+   * ID sady v ňom je JEDINÉ, čo spoľahlivo povie, ktorá kampaň dopyt priniesla.
+   */
+  dopyty: { date: string; name: string; source: string; kampan?: string; utm?: string }[];
   /** Mená klientov, ktorí prešli prahom `jeKlient`. */
   menaKlientov: string[];
   /** Tržba klienta v okne — počíta volajúci, knižnica nepozná platby. */
@@ -98,6 +102,22 @@ export type ReklamaSuhrn = {
  * naslepo dalo 12. 8. 2026 trojnásobok skutočnosti. Tu sa preto čítajú len
  * menovite známe typy.
  */
+/**
+ * ID sád kampane z JSON stĺpca `mkt_kampane.sady`.
+ *
+ * Prázdne pole je normálny stav (staré kampane, ktoré sa sťahovali pred
+ * 19. 10. 2026, ho ešte nemajú) — párovanie vtedy padne na meno kampane.
+ */
+export function sadyZJson(s: string | null | undefined): string[] {
+  if (!s) return [];
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function akcieZJson(s: string | null | undefined): Record<string, number> {
   if (!s) return {};
   try {
@@ -237,20 +257,37 @@ export function reklamaSuhrn(v: ReklamaVstup): ReklamaSuhrn {
       e.spend += k.spend;
       m.set(k.id, e);
     }
-    // Dopyt sa páruje na kampaň cez UTM. Bez UTM sa spárovať NEDÁ a je
-    // čestnejšie nechať nulu než ho rozpočítať medzi kampane pomerom.
-    // Deduplikácia menom AJ TU — hlavičkové „Dopytov z reklamy" ju má a bez
-    // nej by súčet stĺpca vedel prevýšiť číslo nad ním (revízia 19. 8. 2026).
+    /**
+     * Dopyt sa páruje na kampaň cez UTM — DVOMA pravidlami, v tomto poradí:
+     *
+     *  1. `utm_term` = ID SADY. Jediné, čo kampaň rozlíši: reklamy spustené
+     *     do 19. 10. 2026 majú `utm_campaign` všetky rovnaký
+     *     („uvodni-trenink-brno-2026-09"), takže podľa mena patrili nikomu.
+     *     Dvojicu sada → kampaň nesie `mkt_kampane.sady` (odtiaľ `mapaSad`).
+     *  2. `utm_campaign` proti menu kampane, slug na oboch stranách
+     *     (`klucKampane`) — pre kampane, ktoré ID sád ešte nemajú.
+     *
+     * Bez UTM sa spárovať NEDÁ a je čestnejšie nechať nulu než dopyt
+     * rozpočítať medzi kampane pomerom výdavku.
+     *
+     * Deduplikácia menom AJ TU — hlavičkové „Dopytov z reklamy" ju má a bez
+     * nej by súčet stĺpca vedel prevýšiť číslo nad ním (revízia 19. 8. 2026).
+     */
+    const mapaSad = new Map<string, string>();
+    for (const k of v.kampane) {
+      for (const sada of sadyZJson(k.sady)) mapaSad.set(sada, k.id);
+      mapaSad.set(k.id, k.id); // keby reklama dala do termu rovno ID kampane
+    }
     const videneKampan = new Set<string>();
     for (const l of platene) {
-      // Rovnaké pravidlo ako v kampanRetazec: slug na oboch stranách.
-      const kluc = klucKampane(l.kampan || "");
+      const zTermu = mapaSad.get(termZUtm(l.utm || "")) || "";
+      const kluc = zTermu || klucKampane(l.kampan || "");
       if (!kluc) continue;
       const menoKluc = `${kluc}|${normName(l.name || "")}`;
       if (normName(l.name || "") && videneKampan.has(menoKluc)) continue;
       videneKampan.add(menoKluc);
       for (const e of m.values()) {
-        if (klucKampane(e.nazov) !== kluc) continue;
+        if (zTermu ? e.id !== zTermu : klucKampane(e.nazov) !== kluc) continue;
         e.dopytov++;
         if (najdiKlienta(v.menaKlientov, l.name || "")) e.klientov++;
       }

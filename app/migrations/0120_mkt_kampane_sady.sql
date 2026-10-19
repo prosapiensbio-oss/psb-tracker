@@ -1,0 +1,16 @@
+-- Sady kampane, aby sa dopyt dal pripísať podľa utm_term.
+--
+-- PREČO
+--
+-- Reklama dáva do odkazu `utm_term` = ID SADY (nie kampane) — podľa neho
+-- priraďuje dopyt dozor. Karta Kampane v Marketingu párovala len podľa mena
+-- kampane v `utm_campaign`, takže dopyty z reklám spustených pred 19. 10. 2026
+-- (všetky nesú rovnaký „uvodni-trenink-brno-2026-09") nevedela pripísať nikomu
+-- a pri kampani, ktorá dopyt priniesla, ukazovala nulu.
+--
+-- Sady už sťahuje `akcia=kampane` (`act_.../adsets?fields=id,campaign_id`) —
+-- doteraz len na to, či kampaň vôbec doručuje. Tu sa ich ID uložia, aby sa
+-- dvojica sada → kampaň dala prečítať aj spätne, bez ďalšieho volania Mety.
+--
+-- JSON pole reťazcov, napr. ["52603024092275","52603024112275"].
+ALTER TABLE mkt_kampane ADD COLUMN sady TEXT NOT NULL DEFAULT '[]';

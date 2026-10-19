@@ -373,7 +373,10 @@ export const Route = createFileRoute("/api/meta")({
           // a `landing_page_view` — rozdiel medzi nimi je dlaždica „Dorazilo
           // na stránku" (30. 9. 2026). Bez tohto stĺpca by ju nemala z čoho
           // počítať a mlčala by, hoci dáta v databáze sú.
-          `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky, stav, stav_sad, akcie
+          // `sady` sú ID sád kampane (JSON). Karta Kampane podľa nich pripíše
+          // dopyt, ktorý nesie `utm_term` = ID sady — `utm_campaign` to pri
+          // reklamách spustených pred 19. 10. 2026 nerozlíši.
+          `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky, stav, stav_sad, akcie, sady
              FROM mkt_kampane ORDER BY mesiac DESC, spend DESC`,
         ).all();
         const reklamy = await DB.prepare(
@@ -1642,6 +1645,15 @@ export const Route = createFileRoute("/api/meta")({
             n.token,
           );
           const podlaKampane = new Map<string, { effective_status?: string; end_time?: string }[]>();
+          /**
+           * ID sád po kampaniach — kvôli `utm_term`.
+           *
+           * Reklama dáva do odkazu ID SADY, nie kampane. Bez tejto mapy karta
+           * Kampane nevie, komu dopyt patrí, a pri kampani, ktorá ho priniesla,
+           * ukazuje nulu (19. 10. 2026). Sady sa už sťahujú kvôli doručovaniu,
+           * takže je to ten istý dopyt — len sa prestanú zahadzovať ich ID.
+           */
+          const idSad = new Map<string, string[]>();
           if (sadyOdpoved.ok) {
             for (const a of ((sadyOdpoved.data as { data?: Record<string, unknown>[] }).data) || []) {
               const k = String(a.campaign_id || "");
@@ -1650,6 +1662,8 @@ export const Route = createFileRoute("/api/meta")({
                 effective_status: String(a.effective_status || ""),
                 end_time: a.end_time ? String(a.end_time) : undefined,
               }]);
+              const sadaId = String(a.id || "");
+              if (sadaId) idSad.set(k, [...(idSad.get(k) || []), sadaId]);
             }
           }
           const teraz = new Date();
@@ -1664,17 +1678,18 @@ export const Route = createFileRoute("/api/meta")({
               const stav = String(k.effective_status || "");
               const stavSad = stavDorucovania(podlaKampane.get(id) || [], teraz);
               // Stav patrí kampani, nie mesiacu — nastaví sa na všetkých jej riadkoch.
-              stavy.push(DB.prepare("UPDATE mkt_kampane SET stav = ?2, stav_sad = ?4, updated_at = ?3 WHERE id = ?1").bind(id, stav, now, stavSad));
+              const sadyJson = JSON.stringify(idSad.get(id) || []);
+              stavy.push(DB.prepare("UPDATE mkt_kampane SET stav = ?2, stav_sad = ?4, sady = ?5, updated_at = ?3 WHERE id = ?1").bind(id, stav, now, stavSad, sadyJson));
               // Mesiac vzniku, aby kampaň bez jediného zobrazenia nesadla
               // do zlého mesiaca. Mimo sťahovaného okna sa nezakladá.
               const mesiac = String(k.created_time || "").slice(0, 7);
               if (!mesiac || mesiac < od.slice(0, 7) || mesiac > doD.slice(0, 7)) continue;
               bezVykonu++;
               stavy.push(DB.prepare(
-                `INSERT INTO mkt_kampane (id, mesiac, nazov, stav, spend, impressions, clicks, vysledky, ciel, akcie, updated_at, stav_sad)
-                 VALUES (?1,?2,?3,?4,0,0,0,0,?5,'[]',?6,?7)
-                 ON CONFLICT(id, mesiac) DO UPDATE SET nazov=?3, stav=?4, ciel=?5, updated_at=?6, stav_sad=?7`,
-              ).bind(id, mesiac, String(k.name || ""), stav, String(k.objective || ""), now, stavSad));
+                `INSERT INTO mkt_kampane (id, mesiac, nazov, stav, spend, impressions, clicks, vysledky, ciel, akcie, updated_at, stav_sad, sady)
+                 VALUES (?1,?2,?3,?4,0,0,0,0,?5,'[]',?6,?7,?8)
+                 ON CONFLICT(id, mesiac) DO UPDATE SET nazov=?3, stav=?4, ciel=?5, updated_at=?6, stav_sad=?7, sady=?8`,
+              ).bind(id, mesiac, String(k.name || ""), stav, String(k.objective || ""), now, stavSad, sadyJson));
             }
             for (let i = 0; i < stavy.length; i += 40) await DB.batch(stavy.slice(i, i + 40));
           }

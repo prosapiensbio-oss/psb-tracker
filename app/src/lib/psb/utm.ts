@@ -56,6 +56,19 @@ export function slug(text: string): string {
 export const klucKampane = (s: string): string => slug(s);
 
 /**
+ * ID sady z uloženého reťazca UTM („source=meta · medium=paid_social ·
+ * campaign=… · term=52603024092275").
+ *
+ * `utm_term` je jediné miesto, kde reklama nesie, KTORÁ sada klik priniesla —
+ * `utm_campaign` mali tri septembrové kampane rovnaký. Preto sa podľa neho
+ * priraďuje dopyt kampani (dozor aj karta Kampane) a preto je ten výraz tu
+ * jeden pre obe miesta.
+ */
+export function termZUtm(utm: string): string {
+  return /(?:^|[\s·])term=(\d{6,})/.exec(utm || "")?.[1] || "";
+}
+
+/**
  * Značkovaný odkaz do reklamy.
  *
  * Vracia null, keď sa značkovať nemá (Google) alebo keď chýba adresa.

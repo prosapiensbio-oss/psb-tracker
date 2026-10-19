@@ -31,7 +31,9 @@ import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
 export function Reklama({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [obdobie, setObdobie] = useState("12m");
   const kanaly = useMemo(() => KANALY, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null }[]>([]);
+  // `sady` sú ID sád kampane (JSON z mkt_kampane) — podľa nich sa dopyt
+  // s utm_term pripíše tej kampani, ktorá ho naozaj priniesla.
+  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null; sady?: string | null }[]>([]);
   const [reklamy, setReklamy] = useState<ReklamaRiadok[]>([]);
   const [nacitane, setNacitane] = useState(false);
 
@@ -76,7 +78,9 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
     return reklamaSuhrn({
       mesiace, kanaly, kampane,
       mktMesacne: MKT_MESACNE.map((r) => ({ m: r.m, spend: r.spend })),
-      dopyty: data.leads.map((l) => ({ date: l.date, name: l.name, source: l.source, kampan: l.kampan })),
+      // `utm` nesie ID sady (utm_term) — bez neho by karta nevedela pripísať
+      // dopyt kampani, keď majú všetky reklamy rovnaký utm_campaign.
+      dopyty: data.leads.map((l) => ({ date: l.date, name: l.name, source: l.source, kampan: l.kampan, utm: l.utm })),
       menaKlientov,
       // Tržba V OKNE, nie celoživotná — menovateľ (výdavok) je z okna, tak aj
       // čitateľ. Revízia 19. 8.: pri okne „3 mesiace" sa delila celoživotná
@@ -333,7 +337,8 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
                 </tbody>
               </RolovaciaTabulka>
               <div style={{ fontSize: 11.5, color: C.textDim, margin: "8px 0 14px", lineHeight: 1.55 }}>
-                Dopyt sa ku kampani priradí len cez UTM v odkaze. Prázdny stĺpec preto neznamená, že kampaň nič
+                Dopyt sa ku kampani priradí len cez UTM v odkaze — najprv podľa ID sady (utm_term), a keď ho
+                kampaň nemá stiahnuté, podľa mena v utm_campaign. Prázdny stĺpec preto neznamená, že kampaň nič
                 nepriviedla — znamená, že sa to nedá dokázať. Rozpočítať dopyty medzi kampane podľa výdavku by
                 vyrobilo čísla, ktoré vyzerajú presne a nie sú ničím podložené.
               </div>

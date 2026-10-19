@@ -137,6 +137,44 @@ describe("rozpad po kampaniach", () => {
     }));
     expect(v.poKampaniach.find((k) => k.id === "k1")!.dopytov).toBe(1);
   });
+
+  it("utm_term (ID sady) rozhodne aj vtedy, keď majú kampane rovnaký utm_campaign", () => {
+    // Takto to naozaj je pri reklamách spustených do 19. 10. 2026: všetky tri
+    // kampane nesú „uvodni-trenink-brno-2026-09", líšia sa len sadou.
+    const v = reklamaSuhrn(zaklad({
+      kampane: [
+        { id: "52601881569675", nazov: "PSB — návštěvy", mesiac: "2026-07", ciel: "traffic", spend: 3000, sady: '["52603024092275"]' },
+        { id: "52601881597675", nazov: "PSB — retargeting", mesiac: "2026-07", ciel: "traffic", spend: 2000, sady: '["52603024112275"]' },
+      ],
+      dopyty: [
+        { date: "2026-07-05", name: "Jan Novak", source: "reklama", kampan: "uvodni-trenink-brno-2026-09", utm: "source=meta · medium=paid_social · campaign=uvodni-trenink-brno-2026-09 · content=regina-v2 · term=52603024092275" },
+        { date: "2026-07-09", name: "Eva Mala", source: "reklama", kampan: "uvodni-trenink-brno-2026-09", utm: "source=meta · medium=paid_social · campaign=uvodni-trenink-brno-2026-09 · content=retarget · term=52603024112275" },
+      ],
+      menaKlientov: [],
+    }));
+    expect(v.poKampaniach.find((k) => k.id === "52601881569675")!.dopytov).toBe(1);
+    expect(v.poKampaniach.find((k) => k.id === "52601881597675")!.dopytov).toBe(1);
+  });
+
+  it("bez sád sa nič nezmení — páruje sa menom", () => {
+    const v = reklamaSuhrn(zaklad({
+      kampane: [{ id: "k1", nazov: "Traffic — Dýchání", mesiac: "2026-07", ciel: "traffic", spend: 1800, sady: "[]" }],
+      dopyty: [{ date: "2026-07-05", name: "Jan Novak", source: "reklama", kampan: "Traffic — Dýchání", utm: "source=meta · term=999999999" }],
+      menaKlientov: [],
+    }));
+    expect(v.poKampaniach.find((k) => k.id === "k1")!.dopytov).toBe(1);
+  });
+
+  it("neznáma sada padne späť na meno kampane", () => {
+    // Sada môže byť zo staršej kampane, ktorú appka ešte nemá stiahnutú.
+    // Zahodiť dopyt by bolo horšie než pripísať ho podľa mena v utm_campaign.
+    const v = reklamaSuhrn(zaklad({
+      kampane: [{ id: "k1", nazov: "PSB — návštěvy", mesiac: "2026-07", ciel: "traffic", spend: 1800, sady: '["111111111"]' }],
+      dopyty: [{ date: "2026-07-05", name: "Jan Novak", source: "reklama", kampan: "psb-navstevy", utm: "source=meta · term=222222222" }],
+      menaKlientov: [],
+    }));
+    expect(v.poKampaniach.find((k) => k.id === "k1")!.dopytov).toBe(1);
+  });
 });
 
 describe("zReklamy", () => {
