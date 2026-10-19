@@ -29,8 +29,8 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 2 otázky — NDA a overovací odkaz; otázka o reakčných videách zrušená 13. 10.).
 4. [ ] Prvé tri vyhodnotenia v Dozore reklám. (Cieľová cena za dopyt ODLOŽENÁ — Jerry 15. 10. 2026: „sme radi, že nám príde akýkoľvek dopyt, ladíme reklamy a necháme to na neskôr.“)
 5. [ ] Vyskúšať na telefóne: kalendár v mobile, gestá v kalendári, push z ponuky termínov.
-6. [ ] Miřejovský 752 a októbrové príjmy z banky priradiť → potom prepínač peňazí na Kokpit.
-7. [ ] FIO_TOKEN do bety (jeden príkaz).
+6. [x] Miřejovský 752 a októbrové príjmy z banky priradiť → potom prepínač peňazí na Kokpit. (Overené 19. 10.: peniaze z Kokpitu zapnuté od 10/2026.)
+7. [x] FIO_TOKEN do bety (jeden príkaz). (Overené 19. 10.: secret v kokpit-beta je.)
 
 **C · Strižňa 1.0 (hranica v sekcii 2) — Jerry: na zajtra, 14. 10. 2026**
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
