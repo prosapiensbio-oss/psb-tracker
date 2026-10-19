@@ -62,6 +62,7 @@ describe("každý preklik vedie na existujúcu obrazovku", () => {
     const t = ALIAS[tab] || tab;
     if (t === "klienti" && sub === "dopyty") return null;      // presmerované do Marketingu
     if (t === "marketing" && sub === "referencie") return null; // presmerované ku Klientom
+    if (t === "marketing" && sub === "dozor") return null;      // presmerované do Workspace (19. 10. 2026)
     if (t === "vzas" && ["klienti", "cashflow", "trzby", "sedenia", "predikcia"].includes(sub || "")) {
       // legacy „financie" mapa — navigate ich prekladá na platné listy
       if (sub === "klienti") return null;

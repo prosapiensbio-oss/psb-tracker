@@ -692,6 +692,14 @@ export function PSBApp() {
       setWorkspaceKlient(focus.client);
       return;
     }
+    // Dozor reklám je od 19. 10. 2026 karta vo Workspace (Jerry: „dozor reklám
+    // mi daj do Workspace"). Notifikácie dozoru, „Prebrať s Jarvisom" aj staré
+    // odkazy vedú na „marketing|dozor" — presmerujú sa sem, nemažú sa.
+    if (tab === "marketing" && sub === "dozor") {
+      setActive("workspace");
+      setWorkspaceKartu("reklamy");
+      return;
+    }
     // „workspace|kalendar", „workspace|uzavierka"… — rovno na krok kopy.
     if (tab === "workspace") {
       setActive("workspace");
@@ -3344,7 +3352,7 @@ function skupinaFaktur(
             onKlient={onClientClick}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} rozpory={[
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} register={registerAll} rozpory={[
             // Porovnania, ktoré appka počíta inde — karta zdravia ich len číta.
             // Vlastný prepočet by znamenal, že dve obrazovky povedia iné číslo.
             { nazov: "Balíčky: Kokpit vs PTminder", pocet: balickyPorovnanie ? balickyPorovnanie.rozdiel : null, detail: balickyPorovnanie ? `${balickyPorovnanie.sedi} sedí, ${balickyPorovnanie.mlci} sa nedá porovnať (export z ${balickyPorovnanie.poExport})` : undefined },

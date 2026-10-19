@@ -8,6 +8,7 @@ import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorKarta } from "./EditorKarta";
+import { ReklamaPracovisko } from "./ReklamaDozor";
 import { NekonecnyRad } from "./NekonecnyRad";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
@@ -96,7 +97,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -129,6 +130,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   actions?: Actions;
   chat?: AssistantChat;
+  /** Pevná debata reklamného Jarvisa (`reklama-agent`) — pre kartu Dozor reklám. */
+  chatReklama?: AssistantChat;
   register?: RegisterItem[];
   /** Ku ktorému dňu appka pozná zostatok účtu a hotovosti (mesačná kontrola). */
   /** Porovnania dvoch zdrojov pre kartu „Zdravie Kokpitu". */
@@ -814,6 +817,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     <>
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
               {k.druh === "editor" && <EditorKarta mena={mena} />}
+              {/* DOZOR REKLÁM — tá istá obrazovka ako bola v Marketingu (19. 10. 2026). */}
+              {k.druh === "reklamy" && <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate as never} />}
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}

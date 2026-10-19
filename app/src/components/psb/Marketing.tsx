@@ -50,7 +50,6 @@ import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik } from "./MarketingLievik";
 import { PripravitKampan } from "./KampanForm";
 import { Reklama } from "./Reklama";
-import { ReklamaPracovisko } from "./ReklamaDozor";
 import { Kanaly } from "./Kanaly";
 import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { hodnotenie, type PsRiadok } from "../../lib/psb/pagespeed";
@@ -1133,9 +1132,8 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },
           { id: "lievik", label: "Odkiaľ prišli klienti", skupina: "Výsledok" },
           { id: "naklady", label: "Čo to stálo", skupina: "Výsledok" },
-          // Dozor reklám (10. 10. 2026): bežiace kampane, metriky a reklamný
-          // Jarvis na jednej obrazovke — miesto, kde sa o reklame rozhoduje.
-          { id: "dozor", label: "Dozor reklám", skupina: "Výsledok" },
+          // Dozor reklám (10. 10. 2026) je od 19. 10. 2026 karta vo Workspace —
+          // tam sa o reklame rozhoduje; odkazy „marketing|dozor" presmeruje App.
           // „Dosah a obsah" bola jedna záložka zlepená z dvoch obrazoviek:
           // Instagram a vyhľadávanie. Hýbu sa inou rýchlosťou — reel žije dni,
           // pozícia v Googli mesiace — a v jednom okne sa jedno z nich vždy
@@ -1208,7 +1206,13 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           (výdavok ÷ všetci noví), „Platená cesta" a „Kampane" — každá
           s vlastným výpočtom, vlastným prepínačom obdobia a iným výsledkom.
           Podľa nich sa pritom rozhodovalo o rozpočte (18. 8. 2026). */}
-      {sub === "dozor" && <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate} />}
+      {/* Zapamätaná záložka spred presunu — namiesto prázdnej obrazovky odkaz. */}
+      {sub === "dozor" && (
+        <Card>
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 10 }}>Dozor reklám je odteraz karta vo Workspace.</div>
+          <button onClick={() => onNavigate?.("marketing", "dozor")} style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Otvoriť Dozor reklám →</button>
+        </Card>
+      )}
       {sub === "naklady" && (
         <>
           <Reklama data={data} clients={clients} />

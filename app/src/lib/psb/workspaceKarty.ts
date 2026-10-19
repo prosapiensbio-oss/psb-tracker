@@ -98,6 +98,12 @@ export type Karta =
    */
   | { druh: "editor"; nadpis: string; podnadpis: string; polozky: never[] }
   /**
+   * Dozor reklám — bežiace kampane, metriky a reklamný Jarvis (Jerry,
+   * 19. 10. 2026: „dozor reklám mi daj do Workspace"). Nástroj, nie fronta;
+   * patrí Jerrymu, rovnako ako jeho notifikácie.
+   */
+  | { druh: "reklamy"; nadpis: string; podnadpis: string; polozky: never[] }
+  /**
    * KROK — jedna karta na jeden krok týždňa (beta, Jerry 4. 10. 2026).
    * V sebe nesie staré karty ako sekcie, takže sa nič nekreslí dvakrát.
    */
@@ -107,7 +113,7 @@ export type Karta =
 export type Krok = "kalendar" | "sms" | "platby" | "dopyty" | "uzavierka" | "kontroly";
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
-export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "editor", "krok"];
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "editor", "reklamy", "krok"];
 
 /**
  * KARTY BETY — štyri kroky namiesto ôsmich kariet.
@@ -156,6 +162,7 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     ...daj("faktury"),
     ...daj("anamnezy"),
     ...daj("editor"),
+    ...(pre("Jerry") ? daj("reklamy") : []),
     // Klient na konci (Jerry, 5. 10. 2026): kroky 1, 2, 3 idú hneď za sebou;
     // na profil sa aj tak skáče klikom na meno odkiaľkoľvek.
     ...daj("klient"),
@@ -333,6 +340,12 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     druh: "editor",
     nadpis: "Editor",
     podnadpis: "fotky predtým / potom a videá chôdze a behu",
+    polozky: [],
+  });
+  karty.push({
+    druh: "reklamy",
+    nadpis: "Dozor reklám",
+    podnadpis: "bežiace kampane, čo stoja a čo priniesli — a Jarvis, ktorý vidí do Mety",
     polozky: [],
   });
   if (zmeny.length) karty.push({
