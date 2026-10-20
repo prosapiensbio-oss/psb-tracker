@@ -44,5 +44,50 @@ export function chybaZdroja(
   if (zomrel) {
     return `Posledné sťahovanie (${fmtDMY(posledna!.kedy)} ${posledna!.kedy.slice(11, 16)}) sa nedokončilo — kalendár je na spracovanie priveľký. Adresa platí, pripájať ho netreba; skúsi sa znova pri ďalšom behu.`;
   }
+  // Prechodné odmietnutie Googlom pri čerstvých dátach nie je červená
+  // porucha: obrazovka ukáže „pripojený · naposledy …" a ďalší beh to doženie.
+  // Keď sa nedarí deň, je to už chyba a ukáže sa aj s vysvetlením.
+  if (z.posledna_chyba && /^HTTP (429|5\d\d)/.test(z.posledna_chyba)) {
+    const cerstve = !!z.posledne_ok && teraz - Date.parse(z.posledne_ok) < ODMIETNUTIE_V_PORIADKU_MS;
+    if (cerstve) return null;
+    return `Google opakovane odmieta stiahnutie (${z.posledna_chyba}). Adresa platí, pripájať ho netreba — skúša sa každých pár hodín.`;
+  }
   return z.posledna_chyba;
 }
+
+// GOOGLE OBČAS ODMIETNE (HTTP 429). Za 6.–20. 10. 2026 skončilo 9 zo 125
+// sťahovaní na „HTTP 429" — Google tak odpovedá aj na tajnú adresu iCalu,
+// keď sa naň z rovnakých adries Cloudflaru pýta priveľa ľudí naraz. Kalendár
+// sa sťahuje raz za 6 hodín (plánovač každé 3 h, zdroje sa striedajú), takže
+// jedno odmietnutie znamenalo pol dňa starý kalendár a červenú chybu —
+// Jerry: „môj Google kalendár často vypadáva". Odmietnutie je prechodné:
+// o pár sekúnd neskôr ten istý dopyt prejde. Opakuje sa preto len na
+// prechodné kódy, nie na timeout (ten by beh natiahol na minúty).
+const PRECHODNE = new Set([429, 500, 502, 503, 504]);
+const PAUZY_MS = [4000, 12000];
+/** Najdlhšia pauza, akú sme ochotní čakať podľa hlavičky Retry-After. */
+const MAX_PAUZA_MS = 20000;
+
+export type StiahniMoznosti = {
+  fetchFn?: (url: string, init: RequestInit) => Promise<Response>;
+  cakaj?: (ms: number) => Promise<void>;
+};
+
+/** Text iCalu; pri prechodnom odmietnutí skúsi ešte dvakrát. Chyba = `HTTP <kód>`. */
+export async function stiahniIcal(url: string, m: StiahniMoznosti = {}): Promise<string> {
+  const f = m.fetchFn ?? ((u: string, i: RequestInit) => fetch(u, i));
+  const cakaj = m.cakaj ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (let pokus = 0; ; pokus++) {
+    // 28 s na pokus — Jerryho kalendár (~2,5 MB) generuje Google rôzne dlho (8. 9. 2026).
+    const r = await f(url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
+    if (r.ok) return await r.text();
+    if (!PRECHODNE.has(r.status) || pokus >= PAUZY_MS.length) {
+      throw new Error(pokus ? `HTTP ${r.status} (${pokus + 1}× za sebou)` : `HTTP ${r.status}`);
+    }
+    const ra = Number(r.headers.get("retry-after"));
+    await cakaj(Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, MAX_PAUZA_MS) : PAUZY_MS[pokus]);
+  }
+}
+
+/** Odmietnutie Googlom do takejto doby od posledného úspechu nie je porucha. */
+const ODMIETNUTIE_V_PORIADKU_MS = 24 * 3600 * 1000;

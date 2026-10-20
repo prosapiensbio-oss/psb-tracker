@@ -15,7 +15,7 @@ import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiaco
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu, sparujZmeny, najdiPresun } from "../../lib/psb/kalendarZmeny";
-import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
+import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
 //
@@ -90,9 +90,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // kalendár „odpojený" (8. 9. 2026). Odo mňa 9 s, ale Google kolíše (memory:
     // „snímka vyjde ~1 z 3"). 28 s dáva rezervu a fetch je I/O, nie CPU, takže
     // to nehrozí prekročením CPU limitu workera. Cloudflare req cap je ~30 s.
-    const r = await fetch(z.url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    udalosti = citajIcal(await r.text(), odMs, doMs);
+    // Na HTTP 429 od Googlu skúša znova (stiahniIcal, 20. 10. 2026).
+    udalosti = citajIcal(await stiahniIcal(z.url), odMs, doMs);
   } catch (e) {
     const chyba = e instanceof Error ? e.message : "nepodarilo sa stiahnuť";
     await DB.prepare("UPDATE kal_zdroje SET posledna_chyba = ? WHERE id = ?").bind(chyba, z.id).run();
@@ -865,9 +864,7 @@ export const Route = createFileRoute("/api/kalendar")({
 
           let text: string;
           try {
-            const r = await fetch(z.url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            text = await r.text();
+            text = await stiahniIcal(z.url);
           } catch (e) {
             return Response.json({ ok: false, error: e instanceof Error ? e.message : "nepodarilo sa stiahnuť" }, { status: 502 });
           }
