@@ -74,7 +74,6 @@ type BalicekRiadok = {
   platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
 };
 type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null };
-import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { REKLAMA_AGENT } from "./ReklamaDozor";
 import { JarvisOkno } from "./JarvisOkno";
@@ -1161,23 +1160,12 @@ export function PSBApp() {
   const [kalUdalosti, setKalUdalosti] = useState<KalUdalost[]>([]);
   /** Objednané tréningy ďaleko dopredu — len klient a deň (karta Balíčky). */
   const [buduceTreningy, setBuduceTreningy] = useState<{ klient: string | null; zaciatok: string }[]>([]);
-  // Meradlo súbežného chodu kalendára a PTmindera. Počíta ho SERVER nad celou
-  // históriou (obrazovka aj Jarvis majú 21-dňové okno, z ktorého sa otázka
-  // „vydrží kalendár sám?" zodpovedať nedá) a berie sa hotové — dve odpovede
-  // na to isté číslo sú horšie než žiadna.
-  const [kalPorovnanie, setKalPorovnanie] = useState<PorovnanieDochadzky | null>(null);
-  // Druhá polovica tej istej otázky — hodiny. Bez nej by Jarvis na „môžeme
-  // vypnúť PTminder?" odpovedal z polovice obrazu, čo je presne tá chyba,
-  // ktorú appka má zdokumentovanú pri rezerve a dlhoch.
+  // Porovnania s PTminderom (dochádzka, hodiny, tržby) sú od 20. 10. 2026
+  // vypnuté — do PTmindera sa nezapisuje (odchod z PTmindera, krok 3).
   /** Surové riadky vlastnej evidencie — kŕmia fronty „Bez balíčka" a „Dlhujú". */
   const [balickyRiadky, setBalickyRiadky] = useState<BalicekRiadok[]>([]);
   /** Platby zapísané v Kokpite — bez nich by každý nahodený balíček vyzeral ako dlh. */
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
-  const [balickyPorovnanie, setBalickyPorovnanie] = useState<{ spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null>(null);
-  // Tretia tretina: platby. Bez nej by Jarvis na „môžeme vypnúť PTminder?"
-  // odpovedal z dvoch tretín obrazu.
-  const [platbyOd, setPlatbyOd] = useState("");
-  const [platbyPorovnanie, setPlatbyPorovnanie] = useState<{ mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null>(null);
   const [platbyCakaju, setPlatbyCakaju] = useState(0);
   // Zmeny v kalendári si App drží kvôli Jarvisovi. Test 11. 8.: na „kde vidím
   // zrušené tréningy" odpovedal, že ich appka nesleduje — pritom ich sleduje
@@ -1263,8 +1251,7 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/balicky", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; porovnanie?: typeof balickyPorovnanie; balicky?: BalicekRiadok[] }) => {
-        if (j.ok && j.porovnanie) setBalickyPorovnanie(j.porovnanie);
+      .then((j: { ok?: boolean; balicky?: BalicekRiadok[] }) => {
         if (j.ok) setBalickyRiadky(j.balicky || []);
       })
       .catch(() => undefined);
@@ -1274,11 +1261,9 @@ export function PSBApp() {
       .catch(() => undefined);
     void fetch("/api/platby", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; porovnanie?: typeof platbyPorovnanie; nepriradene?: unknown[]; odMesiaca?: string }) => {
+      .then((j: { ok?: boolean; nepriradene?: unknown[] }) => {
         if (!j.ok) return;
-        if (j.porovnanie) setPlatbyPorovnanie(j.porovnanie);
         setPlatbyCakaju((j.nepriradene || []).length);
-        if (typeof j.odMesiaca === "string") setPlatbyOd(j.odMesiaca);
       })
       .catch(() => undefined);
   }, [dataHotove, penazVerzia]);
@@ -1287,10 +1272,9 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; buduceTreningy?: { klient: string | null; zaciatok: string }[]; sporneKonanie?: SporneKonanie[]; porovnanie?: PorovnanieDochadzky }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; buduceTreningy?: { klient: string | null; zaciatok: string }[]; sporneKonanie?: SporneKonanie[] }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
-        if (j.porovnanie) setKalPorovnanie(j.porovnanie);
         if (Array.isArray(j.guillermo)) setGuillermoZazn(j.guillermo);
         if (Array.isArray(j.guillermoUdalosti)) setGuillermoUdal(j.guillermoUdalosti);
         if (Array.isArray(j.buduceTreningy)) setBuduceTreningy(j.buduceTreningy);
@@ -2873,10 +2857,10 @@ function skupinaFaktur(
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
       },
-      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie, balickyPorovnanie, { porovnanie: platbyPorovnanie, cakaju: platbyCakaju },
+      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, null, null, { porovnanie: null, cakaju: platbyCakaju },
       // Tie isté dve fronty, aké ukazuje Workspace — hotové, nie na dopočítanie.
       fronty),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, balickyPorovnanie, platbyPorovnanie, platbyCakaju, fronty, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, platbyCakaju, fronty, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
@@ -3353,11 +3337,7 @@ function skupinaFaktur(
           />
         )}
         {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} register={registerAll} rozpory={[
-            // Porovnania, ktoré appka počíta inde — karta zdravia ich len číta.
-            // Vlastný prepočet by znamenal, že dve obrazovky povedia iné číslo.
-            { nazov: "Balíčky: Kokpit vs PTminder", pocet: balickyPorovnanie ? balickyPorovnanie.rozdiel : null, detail: balickyPorovnanie ? `${balickyPorovnanie.sedi} sedí, ${balickyPorovnanie.mlci} sa nedá porovnať (export z ${balickyPorovnanie.poExport})` : undefined },
-            { nazov: "Dochádzka: kalendár vs PTminder", pocet: kalPorovnanie ? kalPorovnanie.lenPtminder : null, detail: kalPorovnanie ? `${kalPorovnanie.sedeni} sedení ${kalPorovnanie.od} – ${kalPorovnanie.do}; ${kalPorovnanie.lenKalendar} je len v kalendári` : undefined },
-            { nazov: "Tržby: Kokpit vs PTminder", pocet: platbyPorovnanie ? platbyPorovnanie.mesiace.filter((m) => Math.abs(m.rozdiel) > Math.max(200, m.ptminder * 0.01)).length : null, detail: platbyPorovnanie ? `porovnáva sa ${platbyPorovnanie.mesiace.length} mesiacov od ${platbyOd || "?"}` : undefined },
+            // Porovnania Kokpit vs PTminder sú od 20. 10. 2026 vypnuté (do PTmindera sa nezapisuje).
           ]} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
 
         {active === "jarvis" && (

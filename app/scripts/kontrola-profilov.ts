@@ -14,6 +14,7 @@
  */
 import { polozkyHodin } from "../src/lib/psb/notifikaciaHodin";
 import { deriveClients } from "../src/lib/psb/compute";
+import { jeUkonceny } from "../src/lib/psb/ukoncenieBalicka";
 import { normName } from "../src/lib/psb/format";
 import { hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
@@ -114,6 +115,8 @@ const data: PSBData = {
     klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
     platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
     zruseneAt: r.zrusene_at || null, kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
+    // Ukončený balíček s vrátením = nula (Radek Baláž) — ako v loadData.
+    ukonceny: jeUkonceny(r),
   })),
   /**
    * RUČNÉ ZÁSAHY SA MUSIA VOLAŤ `clientOverrides` A BYŤ MAPA PODĽA MENA.

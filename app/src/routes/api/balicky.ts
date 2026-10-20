@@ -47,36 +47,14 @@ const naBalicek = (r: Riadok): Balicek => ({
   zdroj: r.zdroj, zruseneAt: r.zrusene_at,
 });
 
+/**
+ * Vlastná evidencia. Porovnanie s PTminderom (`porovnajBalicky`) sa od
+ * 20. 10. 2026 nepočíta — do PTmindera sa nezapisuje a dopyt ťahal celú
+ * tabuľku kal_udalosti len kvôli nemu.
+ */
 async function nacitaj(DB: D1Database) {
-  const [vlastne, pt, udalosti, horizont] = await DB.batch([
-    DB.prepare("SELECT id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, zrusene_at, created_at FROM balicky ORDER BY klient, platnost_od"),
-    DB.prepare("SELECT client_name, package_name, sessions_remaining, sessions_total, valid_from, valid_to FROM packages"),
-    // Kalendár nesie odtrénované hodiny. Berie sa celá história tabuľky, nie
-    // okno — balíček môže bežať pol roka a okno má 21 dní.
-    DB.prepare("SELECT klient, zaciatok, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL"),
-    // Dokiaľ siaha export. Bez toho by sa porovnávali Kokpitove hodiny do
-    // dneška proti PTminderu do posledného sťahovania a každý klient, ktorý
-    // odvtedy trénoval, by vyzeral ako rozdiel.
-    DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
-  ]);
-  const riadky = ((vlastne.results || []) as unknown as Riadok[]);
-  const ptZoznam = ((pt.results || []) as unknown as {
-    client_name: string; package_name: string; sessions_remaining: number; sessions_total: number; valid_from: string; valid_to: string;
-  }[]).map<PtBalicek>((p) => ({
-    klient: p.client_name, nazov: p.package_name,
-    zostava: p.sessions_remaining || 0, spolu: p.sessions_total || 0,
-    platnostOd: p.valid_from || "", platnostDo: p.valid_to || "",
-  }));
-  return {
-    riadky,
-    porovnanie: porovnajBalicky(
-      riadky.map(naBalicek),
-      ptZoznam,
-      (udalosti.results || []) as unknown as { klient: string | null; zaciatok: string; typ: string | null }[],
-      dnesPraha(),
-      String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || "") || undefined,
-    ),
-  };
+  const vlastne = await DB.prepare("SELECT id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, zrusene_at, created_at FROM balicky ORDER BY klient, platnost_od").all();
+  return { riadky: ((vlastne.results || []) as unknown as Riadok[]) };
 }
 
 
@@ -125,12 +103,12 @@ export const Route = createFileRoute("/api/balicky")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        const { riadky, porovnanie } = await nacitaj(DB);
+        const { riadky } = await nacitaj(DB);
         // Presuny hodín, ktoré ešte čakajú na ďalší balíček (migrácia 0097).
         const presuny = ((await DB.prepare(
           "SELECT klient, hodiny, z_platnosti_do FROM balicky_presun WHERE pouzite_balicek_id IS NULL",
         ).all().catch(() => ({ results: [] }))).results || []) as unknown as { klient: string; hodiny: number; z_platnosti_do: string }[];
-        return Response.json({ ok: true, balicky: riadky, porovnanie, presuny });
+        return Response.json({ ok: true, balicky: riadky, presuny });
       },
 
       POST: async ({ request }) => {

@@ -37,6 +37,7 @@
  * klienta a register preto ukazujú to isté záporné číslo, nie nulu.
  */
 import { normName } from "./format";
+import { jeBeta } from "./beta";
 
 export type BalicekPreZostatok = {
   klient: string;
@@ -153,4 +154,54 @@ export function zostatokKokpitu(
     platnostDo: najnovsi.platnostDo || null,
     pausal,
   };
+}
+
+/**
+ * ZOSTATOK BEZ ZÁLOHY Z PTMINDERA (odchod z PTmindera, krok 3 — 20. 10. 2026).
+ *
+ * Do 19. 10. 2026 sa do PTmindera zapisovalo, takže klient bez aktívneho
+ * balíčka v Kokpite dostal na karte číslo z exportu („z PTmindera — v Kokpite
+ * nie je aktívny balíček"). Po poslednom exporte to číslo zamrzne: tréningy
+ * v ňom už neklesajú a karta by navždy tvrdila hodiny, ktoré klient dávno
+ * minul. Pravidlo odteraz: BEZ BALÍČKA V KOKPITE = BEZ BALÍČKA.
+ *
+ * PREPÍNAČ. Naostro sa zapína až po rozhodnutí Jerryho — overenie 20. 10.
+ * 2026 našlo klientku (Kateřina Stoklásková), ktorej doplnenie 2 h z 11. 10.
+ * je len v PTminderi a do Kokpitu sa nenalialo. Dovtedy beží len v bete
+ * (`jeBeta()` = adresa kokpit-beta). Server (push, /v/, automatické
+ * balíčky) beží vždy podľa `..._NAOSTRO` — v bete je to len náhľad obrazovky.
+ *
+ * Poistka `zaplateneVPtminderi` (zaplatene.ts) sa tým NEMENÍ: o peniazoch
+ * rozhoduje `dlhyKlientov`, nie toto.
+ */
+export const ZOSTATOK_BEZ_PTMINDERA_NAOSTRO = false;
+export const zostatokBezPtmindera = (): boolean => ZOSTATOK_BEZ_PTMINDERA_NAOSTRO || jeBeta();
+
+/**
+ * Dni, keď klient trénoval a v Kokpite mu v ten deň NEPLATIL žiadny balíček.
+ *
+ * Kryje ho akýkoľvek nezrušený balíček s platnosťou cez ten deň — aj
+ * vyčerpaný (tréning nad rámec je mínus a hlási ho notifikácia hodín, nie
+ * táto). Tréning zadarmo sa nepočíta; nič nechýba. Len od `od` (KOKPIT_OD):
+ * staršie tréningy kryl PTminder a appka o nich nesúdi.
+ */
+export function treningyBezBalicka(
+  balicky: BalicekPreZostatok[],
+  klient: string,
+  sedenia: SedeniePreZostatok[],
+  od: string,
+  dnes: string,
+  zadarmo: Set<string> = new Set(),
+): string[] {
+  const k = normName(klient);
+  const moje = balicky.filter((b) => normName(b.klient) === k && !b.zruseneAt);
+  const dni = new Set<string>();
+  for (const s of sedenia) {
+    if (normName(s.client) !== k) continue;
+    const d = den(s.date);
+    if (!d || d < od || d > dnes || zadarmo.has(`${k}|${d}`)) continue;
+    const kryty = moje.some((b) => den(b.platnostOd) <= d && (!b.platnostDo || d <= den(b.platnostDo)));
+    if (!kryty) dni.add(d);
+  }
+  return [...dni].sort();
 }

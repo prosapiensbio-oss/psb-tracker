@@ -369,59 +369,16 @@ export function buildAiContext(
   const vSitemapeUrl = (u: string) => sitemapaUrl.has(String(u || "").replace(/\/$/, "").toLowerCase());
 
   /**
-   * „Vydrží kalendár sám?" — to isté číslo, aké ukazuje karta v Kalendári.
-   *
-   * Počíta ho server nad celou históriou a sem príde HOTOVÉ. Prepočítať ho tu
-   * by nešlo: `kalendar.udalosti` je okno 21 dní dozadu, takže by Jarvis
-   * odpovedal iným číslom než obrazovka — a to je horšie než neodpovedať.
+   * Súbežný chod s PTminderom SKONČIL 19. 10. 2026 (odchod z PTmindera,
+   * krok 3, 20. 10. 2026). Porovnania sa nepočítajú — do PTmindera sa
+   * nezapisuje, takže by merali len to, že stojí. Parametre `porovnanie`,
+   * `balicky` a `platby.porovnanie` sa ignorujú; ostali kvôli volajúcim.
    */
-  const subeznyChodBlok = porovnanie && porovnanie.sedeni
-    ? {
-      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Odpoveď na otázku „môžeme vypnúť PTminder?“. Kalendár a PTminder bežia súbežne; „lenPtminder“ je počet sedení, ktoré sú v PTminderi a v kalendári nie — presne to by sa po vypnutí stratilo. „lenKalendar“ je opak a je to len dnešná robota navyše, nie riziko. Obrazovka: Kalendár → Vydrží kalendár sám?. Nepočítaj tieto čísla z „kalendar.udalosti“ — tam je len okno 21 dní dozadu.",
-      od: porovnanie.od,
-      do: porovnanie.do,
-      sedeniSpolu: porovnanie.sedeni,
-      lenPtminder: porovnanie.lenPtminder,
-      lenKalendar: porovnanie.lenKalendar,
-      tyzdnovBezStratyVRade: (() => {
-        let n = 0;
-        for (const t of porovnanie.tyzdne.filter((x) => x.sedeni > 0)) { if (t.lenPtminder === 0) n++; else break; }
-        return n;
-      })(),
-      tyzdne: porovnanie.tyzdne.filter((t) => t.sedeni > 0).map((t) => ({ od: t.od, do: t.do, sedeni: t.sedeni, lenPtminder: t.lenPtminder, lenKalendar: t.lenKalendar })),
-      chybaju: porovnanie.tyzdne.flatMap((t) => t.chybaju).slice(0, 40),
-      trenerBezKalendara: porovnanie.bezKalendara,
-      // Vypnúť PTminder sa nedá z jednej polovice: dochádzka aj hodiny musia
-      // sedieť naraz. Preto sú obe čísla v jednom kľúči — oddelené by
-      // pozývali k odpovedi „dochádzka sedí, môžeme vypnúť".
-      balicky: balicky
-        ? {
-          poznamka: "Druhá polovica tej istej otázky: zostatky hodín. „rozdiel“ je počet klientov, pri ktorých Kokpit počíta iný zostatok než PTminder. „mlci“ sa porovnať nedá (paušál alebo export 0/0) a nie je to chyba. Obrazovka: Kalendár → Balíčky — vlastná evidencia.",
-          kDatumu: balicky.poExport,
-          klientovSpolu: balicky.spolu,
-          sedi: balicky.sedi,
-          rozdiel: balicky.rozdiel,
-          nedaSaPorovnat: balicky.mlci,
-          rozdielni: balicky.riadky.filter((r) => r.stav === "rozdiel" || r.stav === "lenPtminder").slice(0, 20),
-        }
-        : null,
-      platby: platby?.porovnanie
-        ? {
-          poznamka: "Tretia tretina: peniaze. Kokpit berie bankové platby z výpisu Fio a hotovosť zo zošita. „rozdiel“ je rozdiel mesačných súčtov proti PTminderu v korunách. „cakaju“ je počet príjmov z výpisu, ktoré ešte nemajú priradeného klienta — kým ich je veľa, rozdiel nič nehovorí. Obrazovka: Kalendár → Platby — vlastná evidencia.",
-          kokpitKc: platby.porovnanie.kokpit,
-          ptminderKc: platby.porovnanie.ptminder,
-          rozdielKc: platby.porovnanie.rozdiel,
-          cakaNaPriradenie: platby.cakaju,
-          mesiace: platby.porovnanie.mesiace.slice(0, 12),
-        }
-        : { poznamka: "Platby sa zatiaľ nemerajú.", cakaNaPriradenie: platby?.cakaju ?? 0 },
-      zaverPreVypnutie: !balicky
-        ? "Hodiny sa zatiaľ nemerajú — na otázku o vypnutí PTmindera odpovedz, že polovica obrazu chýba."
-        : porovnanie.lenPtminder === 0 && balicky.rozdiel === 0 && platby?.porovnanie && platby.porovnanie.rozdiel === 0 && !platby.cakaju
-          ? "Všetky tri tretiny sedia: dochádzka, hodiny aj peniaze."
-          : "Ešte nesedia všetky tri naraz; kým sa rozchádzajú, PTminder je potrebný.",
-    }
-    : null;
+  void porovnanie; void balicky;
+  const subeznyChodBlok = {
+    poznamka: "PREČÍTAJ, NEPOČÍTAJ. Do PTmindera sa od 19. 10. 2026 nezapisuje; posledný export je z 19. 10. Kokpit je jediná evidencia dochádzky (Google kalendár), hodín (balíčky v Kokpite) aj peňazí (od 10/2026). Porovnania Kokpit ↔ PTminder sú vypnuté — na otázku „sedí to s PTminderom?“ odpovedz, že sa už neporovnáva. Odkiaľ je zostatok klienta, hovorí jeho „zostatokOdkial“ (Kokpit, alebo ešte export PTmindera, kým Jerry neschváli prepnutie). Staré členstvá zaplatené v PTminderi ďalej rozhoduje jedno pravidlo „zaplatený“ (poistka z PTmindera).",
+    cakaNaPriradenie: platby?.cakaju ?? 0,
+  };
 
   const kalendarBlok = (() => {
     if (!kalendar) return null;

@@ -5,7 +5,6 @@ import { SmsKlientovi } from "./SmsKlientovi";
 import { bezDiakritiky } from "../../lib/psb/sms";
 import { useCallback, useEffect, useState } from "react";
 
-import type { RiadokPorovnania } from "../../lib/psb/balickyEvidencia";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -30,7 +29,6 @@ type Balicek = {
   platnost_od: string; platnost_do: string | null; cena_czk: number | null;
   zdroj: string; poznamka: string | null; zrusene_at: string | null;
 };
-type Porovnanie = { riadky: RiadokPorovnania[]; spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string };
 
 
 async function posli(telo: Record<string, unknown>) {
@@ -63,12 +61,10 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
   onVypis?: (meno: string) => void;
 }) {
   const [balicky, setBalicky] = useState<Balicek[] | null>(null);
-  const [p, setP] = useState<Porovnanie | null>(null);
   const [chyba, setChyba] = useState("");
   const [pracujem, setPracujem] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [pisem, setPisem] = useState(false);
-  const [detail, setDetail] = useState(false);
   const [f, setF] = useState({ klient: "", nazov: "", hodiny: "", platnostOd: dnesPraha(), platnostDo: "", cenaCzk: "", poznamka: "" });
   /**
    * Čo sa práve zapísalo — kvôli ponuke faktúry.
@@ -81,8 +77,8 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/balicky", { credentials: "same-origin" });
-    const j = (await r.json()) as { ok: boolean; balicky?: Balicek[]; porovnanie?: Porovnanie };
-    if (j.ok) { setBalicky(j.balicky || []); setP(j.porovnanie || null); }
+    const j = (await r.json()) as { ok: boolean; balicky?: Balicek[] };
+    if (j.ok) setBalicky(j.balicky || []);
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
@@ -109,7 +105,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
     <Card>
       <H3>
         <Info
-          text="Kokpit si vedie vlastný zoznam predaných balíčkov a zostatok si počíta sám z kalendára. Kým sa jeho čísla rozchádzajú s PTminderom, PTminder je potrebný. Keď „rozdiel“ vydrží niekoľko týždňov na nule, hodiny unesie Kokpit sám."
+          text="Kokpit si vedie vlastný zoznam predaných balíčkov a zostatok si počíta sám z kalendára. Od 19. 10. 2026 sa do PTmindera nezapisuje, takže porovnanie s ním je vypnuté."
           label="Balíčky — vlastná evidencia"
         />
       </H3>
@@ -132,90 +128,16 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
             {pracujem === "nalej" ? "nalievam…" : "Naliať z PTmindera"}
           </button>
         </>
-      ) : p && (
+      ) : (
         <>
-          <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 10px" }}>
-            Porovnáva sa k {p.poExport ? `${p.poExport.slice(8)}. ${Number(p.poExport.slice(5, 7))}. ${p.poExport.slice(0, 4)}` : "dnešku"} — pokiaľ siaha posledný export z PTmindera.
-            Tréningy odvtedy Kokpit vidí, PTminder ešte nie, a rozdiel by hovoril o veku súboru, nie o zhode.
+          {/* Porovnanie s PTminderom (rozdiel hodín po klientoch) je od 20. 10.
+              2026 vypnuté — do PTmindera sa nezapisuje, takže by rozdiel
+              rástol každým tréningom a nehovoril nič o Kokpite. */}
+          <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55, margin: "2px 0 10px" }}>
+            {zive.length} balíčkov v evidencii, z toho {zive.filter((b) => b.zdroj === "rucne").length} zapísaných v Kokpite.
+            Zostatok klienta je v jeho profile — tam sa balíček aj upravuje.
           </div>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "4px 0 12px" }}>
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: p.rozdiel === 0 ? C.green : C.red }}>{p.rozdiel}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>klientov s iným zostatkom<br /><span style={{ color: C.textDim }}>toto rozhoduje</span></div>
-            </div>
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: C.green }}>{p.sedi}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>sedí do hodiny<br /><span style={{ color: C.textDim }}>Kokpit = PTminder</span></div>
-            </div>
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: C.textMuted }}>{p.mlci}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>nedá sa porovnať<br /><span style={{ color: C.textDim }}>paušál alebo export 0/0</span></div>
-            </div>
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: C.text }}>{zive.length}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>balíčkov v evidencii<br /><span style={{ color: C.textDim }}>{zive.filter((b) => b.zdroj === "rucne").length} zapísaných v Kokpite</span></div>
-            </div>
-          </div>
-
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead>
-              <tr style={{ color: C.textDim, fontSize: 11, textAlign: "left" }}>
-                <th style={{ padding: "4px 6px 4px 0", fontWeight: 600 }}>klient</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>predané</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>odtrénované</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>Kokpit</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>PTminder</th>
-                <th style={{ padding: "4px 0 4px 6px", fontWeight: 600 }}>stav</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(detail ? p.riadky : p.riadky.filter((r) => r.stav === "rozdiel" || r.stav === "lenPtminder")).map((r) => (
-                <tr key={r.klient} style={{ borderTop: `1px solid ${mix(C.border, 55)}` }}>
-                  <td style={{ padding: "5px 6px 5px 0", color: C.text }}>
-                    {onKlient ? (
-                      <button
-                        onClick={() => onKlient(r.klient)}
-                        title="Otvoriť profil — tam sa balíček upravuje"
-                        style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: "inherit", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
-                      >
-                        {r.klient}
-                      </button>
-                    ) : r.klient}
-                    {r.balicky.length > 1 && <span style={{ color: C.textDim, fontSize: 11 }}> · {r.balicky.length} balíčky</span>}
-                  </td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{r.predane ?? "—"}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{r.odtrenovane}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: C.text }}>{r.kokpit ?? "—"}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{r.ptminder ?? "—"}</td>
-                  <td style={{ padding: "5px 0 5px 6px", fontSize: 11.5, color: r.stav === "sedi" ? C.green : r.stav === "rozdiel" || r.stav === "lenPtminder" ? C.red : C.textDim }}>
-                    {r.stav === "sedi" ? "sedí"
-                      : r.stav === "rozdiel" ? `${(r.rozdiel as number) > 0 ? "+" : ""}${r.rozdiel} h oproti PTminderu`
-                        : r.stav === "ptminderMlci" ? "PTminder mlčí (0/0)"
-                          : r.stav === "pausal" ? "paušál — nedochádza"
-                            : r.stav === "lenKokpit" ? "v PTminderi nie je"
-                              : "v Kokpite nie je"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {onKlient && (
-            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
-              Veľkosť balíčka, cena aj platnosť sa menia v profile klienta → záložka balíčky. Klikni na meno.
-            </div>
-          )}
-          {!detail && p.rozdiel === 0 && (
-            <div style={{ fontSize: 12.5, color: C.green, marginTop: 8 }}>
-              Všetkých {p.sedi} porovnateľných klientov sedí do hodiny.
-            </div>
-          )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            <button
-              onClick={() => setDetail(!detail)}
-              style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
-            >
-              {detail ? "Ukázať len rozdiely" : `Ukázať všetkých (${p.spolu})`}
-            </button>
             <button
               onClick={() => setPisem(!pisem)}
               style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accentLight, 45)}`, background: "transparent", color: C.accentLight }}

@@ -89,7 +89,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
     <Card>
       <H3>
         <Info
-          text="Kokpit si vedie vlastnú knihu platieb: bankové z výpisu Fio, hotovosť prepísanú zo zošita. Kým sa mesačné súčty rozchádzajú s PTminderom, PTminder je potrebný."
+          text="Kokpit si vedie vlastnú knihu platieb: bankové z výpisu Fio, hotovosť prepísanú zo zošita. Od 19. 10. 2026 sa do PTmindera nezapisuje, porovnanie s ním je vypnuté."
           label={`Platby — vlastná evidencia${celkom ? ` (${celkom} čaká)` : ""}`}
         />
       </H3>
@@ -101,7 +101,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
         {peniazeOd ? (
           <>
             <b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b>{" "}
-            Staršie mesiace z PTmindera; ten zostáva vedľa ako kontrola.{" "}
+            Staršie mesiace z PTmindera (história).{" "}
             <button disabled={!!pracujem} onClick={() => void akcia({ akcia: "peniaze-od", mesiac: "" }, "peniaze")}
               style={{ marginLeft: 6, fontSize: 11.5, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 8px", color: C.textMuted, cursor: "pointer" }}>
               vrátiť na PTminder
@@ -133,77 +133,9 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
         </div>
       )}
 
-      {p && p.mesiace.length > 0 && (
-        <>
-          <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 10px", lineHeight: 1.5 }}>
-            Súbežný chod sa súdi od {odMesiaca ? mesiacKratko(odMesiaca) : "tohto mesiaca"}, po {poExport ? `${denKratko(poExport)} ${poExport.slice(0, 4)}` : "dnešok"} (pokiaľ siaha export).
-            Staršie mesiace v evidencii zostávajú, ale neporovnávajú sa — hotovosť z nich nikto spätne prepisovať nebude, a rozdiel by ukazoval ju, nie chybu.
-          </div>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
-            <div>
-              {/* Kým čaká front nepriradených príjmov, rozdiel meria len to,
-                  koľko práce zostáva — nie zhodu. Červené číslo, ktoré nič
-                  nehovorí, je horšie než žiadne. */}
-              <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: nepriradene.length ? C.textDim : p.rozdiel === 0 ? C.green : C.red }}>
-                {nepriradene.length ? "—" : p.rozdiel === 0 ? "0" : kc(p.rozdiel)}
-              </div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>
-                rozdiel proti PTminderu<br />
-                <span style={{ color: C.textDim }}>
-                  {nepriradene.length ? `najprv priraď ${celkom} príjmov` : "toto rozhoduje"}
-                </span>
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: C.text }}>{kc(p.kokpit)}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>v Kokpite<br /><span style={{ color: C.textDim }}>{zive.length} platieb, z toho {hotovost} hotovosť</span></div>
-            </div>
-            <div>
-              <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: C.textMuted }}>{kc(p.ptminder)}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>v PTminderi<br /><span style={{ color: C.textDim }}>za tie isté mesiace</span></div>
-            </div>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, marginBottom: 12 }}>
-            <thead>
-              <tr style={{ color: C.textDim, fontSize: 11, textAlign: "left" }}>
-                <th style={{ padding: "4px 6px 4px 0", fontWeight: 600 }}>mesiac</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>banka</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>hotovosť</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>iné</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>Kokpit</th>
-                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>PTminder</th>
-                <th style={{ padding: "4px 0 4px 6px", fontWeight: 600, textAlign: "right" }}>rozdiel</th>
-              </tr>
-            </thead>
-            <tbody>
-              {p.mesiace.map((m) => (
-                <tr key={m.mesiac} style={{ borderTop: `1px solid ${mix(C.border, 55)}` }}>
-                  <td style={{ padding: "5px 6px 5px 0", color: C.text }}>{mesiacKratko(m.mesiac)}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{kc(m.kokpitBanka)}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{kc(m.kokpitHotovost)}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{m.kokpitIne ? kc(m.kokpitIne) : "—"}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.text, fontWeight: 700 }}>{kc(m.kokpit)}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{kc(m.ptminder)}</td>
-                  <td style={{ padding: "5px 0 5px 6px", textAlign: "right", fontWeight: 700, color: m.rozdiel === 0 ? C.green : C.red }}>
-                    {m.rozdiel === 0 ? "0" : kc(m.rozdiel)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {p && p.mesiace.length === 0 && (
-        // Prázdna tabuľka bez vysvetlenia vyzerá ako porucha. Keď zvolený
-        // mesiac ešte nezačal, treba povedať, že sa čaká — nie mlčať.
-        <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55, margin: "2px 0 12px" }}>
-          Súbežný chod začína {odMesiaca ? mesiacKratko(odMesiaca) : "budúci mesiac"}. Dovtedy sa neporovnáva nič —
-          v Kokpite je {zive.length} bankových platieb doplnených spätne z výpisu, ale hotovosť zo starších mesiacov
-          v ňom nie je a rozdiel by ukazoval ju, nie chybu. Od {odMesiaca ? mesiacKratko(odMesiaca) : "začiatku"} zapisuj
-          hotovosť aj sem a mesačné súčty musia sedieť s PTminderom.
-        </div>
-      )}
+      {/* Mesačné porovnanie s PTminderom (rozdiel tržieb) je od 20. 10. 2026
+          vypnuté: do PTmindera sa nezapisuje, rozdiel by rástol sám. Peniaze
+          sú od 10/2026 z Kokpitu (prepínač vyššie). */}
       {nepriradene.length > 0 && (
         <>
           <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700, marginTop: 4 }}>

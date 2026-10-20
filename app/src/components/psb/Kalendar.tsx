@@ -293,7 +293,9 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
       {!onNavigate && stav.nezname.length > 0 && (
         <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} trener={trener} ktoSom={ktoSom} /></div>
       )}
-      {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
+      {/* „Chýba v PTminderi" je od 20. 10. 2026 preč — do PTmindera sa už
+          nezapisuje, takže by v ňom chýbal KAŽDÝ tréning (odchod z PTmindera,
+          krok 3). Dochádzka je od 1. 10. z kalendára. */}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,
           takže táto karta hovorila to isté druhýkrát. Sem sa chodí pozerať,
@@ -870,120 +872,6 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
             );
           })}
         </div>
-      )}
-    </Card>
-  );
-}
-
-/**
- * „Vydrží kalendár sám?" — meradlo súbežného chodu.
- *
- * Jerry chce PTminder vypnúť, ale nie naslepo: nechať obe evidencie bežať
- * vedľa seba a zrušiť tú starú, keď sa prestanú rozchádzať. Táto karta je to
- * jediné, čo z toho plánu appka musí vedieť — ostatné je čakanie.
- *
- * Dve čísla, ktoré NIE SÚ symetrické:
- *   • „chýba v kalendári" je RIZIKO — presne to by sa po vypnutí PTmindera
- *     stratilo. Toto číslo rozhoduje o tom, či sa dá vypnúť.
- *   • „chýba v PTminderi" je dnešná robota navyše, nič viac. Po vypnutí
- *     PTmindera prestane existovať aj otázka.
- */
-export function SubeznyChod({ p }: { p: Porovnanie }) {
-  const [detail, setDetail] = useState(false);
-  const stabilne = p.tyzdne.filter((t) => t.sedeni > 0);
-  // Za „sedí" sa počíta týždeň bez jediného strateného sedenia. Cieľ je
-  // súvislá séria od najnovšieho týždňa — jeden dobrý týždeň spred mesiaca
-  // nehovorí nič o tom, ako to funguje teraz.
-  let seria = 0;
-  for (const t of stabilne) { if (t.lenPtminder === 0) seria++; else break; }
-  const pomer = p.sedeni ? (p.sedeni - p.lenPtminder) / p.sedeni : 0;
-  const farba = p.lenPtminder === 0 ? C.green : pomer > 0.97 ? C.orange : C.red;
-
-  return (
-    <Card>
-      <H3>
-        <Info
-          text="Kalendár a PTminder bežia vedľa seba. Kým sa rozchádzajú, PTminder je potrebný. Keď „chýba v kalendári“ zostane niekoľko týždňov na nule, dochádzku unesie kalendár sám a PTminder sa dá na tento účel vypnúť."
-          label="Vydrží kalendár sám?"
-        />
-      </H3>
-      <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 12px" }}>
-        {p.od.split("-").reverse().join(".")} – {p.do.split("-").reverse().join(".")} · porovnáva sa len obdobie, kde majú obe evidencie čo povedať
-      </div>
-      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: farba, lineHeight: 1.1 }}>{p.lenPtminder}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted }}>sedení chýba v kalendári<br /><span style={{ color: C.textDim }}>toto by sa stratilo</span></div>
-        </div>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: C.textMuted, lineHeight: 1.1 }}>{p.lenKalendar}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted }}>tréningov chýba v PTminderi<br /><span style={{ color: C.textDim }}>dnešná robota navyše</span></div>
-        </div>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>{p.sedeni}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted }}>sedení v PTminderi<br /><span style={{ color: C.textDim }}>menovateľ</span></div>
-        </div>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: seria >= 4 ? C.green : C.text, lineHeight: 1.1 }}>{seria}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted }}>{seria === 1 ? "týždeň" : seria > 1 && seria < 5 ? "týždne" : "týždňov"} bez straty<br /><span style={{ color: C.textDim }}>v rade, od najnovšieho</span></div>
-        </div>
-      </div>
-      <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.55, marginBottom: 10 }}>
-        {p.lenPtminder === 0
-          ? "Kalendár zatiaľ nestratil ani jedno sedenie. Keď táto nula vydrží, dochádzku unesie sám."
-          : `Kalendár by v tomto okne stratil ${p.lenPtminder} z ${p.sedeni} sedení. Každé z nich má dôvod — pozri zoznam a buď doplň meno v kalendári, alebo vieš, že tam tréning naozaj nebol.`}
-      </div>
-      {(p.bezKalendara || []).length > 0 && (
-        <div style={{ fontSize: 12, color: C.orange, lineHeight: 1.55, marginBottom: 10 }}>
-          Mimo porovnania: {(p.bezKalendara || []).map((b) => `${b.trener} (${b.sedeni})`).join(", ")} — tento tréner nemá pripojený kalendár,
-          takže jeho sedenia sa po vypnutí PTmindera nemajú odkiaľ vziať.
-        </div>
-      )}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-        <thead>
-          <tr style={{ color: C.textDim, fontSize: 11, textAlign: "left" }}>
-            <th style={{ padding: "4px 6px 4px 0", fontWeight: 600 }}>týždeň</th>
-            <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>sedení</th>
-            <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>chýba v kalendári</th>
-            <th style={{ padding: "4px 0 4px 6px", fontWeight: 600, textAlign: "right" }}>chýba v PTminderi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stabilne.map((t) => (
-            <tr key={t.tyzden} style={{ borderTop: `1px solid ${mix(C.border, 55)}` }}>
-              <td style={{ padding: "5px 6px 5px 0", color: C.text }}>{t.od.slice(8)}.{t.od.slice(5, 7)}. – {t.do.slice(8)}.{t.do.slice(5, 7)}.</td>
-              <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{t.sedeni}</td>
-              <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: t.lenPtminder ? C.red : C.green }}>{t.lenPtminder}</td>
-              <td style={{ padding: "5px 0 5px 6px", textAlign: "right", color: t.lenKalendar ? C.orange : C.textDim }}>{t.lenKalendar}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {(p.lenPtminder > 0 || p.lenKalendar > 0) && (
-        <>
-          <button
-            onClick={() => setDetail(!detail)}
-            style={{
-              marginTop: 10, padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer",
-              border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
-            }}
-          >
-            {detail ? "Skryť" : "Ukázať"}, čo presne nesedí
-          </button>
-          {detail && (
-            <div style={{ marginTop: 8 }}>
-              {stabilne.flatMap((t) => t.chybaju).sort((a, b) => b.den.localeCompare(a.den)).map((x, i) => (
-                <div key={`${x.klient}|${x.den}|${x.kde}|${i}`} style={{ display: "flex", gap: 8, fontSize: 12, padding: "3px 0", color: C.textMuted }}>
-                  <span style={{ color: C.textDim, minWidth: 62 }}>{x.den.slice(8)}.{x.den.slice(5, 7)}.</span>
-                  <span style={{ color: C.text, flex: 1 }}>{x.klient}</span>
-                  <span style={{ color: x.kde === "ptminder" ? C.red : C.orange }}>
-                    {x.kde === "ptminder" ? "nie je v kalendári" : "nie je v PTminderi"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
       )}
     </Card>
   );
@@ -2206,49 +2094,6 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         </div>
       )}
     </div>
-  );
-}
-
-/** Tréningy z kalendára, ktoré sú preč a v PTminderi po nich nič nezostalo. */
-function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData }) {
-  const chybajuce = useMemo(
-    // Tá istá logika ako v Balíčkoch (nezapisaneTreningy) — líši sa len
-    // dneškom: tu sa nekontroluje, lebo zápis zaň ešte len príde.
-    () => nezapisaneTreningy(udalosti, data.sessions, "vynechaj")
-      .slice()
-      .sort((a, b) => b.zaciatok.localeCompare(a.zaciatok)),
-    [udalosti, data.sessions],
-  );
-
-  return (
-    <Card>
-      <H3>
-        <Info
-          text="Hodina bola v kalendári, prebehla — a v PTminderi po nej nie je zápis. Buď sa klient neukázal, alebo sa zabudlo zapísať. To druhé je priamo nevyfakturovaný peniaz. Kontrola má zmysel až po nedeľnom exporte: dovtedy PTminder o poslednom týždni nevie."
-          label={`Chýba v PTminderi (${chybajuce.length})`}
-        />
-      </H3>
-      {!chybajuce.length ? (
-        <Empty>Každá odtrénovaná hodina z kalendára má v PTminderi svoj zápis.</Empty>
-      ) : (
-        <>
-          <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 10px", lineHeight: 1.5 }}>
-            Zoradené od najnovšieho. Ak export ešte neprišiel, posledný týždeň tu bude celý — to je
-            v poriadku, skutočnosť dorazí v nedeľu.
-          </div>
-          {chybajuce.slice(0, 25).map((u) => (
-            <div key={`${u.uid}|${u.trener}`} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12.5, color: C.textMuted, minWidth: 92 }}>{den(u.zaciatok)} {cas(u.zaciatok)}</span>
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{u.klient}</span>
-              <span style={{ fontSize: 11.5, color: C.textDim }}>{u.trener}{u.typ === "uvodny" ? " · úvodný" : ""}</span>
-            </div>
-          ))}
-          {chybajuce.length > 25 && (
-            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>…a ďalších {chybajuce.length - 25}.</div>
-          )}
-        </>
-      )}
-    </Card>
   );
 }
 

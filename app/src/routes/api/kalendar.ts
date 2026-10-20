@@ -356,32 +356,9 @@ export const Route = createFileRoute("/api/kalendar")({
           ).all(),
         ]);
 
-        /**
-         * Meradlo súbežného chodu kalendára a PTmindera.
-         *
-         * Ťahá sa ZVLÁŠŤ, mimo `okno()`: okno má 21 dní dozadu, ale otázka
-         * „vydrží kalendár sám?" sa nedá zodpovedať z troch týždňov. Sú to
-         * dva ploché SELECTy (pár stoviek riadkov) a porovnanie sa robí
-         * v TypeScripte — JOIN mena s menom cez celú históriu je v D1 presne
-         * ten kvadratický dopyt, ktorý appku už raz položil.
-         */
-        const odKedy = dnesPraha(new Date(Date.now() - 84 * 86400000));
-        const [udalostiP, sedeniaP, prveSnimky] = await DB.batch([
-          DB.prepare("SELECT klient, zaciatok, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND zaciatok >= ?").bind(odKedy),
-          DB.prepare("SELECT client_name, date, session_trainer FROM sessions WHERE date >= ?").bind(odKedy),
-          // Odkedy sa ktorý kalendár ČÍTA — nie odkedy je v ňom najstaršia
-          // udalosť. Pred prvou snímkou nemal kalendár ako niečo obsahovať
-          // a každé sedenie by vyzeralo ako strata.
-          DB.prepare("SELECT trener, MIN(substr(kedy,1,10)) od FROM kal_snimky GROUP BY trener"),
-        ]);
-        const kalendarOd: Record<string, string> = {};
-        for (const r of ((prveSnimky.results || []) as unknown as { trener: string; od: string }[])) kalendarOd[r.trener] = r.od;
-        const porovnanie = porovnajTyzdne(
-          (udalostiP.results || []) as unknown as { klient: string | null; zaciatok: string; typ: string | null }[],
-          ((sedeniaP.results || []) as unknown as { client_name: string; date: string; session_trainer: string }[])
-            .map((r) => ({ client: r.client_name, date: r.date, trener: r.session_trainer })),
-          kalendarOd,
-        );
+        // Meradlo súbežného chodu s PTminderom („Vydrží kalendár sám?") sa od
+        // 20. 10. 2026 nepočíta — do PTmindera sa nezapisuje (odchod z
+        // PTmindera, krok 3). Ušetrí to tri dopyty pri každom načítaní.
 
         // Názvy, ktoré appka ešte nepozná — to je práca, ktorú treba odklikať.
         //
@@ -474,7 +451,6 @@ export const Route = createFileRoute("/api/kalendar")({
           guillermoUdalosti: guillermoUdalosti.results || [],
           sporneKonanie: sporne.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
-          porovnanie,
         });
       },
 

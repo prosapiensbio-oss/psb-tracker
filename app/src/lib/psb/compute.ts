@@ -1,7 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { KOKPIT_OD } from "./sedeniaZKalendara";
-import { klucNezaplateneho, zostatokKokpitu } from "./zostatokKokpitu";
+import { klucNezaplateneho, treningyBezBalicka, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
@@ -169,6 +169,12 @@ export type ClientAgg = {
   packageRemainingPtminder?: number | null;
   /** Hodín odtrénovaných nad rámec balíčkov v Kokpite (od 1. 10. 2026). */
   packageNadRamec?: number;
+  /**
+   * Dni od 1. 10. 2026, keď klient trénoval a v Kokpite mu neplatil žiadny
+   * balíček. Plní sa len pri zostatku bez zálohy z PTmindera
+   * (`zostatokBezPtmindera`); z neho je notifikácia `bezbalicka|`.
+   */
+  treningyBezBalicka?: string[];
   /** Ručná kotva: čo ukazoval PTminder a ku ktorému dňu. */
   balicekZostatok: number | null;
   balicekKDatumu: string;
@@ -279,7 +285,12 @@ function prazdnyKlient(meno: string, den: string): ClientAgg {
   };
 }
 
-export function deriveClients(data: PSBData): Record<string, ClientAgg> {
+export function deriveClients(
+  data: PSBData,
+  /** `bezZalohyPtmindera` — prepínač pre testy a kontrolné skripty; inak `zostatokBezPtmindera()`. */
+  volby: { bezZalohyPtmindera?: boolean } = {},
+): Record<string, ClientAgg> {
+  const bezZalohyPtmindera = volby.bezZalohyPtmindera ?? zostatokBezPtmindera();
   // Šesť mesiacov: dosť dlho na to, aby jeden zástup nerozhodol, a dosť krátko
   // na to, aby sa zmena trénera prejavila v tej istej sezóne.
   const hranicaNedavnych = dnesPraha(new Date(Date.now() - 183 * 86400000));
@@ -678,6 +689,26 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         c.packageOdkial = k.pausal
           ? "Kokpit: paušál — hodiny sa nepočítajú"
           : `Kokpit: ${k.spolu} h v zaplatených balíčkoch mínus ${k.minute} odtrénovaných od ${k.od}${k.nezaplateneHodin ? ` (${k.nezaplateneHodin} h čaká na zaplatenie)` : ""}`;
+      } else if (bezZalohyPtmindera) {
+        /**
+         * BEZ BALÍČKA V KOKPITE = BEZ BALÍČKA (odchod z PTmindera, 20. 10.
+         * 2026). Číslo z exportu sa po poslednom zápise do PTmindera už
+         * nehýbe — tréningy z neho neubúdajú a karta by tvrdila hodiny,
+         * ktoré klient minul. Názov členstva a platnosť z exportu idú preč
+         * tiež: s nulou hodín by z „Doplnenie členstva" spravili paušál
+         * (`bezAktivnehoBalicka` ho preskakuje) a klient by vypadol aj
+         * z karty „Bez balíčka". Kto odvtedy trénoval, má notifikáciu.
+         */
+        c.packageRemaining = 0;
+        c.packageTotal = 0;
+        c.packageNadRamec = 0;
+        c.packageOdvodeny = false;
+        c.membership = "";
+        c.packageValidTo = "";
+        c.packageStatus = "";
+        c.lenDoplnky = false;
+        c.packageOdkial = "Kokpit: žiadny aktívny balíček";
+        c.treningyBezBalicka = treningyBezBalicka(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), KOKPIT_OD, dnesPack, zdarmaDni);
       } else if (c.packageTotal > 0) {
         c.packageOdkial = `z PTmindera — v Kokpite nie je aktívny balíček${c.packageOdkial ? ` (${c.packageOdkial})` : ""}`;
       }
@@ -2118,6 +2149,30 @@ export function deriveAnomalies(
       push(`zdroj|${c.name}`, "blue", "Chýba zdroj",
         `${c.name}: nový klient bez zdroja — dopíš, odkiaľ prišiel, kým sa to vie`, c.name);
     }
+  }
+
+  /**
+   * BOL NA TRÉNINGU A NEMÁ AKTÍVNY BALÍČEK (odchod z PTmindera, 20. 10. 2026).
+   *
+   * Kým bežal PTminder, karta takému klientovi ukázala zostatok z exportu.
+   * Odteraz je bez balíčka v Kokpite bez balíčka — a tréning bez balíčka
+   * nemá z čoho odpočítať hodinu ani komu poslať platbu. Balíček normálne
+   * vzniká sám prvým tréningom (`automatickeBalicky`); táto notifikácia je
+   * pre tých, ktorým nevznikol (napr. bez predošlej veľkosti balíčka).
+   *
+   * Kľúč je meno, `platneOd` posledný taký tréning: „Vybavené" platí na to,
+   * čo bolo — ďalší tréning bez balíčka sa ozve znova. Staršie než 30 dní
+   * sa nehlási; s tým sa už nič nespraví a register by svietil celý.
+   */
+  for (const c of Object.values(clients)) {
+    const dni = c.treningyBezBalicka || [];
+    if (!dni.length) continue;
+    const posledny = dni[dni.length - 1];
+    if (daysBetween(posledny, dnesISO) > 30) continue;
+    const vypis = dni.filter((d) => daysBetween(d, dnesISO) <= 30).map((d) => fmtDMY(d)).join(", ");
+    push(`bezbalicka|${c.name}`, "orange", "Tréning bez balíčka",
+      `${c.name}: bol na tréningu (${vypis}) a nemá v Kokpite aktívny balíček — zapíš mu balíček v profile, inak sa tréning nemá z čoho odpočítať a nevznikne platba.`,
+      c.name, undefined, posledny);
   }
 
   // ── Narodeniny ───────────────────────────────────────────────────────────
