@@ -103,6 +103,18 @@ describe("peniaze bez dopytu", () => {
     const p2 = polozkyDozoru(d, [{ date: "2026-10-05", source: "reklama" }], {}, DNES).find((x) => x.key.startsWith("reklama|bezdopytu|"));
     expect(p2?.key).toBe("reklama|bezdopytu|2026-10-05|1");
   });
+
+  it("po odpovedi sa ozve až po ďalšej tisícke od nej (20. 10. 2026)", () => {
+    // 6.–10. 10. po 240 Kč denne (dve kampane × 120) = 1 200 Kč od dopytu 5. 10.
+    const d = data([kamp("1"), kamp("2")], [...dni("1", "2026-10-06", 5, 120), ...dni("2", "2026-10-06", 5, 120)]);
+    const dop = [{ date: "2026-10-05", source: "reklama" }];
+    // Odpovedal 8. 10. — odvtedy 9. a 10. = 480 Kč → ticho, aj keby prešla ďalšia tisícka.
+    const ack = { "reklama|bezdopytu|2026-10-05|1": { ackedAt: "2026-10-08T18:00:00Z", note: "vybavené" } };
+    expect(polozkyDozoru(d, dop, ack, DNES).find((x) => x.key.startsWith("reklama|bezdopytu|"))).toBeUndefined();
+    // Odpovedal 5. 10. (pred celým míňaním) — od odpovede 1 200 Kč → hlási sa znova.
+    const skora = { "reklama|bezdopytu|2026-10-05|1": { ackedAt: "2026-10-05T18:00:00Z", note: "vybavené" } };
+    expect(polozkyDozoru(d, dop, skora, DNES).find((x) => x.key.startsWith("reklama|bezdopytu|"))).toBeDefined();
+  });
 });
 
 describe("problémy a strop", () => {

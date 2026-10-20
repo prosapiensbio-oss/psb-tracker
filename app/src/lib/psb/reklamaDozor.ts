@@ -398,7 +398,20 @@ export function polozkyDozoru(
     const dniPo = d.dni.filter((x) => (posledny ? x.den > posledny : true));
     const minute = dniPo.reduce((s, x) => s + x.spend, 0);
     const tisicky = Math.floor(minute / PRAHY.kcBezDopytu);
-    if (tisicky >= 1) {
+    /**
+     * ODPOVEĎ POSÚVA POČÍTADLO (Jerry, 20. 10. 2026: „včera sme tieto reklamy
+     * riešili aj s Jarvisom, aj s Claudom — prečo mi tá notifikácia
+     * vyskakuje?"). Kľúč nesie tisícku, takže „Vybavené" pri 1 940 Kč neplatilo
+     * na 2 240 Kč a o deň neskôr zazvonilo to isté znova. Po odpovedi sa
+     * ďalšie upozornenie ozve až keď od nej odíde ďalších PRAHY.kcBezDopytu.
+     */
+    const predpona = `reklama|bezdopytu|${posledny || "nikdy"}|`;
+    const poslednaOdpoved = Object.entries(ack)
+      .filter(([k, v]) => k.startsWith(predpona) && v?.ackedAt)
+      .map(([, v]) => String(v!.ackedAt).slice(0, 10))
+      .sort().pop() || "";
+    const odOdpovede = poslednaOdpoved ? dniPo.filter((x) => x.den > poslednaOdpoved).reduce((s, x) => s + x.spend, 0) : minute;
+    if (tisicky >= 1 && odOdpovede >= PRAHY.kcBezDopytu) {
       const aspon = posledny && najstarsiDen && posledny < najstarsiDen ? "aspoň " : "";
       const spolu = bezia.reduce((s, x) => s + (x.denny || 0), 0);
       out.push({
