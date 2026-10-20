@@ -142,16 +142,43 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
     return kolko - ostava;
   };
   const posun = (d: string, dni: number) => new Date(Date.parse(`${d.slice(0, 10)}T00:00:00Z`) + dni * 86400000).toISOString().slice(0, 10);
+  /**
+   * BITCOINOVÁ PLATBA IDE NAJNOVŠIEMU BALÍČKU, KTORÝ V TOM ČASE BEŽÍ.
+   *
+   * Jan Kalmus, 20. 10. 2026: BTC platba 8 436 Kč prišla v deň, keď mu začal
+   * nový 8h Balíček za 8 460 Kč. Pravidlo „do 10 % od ceny" ju dovtedy dalo
+   * NAJSTARŠIEMU balíčku, ku ktorému cena sedela — septembrovému, dávno
+   * zaplatenému v PTminderi — a nový ostal ako dlh v plnej výške.
+   * Platba sa preto najprv hľadá k balíčku s najneskorším začiatkom v jej okne
+   * (−14 až +45 dní); balíček zaplatený inde (`zaplatenyInde`) ju nedostane.
+   */
+  const btcPre = new Set<number>();
+  for (const p of zasoba.filter((x) => x.bitcoin && x.zostava > 0)) {
+    const kand = nase
+      .map((b, i) => ({ b, i }))
+      .filter(({ b, i }) => !btcPre.has(i) && !zaplatenyInde?.(b)
+        && posun(b.platnostOd, -14) <= p.datum && p.datum <= posun(b.platnostOd, 45)
+        && Math.abs(p.zostava - (b.cena || 0)) <= (b.cena || 0) * KURZ_BTC)
+      .sort((x, y) => y.b.platnostOd.localeCompare(x.b.platnostOd));
+    if (kand[0]) { btcPre.add(kand[0].i); p.zostava = 0; p.cela = false; }
+  }
   const out: (B & { doplatit: number })[] = [];
-  for (const b of nase) {
+  for (const [i, b] of nase.entries()) {
+    if (btcPre.has(i)) continue;
     const cena = b.cena || 0;
-    if (zaplatenyInde?.(b)) { const hranica = posun(b.platnostOd, 45); zober(cena, (d) => d <= hranica); continue; }
-    // Len platba z obdobia balíčka (14 dní pred až 45 po začiatku) — inak by
-    // októbrová platba Gaža „sedela" aj na májové členstvo s podobnou cenou.
-    const od = posun(b.platnostOd, -14), po = posun(b.platnostOd, 45);
-    const btc = zasoba.find((p) => p.bitcoin && p.cela && p.zostava > 0 && p.datum >= od && p.datum <= po
-      && Math.abs(p.zostava - cena) <= cena * KURZ_BTC);
-    if (btc) { btc.zostava = 0; btc.cela = false; continue; }
+    if (zaplatenyInde?.(b)) {
+      /**
+       * A NIČ Z OBDOBIA NOVŠIEHO BALÍČKA (Jan Kalmus, 20. 10. 2026: BTC platba
+       * 8 436 Kč prišla v deň, keď začal nový 8h Balíček, a zobral si ju
+       * septembrový balíček zaplatený v PTminderi — nový ostal ako dlh 8 460).
+       * Peniaze, ktoré prídu v deň začiatku ďalšieho balíčka alebo po ňom,
+       * patria jemu.
+       */
+      const hranica = posun(b.platnostOd, 45);
+      const dalsi = nase.slice(i + 1).map((x) => x.platnostOd.slice(0, 10)).find((d) => d > b.platnostOd.slice(0, 10));
+      zober(cena, (d) => d <= hranica && (!dalsi || d < dalsi));
+      continue;
+    }
     const vzate = zober(cena, () => true);
     // Koruna tolerancie na zaokrúhlenie, ako pri rozdelení platby.
     if (vzate + 1 >= cena) continue;
@@ -202,7 +229,7 @@ export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
    * Platby z Kokpitu (banka, zošit) — len na rozpoznanie SPLÁTKY. Bez nich
    * sa splátka nerozpoznáva a poistka sa správa ako do 17. 10. 2026.
    */
-  kokpitPlatby: { klient: string; datum: string; suma: number }[] = [],
+  kokpitPlatby: { klient: string; datum: string; suma: number; sposob?: string }[] = [],
 ): T[] {
   const dni = (a: string, b: string) => (Date.parse(`${b.slice(0, 10)}T00:00:00Z`) - Date.parse(`${a.slice(0, 10)}T00:00:00Z`)) / 86400000;
   const pouzite = new Set<number>();
@@ -252,8 +279,13 @@ export function zaplateneVPtminderi<T extends BalicekDlh & { klient: string }>(
     // 17. 10. 2026). Splátka = platby z Kokpitu v okne balíčka (−14 až +45
     // dní), ktoré dajú aspoň 30 % ceny a menej než celú cenu.
     if (b.platnostOd >= KOKPIT_OD && cena > 0) {
+      // Bitcoinová platba do 10 % od ceny nie je splátka — je to celá platba
+      // (tohto alebo novšieho balíčka za tú istú cenu). Bez tejto výnimky by
+      // BTC platba za nový balíček urobila zo staršieho „čiastočne
+      // zaplatený" a PTminder by ho neodpustil (nález kontroly 20. 10. 2026).
       const vOkneKokpit = kokpitPlatby
         .filter((p) => meno(p.klient) === k && dni(b.platnostOd, p.datum) >= -14 && dni(b.platnostOd, p.datum) <= 45)
+        .filter((p) => !(p.sposob === "bitcoin" && Math.abs((Number(p.suma) || 0) - cena) <= cena * KURZ_BTC))
         .reduce((a, p) => a + (Number(p.suma) || 0), 0);
       if (vOkneKokpit >= cena * 0.3 && vOkneKokpit < cena - 1) return true;
     }

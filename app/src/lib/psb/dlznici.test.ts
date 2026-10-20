@@ -249,6 +249,36 @@ describe("splátky — Markéta Lozias, 17. 10. 2026", () => {
   });
 });
 
+describe("BTC platba v deň nového balíčka — Jan Kalmus, 20. 10. 2026", () => {
+  it("starý balíček zaplatený v PTminderi si ju nevezme", () => {
+    const { polozky } = dlhyKlientov({
+      poplatky: [],
+      balicky: [
+        { id: "sep", klient: "Jan Kalmus", nazov: "OFF - 8 hodín offline", cena: 8460, platnostOd: "2026-09-15", zdroj: "ptminder" },
+        { id: "okt", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-10-20", zdroj: "rucne" },
+      ],
+      platby: [{ klient: "Jan Kalmus", datum: "2026-10-20", suma: 8436, sposob: "bitcoin" }],
+      ptPlatby: [],
+      ptHistoria: [{ klient: "Jan Kalmus", od: "2026-09-15" }],
+    } as never);
+    expect(polozky).toEqual([]);
+  });
+
+  it("to isté o mesiac neskôr: BTC platba za nový balíček nie je splátka starého", () => {
+    const { polozky } = dlhyKlientov({
+      poplatky: [],
+      balicky: [
+        { id: "a", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-10-02", zdroj: "rucne" },
+        { id: "b", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-10-25", zdroj: "rucne" },
+      ],
+      platby: [{ klient: "Jan Kalmus", datum: "2026-10-25", suma: 8436, sposob: "bitcoin" }],
+      ptPlatby: [],
+      ptHistoria: [{ klient: "Jan Kalmus", od: "2026-10-02" }],
+    } as never);
+    expect(polozky).toEqual([]);
+  });
+});
+
 describe("ten istý predaj so zľavou — Peter Gažo, 11. 10. 2026", () => {
   // Gažo si 9. 10. kúpil jeden 18h balíček. PTminder ho vedie za cenníkových
   // 21 150 Kč, Kokpit si ho založil sám za 20 093 (5 % zľava za bitcoin).

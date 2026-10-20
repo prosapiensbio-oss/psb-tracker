@@ -190,7 +190,7 @@ export function dlhyKlientov(v: VstupDlhov): {
       prve, v.ptPlatby, v.ptHistoria,
       otvorene.map((p) => ({ klient: p.klient, datum: den(p.datum) })),
       normName,
-      v.platby.filter((p) => !p.zruseneAt).map((p) => ({ klient: p.klient, datum: den(p.datum), suma: p.suma })),
+      v.platby.filter((p) => !p.zruseneAt).map((p) => ({ klient: p.klient, datum: den(p.datum), suma: p.suma, sposob: p.sposob })),
     );
     if (nezaplatene.length === prve.length) return nezaplatene;
     const ostali = new Set(nezaplatene.map((b) => b.poradie));
