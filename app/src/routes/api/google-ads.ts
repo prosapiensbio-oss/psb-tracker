@@ -271,6 +271,9 @@ export const Route = createFileRoute("/api/google-ads")({
               ok: true,
               sprava: `Zistené: ${vysledok.vyrazy.length} výrazov (${REGIONY_OBJEMU[region]})${ri.ok ? `, ${vysledok.napady.length} podobných` : ` – podobné výrazy sa nezistili: ${ri.chyba}`}.`,
               objem: vysledok,
+              // ako Google výrazy zoskupil (blízke varianty) – keď sledovaný výraz vyjde 0, odpoveď je tu
+              skupiny: ((rh.data as { results?: { text?: string; closeVariants?: string[]; keywordMetrics?: { avgMonthlySearches?: string } }[] })?.results || [])
+                .map((x) => ({ text: x.text, varianty: x.closeVariants || [], mesacne: Number(x.keywordMetrics?.avgMonthlySearches || 0) })),
             });
           }
 
