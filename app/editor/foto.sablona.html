@@ -498,6 +498,16 @@
    */
   window.rozrobene = (() => {
     let aktualny = null;             // id otvoreného návrhu (na serveri)
+    /**
+     * Fotky otvoreného návrhu, tak ako ich drží editor. Jerry, 20. 10. 2026:
+     * „uložil som si do rozrobených Hanusa a teraz tam nie je." Otvorený návrh
+     * sa ukladal pod to isté id aj vtedy, keď sa doň vložili INÉ fotky — práca
+     * nad ďalšou dvojicou (bok → predok) tak ticho prepísala predošlú. Keď
+     * z fotiek návrhu niektorá zmizne, ide to do NOVÉHO návrhu a starý ostane.
+     * Doplnenie prázdnej polovice ani prehodenie strán nie je iná práca.
+     */
+    let zdrojeNavrhu = [];
+    const ineFotky = (teraz) => zdrojeNavrhu.some((z) => z && !teraz.includes(z));
     const naServeri = new Map();     // lokálna adresa fotky (blob:, data:) → adresa na serveri
     let casovac = 0, ukladam = Promise.resolve();
     const stavText = (t) => { $("stavUlozenia").textContent = t; };
@@ -543,13 +553,17 @@
     async function uloz(t) {
       const o = JSON.parse(t);
       if (!o.stav.some((x) => x.src)) return; // prázdny editor sa neukladá
+      const teraz = o.stav.map((x) => x.src || "");
       const krok = async () => {
         try {
+          let inyNavrh = false;
+          if (aktualny && ineFotky(teraz)) { aktualny = null; inyNavrh = true; }
           const nahlad = await sk.vyrobJpeg(320);
           const j = await posliNaServer(aktualny, kt.klient, o, sk.rozmeryFotiek(), nahlad, (src) => fetch(src).then((r) => r.blob()));
           aktualny = j.id;
+          zdrojeNavrhu = teraz;
           // „v rozrobených", nie „uložené" — 15. 10. 2026 si to Jerry pomýlil s uložením do profilu.
-          stavText(`v rozrobených ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
+          stavText(`${inyNavrh ? "iné fotky → nový návrh, " : ""}v rozrobených ${new Date().toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" })}`);
           nacitajZoznam();
         } catch (e) {
           stavText("neuložilo sa — skúsim pri ďalšej zmene");
@@ -568,6 +582,7 @@
       ulozeneZdroje = null; // návrh si nesie vlastný popis — nemazať ho
       nastavUpravovane(null);
       sk.nacitajStav(j.edit.stav, j.edit.rozmery || {});
+      zdrojeNavrhu = sk.stav.map((x) => x.src || "");
       // Klient návrhu sa nastaví aj hore v Kokpite — ukladanie ku klientovi pôjde jemu.
       if (j.klient && j.klient !== kt.klient && kt.vKokpite) window.parent.postMessage({ typ: "psb-nastav-klienta", meno: j.klient }, location.origin);
       stavText(`otvorené · ${cas(j.upravene)}`);
@@ -576,13 +591,14 @@
     async function zmaz(id) {
       if (!confirm("Zmazať tento rozrobený návrh? Zmizne na všetkých zariadeniach.")) return;
       await fetch("/api/editor-navrhy", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ akcia: "zmaz", id }) }).catch(() => null);
-      if (aktualny === id) aktualny = null;
+      if (aktualny === id) { aktualny = null; zdrojeNavrhu = []; }
       nacitajZoznam();
     }
     /** Ďalšie zmeny pôjdu do nového návrhu; vycistit = aj prázdny editor. */
     function novy(vycistit = true) {
       clearTimeout(casovac);
       aktualny = null;
+      zdrojeNavrhu = [];
       ulozeneZdroje = null;
       nastavUpravovane(null);
       if (vycistit) sk.nacitajStav(sk.prazdnyStav, {});
@@ -665,7 +681,7 @@
     // istým id založilo znova, preto ho editor púšťa (nová úprava = nový návrh).
     addEventListener("message", (e) => {
       if (e.origin !== location.origin || e.data?.typ !== "psb-navrhy-zmazane") return;
-      if (aktualny && (kt.klient || "") === e.data.klient) aktualny = null;
+      if (aktualny && (kt.klient || "") === e.data.klient) { aktualny = null; zdrojeNavrhu = []; }
       nacitajZoznam();
     });
     // Návrat na stránku (iné zariadenie medzitým mohlo uložiť) → čerstvý zoznam.

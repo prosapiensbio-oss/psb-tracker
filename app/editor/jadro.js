@@ -1384,25 +1384,25 @@
       h.style.left = `${P.x}px`; h.style.top = `${P.y}px`;
     }
     if (otocUchyt) {
-      // Úchyt na otáčanie nad horným okrajom (v osi fotky), aby ho nezakryl prst pri rohu.
-      // Jerry, 19. 10. 2026: „potrebujem tú fotku aj otáčať" — fotka, ktorá vypĺňa
-      // polovicu, mala úchyt nad štvorcom, mimo obrazovky. Keď nad fotkou nie je
-      // vidno, úchyt ide dovnútra polovice, k jej hornému okraju (uhol sa ráta
-      // okolo stredu fotky, na mieste úchytu nezáleží).
-      let P = zFotky(o, 0, -o.h / 2 - 34);
+      // Úchyt na otáčanie NAD HORNOU HRANOU FOTKY, mimo nej (Jerry, 20. 10. 2026:
+      // „koliečko nech je za hranami fotky, hore nad hornou hranou"). Keď stred
+      // hornej hrany nie je vidno (fotka cez celú polovicu, priblížená plocha),
+      // posunie sa po hrane do viditeľnej časti; keď nie je vidno nič nad
+      // fotkou, ide nad horný okraj polovice. Dovnútra fotky len keď nad ňou
+      // nie je na obrazovke miesto vôbec. Uhol sa ráta okolo stredu fotky,
+      // na mieste úchytu nezáleží.
       const b = stvorec.getBoundingClientRect(), pl = (document.getElementById("platno") || stvorec).getBoundingClientRect();
       const vid = { x: pl.left - b.left, y: pl.top - b.top, r: pl.right - b.left, d: pl.bottom - b.top };
       const vidno = (Q) => Q.x >= vid.x + 16 && Q.x <= vid.r - 16 && Q.y >= vid.y + 16 && Q.y <= vid.d - 16;
-      const vonku = vidno(P);
-      if (!vonku) {
-        // Stred viditeľnej časti polovice, pri jej hornom okraji.
-        const l = Math.max(o.R.x, vid.x), r = Math.min(o.R.x + o.R.w, vid.r);
-        P = { x: (l + r) / 2, y: Math.max(o.R.y, vid.y) + 26 };
-      }
+      const okrajL = Math.max(o.R.x, vid.x), okrajP = Math.min(o.R.x + o.R.w, vid.r), stredVid = (okrajL + okrajP) / 2;
+      const lx = Math.max(-o.w / 2 + 20, Math.min(o.w / 2 - 20, stredVid - o.cx));
+      let P = zFotky(o, 0, -o.h / 2 - 34), hrana = zFotky(o, 0, -o.h / 2), stopka = true;
+      if (!vidno(P)) { P = zFotky(o, lx, -o.h / 2 - 34); hrana = zFotky(o, lx, -o.h / 2); }
+      if (!vidno(P)) { P = { x: stredVid, y: o.R.y - 26 }; stopka = false; }
+      if (!vidno(P)) P = { x: stredVid, y: Math.max(o.R.y, vid.y) + 26 };
       otocUchyt.style.left = `${P.x}px`; otocUchyt.style.top = `${P.y}px`;
-      const hrana = zFotky(o, 0, -o.h / 2);
       const st = uchopy.querySelector(".otoc-stopka");
-      if (st) Object.assign(st.style, { left: `${hrana.x}px`, top: `${hrana.y}px`, transform: `rotate(${o.rot}deg)`, display: vonku ? "" : "none" });
+      if (st) Object.assign(st.style, { left: `${hrana.x}px`, top: `${hrana.y}px`, transform: `rotate(${o.rot}deg)`, display: stopka ? "" : "none" });
     }
   }
   const miestoVoStvorci = (e) => {
