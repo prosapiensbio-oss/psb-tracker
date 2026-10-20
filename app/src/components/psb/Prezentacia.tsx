@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { dalej, plnyKrok, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
@@ -43,9 +43,20 @@ const SEM: Record<Semafor, { farba: string; slovo: string }> = {
 const W = 1600;
 const H = 900;
 const OKRAJ = 96;
+
+/**
+ * Rozmer plátna. Na šírku 1600×900 (projektor, notebook); na telefóne na výšku 720×1280 – slajd sa
+ * poskladá do jedného stĺpca s väčším písmom (Jerry: „rozloženie pre mobil“, zoznam úloh č. 16).
+ * 16:9 na výšku zostal pásik s písmom pod 8 px a „otoč telefón“ nie je rozloženie.
+ */
+type Rozmer = { w: number; h: number; okraj: number; obsahW: number; obsahH: number; naVysku: boolean };
+const rozmer = (naVysku: boolean): Rozmer => {
+  const [w, h, okraj] = naVysku ? [720, 1280, 48] : [W, H, OKRAJ];
+  return { w, h, okraj, obsahW: w - 2 * okraj, obsahH: h - 2 * okraj, naVysku };
+};
+const RozmerCtx = createContext<Rozmer>(rozmer(false));
+const useRozmer = () => useContext(RozmerCtx);
 /** Plocha pre obsah slajdu. Pod ňou je ešte pätka (pinned na bottom: 36). */
-const OBSAH_W = W - 2 * OKRAJ;
-const OBSAH_H = H - 2 * OKRAJ;
 
 /** Blok, ktorý sa objaví až vo svojom kroku. Miesto si drží vždy — inak by sa rozloženie pri odkrývaní hýbalo. */
 function Blok({ ukaz, children, style }: { ukaz: boolean; children: React.ReactNode; style?: React.CSSProperties }) {
@@ -79,15 +90,16 @@ function Stlpce({ seria, popis, farba, vyska = 230 }: { seria: number[]; popis: 
 }
 
 function Titulka({ s, krok }: { s: SlajdTitulka; krok: number }) {
+  const r = useRozmer();
   return (
-    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: r.naVysku ? 48 : 0 }}>
       <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: ZELENA }}>ProSapiens Bio · uzávierka</div>
       <div>
-        <h1 style={{ margin: 0, fontSize: 132, lineHeight: 1, fontWeight: 800, letterSpacing: "-.03em", color: TEXT }}>{s.nadpis}</h1>
+        <h1 style={{ margin: 0, fontSize: r.naVysku ? 104 : 132, lineHeight: 1, fontWeight: 800, letterSpacing: "-.03em", color: TEXT }}>{s.nadpis}</h1>
         <div style={{ fontSize: 40, color: SLABA, marginTop: 24 }}>{s.porovnanie}</div>
       </div>
       <Blok ukaz={krok >= 1}>
-        <div style={{ display: "flex", gap: 56, borderTop: `2px solid ${LINKA}`, paddingTop: 28 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: r.naVysku ? "28px 40px" : 56, borderTop: `2px solid ${LINKA}`, paddingTop: 28 }}>
           {s.cisla.map((c) => (
             <div key={c.popis}>
               <div style={{ fontSize: 56, fontWeight: 800, color: ZELENA, letterSpacing: "-.02em" }}>{c.hodnota}</div>
@@ -101,10 +113,11 @@ function Titulka({ s, krok }: { s: SlajdTitulka; krok: number }) {
 }
 
 function SemaforSlajd({ s, krok }: { s: SlajdSemafor; krok: number }) {
+  const r = useRozmer();
   return (
-    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 28 }}>
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 28 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignContent: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr", gap: r.naVysku ? 16 : 20, alignContent: "start" }}>
         {s.karty.map((k, i) => {
           const sem = SEM[k.semafor];
           return (
@@ -132,8 +145,9 @@ function SemaforSlajd({ s, krok }: { s: SlajdSemafor; krok: number }) {
 
 function OtazkaSlajd({ s, krok }: { s: SlajdOtazka; krok: number }) {
   const sem = SEM[s.semafor];
+  const r = useRozmer();
   return (
-    <div style={{ minHeight: OBSAH_H, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 56, alignContent: "start" }}>
+    <div style={{ minHeight: r.obsahH, display: "grid", gridTemplateColumns: r.naVysku ? "minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)", gap: r.naVysku ? 32 : 56, alignContent: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 26, minWidth: 0 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
@@ -196,10 +210,11 @@ function ZaverSlajd({ s, krok }: { s: SlajdZaver; krok: number }) {
       </div>
     </Blok>
   );
+  const r = useRozmer();
   return (
-    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 44 }}>
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: r.naVysku ? 32 : 44 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignContent: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr", gap: r.naVysku ? 36 : 56, alignContent: "start" }}>
         {s.dobre.length > 0 && stlpec("Čo šlo dobre", ZELENA, s.dobre, krok >= 1)}
         {s.pozor.length > 0 && stlpec("Čo si žiada pozornosť", "#B07A12", s.pozor, krok >= (s.dobre.length ? 2 : 1))}
       </div>
@@ -215,8 +230,9 @@ function ZaverSlajd({ s, krok }: { s: SlajdZaver; krok: number }) {
 }
 
 function AkcieSlajd({ s, krok }: { s: SlajdAkcie; krok: number }) {
+  const r = useRozmer();
   return (
-    <div style={{ minHeight: OBSAH_H, display: "flex", flexDirection: "column", gap: 36 }}>
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 36 }}>
       <h2 style={{ margin: 0, fontSize: 64, fontWeight: 800, letterSpacing: "-.02em", color: TEXT }}>{s.nadpis}</h2>
       {s.akcie.length === 0 ? (
         <Blok ukaz={krok >= 1}>
@@ -264,22 +280,23 @@ export const PLATNO = { sirka: W, vyska: H };
 function Zmesti({ children }: { children: React.ReactNode }) {
   const obsah = useRef<HTMLDivElement | null>(null);
   const [f, setF] = useState(1);
+  const { obsahH, obsahW } = useRozmer();
   useLayoutEffect(() => {
     const el = obsah.current;
     if (!el) return;
     const zmeraj = () => {
       const h = el.offsetHeight;
-      const novy = h > OBSAH_H ? Math.max(0.55, OBSAH_H / h) : 1;
+      const novy = h > obsahH ? Math.max(0.55, obsahH / h) : 1;
       setF((stary) => (Math.abs(stary - novy) > 0.002 ? novy : stary));
     };
     zmeraj();
     const po = new ResizeObserver(zmeraj);
     po.observe(el);
     return () => po.disconnect();
-  }, [children]);
+  }, [children, obsahH]);
   return (
-    <div style={{ height: OBSAH_H, position: "relative" }}>
-      <div style={{ width: OBSAH_W, transform: f < 1 ? `scale(${f})` : undefined, transformOrigin: "top center" }}>
+    <div style={{ height: obsahH, position: "relative" }}>
+      <div style={{ width: obsahW, transform: f < 1 ? `scale(${f})` : undefined, transformOrigin: "top center" }}>
         <div ref={obsah}>{children}</div>
       </div>
     </div>
@@ -290,27 +307,31 @@ function Zmesti({ children }: { children: React.ReactNode }) {
  * Jeden slajd na plátne 1600×900. Vyčlenené z prezentácie, aby sa ten istý
  * slajd dal vykresliť aj bez nej — náhľad pri stavaní, neskôr tlač.
  */
-export function Platno({ s, krok, pata, strana, zoSlajdov, onKlik }: {
-  s: Slajd; krok: number; pata: string; strana?: number; zoSlajdov?: number; onKlik?: () => void;
+export function Platno({ s, krok, pata, strana, zoSlajdov, onKlik, naVysku = false }: {
+  s: Slajd; krok: number; pata: string; strana?: number; zoSlajdov?: number; onKlik?: () => void; naVysku?: boolean;
 }) {
+  const r = useMemo(() => rozmer(naVysku), [naVysku]);
   return (
+    <RozmerCtx.Provider value={r}>
     <div onClick={onKlik}
-      style={{ width: W, height: H, flex: "0 0 auto", background: POZADIE, color: TEXT, cursor: onKlik ? "pointer" : "default",
+      style={{ width: r.w, height: r.h, flex: "0 0 auto", background: POZADIE, color: TEXT, cursor: onKlik ? "pointer" : "default",
         fontFamily: '"Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: OKRAJ, boxSizing: "border-box", position: "relative" }}>
+        padding: r.okraj, boxSizing: "border-box", position: "relative" }}>
       <Zmesti>
         <Obsah s={s} krok={krok} />
       </Zmesti>
-      <div style={{ position: "absolute", left: OKRAJ, bottom: 36, fontSize: 18, color: SLABA }}>{pata}</div>
+      <div style={{ position: "absolute", left: r.okraj, bottom: naVysku ? 20 : 36, right: naVysku ? r.okraj + 90 : undefined, fontSize: 18, color: SLABA, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pata}</div>
       {strana !== undefined && zoSlajdov !== undefined && (
-        <div style={{ position: "absolute", right: OKRAJ, bottom: 36, display: "flex", gap: 8, alignItems: "center" }}>
-          {Array.from({ length: zoSlajdov }, (_, j) => (
+        <div style={{ position: "absolute", right: r.okraj, bottom: naVysku ? 20 : 36, display: "flex", gap: 8, alignItems: "center" }}>
+          {/* na výšku len „3 / 12“ – bodky by sa bili s pätou */}
+          {!naVysku && Array.from({ length: zoSlajdov }, (_, j) => (
             <span key={j} style={{ width: j === strana - 1 ? 22 : 8, height: 8, borderRadius: 4, background: j === strana - 1 ? ZELENA : LINKA, transition: "width .2s ease" }} />
           ))}
           <span style={{ fontSize: 18, color: SLABA, marginLeft: 10, fontVariantNumeric: "tabular-nums" }}>{strana} / {zoSlajdov}</span>
         </div>
       )}
     </div>
+    </RozmerCtx.Provider>
   );
 }
 
@@ -320,8 +341,10 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   // pri rýchlom klikaní prečítali navzájom staré.
   const [kde, setKde] = useState(() => ({ i: 0, krok: plnyKrok(slajdy, 0) }));
   const [mierka, setMierka] = useState(1);
-  /** Úzka obrazovka na výšku — telefón. Slajd je 16:9, takže na výšku z neho zostane pásik. */
+  /** Úzka obrazovka na výšku — telefón: plátno 720×1280 a slajd v jednom stĺpci (rozmer()). */
   const [naVysku, setNaVysku] = useState(false);
+  /** Tlač / PDF: všetky slajdy celé, každý na vlastnej strane. */
+  const [tlac, setTlac] = useState(false);
   const [celaObrazovka, setCelaObrazovka] = useState(false);
   const ram = useRef<HTMLDivElement | null>(null);
   const { i, krok } = kde;
@@ -345,8 +368,11 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
     const prepocitaj = () => {
       const w = window.innerWidth || document.documentElement.clientWidth || 1280;
       const h = window.innerHeight || document.documentElement.clientHeight || 800;
-      setMierka(Math.max(0.1, Math.min((w - 24) / W, (h - 84) / H)));
-      setNaVysku(w < 700 && h > w);
+      const vysku = w < 700 && h > w;
+      const p = rozmer(vysku);
+      // na výšku sú tlačidlá hore aj dole MIMO slajdu (inak ležia na texte): 64 px hore, 72 px dole
+      setMierka(Math.max(0.1, Math.min((w - 24) / p.w, (h - (vysku ? 64 + 72 : 84)) / p.h)));
+      setNaVysku(vysku);
     };
     prepocitaj();
     window.addEventListener("resize", prepocitaj);
@@ -372,9 +398,24 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
     return () => window.removeEventListener("keydown", k);
   }, [vpred, vzad, slajdy, onZavri, prepniCeluObrazovku]);
 
+  // Tlač: najprv sa vykreslia všetky strany (portál #prezentacia-tlac), až potom dialóg tlače;
+  // po ňom (aj po zrušení) sa strany zahodia.
+  useEffect(() => {
+    if (!tlac) return;
+    const hotovo = () => setTlac(false);
+    window.addEventListener("afterprint", hotovo);
+    const t = setTimeout(() => window.print(), 400);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("afterprint", hotovo);
+    };
+  }, [tlac]);
+
   const s = slajdy[i];
   if (!s) return null;
   const naKonci = !dalej(slajdy, i, krok);
+  const r = rozmer(naVysku);
+  const pata = `${report.nadpis} · ${report.porovnanie}`;
 
   const tlacidlo: React.CSSProperties = {
     background: "rgba(12,17,11,.88)", border: "1px solid rgba(255,255,255,.3)", color: "#EAF1EC",
@@ -384,35 +425,63 @@ export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () =
   return createPortal(
     <div ref={ram} role="dialog" aria-modal="true" aria-label={`Prezentácia ${report.nadpis}`}
       style={{ position: "fixed", inset: 0, zIndex: 120, background: RAM, display: "grid", placeItems: "center", overflow: "hidden",
-        padding: "12px 12px 72px", boxSizing: "border-box",
+        padding: naVysku ? "64px 12px 72px" : "12px 12px 72px", boxSizing: "border-box",
         // Klik posúva slajd; bez tohto druhý klik označí text pod kurzorom.
         userSelect: "none", WebkitUserSelect: "none" }}>
       {/* Obal má UŽ ZMENŠENÝ rozmer a plátno sa škáluje od ľavého horného rohu.
           Keď sa škálovalo od stredu, grid dostal box široký 1600 px, pri menšom
           okne ho zarovnal na začiatok (tak sa rieši pretečenie) a slajd potom
           trčal vpravo — presne to Jerry videl 12. 10. */}
-      <div style={{ width: Math.round(W * mierka), height: Math.round(H * mierka), flex: "0 0 auto", overflow: "hidden", boxShadow: "0 30px 90px rgba(0,0,0,.5)" }}>
-        <div style={{ width: W, height: H, transform: `scale(${mierka})`, transformOrigin: "top left" }}>
-          <Platno s={s} krok={krok} pata={`${report.nadpis} · ${report.porovnanie}`} strana={i + 1} zoSlajdov={slajdy.length} onKlik={vpred} />
+      <div style={{ width: Math.round(r.w * mierka), height: Math.round(r.h * mierka), flex: "0 0 auto", overflow: "hidden", boxShadow: "0 30px 90px rgba(0,0,0,.5)" }}>
+        <div style={{ width: r.w, height: r.h, transform: `scale(${mierka})`, transformOrigin: "top left" }}>
+          <Platno s={s} krok={krok} pata={pata} strana={i + 1} zoSlajdov={slajdy.length} onKlik={vpred} naVysku={naVysku} />
         </div>
       </div>
-
-      {naVysku && (
-        <div style={{ position: "fixed", top: 72, left: 0, right: 0, textAlign: "center", fontSize: 14, color: "rgba(234,241,236,.72)", zIndex: 2 }}>
-          Otoč telefón na šírku — slajd je 16 : 9.
-        </div>
-      )}
 
       {/* Ovládanie je MIMO plátna, aby sa nezmenšovalo spolu s ním. */}
       <div style={{ position: "fixed", top: 16, right: 16, display: "flex", gap: 8, zIndex: 2 }}>
-        <button onClick={() => void prepniCeluObrazovku()} style={tlacidlo}>{celaObrazovka ? "Zmenšiť" : "Celá obrazovka"}</button>
+        <button onClick={() => setTlac(true)} disabled={tlac} style={tlacidlo} title="Všetky slajdy, každý na vlastnej strane – v dialógu tlače sa dá „Uložiť ako PDF“ a poslať">
+          {tlac ? "Pripravujem…" : "🖨 Tlačiť / PDF"}
+        </button>
+        {!naVysku && <button onClick={() => void prepniCeluObrazovku()} style={tlacidlo}>{celaObrazovka ? "Zmenšiť" : "Celá obrazovka"}</button>}
         <button onClick={onZavri} style={tlacidlo}>Zavrieť ✕</button>
       </div>
+      {tlac && <TlacPrezentacie slajdy={slajdy} pata={pata} />}
       <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, zIndex: 2, alignItems: "center" }}>
         <button onClick={vzad} disabled={i === 0} style={{ ...tlacidlo, opacity: i === 0 ? 0.4 : 1 }}>‹ Späť</button>
         <button onClick={vpred} disabled={naKonci} style={{ ...tlacidlo, opacity: naKonci ? 0.4 : 1 }}>Ďalej ›</button>
         {!naVysku && <span style={{ fontSize: 12.5, color: "rgba(234,241,236,.6)", marginLeft: 10 }}>šípky · medzerník · F = celá obrazovka</span>}
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Prezentácia na tlač / do PDF (zoznam úloh č. 16): každý slajd celý (všetky kroky odkryté) na
+ * vlastnej strane 16:9. Strany sa kreslia do `document.body` mimo okna prezentácie a tlač
+ * skryje všetko ostatné – inak by sa tlačila appka pod prezentáciou.
+ */
+function TlacPrezentacie({ slajdy, pata }: { slajdy: Slajd[]; pata: string }) {
+  return createPortal(
+    <div id="prezentacia-tlac">
+      <style>{`
+        @media screen { #prezentacia-tlac { position: fixed; left: -100000px; top: 0; } }
+        @media print {
+          @page { size: ${W}px ${H}px; margin: 0; }
+          html, body { margin: 0 !important; padding: 0 !important; background: ${POZADIE} !important; }
+          body > *:not(#prezentacia-tlac) { display: none !important; }
+          #prezentacia-tlac { display: block !important; position: static !important; }
+          #prezentacia-tlac .strana { width: ${W}px; height: ${H}px; overflow: hidden; break-after: page; page-break-after: always; }
+          #prezentacia-tlac .strana:last-child { break-after: auto; page-break-after: auto; }
+          #prezentacia-tlac * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}</style>
+      {slajdy.map((s, i) => (
+        <div className="strana" key={i}>
+          <Platno s={s} krok={plnyKrok(slajdy, i)} pata={pata} strana={i + 1} zoSlajdov={slajdy.length} />
+        </div>
+      ))}
     </div>,
     document.body,
   );
