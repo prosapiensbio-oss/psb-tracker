@@ -38,6 +38,8 @@ type Riadok = {
 /** Rozpísaná položka za ďalšieho klienta — čísla ako text, kým sa píšu. */
 type DalsiaPolozka = { klient: string; popis: string; ks: string; cena: string };
 
+type Odberatel = { id: string; klient: string; firma: string; ico: string; dic: string; ulica: string; psc: string; mesto: string; stat: string };
+
 type Udaje = {
   klient: string; stat: string; firma: string; ico: string; dic: string;
   ulica: string; psc: string; mesto: string; email: string; dalsie_maily: string;
@@ -98,6 +100,13 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
 }) {
   const [riadky, setRiadky] = useState<Riadok[] | null>(null);
   const [udaje, setUdaje] = useState<Udaje[]>([]);
+  /**
+   * ĎALŠIE FIRMY KLIENTA (Jerry, 20. 10. 2026: „ulož obidva a daj mi možnosť
+   * to zmeniť, predvolene nechaj 19806710"). Predvolená je v `udaje`; tu sú
+   * ostatné. Výber platí pre jednu faktúru, „nastaviť ako predvolenú" natrvalo.
+   */
+  const [odberatelia, setOdberatelia] = useState<Odberatel[]>([]);
+  const [odberatelId, setOdberatelId] = useState("");
   const [chyba, setChyba] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [pracujem, setPracujem] = useState("");
@@ -141,6 +150,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     if (!j?.ok) { setChyba(j?.error || "Faktúry sa nenačítali."); return; }
     setRiadky(j.faktury || []);
     setUdaje(j.udaje || []);
+    setOdberatelia(j.odberatelia || []);
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
@@ -167,6 +177,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
    * súčasne vidím, že nemám fakturačné údaje — to by malo na mňa vyskočiť."
    * Dovtedy to bol tlmený odkaz „doplniť" na pravom okraji riadku.
    */
+  const dalsieFirmy = useMemo(() => odberatelia.filter((o) => o.klient === f.klient), [odberatelia, f.klient]);
+  const vybrana = dalsieFirmy.find((o) => o.id === odberatelId) || null;
+  useEffect(() => { setOdberatelId(""); }, [f.klient]);
   useEffect(() => {
     setU(udajeKlienta ? { ...PRAZDNE_UDAJE, ...udajeKlienta } : PRAZDNE_UDAJE);
     setUpravujemUdaje(!udajeKlienta && !!f.klient);
@@ -257,6 +270,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       cena: Number(f.cena) || 0, vystavene: f.vystavene,
       splatnostDni: Number(f.splatnostDni) || SPLATNOST_DNI,
       poznamka: f.poznamka, balicekId: f.balicekId || undefined,
+      odberatelId: vybrana?.id || undefined,
       dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0 })),
     }, "vystav");
     if (!j) return;
@@ -492,13 +506,38 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
           <input value={f.poznamka} onChange={(e) => setF((s) => ({ ...s, poznamka: e.target.value }))} style={{ ...poleStyl, marginBottom: 10 }} />
 
           <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 8 }}>
-            Odberateľ: <b style={{ color: C.text }}>{udajeKlienta?.firma || f.klient || "—"}</b>
-            {udajeKlienta?.ico ? ` · IČ ${udajeKlienta.ico}` : ""}
+            Odberateľ: <b style={{ color: C.text }}>{vybrana?.firma || udajeKlienta?.firma || f.klient || "—"}</b>
+            {(vybrana ? vybrana.ico : udajeKlienta?.ico) ? ` · IČ ${vybrana ? vybrana.ico : udajeKlienta?.ico}` : ""}
             {udajeKlienta?.email ? ` · ${udajeKlienta.email}` : ""}
             {!udajeKlienta && f.klient
               ? <b style={{ color: C.orange }}> — fakturačné údaje ešte nemá, doplň ich nižšie</b>
               : null}
           </div>
+          {dalsieFirmy.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontSize: 11.5, color: C.textMuted }}>Faktúra na:</span>
+              {[{ id: "", firma: udajeKlienta?.firma || f.klient, ico: udajeKlienta?.ico || "", predvolena: true }, ...dalsieFirmy.map((o) => ({ ...o, predvolena: false }))].map((o) => {
+                const on = (o.id || "") === (vybrana?.id || "");
+                return (
+                  <button key={o.id || "predvolena"} type="button" onClick={() => setOdberatelId(o.id)}
+                    style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                      border: `1px solid ${on ? C.accent : C.border}`, background: on ? mix(C.accent, 16) : "transparent", color: on ? C.accentLight : C.textMuted }}>
+                    {o.firma}{o.ico ? ` · ${o.ico}` : ""}{o.predvolena ? " (predvolená)" : ""}
+                  </button>
+                );
+              })}
+              {vybrana && (
+                <button type="button" disabled={pracujem === "predvolena"}
+                  onClick={() => void (async () => {
+                    const j = await posli({ akcia: "odberatel-predvoleny", klient: f.klient, id: vybrana.id }, "predvolena");
+                    if (j?.ok) { setOdberatelId(""); setHlaska(`Predvolená firma pre ${f.klient}: ${vybrana.firma}. Doterajšia ostala uložená.`); }
+                  })()}
+                  style={{ background: "none", border: "none", color: C.textMuted, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                  nastaviť ako predvolenú
+                </button>
+              )}
+            </div>
+          )}
 
           <button
             type="button"

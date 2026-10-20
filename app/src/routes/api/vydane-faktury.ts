@@ -120,6 +120,38 @@ const prazdneUdaje = {
   os_titul: "", os_meno: "", os_priezvisko: "", os_mobil: "",
 };
 
+/**
+ * ODLOŽENIE PREDVOLENEJ FIRMY (Jerry, 20. 10. 2026: „vymazávať si to nemusel").
+ * Keď sa pri klientovi mení firma alebo IČ, doterajšia sa uloží medzi ďalšie
+ * firmy (`klient_odberatelia`) — ak tam už nie je. A tá, ktorá sa práve stáva
+ * predvolenou, sa spomedzi ďalších vyradí, aby nebola dvakrát.
+ */
+async function odlozOdberatela(
+  DB: import("@cloudflare/workers-types").D1Database,
+  klient: string,
+  bolo: Record<string, string | null> | null,
+  nove: { firma: string; ico: string; dic?: string; ulica?: string; psc?: string; mesto?: string; stat?: string },
+  kto: string | null | undefined,
+): Promise<void> {
+  const firma = String(bolo?.firma || "").trim(), ico = String(bolo?.ico || "").trim();
+  const zmena = (firma || ico) && (firma !== String(nove.firma || "").trim() || ico !== String(nove.ico || "").trim());
+  const prikazy = [];
+  if (zmena) {
+    const uz = await DB.prepare("SELECT id FROM klient_odberatelia WHERE klient = ?1 AND firma = ?2 AND ico = ?3")
+      .bind(klient, firma, ico).first().catch(() => null);
+    if (!uz) {
+      prikazy.push(DB.prepare(
+        `INSERT INTO klient_odberatelia (id, klient, firma, ico, dic, ulica, psc, mesto, stat, created_at, autor)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)`,
+      ).bind(uid(), klient, firma, ico, String(bolo?.dic || ""), String(bolo?.ulica || ""), String(bolo?.psc || ""),
+        String(bolo?.mesto || ""), String(bolo?.stat || "Česká republika"), teraz(), kto || null));
+    }
+  }
+  prikazy.push(DB.prepare("DELETE FROM klient_odberatelia WHERE klient = ?1 AND firma = ?2 AND ico = ?3")
+    .bind(klient, String(nove.firma || "").trim(), String(nove.ico || "").trim()));
+  await DB.batch(prikazy).catch(() => null);
+}
+
 export const Route = createFileRoute("/api/vydane-faktury")({
   server: {
     handlers: {
@@ -190,6 +222,10 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             maRiadok.add(kluc);
             udaje.push({ klient, email: z.email, telefon: z.telefon, zDopytu: 1 });
           }
+          // Ďalšie firmy pri klientovi (migrácia 0122) — predvolená je v udaje.
+          const odberatelia = ((await DB.prepare(
+            "SELECT id, klient, firma, ico, dic, ulica, psc, mesto, stat, created_at FROM klient_odberatelia ORDER BY created_at",
+          ).all().catch(() => ({ results: [] }))).results || []) as Record<string, unknown>[];
           // Kontakty na spárovanie — bez klienta a neodložené.
           const k = await DB.prepare(
             "SELECT id, firma, ico, dic, email, telefon, os_meno, os_priezvisko, klient, odlozene_at FROM fakturacne_kontakty ORDER BY firma",
@@ -201,7 +237,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const d = polozky.get(String(r.id));
             return d ? { ...r, dalsie: d } : r;
           });
-          return Response.json({ ok: true, faktury, udaje, kontakty: k.results || [] },
+          return Response.json({ ok: true, faktury, udaje, odberatelia, kontakty: k.results || [] },
             { headers: { "cache-control": "no-store" } });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
@@ -266,6 +302,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) {
               return Response.json({ ok: false, error: "E-mail nevyzerá ako e-mail." }, { status: 400 });
             }
+            await odlozOdberatela(DB, klient, bolo, v, kto);
             await DB.prepare(
               `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily,
                  telefon, web, os_titul, os_meno, os_priezvisko, os_mobil, updated_at, telefon2)
@@ -286,6 +323,32 @@ export const Route = createFileRoute("/api/vydane-faktury")({
            * až vtedy, keď dvojicu človek ↔ firma niekto povie — a povedať ju
            * vie len Jerry.
            */
+          /**
+           * ĎALŠIA FIRMA SA STANE PREDVOLENOU (Jerry, 20. 10. 2026). Doterajšia
+           * predvolená sa odloží medzi ďalšie — nič sa nemaže. E-mail a telefón
+           * klienta sa nemenia: patria človeku, nie firme.
+           */
+          if (b.akcia === "odberatel-predvoleny") {
+            const klient = await kanonickeMeno(DB, kus(b.klient, 120));
+            const alt = await DB.prepare("SELECT * FROM klient_odberatelia WHERE id = ?1 AND klient = ?2")
+              .bind(kus(b.id, 40), klient).first<Record<string, string>>();
+            if (!klient || !alt) return Response.json({ ok: false, error: "Taká firma pri klientovi nie je." }, { status: 404 });
+            const bolo = await DB.prepare("SELECT * FROM klient_fakturacia WHERE klient = ?1").bind(klient).first<Record<string, string | null>>();
+            const nove = { firma: alt.firma, ico: alt.ico, dic: alt.dic, ulica: alt.ulica, psc: alt.psc, mesto: alt.mesto, stat: alt.stat || "Česká republika" };
+            await odlozOdberatela(DB, klient, bolo, nove, kto);
+            await DB.prepare(
+              `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+               ON CONFLICT(klient) DO UPDATE SET stat=?2, firma=?3, ico=?4, dic=?5, ulica=?6, psc=?7, mesto=?8, updated_at=?9`,
+            ).bind(klient, nove.stat, nove.firma, nove.ico, nove.dic, nove.ulica, nove.psc, nove.mesto, teraz()).run();
+            await audit(DB, { action: "fakturacne-udaje", predmet: klient, neu: `predvolená firma: ${nove.firma} (${nove.ico})`, actor: kto });
+            return Response.json({ ok: true });
+          }
+          if (b.akcia === "odberatel-zmaz") {
+            const r = await DB.prepare("DELETE FROM klient_odberatelia WHERE id = ?1").bind(kus(b.id, 40)).run();
+            await audit(DB, { action: "fakturacne-udaje", predmet: kus(b.klient, 120), neu: "ďalšia firma zmazaná", actor: kto });
+            return Response.json({ ok: (r.meta?.changes || 0) > 0 });
+          }
+
           if (b.akcia === "kontakty-import") {
             const kontakty = rozparsujKontakty(String(b.csv || ""));
             if (!kontakty.length) return Response.json({ ok: false, error: "V súbore nie sú kontakty." }, { status: 400 });
@@ -435,7 +498,18 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             // Odtlačok odberateľa. Berie sa z karty klienta, keď ho volajúci
             // neposlal — ale UKLADÁ sa do faktúry, nie ako odkaz.
             const u = (await DB.prepare("SELECT * FROM klient_fakturacia WHERE klient = ?1").bind(klient).first()) as Record<string, string> | null;
-            const zdroj = { ...prazdneUdaje, ...(u || {}) };
+            /**
+             * Faktúra na inú firmu klienta (`odberatelId`, 20. 10. 2026). Polia
+             * firmy sa berú z nej CELÉ — prázdne DIČ ďalšej firmy nesmie
+             * doplniť DIČ predvolenej. E-mail ostáva klientov.
+             */
+            const alt = kus(b.odberatelId, 40)
+              ? await DB.prepare("SELECT * FROM klient_odberatelia WHERE id = ?1 AND klient = ?2").bind(kus(b.odberatelId, 40), klient).first<Record<string, string>>()
+              : null;
+            if (kus(b.odberatelId, 40) && !alt) return Response.json({ ok: false, error: "Vybraná firma pri klientovi už nie je." }, { status: 404 });
+            const zdroj = alt
+              ? { ...prazdneUdaje, email: u?.email || "", firma: alt.firma, ico: alt.ico, dic: alt.dic, ulica: alt.ulica, psc: alt.psc, mesto: alt.mesto, stat: alt.stat }
+              : { ...prazdneUdaje, ...(u || {}) };
             const odb = {
               firma: kus(b.odbFirma, 160) || zdroj.firma || klient,
               ico: kus(b.odbIco, 20) || zdroj.ico,
