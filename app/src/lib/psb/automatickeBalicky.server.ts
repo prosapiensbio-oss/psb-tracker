@@ -21,6 +21,7 @@ import { normName } from "./format";
 import { osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
 import { navrhNovehoBalicka, type NavrhNovehoBalicka } from "./workspaceKroky";
+import { sBtcZlavou } from "./btcZlavaBalicka";
 
 export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promise<NavrhNovehoBalicka[]> {
   const data = await loadData(DB);
@@ -71,7 +72,8 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
       ...(data.historiaBalickov || []).filter((h) => normName(h.client) === k).map((h) => ({ den: h.validFrom || "", cena: h.payment ?? null })),
     ];
     const n = navrhNovehoBalicka(c.name, os, stavy, ceny);
-    if (n) out.push(n);
+    if (n) out.push(sBtcZlavou(n, data.clientOverrides?.[c.name]));
   }
   return out;
 }
+

@@ -1518,7 +1518,24 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       const pary = kandidatiPlatby(x.meno, x, zdroje?.platby || [], data.nezaplateneKokpit || []);
                       return (
                         <div style={{ flexBasis: "100%", margin: "4px 0 6px", padding: "8px 10px", borderRadius: 9, border: `1px solid ${C.border}`, background: mix(C.card, 70) }}>
-                          {!pary.length && (
+                          {/* BITCOINOVÝ KLIENT neplatí na účet (Jerry, 20. 10. 2026:
+                              „jeho párovanie sa bude hľadať v BTC appke"). Platba
+                              z BTC knihy sa do Kokpitu zapíše sama (`btcNaPlatby`)
+                              a dlh zmizne; tu stačí vidieť, čo v knihe je. */}
+                          {!pary.length && data.clientOverrides?.[x.meno]?.bitcoin && (() => {
+                            const k = normName(x.meno);
+                            const btcK = (btc?.platby || []).filter((p) => p.klient && normName(p.klient) === k)
+                              .sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3);
+                            return (
+                              <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>
+                                {x.meno} platí bitcoinom — platbu nájdeš v Bitcoin appke a do Kokpitu sa zapíše sama, len čo ju tam zaevidujete.
+                                {btcK.length
+                                  ? <> Posledné v BTC knihe: {btcK.map((p) => `${fmtDMY(p.datum.slice(0, 10))} ${p.sats ? `${p.sats.toLocaleString("cs-CZ")} sats` : ""}${p.czk ? ` (≈ ${kc(p.czk)})` : ""}`).join(" · ")}.</>
+                                  : <> V BTC knihe zatiaľ nie je ani jedna jeho platba.</>}
+                              </div>
+                            );
+                          })()}
+                          {!pary.length && !data.clientOverrides?.[x.meno]?.bitcoin && (
                             <div style={{ fontSize: 12, color: C.textMuted }}>
                               Žiadna platba z Fio, ktorá by k {x.meno} sedela — ani menom, ani sumou {kc(x.spolu)}. Výpis z banky siaha
                               po posledné stiahnutie; nové príjmy stiahneš hore v tomto kroku.
