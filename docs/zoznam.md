@@ -34,7 +34,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **C · Strižňa 1.0 (hranica v sekcii 2) — Jerry: na zajtra, 14. 10. 2026**
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
-9. [ ] Upload do Higgsfieldu (SSL pri PUT).
+9. [ ] Upload do Higgsfieldu (SSL pri PUT) – opravované 3× (eba67c2, 741b0fe, dfa9b7b); nechať otvorené, kým ďalšie veľké nahratie neprejde.
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
 9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
 9f. [x] Ďalšie profily v Strižni – hotové 19. 10. 2026 (Jerry: „priprav Strižňu pre tie ďalšie naše profily“): PSB,
@@ -54,13 +54,13 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9i. [ ] Nestabilný test `server/vyhladavac.test.ts` pod záťažou (18. 10.; samostatne prechádza) – ako prispevky.test.ts (opravený e9b54bc).
 9j. [ ] Zostaviť video: klip bez reči (WhatsApp, −70 LUFS) sa nedá dať ako kamera B (voľba je vypnutá) – zladenie podľa zvuku nemá z čoho. (Overené v kóde 19. 10.)
 9k. [ ] Kľúčové snímky farieb ◆ aj na časovej osi (teraz len ‹ ◇ › v paneli Farby) + plynulý (lineárny) prechod. (Overené 19. 10.)
-9l. [ ] Kľúčové snímky polohy aj pre B-roll / kameru B.
-9m. [ ] Kalendár: presun príspevku ťahaním na iný deň. (Overené 19. 10.: ťahanie nie je.)
+9l. [x] Kľúčové snímky polohy aj pre B-roll / kameru B – na osi sú ◆ pri kamere B aj vrstvách (overené 20. 10. v kóde).
+9m. [x] Kalendár: presun príspevku ťahaním na iný deň – hotové 19. 10. (kalendarPresun.ts; overené 20. 10. v kóde).
 9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
-12. [ ] Analyzátor IG videa (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
-14. [ ] Osobné profily — SAMOSTATNÝ projekt, nie súčasť Strižne (Jerry 13. 10.; otvorené otázky v sekcii 2).
+12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
+14. [x] Osobné profily — nahradené 19.–20. 10.: profily sú v Strižni (prepínač účtov, značky Metricoolu, farby) – Jerry to tak chcel (Jerry 13. 10.; otvorené otázky v sekcii 2).
 
 **E · Keď bude čas / keď sa niečo ukáže**
 15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
