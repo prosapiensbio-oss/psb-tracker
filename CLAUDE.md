@@ -3102,3 +3102,23 @@ vtedy sa objekt z R2 HNEĎ zmaže (riadok ostáva ako história). Kód:
   --persist-to <tmp> --var STRIZNA_TOKEN:<32+ znakov>`, tabuľka cez
   `wrangler d1 execute DB --local --persist-to <tmp> --file …`; cookie pre
   obrazovku je `Jerry|HMAC("dev-secret", "psb-authed-v1|Jerry")`.
+
+## Koniec súbežného chodu s PTminderom (20. 10. 2026)
+
+Do PTmindera sa od 19. 10. 2026 nezapisuje. Porovnania Kokpit ↔ PTminder
+(„Vydrží kalendár sám?", „Chýba v PTminderi", mesiace kalendár vs export,
+rozdiel hodín a tržieb, rozpory v Zdraví Kokpitu, `subeznyChod` v aiContext)
+sú preč — merali by už len to, že PTminder stojí; server ich nepočíta.
+**Poistka `zaplateneVPtminderi` ostáva** — staré členstvá zaplatené
+v PTminderi musí odpúšťať aj so zamrznutými dátami.
+
+Zostatok bez zálohy z exportu (`zostatokBezPtmindera` v `zostatokKokpitu.ts`):
+bez aktívneho balíčka v Kokpite = 0 h, bez názvu členstva (inak by
+„Doplnenie členstva" s nulou spravilo paušál a klient by vypadol z karty Bez
+balíčka) + notifikácia `bezbalicka|` z `treningyBezBalicka` (platneOd =
+posledný taký tréning, staršie než 30 dní mlčí). Naostro sa zapína konštantou
+`ZOSTATOK_BEZ_PTMINDERA_NAOSTRO`; dovtedy beží len v bete (`jeBeta()` —
+server, push, /v/ a automatické balíčky idú vždy podľa konštanty).
+Overenie: snímka všetkých klientov nad kópiou ostrej DB, `deriveClients(data,
+{ bezZalohyPtmindera })` vypnuté = zhodné s HEAD, zapnuté = zmena len tam,
+kde zostatok stál na exporte.

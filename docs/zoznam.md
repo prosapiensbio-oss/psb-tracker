@@ -92,12 +92,24 @@ je kde pozrieť).
 3. [ ] **Týždeň od 19. 10.** — Claude:
        - [x] 6M z balíčkov v Kokpite (předplatné) — hotové 15. 10. (tá istá
          množina 12+ klientov ako zo snímky; `sixMClientSet`);
-       - vypnúť porovnania s PTminderom (karta „Vydrží kalendár sám?",
-         peniaze v Prechode, balíčky, „Chýba v PTminderi", poistka
-         `zaplateneVPtminderi` NEVYPÍNAŤ — po poslednom exporte ostanú jej dáta
-         zamrznuté a staré členstvá zaplatené v PTminderi musí odpúšťať ďalej);
-       - zostatok na karte bez zálohy „z PTmindera" (bez balíčka v Kokpite =
-         bez balíčka + notifikácia „bol na tréningu a nemá aktívny balíček").
+       - [x] vypnúť porovnania s PTminderom — **naostro 20. 10. 2026**: preč
+         „Vydrží kalendár sám?", „Chýba v PTminderi", mesiace kalendár vs export
+         (Prechod), rozdiel hodín v Balíčkoch, mesačné porovnanie tržieb
+         v Platbách, rozpory v Zdraví Kokpitu, blok v Jarvisovom kontexte;
+         server ich už nepočíta. Poistka `zaplateneVPtminderi` bez zmeny.
+       - [ ] zostatok na karte bez zálohy „z PTmindera" — **hotové, ale len
+         v BETE** (prepínač `ZOSTATOK_BEZ_PTMINDERA_NAOSTRO` v
+         `zostatokKokpitu.ts`, dnes `false`) + notifikácia `bezbalicka|`
+         „Tréning bez balíčka". Snímka pred/po (ostrá DB 20. 10.): zostatok
+         sa mení dvom klientom — **Kateřina Stoklásková 1 → 0** (v PTminderi má
+         doplnenie 2 h z 11. 10., 1 h zostáva; do Kokpitu nenaliate) a
+         **Svetopluk Stoklasko 2 → 0** (členstvo skončilo 20. 9., v exporte
+         z 19. 10. nemá nič; 2 h boli dopočítané). Ostatným (23 neaktívnych
+         + Klára Holubová na pauze) mizne len „0 z N" doplnenia. Notifikácia by
+         dnes svietila pri oboch Stoklasových. **ČAKÁ NA JERRYHO:** čo
+         s Kateřininou hodinou (doplniť jej balíček v profile / „Doplniť nové
+         z PTmindera" v Prechode / nechať tak), potom prepínač na `true`
+         a nasadiť.
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
