@@ -63,7 +63,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **E · Keď bude čas / keď sa niečo ukáže**
 15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
-16. [ ] Prezentácia reportu: rozloženie pre mobil, export/tlač.
+16. [x] Prezentácia reportu – hotové 20. 10. 2026: telefón na výšku má vlastné rozloženie (720×1280, jeden stĺpec), „🖨 Tlačiť / PDF“ dá každý slajd na vlastnú stranu 16:9. Overené mimo appky na ukážkovom reporte; na skutočnom Jerryho telefóne ešte nie.
 17. [ ] Anonymný dotazník aj bývalým klientom.
 18. [x] Objem hľadania z Google Ads – hotové 20. 10. 2026: Marketing → Vyhľadávanie → „Čo ľudia hľadajú na Googli“ (Česko / Brno, 12 mesiacov, záujem rok proti roku, podobné výrazy, „+ Nápad“). Google počíta hľadanie pod jedným tvarom slova („bolest zad“ 0, „bolesti zad“ 2 400) – nula sa ukazuje ako „skús iný tvar“.
 19. [x] Zrušené tréningy z Google Calendar – hotové už od augusta 2026 (snímky kalendára → karta „Zrušené a presunuté“, „Bol tam, alebo nie?“, presuny podľa prvy_raz); položka bola len nevyškrtnutá (overené 20. 10.).
