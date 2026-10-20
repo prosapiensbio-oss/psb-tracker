@@ -65,8 +65,8 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
 16. [ ] Prezentácia reportu: rozloženie pre mobil, export/tlač.
 17. [ ] Anonymný dotazník aj bývalým klientom.
-18. [ ] Obrazovka pre objem hľadania z Google Ads (prístup je).
-19. [ ] Zrušené tréningy z Google Calendar (odložené na po Fio).
+18. [x] Objem hľadania z Google Ads – hotové 20. 10. 2026: Marketing → Vyhľadávanie → „Čo ľudia hľadajú na Googli“ (Česko / Brno, 12 mesiacov, záujem rok proti roku, podobné výrazy, „+ Nápad“). Google počíta hľadanie pod jedným tvarom slova („bolest zad“ 0, „bolesti zad“ 2 400) – nula sa ukazuje ako „skús iný tvar“.
+19. [x] Zrušené tréningy z Google Calendar – hotové už od augusta 2026 (snímky kalendára → karta „Zrušené a presunuté“, „Bol tam, alebo nie?“, presuny podľa prvy_raz); položka bola len nevyškrtnutá (overené 20. 10.).
 20. [ ] NDA pri fotkách pred/po — blokované kontrolou súhlasov.
 21. [ ] Po vypnutí PTmindera: karta klienta dve čísla vedľa seba (sekcia 4).
 
