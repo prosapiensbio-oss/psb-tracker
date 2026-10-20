@@ -10,6 +10,10 @@ import {
   nastavenie, servisnyUcet, ulozNastavenie, ziskajToken,
 } from "../../lib/psb/googleAuth.server";
 import {
+  citajUlozeny, GEO_CESKO, JAZYK_CS, PREDVOLENE_VYRAZY, REGIONY_OBJEMU, vyrazyZTextu, zHistorickych, zNapadov,
+  type RegionObjemu, type UlozenyObjem,
+} from "../../lib/psb/objemHladania";
+import {
   adsDopyty, adsKampane, adsRiadky, adsUcty, adsUrl, chybaZOdpovede, gaqlDopyty,
   gaqlKampane, gaqlUcty, normCustomer, SCOPE_ADS,
 } from "../../lib/psb/googleAds";
@@ -124,6 +128,14 @@ export const Route = createFileRoute("/api/google-ads")({
             kampani: kampani?.n ?? 0,
             dopytov: dopytov?.n ?? 0,
             ucty: ucty?.results ?? [],
+            // objem hľadania (akcia „objem“) – uložený výsledok pre Česko aj Brno a sledované výrazy
+            objem: {
+              cz: citajUlozeny(await nastavenie(DB, "gads_objem_cz")),
+              brno: citajUlozeny(await nastavenie(DB, "gads_objem_brno")),
+              vyrazy: await (async () => {
+                try { const v = await nastavenie(DB, "gads_objem_vyrazy"); return v ? (JSON.parse(v) as string[]) : PREDVOLENE_VYRAZY; } catch { return PREDVOLENE_VYRAZY; }
+              })(),
+            },
           });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
@@ -195,6 +207,70 @@ export const Route = createFileRoute("/api/google-ads")({
                 ? `Spojenie funguje. Servisný účet vidí ${mena.length} ${mena.length === 1 ? "účet" : "účty"}: ${mena.join(", ")}.`
                 : "Google odpovedal, ale servisný účet nevidí žiadny účet — chýba mu prístup v Google Ads (Správca → Prístup a zabezpečenie).",
               ucty: mena,
+            });
+          }
+
+          // ── objem hľadania (plánovač kľúčových slov) ──────────────────
+          //
+          // Zoznam úloh č. 18 (Jerry 20. 10. 2026). Dve volania: presné čísla
+          // sledovaných výrazov (generateKeywordHistoricalMetrics, aj po
+          // mesiacoch) a podobné výrazy, ktoré ľudia hľadajú
+          // (generateKeywordIdeas). Výsledok sa uloží do nastavení – obrazovka
+          // ho číta bez ďalšieho volania Googlu. Nič sa neplatí, nič sa nemení
+          // v Google Ads.
+          if (b.akcia === "objem") {
+            const region: RegionObjemu = b.region === "brno" ? "brno" : "cz";
+            if (Array.isArray(b.vyrazy)) {
+              const v = vyrazyZTextu((b.vyrazy as unknown[]).map(String).join("\n"));
+              if (!v.length) return Response.json({ ok: false, error: "Napíš aspoň jeden výraz." }, { status: 400 });
+              await ulozNastavenie(DB, "gads_objem_vyrazy", JSON.stringify(v));
+            }
+            const ulozene = await nastavenie(DB, "gads_objem_vyrazy");
+            let vyrazy: string[] = PREDVOLENE_VYRAZY;
+            try { if (ulozene) vyrazy = vyrazyZTextu((JSON.parse(ulozene) as string[]).join("\n")); } catch { /* predvolené */ }
+            const cid = String((await DB.prepare("SELECT id FROM gads_ucty WHERE je_manager = 0 ORDER BY nazov LIMIT 1").first<{ id: string }>().catch(() => null))?.id || "");
+            if (!cid) return Response.json({ ok: false, error: "Nie je známy reklamný účet — najprv stiahni dáta z Google Ads." }, { status: 400 });
+
+            // Brno: id mesta sa zistí raz z Googlu (nie natvrdo z hlavy) a zapamätá
+            let geo = GEO_CESKO;
+            if (region === "brno") {
+              geo = await nastavenie(DB, "gads_geo_brno");
+              if (!geo) {
+                const rg = await volaj(adsUrl("geoTargetConstants:suggest"), h, { locale: "cs", countryCode: "CZ", locationNames: { names: ["Brno"] } });
+                if (!rg.ok) return Response.json({ ok: false, error: `Brno sa v Googli nenašlo: ${rg.chyba}` }, { status: 502 });
+                const navrhy = ((rg.data as { geoTargetConstantSuggestions?: { geoTargetConstant?: { resourceName?: string; name?: string; targetType?: string } }[] })?.geoTargetConstantSuggestions || [])
+                  .map((x) => x.geoTargetConstant).filter((x): x is { resourceName?: string; name?: string; targetType?: string } => !!x?.resourceName);
+                const mesto = navrhy.find((x) => x.targetType === "City" && x.name === "Brno") ?? navrhy.find((x) => x.name === "Brno");
+                if (!mesto?.resourceName) return Response.json({ ok: false, error: "Google nevrátil Brno ako miesto – skús Česko." }, { status: 502 });
+                geo = mesto.resourceName;
+                await ulozNastavenie(DB, "gads_geo_brno", geo);
+              }
+            }
+            const spolocne = { language: JAZYK_CS, geoTargetConstants: [geo], keywordPlanNetwork: "GOOGLE_SEARCH" };
+            const rh = await volaj(adsUrl(`customers/${cid}:generateKeywordHistoricalMetrics`), h, {
+              ...spolocne, keywords: vyrazy, historicalMetricsOptions: { includeAverageCpc: true },
+            });
+            if (!rh.ok) return Response.json({ ok: false, error: rh.chyba }, { status: 502 });
+            // podobné výrazy z najviac 10 sledovaných (Google berie do 20 semien; viac = rozmazané nápady)
+            const ri = await volaj(adsUrl(`customers/${cid}:generateKeywordIdeas`), h, {
+              ...spolocne, keywordSeed: { keywords: vyrazy.slice(0, 10) }, pageSize: 200,
+            });
+            const vysledok: UlozenyObjem = {
+              zistene: new Date().toISOString(),
+              region,
+              vyrazy: zHistorickych(rh.data, vyrazy),
+              napady: ri.ok ? zNapadov(ri.data, vyrazy) : [],
+            };
+            await ulozNastavenie(DB, `gads_objem_${region}`, JSON.stringify(vysledok));
+            await audit(DB, {
+              action: "import", predmet: "google ads objem",
+              neu: `${vysledok.vyrazy.length} výrazov, ${vysledok.napady.length} podobných (${REGIONY_OBJEMU[region]})`,
+              actor: (await currentUser(request)) || undefined,
+            });
+            return Response.json({
+              ok: true,
+              sprava: `Zistené: ${vysledok.vyrazy.length} výrazov (${REGIONY_OBJEMU[region]})${ri.ok ? `, ${vysledok.napady.length} podobných` : ` – podobné výrazy sa nezistili: ${ri.chyba}`}.`,
+              objem: vysledok,
             });
           }
 

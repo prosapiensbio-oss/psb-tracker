@@ -37,6 +37,7 @@ import {
 import { KATEGORIE_HOOKOV } from "../../lib/psb/marketing-obsah";
 import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
+import { ObjemHladania } from "./ObjemHladania";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
@@ -1275,6 +1276,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
       {sub === "vyhladavanie" && (
         <>
           <Vyhladavanie chat={chat} />
+          <ObjemHladania />
           <GoogleAdsKarta clients={clients} chat={chat} {...skrytie} />
         </>
       )}
