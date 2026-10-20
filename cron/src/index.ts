@@ -60,7 +60,7 @@ const zavolaj = (env: Env, cesta = "/api/kalendar?cron=1") =>
   env.KOKPIT.fetch(
     // Adresa musí byť SKUTOČNÁ, hoci požiadavka ide prepojením a von nikdy
     // nejde: appka je SSR a na neznámy host odpovedá 404, nie svojou trasou.
-    new Request("https://kokpit.prosapiensbio.workers.dev/api/kalendar?cron=1", {
+    new Request(`https://kokpit.prosapiensbio.workers.dev${cesta}`, {
       headers: { "x-cron-token": env.KAL_CRON_TOKEN },
     }),
   );
@@ -270,6 +270,12 @@ const ohlas = (env: Env, automat: string, p: Promise<Response>): Promise<void> =
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Dobeh kalendára: každú hodinu znova len ten, čo naposledy zlyhal —
+    // Google odmieta adresy Cloudflaru aj hodiny (HTTP 429, 20. 10. 2026).
+    if (event.cron === "30 * * * *") {
+      ctx.waitUntil(ohlas(env, "kalendar", zavolaj(env, "/api/kalendar?cron=1&dobeh=1")));
+      return;
+    }
     if (event.cron === "40 4 * * *") {  // 06:40 lokál v lete — po kontrole webu a reklamách
       ctx.waitUntil((async () => {
         const mesiace = denPraha() <= 7 ? [mesiacPraha(-1), mesiacPraha()] : [mesiacPraha()];

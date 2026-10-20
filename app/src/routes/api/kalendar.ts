@@ -15,7 +15,7 @@ import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiaco
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu, sparujZmeny, najdiPresun } from "../../lib/psb/kalendarZmeny";
-import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
+import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
 //
@@ -233,10 +233,15 @@ export const Route = createFileRoute("/api/kalendar")({
           // neúspešný, inak padajúci kalendár zablokuje každý beh (10.–13. 9. 2026).
           const ziadany = q0.get("trener") || "";
           const zdroje = ((await DB.prepare(
-            "SELECT z.id, z.trener, z.url, z.aktivny, z.posledne_ok, (SELECT MAX(s.kedy) FROM kal_snimky s WHERE s.trener = z.trener) AS posledny_pokus FROM kal_zdroje z WHERE z.aktivny = 1",
-          ).all()).results || []) as unknown as (Zdroj & ZdrojSPokusom & { posledne_ok: string | null })[];
+            `SELECT z.id, z.trener, z.url, z.aktivny, z.posledne_ok,
+                    (SELECT MAX(s.kedy) FROM kal_snimky s WHERE s.trener = z.trener) AS posledny_pokus,
+                    (SELECT s.ok FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS posledny_ok
+               FROM kal_zdroje z WHERE z.aktivny = 1`,
+          ).all()).results || []) as unknown as (Zdroj & ZdrojSPokusom & { posledne_ok: string | null; posledny_ok: number | null })[];
           if (!zdroje.length) return Response.json({ ok: true, vysledky: {} });
-          const z = vyberZdroj(zdroje, ziadany);
+          // Hodinový dobeh: len zdroj, ktorému posledný pokus zlyhal (kalendarZdroje).
+          const z = q0.get("dobeh") === "1" ? zdrojNaDobeh(zdroje, Date.now()) : vyberZdroj(zdroje, ziadany);
+          if (!z && q0.get("dobeh") === "1") return Response.json({ ok: true, vysledky: {}, dobeh: "netreba" });
           if (!z) return Response.json({ ok: false, error: "neznamy trener" }, { status: 404 });
           return Response.json({ ok: true, vysledky: { [z.trener]: await snimka(DB, z) } });
         }

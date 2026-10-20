@@ -91,3 +91,20 @@ export async function stiahniIcal(url: string, m: StiahniMoznosti = {}): Promise
 
 /** Odmietnutie Googlom do takejto doby od posledného úspechu nie je porucha. */
 const ODMIETNUTIE_V_PORIADKU_MS = 24 * 3600 * 1000;
+
+// DOBEH PO ODMIETNUTÍ. 20. 10. 2026 Google odmietal Jerryho kalendár
+// z Cloudflaru tri pokusy za sebou, hoci z Macu prešiel na prvý raz —
+// odmieta adresy Cloudflaru, nie kalendár, a nepustí ani o pár sekúnd.
+// Bez dobehu by ďalší pokus prišiel až o 6 h. Plánovač preto každú hodinu
+// (o pol) skúsi ZNOVA len zdroj, ktorému posledný pokus zlyhal; keď je
+// všetko v poriadku, neurobí nič a Google sa nepýta navyše.
+const DOBEH_PO_MS = 40 * 60 * 1000;
+
+export type ZdrojNaDobeh = { trener: string; posledny_pokus: string | null; posledny_ok: number | null };
+
+/** Zdroj, ktorému posledný pokus zlyhal (a nebeží práve teraz), inak nič. */
+export function zdrojNaDobeh<T extends ZdrojNaDobeh>(zdroje: T[], teraz: number): T | undefined {
+  return [...zdroje]
+    .filter((z) => !!z.posledny_pokus && z.posledny_ok === 0 && teraz - Date.parse(z.posledny_pokus) > DOBEH_PO_MS)
+    .sort((a, b) => (a.posledny_pokus || "").localeCompare(b.posledny_pokus || ""))[0];
+}

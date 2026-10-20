@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj } from "./kalendarZdroje";
+import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, zdrojNaDobeh } from "./kalendarZdroje";
 
 describe("vyberZdroj — rotácia podľa pokusu", () => {
   test("scenár 10.–13. 9. 2026: padajúci Jerry nesmie blokovať Terezku", () => {
@@ -95,5 +95,22 @@ describe("chybaZdroja — odmietnutie Googlom", () => {
   });
   test("iná chyba sa ukáže hneď", () => {
     expect(chybaZdroja({ posledne_ok: "2026-10-20T09:00:10Z", posledna_chyba: "HTTP 404" }, null, teraz)).toBe("HTTP 404");
+  });
+});
+
+describe("zdrojNaDobeh — hodinový dobeh po zlyhaní", () => {
+  const teraz = Date.parse("2026-10-20T16:30:00Z");
+  test("berie len zlyhaný zdroj staršieho pokusu", () => {
+    const z = [
+      { trener: "Terezka", posledny_pokus: "2026-10-20T16:20:00Z", posledny_ok: 1 },
+      { trener: "Jerry", posledny_pokus: "2026-10-20T15:00:00Z", posledny_ok: 0 },
+    ];
+    expect(zdrojNaDobeh(z, teraz)?.trener).toBe("Jerry");
+  });
+  test("keď je všetko v poriadku, nerobí nič", () => {
+    expect(zdrojNaDobeh([{ trener: "Jerry", posledny_pokus: "2026-10-20T15:00:00Z", posledny_ok: 1 }], teraz)).toBeUndefined();
+  });
+  test("čerstvý pokus (ešte môže bežať) nechá tak", () => {
+    expect(zdrojNaDobeh([{ trener: "Jerry", posledny_pokus: "2026-10-20T16:10:00Z", posledny_ok: 0 }], teraz)).toBeUndefined();
   });
 });
