@@ -113,8 +113,9 @@ export function ObjemHladania() {
     return (
       <tr key={o.vyraz} style={{ borderTop: `1px solid ${mix(C.text, 8)}` }}>
         <td style={{ padding: "5px 6px", color: C.text }}>{o.vyraz}</td>
-        <td style={{ padding: "5px 6px", textAlign: "right", color: o.mesacne ? C.text : C.textDim, fontWeight: sledovany ? 600 : 400 }}>
-          {o.mesacne ? o.mesacne.toLocaleString("sk-SK") : "pod 10"}
+        <td style={{ padding: "5px 6px", textAlign: "right", color: o.mesacne ? C.text : C.textDim, fontWeight: sledovany ? 600 : 400, whiteSpace: "nowrap" }}
+          title={o.bezDat ? "Google k tomuto tvaru nedal žiadne číslo – často ho zaradí pod iný tvar (napr. „bolesti zad“ alebo „cviky na záda“). Uprav výraz, nie je to nula hľadaní." : undefined}>
+          {o.bezDat ? "Google nedal číslo" : o.mesacne ? o.mesacne.toLocaleString("sk-SK") : "pod 10"}
         </td>
         <td style={{ padding: "5px 6px" }}><Trend o={o} /></td>
         <td style={{ padding: "5px 6px", color: smer ? (smer.zmena > 0 ? C.green : smer.zmena < 0 ? C.red : C.textMuted) : C.textDim, fontSize: 11.5, whiteSpace: "nowrap" }}>
@@ -179,7 +180,13 @@ export function ObjemHladania() {
         </Empty>
       ) : (
         <>
-          <div style={{ marginTop: 12 }}>{tabulka([...data.vyrazy].sort((a, b) => b.mesacne - a.mesacne), true)}</div>
+          <div style={{ marginTop: 12 }}>{tabulka([...data.vyrazy].sort((a, b) => Number(!!a.bezDat) - Number(!!b.bezDat) || b.mesacne - a.mesacne), true)}</div>
+          {data.vyrazy.some((v) => v.bezDat) && (
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+              „Google nedal číslo“ nie je nula hľadaní – plánovač tak odpovedá, keď daný tvar zaradí pod iný. Skús iný tvar
+              (napr. „bolesti zad“, „cviky na záda“) v „Upraviť sledované výrazy“ alebo vezmi podobný výraz zo zoznamu nižšie.
+            </div>
+          )}
           {data.napady.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 4 }}>

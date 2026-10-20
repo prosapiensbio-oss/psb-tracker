@@ -52,6 +52,12 @@ export type ObjemVyrazu = {
   /** Cena za klik na vrchu stránky (Kč), ak ju Google dal. */
   cpcOd: number | null;
   cpcDo: number | null;
+  /**
+   * Google k výrazu nedal žiadne číslo (ani mesiace). Nie je to „nikto nehľadá“: plánovač tak odpovedá,
+   * keď tvar zaradí pod iný (overené 20. 10. 2026 – „bolest zad“, „skolióza cvičení“ bez metrík,
+   * „cviky na záda“ 2 900). Obrazovka to musí povedať, nie ukázať nulu.
+   */
+  bezDat?: boolean;
 };
 export type UlozenyObjem = {
   zistene: string;
@@ -100,7 +106,9 @@ function zMetrik(text: string, m: Metriky | undefined): ObjemVyrazu {
     .map((x) => ({ mesiac: mesiacZGooglu(x), n: cislo(x.monthlySearches) }))
     .filter((x) => x.mesiac)
     .sort((a, b) => a.mesiac.localeCompare(b.mesiac));
+  const bezDat = m?.avgMonthlySearches === undefined && !trend.length;
   return {
+    ...(bezDat ? { bezDat: true } : {}),
     vyraz: text,
     mesacne: cislo(m?.avgMonthlySearches),
     trend,
@@ -121,7 +129,7 @@ export function zHistorickych(data: unknown, sledovane: string[]): ObjemVyrazu[]
     // Google zlučuje blízke varianty (s diakritikou a bez) – sledovaný výraz nájde aj cez ne
     for (const v of r.closeVariants ?? []) if (!podla.has(normVyraz(v))) podla.set(normVyraz(v), { ...o, vyraz: v });
   }
-  return sledovane.map((v) => ({ ...(podla.get(normVyraz(v)) ?? { mesacne: 0, trend: [], konkurencia: "nezname" as const, cpcOd: null, cpcDo: null }), vyraz: v }));
+  return sledovane.map((v) => ({ ...(podla.get(normVyraz(v)) ?? { mesacne: 0, trend: [], konkurencia: "nezname" as const, cpcOd: null, cpcDo: null, bezDat: true }), vyraz: v }));
 }
 
 /** Odpoveď generateKeywordIdeas → podobné výrazy (bez sledovaných), od najhľadanejšieho. */
