@@ -36,7 +36,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
 9. [ ] Upload do Higgsfieldu (SSL pri PUT) – opravované 3× (eba67c2, 741b0fe, dfa9b7b); nechať otvorené, kým ďalšie veľké nahratie neprejde.
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
-9c. [ ] Staré projekty so zastaraným renderom raz vyrenderovať znova.
+9c. [x] Staré projekty so zastaraným renderom – 20. 10. 2026 Strižňa hlási 0 zastaraných (GET /api/zastarane), nie je čo prerenderovať.
 9f. [x] Ďalšie profily v Strižni – hotové 19. 10. 2026 (Jerry: „priprav Strižňu pre tie ďalšie naše profily“): PSB,
     @philipjerry, @filip_stranavsky, @ahsoka.the.whippet vo vlastných značkách Metricoolu, Terezka ručne; farby grafík,
     tón Clauda, výber účtu pri nahrávaní. Commit c14f3d2 v strizna.
