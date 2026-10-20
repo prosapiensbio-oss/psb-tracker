@@ -114,8 +114,8 @@ export function ObjemHladania() {
       <tr key={o.vyraz} style={{ borderTop: `1px solid ${mix(C.text, 8)}` }}>
         <td style={{ padding: "5px 6px", color: C.text }}>{o.vyraz}</td>
         <td style={{ padding: "5px 6px", textAlign: "right", color: o.mesacne ? C.text : C.textDim, fontWeight: sledovany ? 600 : 400, whiteSpace: "nowrap" }}
-          title={o.bezDat ? "Google k tomuto tvaru nedal žiadne číslo – často ho zaradí pod iný tvar (napr. „bolesti zad“ alebo „cviky na záda“). Uprav výraz, nie je to nula hľadaní." : undefined}>
-          {o.bezDat ? "Google nedal číslo" : o.mesacne ? o.mesacne.toLocaleString("sk-SK") : "pod 10"}
+          title={o.bezDat ? "Google pri tomto tvare hlási 0 – hľadanie pripisuje inému tvaru (napr. „bolest zad“ 0, ale „bolesti zad“ 2 400). Skús iný tvar výrazu." : undefined}>
+          {o.bezDat ? "0 – skús iný tvar" : o.mesacne.toLocaleString("sk-SK")}
         </td>
         <td style={{ padding: "5px 6px" }}><Trend o={o} /></td>
         <td style={{ padding: "5px 6px", color: smer ? (smer.zmena > 0 ? C.green : smer.zmena < 0 ? C.red : C.textMuted) : C.textDim, fontSize: 11.5, whiteSpace: "nowrap" }}>
@@ -150,7 +150,7 @@ export function ObjemHladania() {
         <H3>
           <Info
             label="Čo ľudia hľadajú na Googli"
-            text="Odhad Googlu z plánovača kľúčových slov: koľko ľudí mesačne napíše výraz do vyhľadávania (priemer za 12 mesiacov, zaokrúhlený do pásiem). Nie je to návštevnosť ani zákazníci. „Pod 10“ neznamená nikto, len pod hranicou, ktorú Google hlási. Záujem porovnáva posledné 3 mesiace s rovnakými mesiacmi pred rokom, aby sezóna nevyzerala ako rast. Konkurencia je o reklame (koľko inzerentov o výraz súperí), nie o tom, ako ťažko sa dostať do výsledkov."
+            text="Odhad Googlu z plánovača kľúčových slov: koľko ľudí mesačne napíše výraz do vyhľadávania (priemer za 12 mesiacov, zaokrúhlený do pásiem). Nie je to návštevnosť ani zákazníci. Nula pri výraze zvyčajne znamená, že Google hľadanie pripísal inému tvaru slova (napr. „bolesti zad“ namiesto „bolest zad“). Záujem porovnáva posledné 3 mesiace s rovnakými mesiacmi pred rokom, aby sezóna nevyzerala ako rast. Konkurencia je o reklame (koľko inzerentov o výraz súperí), nie o tom, ako ťažko sa dostať do výsledkov."
           />
         </H3>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -183,8 +183,8 @@ export function ObjemHladania() {
           <div style={{ marginTop: 12 }}>{tabulka([...data.vyrazy].sort((a, b) => Number(!!a.bezDat) - Number(!!b.bezDat) || b.mesacne - a.mesacne), true)}</div>
           {data.vyrazy.some((v) => v.bezDat) && (
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
-              „Google nedal číslo“ nie je nula hľadaní – plánovač tak odpovedá, keď daný tvar zaradí pod iný. Skús iný tvar
-              (napr. „bolesti zad“, „cviky na záda“) v „Upraviť sledované výrazy“ alebo vezmi podobný výraz zo zoznamu nižšie.
+              „0 – skús iný tvar“ neznamená, že to nikto nehľadá: Google hľadanie pripíše jednému tvaru slova a ostatné dostanú 0
+              („bolest zad“ 0, „bolesti zad“ 2 400). Zmeň tvar v „Upraviť sledované výrazy“ alebo vezmi podobný výraz zo zoznamu nižšie.
             </div>
           )}
           {data.napady.length > 0 && (

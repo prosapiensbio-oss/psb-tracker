@@ -24,8 +24,9 @@ describe("objem hľadania", () => {
     const o = zHistorickych(data, ["Plochá noha", "bolesť zad", "nič"]);
     expect(o.map((x) => [x.vyraz, x.mesacne])).toEqual([["Plochá noha", 880], ["bolesť zad", 5400], ["nič", 0]]);
     expect(o.map((x) => !!x.bezDat)).toEqual([false, false, true]);
-    // Google vráti výraz, ale bez metrík (20. 10. 2026: „bolest zad“) = bez čísla, nie nula
+    // Google vráti výraz s nulou alebo bez metrík (20. 10. 2026: „bolest zad“) = iný tvar, nie „pod 10“
     expect(zHistorickych({ results: [{ text: "bolest zad" }] }, ["bolest zad"])[0].bezDat).toBe(true);
+    expect(zHistorickych({ results: [{ text: "bolest zad", keywordMetrics: { monthlySearchVolumes: mesiace([2025, 9], [0, 0]) } }] }, ["bolest zad"])[0].bezDat).toBe(true);
     expect(o[1]).toMatchObject({ konkurencia: "nizka", cpcOd: 4.5, cpcDo: 18.25, trend: [{ mesiac: "2025-09", n: 5000 }, { mesiac: "2025-10", n: 6000 }] });
   });
 

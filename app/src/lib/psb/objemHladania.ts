@@ -25,14 +25,14 @@ export const GEO_CESKO = "geoTargetConstants/2203";
 export const JAZYK_CS = "languageConstants/1021";
 
 /** Témy PSB, ktoré sa sledujú, kým si Jerry nenapíše vlastné. */
+// tvary overené 20. 10. 2026 – Google počíta hľadanie pod jedným tvarom („bolesti zad“ 2 400, „bolest zad“ 0)
 export const PREDVOLENE_VYRAZY = [
-  "bolest zad",
-  "bolest zad cviky",
-  "bolest kolene",
+  "bolesti zad",
+  "cviky na záda",
+  "bolest kolena",
   "bolest ramene",
   "bolest krční páteře",
-  "výhřez ploténky cvičení",
-  "skolióza cvičení",
+  "skolióza",
   "držení těla",
   "plochá noha",
   "osobní trenér brno",
@@ -53,9 +53,10 @@ export type ObjemVyrazu = {
   cpcOd: number | null;
   cpcDo: number | null;
   /**
-   * Google k výrazu nedal žiadne číslo (ani mesiace). Nie je to „nikto nehľadá“: plánovač tak odpovedá,
-   * keď tvar zaradí pod iný (overené 20. 10. 2026 – „bolest zad“, „skolióza cvičení“ bez metrík,
-   * „cviky na záda“ 2 900). Obrazovka to musí povedať, nie ukázať nulu.
+   * Google pri tomto tvare hlási 0 (alebo nič). Nie je to „nikto nehľadá“: plánovač pripíše hľadanie
+   * jednému tvaru a ostatné dostanú 0 (overené 20. 10. 2026 – „bolest zad“ 0, „bolesti zad“ 2 400;
+   * nulové int64 v JSON odpovedi Google vynecháva, preto sa nedá odlíšiť „0“ od „nič“).
+   * Obrazovka to musí povedať a navrhnúť iný tvar, nie ukázať „pod 10“.
    */
   bezDat?: boolean;
 };
@@ -106,7 +107,7 @@ function zMetrik(text: string, m: Metriky | undefined): ObjemVyrazu {
     .map((x) => ({ mesiac: mesiacZGooglu(x), n: cislo(x.monthlySearches) }))
     .filter((x) => x.mesiac)
     .sort((a, b) => a.mesiac.localeCompare(b.mesiac));
-  const bezDat = m?.avgMonthlySearches === undefined && !trend.length;
+  const bezDat = cislo(m?.avgMonthlySearches) === 0;
   return {
     ...(bezDat ? { bezDat: true } : {}),
     vyraz: text,
