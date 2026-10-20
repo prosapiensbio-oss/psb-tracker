@@ -1065,11 +1065,23 @@ export function buildAiContext(
     dlznici: {
       pocet: (fronty?.dlznici || []).length,
       spoluCzk: r0((fronty?.dlznici || []).reduce((a, d) => a + d.spolu, 0)),
-      klienti: (fronty?.dlznici || []).map((d) => ({
-        klient: d.meno, trener: d.trener, spoluCzk: d.spolu,
-        zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
-      })),
-      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto.",
+      klienti: (fronty?.dlznici || []).map((d) => {
+        // Bitcoinový klient neplatí na účet — jeho platby sú v BTC knihe
+        // (Jerry, 20. 10. 2026: „Jarvis má tiež ukazovať BTC platby pri dlžníkoch").
+        const bitcoin = !!data.clientOverrides?.[d.meno]?.bitcoin;
+        const k = normName(d.meno);
+        const btcPlatby = bitcoin
+          ? (btc?.platby || []).filter((p) => normName(p.klient) === k)
+            .sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3)
+            .map((p) => ({ datum: p.datum.slice(0, 10), sats: p.sats, czkVtedy: p.czkVtedy }))
+          : undefined;
+        return {
+          klient: d.meno, trener: d.trener, spoluCzk: d.spolu,
+          zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
+          ...(bitcoin ? { platiBitcoinom: true, btcZlavaPct: Number(data.clientOverrides?.[d.meno]?.btcZlava) || 0, poslednePlatbyZBtcKnihy: btcPlatby } : {}),
+        };
+      }),
+      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto. Pri klientovi s platiBitcoinom NEHĽADAJ platbu vo Fio: platí cez Lightning, jeho platby sú v BTC knihe (Bitcoin appka) — poslednePlatbyZBtcKnihy sú tri najnovšie odtiaľ (czkVtedy = koruny podľa kurzu v deň platby). Platba z BTC knihy sa do Kokpitu prevezme sama a ak je do 10 % od ceny balíčka, dlh zmaže; keď v knihe platba je, ale dlh ostal, povedz to nahlas (napr. iný deň alebo meno sa nespárovalo).",
     },
     platnostAHodiny: {
       pocet: (fronty?.platnost || []).length,
