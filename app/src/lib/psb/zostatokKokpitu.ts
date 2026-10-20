@@ -174,7 +174,11 @@ export function zostatokKokpitu(
  * Poistka `zaplateneVPtminderi` (zaplatene.ts) sa tým NEMENÍ: o peniazoch
  * rozhoduje `dlhyKlientov`, nie toto.
  */
-export const ZOSTATOK_BEZ_PTMINDERA_NAOSTRO = false;
+// ZAPNUTÉ NAOSTRO 20. 10. 2026 — Jerry: „nechaj ich odtrénovať". Obom
+// Stoklasovým sa doplnenie 2 h zapísalo do Kokpitu (balicky, zdroj rucne);
+// snímka pred/po nad ostrou DB: mení sa len „0 z N" → „0 z 0" u 22
+// neaktívnych a jednej pauzy, nikto nedostane notifikáciu bezbalicka|.
+export const ZOSTATOK_BEZ_PTMINDERA_NAOSTRO = true;
 export const zostatokBezPtmindera = (): boolean => ZOSTATOK_BEZ_PTMINDERA_NAOSTRO || jeBeta();
 
 /**

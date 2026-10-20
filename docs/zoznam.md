@@ -97,19 +97,16 @@ je kde pozrieť).
          (Prechod), rozdiel hodín v Balíčkoch, mesačné porovnanie tržieb
          v Platbách, rozpory v Zdraví Kokpitu, blok v Jarvisovom kontexte;
          server ich už nepočíta. Poistka `zaplateneVPtminderi` bez zmeny.
-       - [ ] zostatok na karte bez zálohy „z PTmindera" — **hotové, ale len
-         v BETE** (prepínač `ZOSTATOK_BEZ_PTMINDERA_NAOSTRO` v
-         `zostatokKokpitu.ts`, dnes `false`) + notifikácia `bezbalicka|`
-         „Tréning bez balíčka". Snímka pred/po (ostrá DB 20. 10.): zostatok
-         sa mení dvom klientom — **Kateřina Stoklásková 1 → 0** (v PTminderi má
-         doplnenie 2 h z 11. 10., 1 h zostáva; do Kokpitu nenaliate) a
-         **Svetopluk Stoklasko 2 → 0** (členstvo skončilo 20. 9., v exporte
-         z 19. 10. nemá nič; 2 h boli dopočítané). Ostatným (23 neaktívnych
-         + Klára Holubová na pauze) mizne len „0 z N" doplnenia. Notifikácia by
-         dnes svietila pri oboch Stoklasových. **ČAKÁ NA JERRYHO:** čo
-         s Kateřininou hodinou (doplniť jej balíček v profile / „Doplniť nové
-         z PTmindera" v Prechode / nechať tak), potom prepínač na `true`
-         a nasadiť.
+       - [x] zostatok na karte bez zálohy „z PTmindera" — **naostro 20. 10.
+         2026** (`ZOSTATOK_BEZ_PTMINDERA_NAOSTRO = true`). Jerry o oboch
+         Stoklasových: „nechaj ich odtrénovať" → Svetoplukovi aj Kateřine
+         zapísané doplnenie 2 h do Kokpitu (Svetopluk 1 h zostáva, Kateřina
+         0 — 6. a 20. 10.). Snímka pred/po: mení sa len „0 z N" → „0 z 0"
+         u 22 neaktívnych a Kláry Holubovej (pauza); notifikácia bezbalicka|
+         nesvieti nikomu. Notifikácia „tréning nie je v PTminderi" vypnutá.
+         „Vybavené" pri notifikácii s možnosťami sa odteraz pýta ako
+         (doplnenie / prepadnutie / presun) — 1. 10. holé vybavené nechalo
+         Stoklasových hodiny bez rozhodnutia.
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
