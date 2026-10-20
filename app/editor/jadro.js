@@ -1426,12 +1426,11 @@
     kresli();
   }
   /**
-   * ŤAH ZA ROH (Jerry, 19. 10. 2026: „za hociktorý roh chytím tú fotku a môžem
-   * ju nakloniť hocijako"). Chytený roh ide presne za prstom, protiľahlý stojí,
-   * pomer strán ostáva — jedným ťahom sa fotka zväčší aj nakloní. Uhol sa
-   * NEPRICHYTÁVA (prichytenie do 1,5° skákalo a malé naklonenie nešlo).
-   * Shift = len zväčšiť, uhol sa nemení. Roh sa hýbe o toľko, o koľko prst —
-   * kde presne ho prst chytil, nevadí (inak by pri prvom pohybe odskočil).
+   * ŤAH ZA ROH = LEN ZVÄČŠENIE. Protiľahlý roh stojí, pomer strán aj uhol
+   * ostávajú. Nakláňa sa len koliečkom ⟳ hore (Jerry, 20. 10. 2026: „otáčanie
+   * za chytanie rohov vymaž, nechaj rohy iba rozťahovať" — deň predtým rohy
+   * aj nakláňali). Roh sa hýbe o toľko, o koľko prst — kde presne ho prst
+   * chytil, nevadí (inak by pri prvom pohybe odskočil); „jemne"/Alt platí.
    */
   uchopy?.querySelectorAll(".roh").forEach((h) => {
     let kotva = null;
@@ -1448,19 +1447,14 @@
       if (!kotva) return;
       const t = stav[aktivne], E = kotva.efekt(miestoVoStvorci(e), jemne(e));
       const dx = E.x + kotva.off.x - kotva.x, dy = E.y + kotva.off.y - kotva.y;
-      // Uhlopriečka od kotvy k chytenému rohu vo vlastných osiach fotky.
+      // Uhlopriečka od kotvy k chytenému rohu vo vlastných osiach fotky;
+      // mierka = priemet ťahu na ňu (uhol sa nemení).
       const ux = kotva.sx === "p" ? t.fw : -t.fw, uy = kotva.sy === "d" ? t.fh : -t.fh;
-      let u = kotva.rot;
-      if (!e.shiftKey) {
-        u = (Math.atan2(dy, dx) - Math.atan2(uy, ux)) / RAD;
-        u = ((u + 180) % 360 + 360) % 360 - 180;
-      }
-      const a = u * RAD, c = Math.cos(a), n = Math.sin(a);
+      const a = kotva.rot * RAD, c = Math.cos(a), n = Math.sin(a);
       const lx = dx * c + dy * n, ly = -dx * n + dy * c;
       const sc = Math.max(1e-3, (lx * ux + ly * uy) / (ux * ux + uy * uy));
       const w = t.fw * sc;
-      t.v = { ...t.v, rot: Math.round(u * 100) / 100 };
-      // Stred = kotva + polovica uhlopriečky v novom uhle a mierke.
+      // Stred = kotva + polovica uhlopriečky v mierke.
       const ox = ux * sc / 2, oy = uy * sc / 2;
       nastavStred(aktivne, kotva.x + ox * c - oy * n, kotva.y + ox * n + oy * c, w);
     });
