@@ -50,9 +50,9 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
     neoverené) a prvý mem/infografika plánovaná do inej značky.
 9k. [ ] Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
 9g. [x] ✦ AI záber: (Jerry 20. 10.: hotovo) prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
-9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
-9i. [ ] Nestabilný test `server/vyhladavac.test.ts` pod záťažou (18. 10.; samostatne prechádza) – ako prispevky.test.ts (opravený e9b54bc).
-9k. [ ] Kľúčové snímky farieb ◆ aj na časovej osi (teraz len ‹ ◇ › v paneli Farby) + plynulý (lineárny) prechod. (Overené 19. 10.)
+9h. [x] Presúvať video ťahaním medzi stopami Video 3 / Video 4 – hotové 19. 10. (strizna daf12d9, BRoll.stopa; overené 20. 10. v kóde).
+9i. [x] Nestabilné testy pod záťažou – vyhľadávač opravený 19. 10. (a38ac82), synchronizácia 20. 10. (ea2a68f); dve sady naraz prešli.
+9k. [x] Kľúčové snímky farieb ◆ na časovej osi + prechod plynulo / lineárne / skok – hotové 19. 10. (strizna daf12d9; overené 20. 10. v kóde).
 9l. [x] Kľúčové snímky polohy aj pre B-roll / kameru B – na osi sú ◆ pri kamere B aj vrstvách (overené 20. 10. v kóde).
 9m. [x] Kalendár: presun príspevku ťahaním na iný deň – hotové 19. 10. (kalendarPresun.ts; overené 20. 10. v kóde).
 9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
