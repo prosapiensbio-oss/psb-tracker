@@ -2297,6 +2297,14 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
   /** Ktorá možnosť sa práve zapisuje; `chyba:<popis>` = tá neprešla. */
   const [akciaStav, setAkciaStav] = useState("");
   /**
+   * „VYBAVENÉ" PRI OTÁZKE S MOŽNOSŤAMI SA PÝTA AKO (Jerry, 20. 10. 2026).
+   * Pri končiacej platnosti padlo 1. 10. holé „vybavené" — ani doplnenie, ani
+   * prepadnutie — a o hodinách Svetopluka a Kateřiny nebolo rozhodnuté nič.
+   * Keď notifikácia nesie možnosti (`akcie`), klik na Vybavené ich ukáže
+   * v okne s otázkou namiesto tichého odklepnutia.
+   */
+  const [pytaSaAko, setPytaSaAko] = useState(false);
+  /**
    * Jedna možnosť z notifikácie. Keď nesie balíček, hodiny sa najprv zapíšu
    * a až potom sa odpovie — inak by zlyhaný zápis zostal umlčaný upozornením
    * a hodiny by nikde neboli.
@@ -2783,12 +2791,33 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               Jarvisovi, aby vedel, ako jeho záver dopadol. */}
           {!item.acked && (
             <button
-              onClick={() => (chat ? posliJarvisovi("vybavené", false) : actions.ackAnomaly(item.key, "vybavené", true))}
+              onClick={() => ((item.akcie || []).length
+                ? setPytaSaAko((v) => !v)
+                : chat ? posliJarvisovi("vybavené", false) : actions.ackAnomaly(item.key, "vybavené", true))}
               style={{ ...linkBtn, color: C.green }}
-              title="Viem o tom a je to vyriešené"
+              title={(item.akcie || []).length ? "Vybavené — ako? Vyber, čo sa stalo" : "Viem o tom a je to vyriešené"}
             >
               Vybavené
             </button>
+          )}
+          {!item.acked && pytaSaAko && (item.akcie || []).length > 0 && (
+            <div style={{ flexBasis: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 9, border: `1px solid ${mix(C.green, 45)}`, background: C.surface, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Ako je to vybavené?</div>
+              <div style={{ fontSize: 11.5, color: C.textMuted }}>Bez výberu by o hodinách nebolo rozhodnuté nič — appka by ich ďalej počítala, akoby platili.</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(item.akcie || []).map((a) => (
+                  <button
+                    key={a.popis}
+                    onClick={() => void spravAkciu(a).then(() => setPytaSaAko(false))}
+                    disabled={akciaStav === a.popis}
+                    style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: akciaStav === `chyba:${a.popis}` ? C.red : C.green }}
+                  >
+                    {akciaStav === a.popis ? "…" : akciaStav === `chyba:${a.popis}` ? "skús znova" : a.popis}
+                  </button>
+                ))}
+                <button onClick={() => setPytaSaAko(false)} style={{ ...linkBtn, color: C.textMuted }}>zrušiť</button>
+              </div>
+            </div>
           )}
           {chat && !item.acked && (
             <button onClick={() => setOdpoved((o) => !o)} style={{ ...linkBtn, color: odpoved ? C.accentLight : C.accent }}>
