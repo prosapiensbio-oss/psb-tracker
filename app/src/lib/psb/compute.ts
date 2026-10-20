@@ -3183,28 +3183,13 @@ export function deriveRegister(
     else if (cap.util < 60)
       add(`cap|${cap.trainer}|under`, "Kapacita", "orange", `${cap.trainer} — veľa voľného priestoru`, cap.advice, 10, undefined);
   }
-  // Kalendár tvrdí tréning, export ho nepotvrdil. Vysoká priorita: je to
-  // buď nezaplatená hodina, alebo klient, ktorý prestal chodiť a appka o tom
-  // podľa kalendára nevie.
+  /**
+   * „TRÉNING NIE JE V PTMINDERI" JE VYPNUTÉ (Jerry, 20. 10. 2026: „notifikáciu
+   * vypni"). Do PTmindera sa od tohto týždňa nezapisuje, takže by sa pýtala
+   * na každý tréning. Pravda o dochádzke je kalendár; funkcia
+   * `nepotvrdeneTreningy` ostáva pre kontrolu nad ostrými dátami.
+   */
   const cakajuci = cakajuciKlienti(clients, kal?.udalosti, kal?.zmeny);
-  const cakajuciMena = new Set(cakajuci.map((c) => normName(c.meno)));
-  for (const n of nepotvrdeneTreningy(data.sessions, kal?.udalosti, kal?.zmeny)) {
-    // Pri človeku, ktorého appka ešte vôbec nepozná, je „chýba v PTminderi"
-    // a „nový klient čaká na potvrdenie" tá istá veta dvakrát. Hovorí ju tá
-    // druhá — je zrozumiteľnejšia a vedie k tomu istému kroku.
-    if (cakajuciMena.has(normName(n.klient))) continue;
-    add(
-      `nepotvrdene|${n.datum}|${n.klient}`,
-      "Zápis",
-      "orange",
-      `${n.klient} — tréning ${fmtDMY(n.datum)} nie je v PTminderi`,
-      `${n.klient}: tréning ${fmtDMY(n.datum)} je v kalendári, ale v PTminderi nie — a ten deň už export pokrýva. Konal sa, alebo nie?`,
-      7,
-      n.klient,
-      "nepotvrdene",
-      { trener: n.trener, oKom: n.klient },
-    );
-  }
 
   /**
    * OPAČNÝ SMER — a od 1. 10. 2026 ten dôležitejší.
