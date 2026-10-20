@@ -26,9 +26,9 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 2. [x] Maily a telefóny klientov z PTmindera k profilom — sekcia 4. (19. 10. 2026: Client List naliaty — 234 klientov, súčasní mali kontakty už skoro všetci; pribudli staré kontakty a dátumy registrácie → „klient od“ a „spolupracujeme“ v profile.)
 
 **B · Čaká len na Jerryho slovo (minúty)**
-3. [ ] Poslať FP mail (`docs/fp-otazka.md`, 2 otázky — NDA a overovací odkaz; otázka o reakčných videách zrušená 13. 10.).
-4. [ ] Prvé tri vyhodnotenia v Dozore reklám. (Cieľová cena za dopyt ODLOŽENÁ — Jerry 15. 10. 2026: „sme radi, že nám príde akýkoľvek dopyt, ladíme reklamy a necháme to na neskôr.“)
-5. [ ] Vyskúšať na telefóne: kalendár v mobile, gestá v kalendári, push z ponuky termínov.
+3. [x] Poslať FP mail (Jerry 20. 10.: hotovo) (`docs/fp-otazka.md`, 2 otázky — NDA a overovací odkaz; otázka o reakčných videách zrušená 13. 10.).
+4. [x] Prvé tri vyhodnotenia v Dozore reklám. (Jerry 20. 10.: hotovo) (Cieľová cena za dopyt ODLOŽENÁ — Jerry 15. 10. 2026: „sme radi, že nám príde akýkoľvek dopyt, ladíme reklamy a necháme to na neskôr.“)
+5. [x] Vyskúšať na telefóne: (Jerry 20. 10.: hotovo) kalendár v mobile, gestá v kalendári, push z ponuky termínov.
 6. [x] Miřejovský 752 a októbrové príjmy z banky priradiť → potom prepínač peňazí na Kokpit. (Overené 19. 10.: peniaze z Kokpitu zapnuté od 10/2026.)
 7. [x] FIO_TOKEN do bety (jeden príkaz). (Overené 19. 10.: secret v kokpit-beta je.)
 
@@ -44,15 +44,14 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
     každý profil je autonómny“). Prehľad + ľavé menu; Produkčný deň, reposty, memy, infografiky (aj Jarvis), karty,
     kalendár a výsledky z Metricoolu pre každú značku zvlášť. Commity de7464a, 0a15b29, 29de5c6, b3b5670 v strizna.
     Ostáva len PSB: feed z Metricoolu; Jarvis pri inom účte vidí karty a výsledky PSB.
-9m. [ ] Okno príspevku v Kalendári (19. 10. 2026, commit 54a3ea8 v strizna) naostro: prvá zmena textu/titulky cez Metricool
+9m. [x] Okno príspevku v Kalendári (Jerry 20. 10.: hotovo) (19. 10. 2026, commit 54a3ea8 v strizna) naostro: prvá zmena textu/titulky cez Metricool
     (updateScheduledPost s novou titulkou je neoverený) a prvá kópia strihu na iný účet.
-9l. [ ] Prepínač profilov naostro: prvé stiahnutie výsledkov @philipjerry / @filip_stranavsky / @ahsoka (Metricool, nikdy
+9l. [x] Prepínač profilov naostro: (Jerry 20. 10.: hotovo) prvé stiahnutie výsledkov @philipjerry / @filip_stranavsky / @ahsoka (Metricool, nikdy
     neoverené) a prvý mem/infografika plánovaná do inej značky.
 9k. [ ] Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
-9g. [ ] ✦ AI záber: prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
+9g. [x] ✦ AI záber: (Jerry 20. 10.: hotovo) prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
 9h. [ ] Ponuka: presúvať video ťahaním medzi stopami Video 3 / Video 4 (teraz sa stopa určuje sama podľa prekrytia).
 9i. [ ] Nestabilný test `server/vyhladavac.test.ts` pod záťažou (18. 10.; samostatne prechádza) – ako prispevky.test.ts (opravený e9b54bc).
-9j. [ ] Zostaviť video: klip bez reči (WhatsApp, −70 LUFS) sa nedá dať ako kamera B (voľba je vypnutá) – zladenie podľa zvuku nemá z čoho. (Overené v kóde 19. 10.)
 9k. [ ] Kľúčové snímky farieb ◆ aj na časovej osi (teraz len ‹ ◇ › v paneli Farby) + plynulý (lineárny) prechod. (Overené 19. 10.)
 9l. [x] Kľúčové snímky polohy aj pre B-roll / kameru B – na osi sú ◆ pri kamere B aj vrstvách (overené 20. 10. v kóde).
 9m. [x] Kalendár: presun príspevku ťahaním na iný deň – hotové 19. 10. (kalendarPresun.ts; overené 20. 10. v kóde).
