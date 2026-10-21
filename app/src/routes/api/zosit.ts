@@ -121,18 +121,35 @@ export const Route = createFileRoute("/api/zosit")({
         // ako nezaradené a zápis by ich vložil druhýkrát (viď zositNahlad.ts).
         const { DB } = bindings();
         let oznacene = cisté.map((x) => ({ ...x, uzMame: false, kategoriaVDb: "", kategoria: "", zamknuty: false }));
+        /**
+         * BEZ OVERENIA NIČ NOVÉ (21. 10. 2026). Kontrola „toto už v Kokpite
+         * je“ a „tento vklad už má banka“ padala pri chybe na prázdny zoznam
+         * — a prázdny zoznam znamená „nič z toho nemáme“: každý riadok strany
+         * by sa ukázal ako nový a zápis by ho vložil druhýkrát. Keď sa to
+         * overiť nedá, náhľad sa nevráti vôbec. Pravidlá kategórií sú len
+         * návrh, tie smú chýbať.
+         */
+        const neoverene = "Nepodarilo sa overiť, čo z tejto strany už v Kokpite je — riadky by sa mohli zapísať dvakrát. Skús to znova o chvíľu.";
+        if (!DB && cisté.length) return Response.json({ ok: false, error: neoverene }, { status: 503 });
         if (DB && cisté.length) {
           const od = new Date(Date.parse(`${cisté[0].datum}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
           const doDna = new Date(Date.parse(`${cisté[cisté.length - 1].datum}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
-          const [vDb, vklady, pr, zamky] = await Promise.all([
-            DB.prepare("SELECT date, amount_czk, counterparty, category FROM fio_transactions WHERE typ = 'hotovosť' AND date BETWEEN ?1 AND ?2")
-              .bind(od, doDna).all().then((x) => (x.results || []) as unknown as HotovostVDb[]).catch(() => [] as HotovostVDb[]),
-            // Vklady hotovosti, ktoré už má BANKA. Presun na účet je v zošite
-            // aj vo výpise — zapísať oboje by tie peniaze započítalo dvakrát.
-            DB.prepare(`SELECT date, amount_czk, counterparty FROM fio_transactions
-                         WHERE typ <> 'hotovosť' AND date BETWEEN ?1 AND ?2
-                           AND (lower(counterparty) LIKE '%vklad%' OR lower(note) LIKE '%vklad hotovosti%')`)
-              .bind(od, doDna).all().then((x) => (x.results || []) as unknown as VkladVBanke[]).catch(() => [] as VkladVBanke[]),
+          let vDb: HotovostVDb[], vklady: VkladVBanke[];
+          try {
+            [vDb, vklady] = await Promise.all([
+              DB.prepare("SELECT date, amount_czk, counterparty, category FROM fio_transactions WHERE typ = 'hotovosť' AND date BETWEEN ?1 AND ?2")
+                .bind(od, doDna).all().then((x) => (x.results || []) as unknown as HotovostVDb[]),
+              // Vklady hotovosti, ktoré už má BANKA. Presun na účet je v zošite
+              // aj vo výpise — zapísať oboje by tie peniaze započítalo dvakrát.
+              DB.prepare(`SELECT date, amount_czk, counterparty FROM fio_transactions
+                           WHERE typ <> 'hotovosť' AND date BETWEEN ?1 AND ?2
+                             AND (lower(counterparty) LIKE '%vklad%' OR lower(note) LIKE '%vklad hotovosti%')`)
+                .bind(od, doDna).all().then((x) => (x.results || []) as unknown as VkladVBanke[]),
+            ]);
+          } catch {
+            return Response.json({ ok: false, error: neoverene }, { status: 503 });
+          }
+          const [pr, zamky] = await Promise.all([
             DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
               .then((x) => ((x.results || []) as { text_pattern: string; category: string }[]).map((y) => ({ vzor: String(y.text_pattern || ""), kategoria: String(y.category || "") })))
               .catch(() => []),

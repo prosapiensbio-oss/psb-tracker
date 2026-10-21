@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
+import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import {
-  nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
+  chybaZoznamuMien, fakturyZIdokladu, nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
   sposobZRiadku, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
@@ -50,26 +50,122 @@ const uid = () => crypto.randomUUID();
  * (CLAUDE.md: ticho zlyhávajúci zápis je horší než hlasitá chyba).
  */
 type StavZapisu = "nova" | "obnovena" | "uz-bola";
+type VysledokZapisu = { ok: true; stav: StavZapisu } | { ok: false; error: string };
+
+/**
+ * Meno so zoznamom („A, B, C“ z fakturačného kontaktu) nie je klient —
+ * viď `chybaZoznamuMien`. Známi klienti sa ťahajú LEN keď je v mene čiarka;
+ * bežné priradenie tým nič nestojí.
+ */
+async function chybaMena(DB: D1Database, klient: string): Promise<string | null> {
+  if (!klient.includes(",")) return null;
+  const [s, bal] = await DB.batch([
+    DB.prepare("SELECT DISTINCT client_name m FROM sessions"),
+    DB.prepare("SELECT DISTINCT klient m FROM balicky"),
+  ]);
+  const znami = [...(s.results || []), ...(bal.results || [])].map((x) => String((x as { m: string }).m || ""));
+  return chybaZoznamuMien(klient, znami);
+}
+
+const zoznamMien = (xs: string[]) => xs.length === 1 ? `klientovi ${xs[0]}` : `klientom ${xs.join(", ")}`;
 
 async function zapisPriradenie(
   DB: D1Database,
   v: { klient: string; datum: string; suma: number; sposob: string; fioId: string; poznamka: string; kto: string | null | undefined; vopred: boolean },
-): Promise<StavZapisu> {
-  const uz = await DB.prepare("SELECT id, zrusene_at FROM platby WHERE fio_id = ?1 AND klient = ?2")
-    .bind(v.fioId, v.klient).first<{ id: string; zrusene_at: string | null }>().catch(() => null);
-  if (uz && !uz.zrusene_at) return "uz-bola";
+  /**
+   * Smie mať pohyb živú platbu aj pre INÉHO klienta? Len pri dieloch
+   * (`zapisDiely` si súčet overí sám). Celý pohyb druhému klientovi nie.
+   */
+  dielyPohybu = false,
+): Promise<VysledokZapisu> {
+  const zlyMeno = await chybaMena(DB, v.klient);
+  if (zlyMeno) return { ok: false, error: zlyMeno };
+  /**
+   * Bez `.catch`: keď sa nedá zistiť, čo už na pohybe visí, nezapisuje sa
+   * nič. Dovtedy chyba čítania znamenala „nič tam nie je“ a zapísalo sa.
+   *
+   * Meno sa porovnáva normalizované (21. 10. 2026): „Tomas Dvorak“ a „Tomáš
+   * Dvořák“ sú ten istý klient, v SQL dva reťazce — zrušená platba by sa
+   * neoživila a vedľa nej by vznikla druhá.
+   */
+  const riadky = ((await DB.prepare("SELECT id, klient, zrusene_at FROM platby WHERE fio_id = ?1")
+    .bind(v.fioId).all()).results || []) as unknown as { id: string; klient: string; zrusene_at: string | null }[];
+  const k = normName(v.klient);
+  const moje = riadky.filter((x) => normName(x.klient) === k);
+  /**
+   * JEDEN POHYB, DVAJA KLIENTI CELÝ (21. 10. 2026). Unikátna je dvojica
+   * (fio_id, klient), takže databáza pustila ten istý prevod celý aj druhému
+   * klientovi — tržba sa zdvojila a banka sedela. Spoločný prevod sa delí cez
+   * `rozdel`; celé priradenie inému sa odmietne s menom toho, kto ho má.
+   */
+  const ini = riadky.filter((x) => !x.zrusene_at && normName(x.klient) !== k).map((x) => x.klient);
+  if (ini.length && !dielyPohybu) {
+    return {
+      ok: false,
+      error: `Tento pohyb už je priradený ${zoznamMien(ini)}. Ak patrí inému, najprv tú platbu zruš; ak patrí viacerým, rozdeľ ho.`,
+    };
+  }
+  const zivy = moje.find((x) => !x.zrusene_at);
+  if (zivy) return { ok: true, stav: "uz-bola" };
+  const uz = moje.find((x) => x.klient === v.klient) || moje[0];
   if (uz) {
     await DB.prepare(
-      `UPDATE platby SET zrusene_at = NULL, datum = ?2, suma_czk = ?3, sposob = ?4, poznamka = ?5, autor = ?6, vopred = ?7
+      // Meno sa berie z NOVÉHO priradenia — zrušený riadok mohol niesť inú
+      // podobu mena („Tomas Dvorak“ vs „Tomáš Dvořák“).
+      `UPDATE platby SET zrusene_at = NULL, klient = ?8, datum = ?2, suma_czk = ?3, sposob = ?4, poznamka = ?5, autor = ?6, vopred = ?7
          WHERE id = ?1`,
-    ).bind(uz.id, v.datum, v.suma, v.sposob, v.poznamka, v.kto || null, v.vopred ? 1 : 0).run();
-    return "obnovena";
+    ).bind(uz.id, v.datum, v.suma, v.sposob, v.poznamka, v.kto || null, v.vopred ? 1 : 0, v.klient).run();
+    return { ok: true, stav: "obnovena" };
   }
   await DB.prepare(
     "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
   ).bind(uid(), v.klient, v.datum, v.suma, v.sposob, v.fioId, v.poznamka, teraz(), v.kto || null, v.vopred ? 1 : 0).run();
-  return "nova";
+  return { ok: true, stav: "nova" };
 }
+
+/**
+ * OPRAVA NAUČENÉHO PLATITEĽA (21. 10. 2026).
+ *
+ * Pravidlo v `platba_mapovanie` sa dovtedy len pridávalo. Keď sa naučilo zle
+ * a človek potom platbu od toho istého odosielateľa priradil inému, pravidlo
+ * zostalo a ďalší prevod znova ponúklo zlému klientovi — ako „naučené“, teda
+ * najistejší návrh, ktorý dávka predvyplní.
+ *
+ * Keď človek rozhodne inak než pravidlo: smie sa nový klient naučiť
+ * (`smieSaZapamatat`), pravidlo sa PREPÍŠE; nesmie, staré sa ZMAŽE, nech
+ * prestane navrhovať. Oboje ide do auditu. `klienti` sú tí, komu pohyb
+ * práve priradili (pri dieloch viacerí) — pravidlo, ktoré ukazuje na
+ * jedného z nich, nie je v rozpore.
+ */
+async function opravPravidlo(
+  DB: D1Database,
+  vzor: string,
+  klienti: string[],
+  naucitPre: string | null,
+  kto: string | undefined,
+): Promise<{ naucil: boolean }> {
+  if (!vzor) return { naucil: false };
+  const stare = await DB.prepare("SELECT klient FROM platba_mapovanie WHERE vzor = ?1").bind(vzor).first<{ klient: string }>();
+  const vRozpore = !!stare && !klienti.some((x) => normName(x) === normName(stare.klient));
+  if (naucitPre) {
+    await DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
+      .bind(vzor, naucitPre, teraz()).run();
+    if (stare && normName(stare.klient) !== normName(naucitPre)) {
+      await audit(DB, { action: "platba-pravidlo-nahradene", predmet: vzor, old: stare.klient, neu: naucitPre, actor: kto });
+    }
+    return { naucil: true };
+  }
+  if (stare && vRozpore) {
+    await DB.prepare("DELETE FROM platba_mapovanie WHERE vzor = ?1").bind(vzor).run();
+    await audit(DB, {
+      action: "platba-pravidlo-zmazane", predmet: vzor, old: stare.klient,
+      neu: `priradené ${klienti.join(", ")} — pravidlo sa nesmie naučiť, staré zmazané`, actor: kto,
+    });
+  }
+  return { naucil: false };
+}
+
+const textChyby = (e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160);
 const teraz = () => new Date().toISOString();
 const denISO = (s: unknown) => {
   const v = String(s ?? "").slice(0, 10);
@@ -179,20 +275,53 @@ async function zapisDiely(
   if (Math.abs(spolu - Math.round(r.amount_czk)) > 1) {
     return { ok: false, error: `Diely dávajú ${spolu} Kč, pohyb je ${Math.round(r.amount_czk)} Kč.` };
   }
+  if (new Set(kusy.map((d) => normName(d.klient))).size !== kusy.length) {
+    return { ok: false, error: "Ten istý klient je v dieloch dvakrát — spoj jeho diely do jedného." };
+  }
   // Bez try/catch vracia worker HTML stránku „This page didn't load"
   // a na obrazovke to vyzerá, že sa neudialo nič. Presne tak vyzerala
   // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
-  const vopred = await Promise.all(kusy.map((d) => jeVopred(DB, d.klient)));
   try {
+    for (const d of kusy) {
+      const zle = await chybaMena(DB, d.klient);
+      if (zle) return { ok: false, error: zle };
+    }
+    /**
+     * DIELY NAVRCH CELÉHO PRIRADENIA (21. 10. 2026). Pohyb priradený celý
+     * jednému klientovi (dávka 28. 9. tak zapísala DK Consulting Danovi) sa
+     * rozdelením neopravil: Danov riadok zostal na celej sume („už bola“)
+     * a Monikin diel pribudol navrch — súčet platieb prerástol pohyb. Teraz
+     * sa najprv overí, čo na pohybe už živé visí: celé priradenie treba
+     * najprv zrušiť a diely spolu so starými nesmú prerásť sumu pohybu.
+     */
+    const suma = Math.round(r.amount_czk);
+    const zive = ((await DB.prepare("SELECT klient, suma_czk FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL")
+      .bind(r.id).all()).results || []) as unknown as { klient: string; suma_czk: number }[];
+    const cely = zive.find((x) => Math.abs(Math.round(Number(x.suma_czk) || 0) - suma) <= 1);
+    if (cely) {
+      return { ok: false, error: `Tento pohyb už je celý priradený klientovi ${cely.klient} (${suma} Kč). Najprv tú platbu zruš, potom ho rozdeľ.` };
+    }
+    const uzZapisane = zive.reduce((n, x) => n + Math.round(Number(x.suma_czk) || 0), 0);
+    const pribudne = kusy.filter((d) => !zive.some((x) => normName(x.klient) === normName(d.klient))).reduce((n, d) => n + d.suma, 0);
+    if (zive.length && uzZapisane + pribudne > suma + 1) {
+      return {
+        ok: false,
+        error: `Pohyb už má priradené ${uzZapisane} Kč (${zive.map((x) => x.klient).join(", ")}); s novými dielmi by to bolo ${uzZapisane + pribudne} Kč z ${suma} Kč. Najprv zruš staré priradenie.`,
+      };
+    }
+    const vopred = await Promise.all(kusy.map((d) => jeVopred(DB, d.klient)));
     // Po jednom, nie v dávke: zrušená platba toho istého klienta sa OŽIVÍ
     // (viď `zapisPriradenie`) — dovtedy na nej rozdelenie padalo hláškou
     // „už má priradenú platbu", hoci žiadna živá neexistovala.
     for (let i = 0; i < kusy.length; i++) {
       const d = kusy[i];
-      await zapisPriradenie(DB, {
+      const v = await zapisPriradenie(DB, {
         klient: d.klient, datum: r.date.slice(0, 10), suma: d.suma, sposob: sposobZRiadku(r), fioId: r.id,
         poznamka: `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, kto, vopred: vopred[i],
-      });
+      }, true);
+      if (!v.ok) {
+        return { ok: false, error: `${v.error}${i ? ` Zapísané už sú diely: ${kusy.slice(0, i).map((x) => x.klient).join(", ")}.` : ""}` };
+      }
     }
   } catch (e) {
     const t = String(e instanceof Error ? e.message : e);
@@ -209,6 +338,10 @@ async function zapisDiely(
     neu: kusy.map((d) => `${d.klient}: ${d.suma}`).join(" · "),
     actor: kto,
   });
+  // Pri dieloch sa pravidlo neučí, ale zlé sa opraví: naučený platiteľ,
+  // ktorý ukazuje na niekoho mimo dielov, by ďalší prevod ponúkol zle.
+  try { await opravPravidlo(DB, vzorPlatby(r), kusy.map((d) => d.klient), null, kto); }
+  catch (e) { await audit(DB, { action: "platba-pravidlo-chyba", predmet: vzorPlatby(r), neu: textChyby(e), actor: kto }); }
   return { ok: true };
 }
 
@@ -273,18 +406,13 @@ async function stavPlatieb(DB: D1Database) {
    * vystavená priamo na človeka, hľadá sa medzi klientmi.
    */
   const menaKlientov = ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name);
-  const podlaFirmy = new Map<string, string>();
-  for (const k of ((kontakty.results || []) as unknown as { firma: string; klient: string }[])) {
-    podlaFirmy.set(normName(k.firma), k.klient);
-  }
-  const zIdokladu = ((idoklad.results || []) as unknown as { cislo: string; nazov: string }[])
-    .map((f) => ({
-      cislo: f.cislo,
-      klient: podlaFirmy.get(normName(f.nazov))
-        || menaKlientov.find((m) => normName(m) === normName(f.nazov))
-        || "",
-    }))
-    .filter((f) => f.klient);
+  // Kontakt môže patriť viacerým klientom („A, B, C“) — rozloží sa na mená
+  // a faktúra ich ponúkne na výber (21. 10. 2026, `fakturyZIdokladu`).
+  const zIdokladu = fakturyZIdokladu(
+    (idoklad.results || []) as unknown as { cislo: string; nazov: string }[],
+    (kontakty.results || []) as unknown as { firma: string; klient: string }[],
+    menaKlientov,
+  );
 
   const vsetkyNepriradene = nepriradene(
     (fio.results || []) as unknown as FioRiadok[],
@@ -377,21 +505,33 @@ export const Route = createFileRoute("/api/platby")({
           const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
             .bind(fioId).first<FioRiadok>();
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
-          const stav = await zapisPriradenie(DB, {
-            klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
-            poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
-          }).catch((e) => { throw e; });
-          const prikazy: D1PreparedStatement[] = [];
+          let stav: StavZapisu;
+          try {
+            const v = await zapisPriradenie(DB, {
+              klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
+              poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
+            });
+            if (!v.ok) return Response.json(v, { status: 409 });
+            stav = v.stav;
+          } catch (e) {
+            return Response.json({ ok: false, error: `Platba sa nezapísala: ${textChyby(e)}` }, { status: 500 });
+          }
           // Pravidlo sa učí LEN vtedy, keď je klient priamo v odosielateľovi.
           // Inak by sa naučilo zo sprostredkovaného prevodu a každý ďalší
           // prevod tej istej osoby by appka ponúkala ako platbu toho klienta.
+          // Pravidlo, ktoré ukazovalo na niekoho iného, sa opraví
+          // (`opravPravidlo`, 21. 10. 2026).
           const vzor = vzorPlatby(r);
-          const naucil = !!b.zapamataj && smieSaZapamatat(vzor, klient);
-          if (naucil) {
-            prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
-              .bind(vzor, klient, teraz()));
+          let naucil = false;
+          let chybaPravidla = "";
+          try {
+            naucil = (await opravPravidlo(DB, vzor, [klient], !!b.zapamataj && smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil;
+          } catch (e) {
+            // Platba už je zapísaná — nevracia sa chyba celej akcie, ale
+            // povie sa to nahlas a zostane stopa v audite.
+            chybaPravidla = `Platba je zapísaná, ale pravidlo platiteľa sa neuložilo: ${textChyby(e)}`;
+            await audit(DB, { action: "platba-pravidlo-chyba", predmet: vzor, neu: chybaPravidla, actor: kto });
           }
-          if (prikazy.length) await DB.batch(prikazy);
           await audit(DB, { action: "platba-priradena", predmet: klient, neu: `${r.amount_czk} Kč · ${r.date.slice(0, 10)}${stav === "obnovena" ? " (obnovená zrušená platba)" : ""}`, actor: kto });
 
           /**
@@ -405,13 +545,17 @@ export const Route = createFileRoute("/api/platby")({
            * Tu je ten správny okamih: peniaze dorazili. Appka len NAVRHNE,
            * čo si klient zrejme kúpil; zapíše sa to až kliknutím.
            */
-          const jehoBalicky = ((await DB.prepare(
-            "SELECT nazov, cena_czk, platnost_od, zrusene_at FROM balicky WHERE klient = ?1",
-          ).bind(klient).all().catch(() => ({ results: [] }))).results || []) as unknown as
-            { nazov: string; cena_czk: number | null; platnost_od: string; zrusene_at: string | null }[];
+          // Meno sa NEPOROVNÁVA v SQL (21. 10. 2026): „Tomas Dvorak“ a „Tomáš
+          // Dvořák“ sú dva reťazce a návrh balíčka by nenašiel ani jeden.
+          // Tabuľka je malá, filtruje sa tu.
+          const jehoBalicky = (((await DB.prepare(
+            "SELECT klient, nazov, cena_czk, platnost_od, zrusene_at FROM balicky",
+          ).all().catch(() => ({ results: [] }))).results || []) as unknown as
+            { klient: string; nazov: string; cena_czk: number | null; platnost_od: string; zrusene_at: string | null }[])
+            .filter((x) => normName(x.klient) === normName(klient));
           const navrh = balicekZPlatby({ suma: r.amount_czk, den: r.date.slice(0, 10), balicky: jehoBalicky });
 
-          return Response.json({ ok: true, zapamatane: naucil, navrh, stav });
+          return Response.json({ ok: true, zapamatane: naucil, navrh, stav, ...(chybaPravidla ? { upozornenie: chybaPravidla } : {}) });
         }
 
         /**
@@ -436,45 +580,67 @@ export const Route = createFileRoute("/api/platby")({
           let hotovo = 0;
           let naucenych = 0;
           const chyby: string[] = [];
+          /** Čo sa naozaj zapísalo — do auditu, aj keď dávka skončí s chybami. */
+          const zapisane: string[] = [];
           for (const p of polozky) {
             const fioId = String(p.fioId || "");
             const klient = String(p.klient || "").trim();
+            let oznacenie = fioId.slice(0, 8) || "?";
             /**
-             * SPOLOČNÝ PREVOD V DÁVKE. Diely sa zapíšu každému zvlášť a
-             * pravidlo sa neučí — vzor by ukazoval na dvoch ľudí naraz.
+             * CHYBA JEDNÉHO RIADKU NERUŠÍ OSTATNÉ — naozaj (21. 10. 2026).
+             * Komentár nad dávkou to sľuboval, ale výnimka z D1 vyletela von:
+             * časť platieb sa zapísala, worker vrátil HTML stránku a audit
+             * nezostal žiadny. Každý riadok má vlastný try/catch a chyba ide
+             * do zoznamu `chyby`.
              */
-            if (fioId && Array.isArray(p.diely) && p.diely.length >= 2) {
+            try {
+              /**
+               * SPOLOČNÝ PREVOD V DÁVKE. Diely sa zapíšu každému zvlášť a
+               * pravidlo sa neučí — vzor by ukazoval na dvoch ľudí naraz.
+               */
+              if (fioId && Array.isArray(p.diely) && p.diely.length >= 2) {
+                const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
+                  .bind(fioId).first<FioRiadok>();
+                if (!r) { chyby.push(`${oznacenie}: riadok výpisu neexistuje`); continue; }
+                oznacenie = `${r.date.slice(0, 10)} ${Math.round(r.amount_czk)} Kč`;
+                const kusy = (p.diely as { klient?: unknown; suma?: unknown }[])
+                  .map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
+                const v = await zapisDiely(DB, r, kusy, kto);
+                if (!v.ok) { chyby.push(`${oznacenie}: ${v.error}`); continue; }
+                zapisane.push(`${oznacenie} → ${kusy.map((d) => `${d.klient} ${d.suma}`).join(" + ")}`);
+                hotovo++;
+                continue;
+              }
+              if (!fioId || !klient) { chyby.push("chýba platba alebo klient"); continue; }
               const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
                 .bind(fioId).first<FioRiadok>();
-              if (!r) { chyby.push(`${fioId.slice(0, 8)}: riadok výpisu neexistuje`); continue; }
-              const kusy = (p.diely as { klient?: unknown; suma?: unknown }[])
-                .map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
-              const v = await zapisDiely(DB, r, kusy, kto);
-              if (!v.ok) { chyby.push(`${r.date.slice(0, 10)} ${Math.round(r.amount_czk)} Kč: ${v.error}`); continue; }
+              if (!r) { chyby.push(`${oznacenie}: riadok výpisu neexistuje`); continue; }
+              oznacenie = `${r.date.slice(0, 10)} ${Math.round(r.amount_czk)} Kč`;
+              const vzor = vzorPlatby(r);
+              const v = await zapisPriradenie(DB, {
+                klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
+                poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
+              });
+              if (!v.ok) { chyby.push(`${oznacenie}: ${v.error}`); continue; }
+              zapisane.push(`${oznacenie} → ${klient}${v.stav === "uz-bola" ? " (už bolo)" : ""}`);
               hotovo++;
-              continue;
+              try {
+                if ((await opravPravidlo(DB, vzor, [klient], smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil) naucenych++;
+              } catch (e) {
+                chyby.push(`${oznacenie}: platba zapísaná, pravidlo platiteľa nie (${textChyby(e)})`);
+              }
+            } catch (e) {
+              chyby.push(`${oznacenie}: ${textChyby(e)}`);
             }
-            if (!fioId || !klient) { chyby.push("chýba platba alebo klient"); continue; }
-            const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
-              .bind(fioId).first<FioRiadok>();
-            if (!r) { chyby.push(`${fioId.slice(0, 8)}: riadok výpisu neexistuje`); continue; }
-            const vzor = vzorPlatby(r);
-            const naucil = smieSaZapamatat(vzor, klient);
-            await zapisPriradenie(DB, {
-              klient, datum: r.date.slice(0, 10), suma: r.amount_czk, sposob: sposobZRiadku(r), fioId,
-              poznamka: (r.counterparty || "").slice(0, 200), kto, vopred: await jeVopred(DB, klient),
-            });
-            const prikazy: D1PreparedStatement[] = [];
-            if (naucil) {
-              prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
-                .bind(vzor, klient, teraz()));
-              naucenych++;
-            }
-            if (prikazy.length) await DB.batch(prikazy);
-            hotovo++;
           }
-          await audit(DB, { action: "platby-davka", predmet: `${hotovo} z ${polozky.length}`, neu: `naučených pravidiel: ${naucenych}`, actor: kto });
-          return Response.json({ ok: true, hotovo, naucenych, chyby: chyby.slice(0, 10) });
+          await audit(DB, {
+            action: "platby-davka",
+            predmet: `${hotovo} z ${polozky.length}`,
+            neu: `naučených pravidiel: ${naucenych}${zapisane.length ? ` · ${zapisane.join(" · ")}` : ""}`,
+            ...(chyby.length ? { reason: `${chyby.length} chýb: ${chyby.join(" · ").slice(0, 600)}` } : {}),
+            actor: kto,
+          });
+          return Response.json({ ok: true, hotovo, naucenych, chyby: chyby.slice(0, 10), chybCelkom: chyby.length });
         }
 
         /**
@@ -507,7 +673,7 @@ export const Route = createFileRoute("/api/platby")({
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
           const kusy = diely.map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
           const v = await zapisDiely(DB, r, kusy, kto);
-          if (!v.ok) return Response.json(v, { status: /dávajú|potrebuje|aspoň/.test(v.error) ? 400 : 500 });
+          if (!v.ok) return Response.json(v, { status: /dávajú|potrebuje|aspoň|dvakrát|zoznam/.test(v.error) ? 400 : /už je|už má/.test(v.error) ? 409 : 500 });
           return Response.json({ ok: true, dielov: kusy.length });
         }
 
@@ -531,6 +697,8 @@ export const Route = createFileRoute("/api/platby")({
           if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
           if (!datum) return Response.json({ ok: false, error: "Chýba dátum (RRRR-MM-DD)." }, { status: 400 });
           if (suma <= 0) return Response.json({ ok: false, error: "Suma musí byť kladná." }, { status: 400 });
+          const zleMeno = await chybaMena(DB, klient);
+          if (zleMeno) return Response.json({ ok: false, error: zleMeno }, { status: 400 });
           const sposob = SPOSOBY.includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
           await DB.prepare(
             "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,NULL,?,?,?,?)",
@@ -565,6 +733,31 @@ export const Route = createFileRoute("/api/platby")({
         if (akcia === "zrus" || akcia === "vrat") {
           const id = String(b.id || "");
           if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });
+          /**
+           * Vrátenie zrušenej bankovej platby nesmie prerásť pohyb (21. 10.
+           * 2026) — rovnaká stráž ako pri priradení: keď pohyb medzitým
+           * dostal iného klienta, oživená platba by ten istý prevod
+           * započítala dvakrát.
+           */
+          if (akcia === "vrat") {
+            const p = await DB.prepare("SELECT fio_id, suma_czk, zrusene_at FROM platby WHERE id = ?1").bind(id)
+              .first<{ fio_id: string | null; suma_czk: number; zrusene_at: string | null }>();
+            if (p?.fio_id && p.zrusene_at) {
+              const [pohyb, zive] = await DB.batch([
+                DB.prepare("SELECT amount_czk FROM fio_transactions WHERE id = ?1").bind(p.fio_id),
+                DB.prepare("SELECT klient, suma_czk FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL").bind(p.fio_id),
+              ]);
+              const suma = Math.round(Number(((pohyb.results || [])[0] as { amount_czk?: number } | undefined)?.amount_czk) || 0);
+              const ini = (zive.results || []) as unknown as { klient: string; suma_czk: number }[];
+              const spolu = ini.reduce((n, x) => n + Math.round(Number(x.suma_czk) || 0), 0) + Math.round(Number(p.suma_czk) || 0);
+              if (ini.length && suma && spolu > suma + 1) {
+                return Response.json({
+                  ok: false,
+                  error: `Tento pohyb už je priradený ${zoznamMien(ini.map((x) => x.klient))}; s vrátenou platbou by to bolo ${spolu} Kč z ${suma} Kč.`,
+                }, { status: 409 });
+              }
+            }
+          }
           await DB.prepare("UPDATE platby SET zrusene_at = ? WHERE id = ?").bind(akcia === "zrus" ? teraz() : null, id).run();
           await audit(DB, { action: akcia === "zrus" ? "platba-zrusena" : "platba-vratena", predmet: id, actor: kto });
           return Response.json({ ok: true });

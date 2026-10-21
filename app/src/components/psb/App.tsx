@@ -464,6 +464,14 @@ export function PSBApp() {
   const [navratDoMapy, setNavratDoMapy] = useState<{ mesiac: string; faza: number; napadId?: string } | null>(null);
   /** Neúspešný zápis do dát — hlási sa raz pre celú appku, viď setOverride. */
   const [chybaZapisu, setChybaZapisu] = useState("");
+  /**
+   * /api/data zlyhalo (21. 10. 2026). `fetchData` po troch pokusoch vráti
+   * EMPTY_DATA — ten istý objekt, nie kópiu —, takže sa to dá odlíšiť od
+   * naozaj prázdnej databázy. loadData odvtedy na výpadku platieb či
+   * balíčkov padá nahlas namiesto tichého „nikto nič nezaplatil“; bez pásu
+   * by to obrazovka aj tak ukázala len ako prázdno.
+   */
+  const [dataChyba, setDataChyba] = useState(false);
   const [marketingSub, setMarketingSub] = useState("prehlad");
   // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
   //
@@ -801,7 +809,12 @@ export function PSBApp() {
   // they were editing (e.g. every keystroke in Dopyty bounced back to Klienti).
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    setData(await fetchData());
+    const d = await fetchData();
+    const zlyhalo = d === EMPTY_DATA;
+    setDataChyba(zlyhalo);
+    // Obnova na pozadí, ktorá zlyhala, nezmaže to, čo už na obrazovke je —
+    // staré čísla s pásom „nenačítali sa“ sú lepšie než prázdna appka.
+    if (!(zlyhalo && silent)) setData(d);
     if (!silent) setLoading(false);
   }, []);
 
@@ -1164,6 +1177,13 @@ export function PSBApp() {
   // vypnuté — do PTmindera sa nezapisuje (odchod z PTmindera, krok 3).
   /** Surové riadky vlastnej evidencie — kŕmia fronty „Bez balíčka" a „Dlhujú". */
   const [balickyRiadky, setBalickyRiadky] = useState<BalicekRiadok[]>([]);
+  /**
+   * /api/balicky zlyhalo (21. 10. 2026). Bez balíčkov z Kokpitu vyzerá
+   * každý nahodený balíček ako chýbajúci a hodiny idú do mínusu — predtým
+   * sa chyba prehltla a obrazovky to ukázali ako pravdu. Pás navrchu to
+   * hovorí nahlas; zhasne pri prvom úspešnom načítaní.
+   */
+  const [balickyChyba, setBalickyChyba] = useState(false);
   /** Platby zapísané v Kokpite — bez nich by každý nahodený balíček vyzeral ako dlh. */
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
   const [platbyCakaju, setPlatbyCakaju] = useState(0);
@@ -1252,9 +1272,9 @@ export function PSBApp() {
     void fetch("/api/balicky", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { ok?: boolean; balicky?: BalicekRiadok[] }) => {
-        if (j.ok) setBalickyRiadky(j.balicky || []);
+        if (j.ok) { setBalickyRiadky(j.balicky || []); setBalickyChyba(false); } else setBalickyChyba(true);
       })
-      .catch(() => undefined);
+      .catch(() => setBalickyChyba(true));
     void fetch("/api/platby?klient=1", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { ok?: boolean; platby?: PlatbaRiadok[] }) => { if (j.ok) setVlastnePlatby(j.platby || []); })
@@ -2987,7 +3007,7 @@ function skupinaFaktur(
         if (!r?.ok) return false;
         // Balíček mení zostatok aj peniaze — bez tohto by obrazovky držali staré.
         const j = await fetch("/api/balicky", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
-        if (j?.ok) setBalickyRiadky(j.balicky || []);
+        if (j?.ok) { setBalickyRiadky(j.balicky || []); setBalickyChyba(false); } else setBalickyChyba(true);
         return true;
       },
       obnovKalendar: async () => {
@@ -3113,6 +3133,15 @@ function skupinaFaktur(
           style={{ position: "sticky", top: 0, zIndex: 60, cursor: "pointer", padding: "8px 16px", background: mix(C.red, 22), borderBottom: `1px solid ${mix(C.red, 55)}`, color: C.text, fontSize: 12.5, textAlign: "center" }}
         >
           {chybaZapisu} <span style={{ color: C.textDim }}>· zavrieť</span>
+        </div>
+      )}
+      {(dataChyba || balickyChyba) && (
+        <div
+          role="alert"
+          style={{ position: "sticky", top: 0, zIndex: 59, padding: "8px 16px", background: mix(C.orange, 22), borderBottom: `1px solid ${mix(C.orange, 55)}`, color: C.text, fontSize: 12.5, textAlign: "center" }}
+        >
+          {dataChyba && <div><b>Dáta Kokpitu sa nenačítali</b> — čísla na obrazovke môžu byť staré alebo prázdne. Obnov stránku; keď to trvá, je chyba na serveri.</div>}
+          {balickyChyba && <div><b>Balíčky z Kokpitu sa nenačítali</b> — hodiny môžu byť zlé.</div>}
         </div>
       )}
       {mobil && (

@@ -311,14 +311,29 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
   const [otvoreny, setOtvoreny] = useState("");
   /** Odoslané v tomto okne — zmiznú hneď, nečaká sa na nové načítanie. */
   const [teraz, setTeraz] = useState<Record<string, string>>({});
+  /**
+   * ZOZNAM „UŽ ODIŠLA“ SA NENAČÍTAL → NEPONÚKAŤ NIČ (21. 10. 2026).
+   *
+   * Predtým sa pri chybe alebo `ok: false` dosadilo `{}` — teda „nikomu
+   * nič neodišlo“ — a krok ponúkol SMS o peniazoch znova každému, aj tomu,
+   * komu ráno odišla. Dvojitá SMS o platbe je presne to, čo klient berie
+   * ako upomienku. Radšej nič a tlačidlo „skúsiť znova“.
+   */
+  const [odoslaneChyba, setOdoslaneChyba] = useState(false);
+  const [pokus, setPokus] = useState(0);
 
   useEffect(() => {
     let zive = true;
+    setOdoslaneChyba(false);
     void fetch("/api/sms?odoslane=1", { credentials: "same-origin", cache: "no-store" })
-      .then((r) => r.json()).then((j) => { if (zive) setOdoslane(j?.ok ? (j.odoslane || {}) : {}); })
-      .catch(() => { if (zive) setOdoslane({}); });
+      .then((r) => r.json()).then((j: { ok?: boolean; odoslane?: Record<string, string> } | null) => {
+        if (!zive) return;
+        if (j?.ok && j.odoslane && typeof j.odoslane === "object") setOdoslane(j.odoslane);
+        else { setOdoslane(null); setOdoslaneChyba(true); }
+      })
+      .catch(() => { if (zive) { setOdoslane(null); setOdoslaneChyba(true); } });
     return () => { zive = false; };
-  }, []);
+  }, [pokus]);
 
   const riadky = useMemo(() => {
     if (!odoslane) return [];
@@ -351,8 +366,18 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
     return vsetky;
   }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz]);
 
-  useEffect(() => { onPocet?.(riadky.length); }, [riadky.length, onPocet]);
+  useEffect(() => { if (!odoslaneChyba) onPocet?.(riadky.length); }, [riadky.length, onPocet, odoslaneChyba]);
 
+  if (odoslaneChyba) {
+    return (
+      <div role="alert" style={{ fontSize: 12, color: C.text, padding: "9px 12px", borderRadius: 10, background: mix(C.red, 12), border: `1px solid ${mix(C.red, 45)}` }}>
+        Nepodarilo sa overiť, komu SMS už odišla — skús znova.{" "}
+        <button onClick={() => setPokus((x) => x + 1)} style={{ marginLeft: 6, padding: "4px 10px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.text }}>
+          Skúsiť znova
+        </button>
+      </div>
+    );
+  }
   if (!odoslane) return <div style={{ fontSize: 12, color: C.textDim }}>načítavam, komu už SMS odišla…</div>;
   if (!riadky.length) return <VsetkoVybavene text="Všetko vybavené — nikomu netreba písať." />;
 

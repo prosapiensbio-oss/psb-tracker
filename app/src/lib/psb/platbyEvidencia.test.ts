@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby, poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
+import { chybaZoznamuMien, fakturyZIdokladu, klientiKontaktu, klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby, poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -432,5 +432,82 @@ describe("spôsob platby z typu pohybu", () => {
     expect(sposobZRiadku({ typ: "Okamžitá příchozí platba" })).toBe("banka");
     expect(sposobZRiadku({ typ: "hotovosť" })).toBe("hotovost");
     expect(sposobZRiadku({ typ: "Vklad hotovosti" })).toBe("hotovost");
+  });
+});
+
+describe("fakturačný kontakt pre viacerých klientov (21. 10. 2026)", () => {
+  // `fakturacne_kontakty.klient` = zoznam mien oddelený čiarkou; párovanie ho
+  // bralo ako jedno meno a z troch ľudí vyrobilo neexistujúceho klienta.
+  const ZOZNAM = "Lenka Prinosilova, Anetka Přinosilová, Maty Přínosil";
+  const TRIJA = ["Lenka Prinosilova", "Anetka Přinosilová", "Maty Přínosil"];
+
+  it("zoznam sa rozloží na mená, jedno meno ostane jedno", () => {
+    expect(klientiKontaktu(ZOZNAM)).toEqual(TRIJA);
+    expect(klientiKontaktu("Jan Kral")).toEqual(["Jan Kral"]);
+    expect(klientiKontaktu(" Jan Kral ,, jan král ")).toEqual(["Jan Kral"]);
+    expect(klientiKontaktu("")).toEqual([]);
+    expect(klientiKontaktu(null)).toEqual([]);
+  });
+
+  it("faktúra z iDokladu: jeden klient → jeden riadok, ako doteraz", () => {
+    expect(fakturyZIdokladu([{ cislo: "20260035", nazov: "FSH Devices s.r.o." }], [{ firma: "FSH Devices s.r.o.", klient: "Jan Kral" }], []))
+      .toEqual([{ cislo: "20260035", klient: "Jan Kral" }]);
+  });
+
+  it("faktúra z iDokladu: kontakt s tromi klientmi → traja kandidáti, žiadny zlepenec", () => {
+    const f = fakturyZIdokladu([{ cislo: "20260041", nazov: "Lenka Přinosilová" }], [{ firma: "Lenka Přinosilová", klient: ZOZNAM }], []);
+    expect(f.map((x) => x.klient)).toEqual(TRIJA);
+    expect(f.every((x) => x.cislo === "20260041" && !x.klient.includes(","))).toBe(true);
+  });
+
+  it("dva kontakty s tou istou firmou sa zjednotia, neprepíšu", () => {
+    const f = fakturyZIdokladu([{ cislo: "20260050", nazov: "Benefit Management" }], [
+      { firma: "Benefit Management", klient: "Bohdan Klimek" },
+      { firma: "BENEFIT MANAGEMENT", klient: "Panagiotis Tsiolis" },
+    ], []);
+    expect(f.map((x) => x.klient)).toEqual(["Bohdan Klimek", "Panagiotis Tsiolis"]);
+  });
+
+  it("bez kontaktu sa faktúra páruje na klienta podľa mena", () => {
+    expect(fakturyZIdokladu([{ cislo: "20260060", nazov: "BARBORA VANKOVÁ" }], [], MENA))
+      .toEqual([{ cislo: "20260060", klient: "Barbora Vankova" }]);
+    expect(fakturyZIdokladu([{ cislo: "20260061", nazov: "Neznáma Firma" }], [], MENA)).toEqual([]);
+  });
+
+  const fio = [{ id: "f9", date: "2026-09-16", amount_czk: 7790, counterparty: "20260041 MGR. FILIP STRANAVSKY · Lenka Přinosilová", note: "", typ: "" }];
+  const faktury = fakturyZIdokladu([{ cislo: "20260041", nazov: "Lenka Přinosilová" }], [{ firma: "Lenka Přinosilová", klient: ZOZNAM }], []);
+
+  it("platba na takú faktúru je na výber, nie jeden návrh", () => {
+    const out = nepriradene(fio as never, [], {}, new Set(), [], [], faktury);
+    expect(out[0].kandidati).toEqual(TRIJA);
+    expect(out[0].kandidati.some((k) => k.includes(","))).toBe(false);
+  });
+
+  it("PTminder ju zúži, len keď zostane práve jeden", () => {
+    const jeden = [{ klient: "Anetka Přinosilová", datum: "2026-09-16", suma: 7790, metoda: "bank" }];
+    expect(nepriradene(fio as never, [], {}, new Set(), [], jeden, faktury)[0].kandidati).toEqual(["Anetka Přinosilová"]);
+    const dvaja = [...jeden, { klient: "Maty Přínosil", datum: "2026-09-16", suma: 7790, metoda: "bank" }];
+    expect(nepriradene(fio as never, [], {}, new Set(), [], dvaja, faktury)[0].kandidati).toEqual(TRIJA);
+  });
+
+  it("pravidlo naučené na zoznam sa ako „naučené“ neponúkne", () => {
+    const vzor = vzorPlatby(fio[0] as never);
+    const out = nepriradene(fio as never, [], { [vzor]: ZOZNAM }, new Set(), [], [], faktury);
+    expect(out[0].zdrojNavrhu).toBe("faktura");
+    expect(out[0].kandidati).toEqual(TRIJA);
+  });
+
+  it("pravidlo na jedného klienta platí ďalej", () => {
+    const vzor = vzorPlatby(fio[0] as never);
+    const out = nepriradene(fio as never, [], { [vzor]: "Anetka Přinosilová" }, new Set(), [], [], faktury);
+    expect(out[0]).toMatchObject({ kandidati: ["Anetka Přinosilová"], zdrojNavrhu: "naucene" });
+  });
+
+  it("server odmietne zápis na zoznam mien, ktorý nie je známy klient", () => {
+    expect(chybaZoznamuMien("Jan Kral", MENA)).toBeNull();
+    expect(chybaZoznamuMien(ZOZNAM, TRIJA)).toContain("nie je jeden klient");
+    expect(chybaZoznamuMien(ZOZNAM, TRIJA)).toContain("3 mien");
+    // Keby niekto naozaj mal čiarku v mene, a je to známy klient, prejde.
+    expect(chybaZoznamuMien("Novák, ml.", ["Novák, ml."])).toBeNull();
   });
 });

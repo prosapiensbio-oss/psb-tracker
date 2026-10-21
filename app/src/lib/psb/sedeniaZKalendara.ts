@@ -28,6 +28,7 @@
  * novými názvami. Zmiznutá udalosť sa nepočíta (zrušená), pokiaľ o nej
  * nepovedal Jerry „bol tam" (`kal_konanie`). A len to, čo sa už začalo.
  */
+import { normName } from "./format";
 import type { SessionRow } from "./types";
 
 /** Od tohto dňa je dochádzka z kalendára. */
@@ -102,8 +103,12 @@ const minutyMedzi = (od: string, do_: string): number => {
  * (1 098,33 Kč), nie z novšieho offline (1 450). Až potom rozhoduje novší.
  */
 function platnyBalicek(balicky: BalicekKokpitu[], klient: string, isoDen: string, online = false): BalicekKokpitu | null {
+  // Meno sa porovnáva cez normName (21. 10. 2026): balíček zapísaný ako
+  // „Stigut“ a udalosť ako „Štigut“ je ten istý človek. Presná zhoda tu
+  // ocenila tréning nulou, kým zvyšok appky (normName) balíček našiel.
+  const kto = normName(klient);
   const platne = balicky
-    .filter((b) => b.klient === klient && !b.zrusene_at && den(b.platnost_od) <= isoDen && (!b.platnost_do || den(b.platnost_do) >= isoDen))
+    .filter((b) => normName(b.klient) === kto && !b.zrusene_at && den(b.platnost_od) <= isoDen && (!b.platnost_do || den(b.platnost_do) >= isoDen))
     .sort((a, b) => den(b.platnost_od).localeCompare(den(a.platnost_od)));
   const jeOnline = (b: BalicekKokpitu) => /^\s*ON\b|online/i.test(b.nazov || "");
   return platne.find((b) => jeOnline(b) === online) || platne[0] || null;

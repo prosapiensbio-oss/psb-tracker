@@ -132,11 +132,13 @@ async function odlozOdberatela(
   bolo: Record<string, string | null> | null,
   nove: { firma: string; ico: string; dic?: string; ulica?: string; psc?: string; mesto?: string; stat?: string },
   kto: string | null | undefined,
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const firma = String(bolo?.firma || "").trim(), ico = String(bolo?.ico || "").trim();
   const zmena = (firma || ico) && (firma !== String(nove.firma || "").trim() || ico !== String(nove.ico || "").trim());
   const prikazy = [];
   if (zmena) {
+    // Chyba čítania = „neviem, či tam je“ → zapíše sa; najhoršie vznikne
+    // dvojica tej istej firmy, nie strata.
     const uz = await DB.prepare("SELECT id FROM klient_odberatelia WHERE klient = ?1 AND firma = ?2 AND ico = ?3")
       .bind(klient, firma, ico).first().catch(() => null);
     if (!uz) {
@@ -149,7 +151,21 @@ async function odlozOdberatela(
   }
   prikazy.push(DB.prepare("DELETE FROM klient_odberatelia WHERE klient = ?1 AND firma = ?2 AND ico = ?3")
     .bind(klient, String(nove.firma || "").trim(), String(nove.ico || "").trim()));
-  await DB.batch(prikazy).catch(() => null);
+  /**
+   * Bez `.catch(() => null)` (21. 10. 2026): volajúci hneď potom prepíše
+   * firmu a IČ v `klient_fakturacia`. Keď sa doterajšia firma neodložila,
+   * prepis by ju zmazal bez stopy — presne to, čomu má táto funkcia brániť.
+   * Neúspech preto zastaví celú zmenu.
+   */
+  try {
+    await DB.batch(prikazy);
+  } catch (e) {
+    return {
+      ok: false,
+      error: `Doterajšiu firmu${firma ? ` „${firma}“` : ""} sa nepodarilo odložiť medzi ďalšie firmy, preto sa nič nezmenilo. Skús to znova. (${String(e instanceof Error ? e.message : e).slice(0, 160)})`,
+    };
+  }
+  return { ok: true };
 }
 
 export const Route = createFileRoute("/api/vydane-faktury")({
@@ -302,7 +318,8 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) {
               return Response.json({ ok: false, error: "E-mail nevyzerá ako e-mail." }, { status: 400 });
             }
-            await odlozOdberatela(DB, klient, bolo, v, kto);
+            const odlozene = await odlozOdberatela(DB, klient, bolo, v, kto);
+            if (!odlozene.ok) return Response.json(odlozene, { status: 500 });
             await DB.prepare(
               `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily,
                  telefon, web, os_titul, os_meno, os_priezvisko, os_mobil, updated_at, telefon2)
@@ -335,7 +352,8 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!klient || !alt) return Response.json({ ok: false, error: "Taká firma pri klientovi nie je." }, { status: 404 });
             const bolo = await DB.prepare("SELECT * FROM klient_fakturacia WHERE klient = ?1").bind(klient).first<Record<string, string | null>>();
             const nove = { firma: alt.firma, ico: alt.ico, dic: alt.dic, ulica: alt.ulica, psc: alt.psc, mesto: alt.mesto, stat: alt.stat || "Česká republika" };
-            await odlozOdberatela(DB, klient, bolo, nove, kto);
+            const odlozene = await odlozOdberatela(DB, klient, bolo, nove, kto);
+            if (!odlozene.ok) return Response.json(odlozene, { status: 500 });
             await DB.prepare(
               `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
                ON CONFLICT(klient) DO UPDATE SET stat=?2, firma=?3, ico=?4, dic=?5, ulica=?6, psc=?7, mesto=?8, updated_at=?9`,
@@ -839,8 +857,10 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           }
 
           if (b.akcia === "uhradena" || b.akcia === "neuhradena") {
+            // Deň úhrady je pražský deň, nie UTC (21. 10. 2026) — medzi
+            // polnocou a 1:00/2:00 by `toISOString` dal včerajšok.
             await DB.prepare("UPDATE vydane_faktury SET uhradene_at=?2, platba_id=?3 WHERE id=?1")
-              .bind(id, b.akcia === "uhradena" ? (denISO(b.den) || teraz().slice(0, 10)) : null,
+              .bind(id, b.akcia === "uhradena" ? (denISO(b.den) || dnesPraha()) : null,
                 b.akcia === "uhradena" ? (kus(b.platbaId, 40) || null) : null).run();
             await audit(DB, { action: `faktura-${b.akcia}`, predmet: id, actor: kto });
             return Response.json({ ok: true });

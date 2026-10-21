@@ -7,7 +7,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { porovnajBalicky, type Balicek, type PtBalicek } from "../../lib/psb/balickyEvidencia";
 import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
-import { jeMesiac } from "../../lib/psb/format";
+import { jeMesiac, normName } from "../../lib/psb/format";
 import { jePlatenyBalicek, podobnyBalicek, type ExistujuciBalicek } from "../../lib/psb/duplicitaBalicka";
 import { dnesPraha } from "../../lib/psb/cas";
 import { chybaUkoncenia, poznamkaUkoncenia, poznamkaVratenia } from "../../lib/psb/ukoncenieBalicka";
@@ -73,10 +73,14 @@ async function zapisBalicek(
   akcia = "balicek-novy",
 ): Promise<{ id: string; prenesene: number }> {
   const id = uid();
+  // Meno sa NEPOROVNÁVA v SQL (21. 10. 2026): presun zapísaný pod „Tomas
+  // Dvorak“ by balíček pre „Tomáš Dvořák“ nenašiel a prenesené hodiny by
+  // ticho prepadli. Čakajúcich presunov je pár, filtruje sa tu.
   const caka = b.hodiny != null && !/doplnenie/i.test(b.nazov)
     ? (((await DB.prepare(
-      "SELECT id, hodiny, z_platnosti_do FROM balicky_presun WHERE klient = ?1 AND pouzite_balicek_id IS NULL AND z_platnosti_do < ?2",
-    ).bind(b.klient, b.od).all().catch(() => ({ results: [] }))).results || []) as unknown as { id: string; hodiny: number; z_platnosti_do: string }[])
+      "SELECT id, klient, hodiny, z_platnosti_do FROM balicky_presun WHERE pouzite_balicek_id IS NULL AND z_platnosti_do < ?1",
+    ).bind(b.od).all().catch(() => ({ results: [] }))).results || []) as unknown as { id: string; klient: string; hodiny: number; z_platnosti_do: string }[])
+      .filter((x) => normName(x.klient) === normName(b.klient))
     : [];
   const prenesene = caka.reduce((a, x) => a + (Number(x.hodiny) || 0), 0);
   const hodinySpolu = b.hodiny == null ? null : b.hodiny + prenesene;

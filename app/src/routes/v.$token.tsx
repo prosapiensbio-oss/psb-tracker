@@ -33,10 +33,30 @@ import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
  * Sadzba je tá istá ako v maili (mailKlientovi) — jeden vzhľad, jedna
  * pravda; obrázky idú ako URL a data:, lebo stránka prílohy nemá.
  */
+/**
+ * Čítanie hodín a balíčkov odteraz chybu NEZHLTNE (21. 10. 2026) — prázdny
+ * zoznam balíčkov by klientovi ukázal mínus a QR na plnú sumu. Klient však
+ * nemá vidieť surovú chybovú stránku: dostane vetu, že to má skúsiť o chvíľu.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sChybou<F extends (...a: any[]) => Promise<Response>>(f: F): F {
+  return (async (...a: Parameters<F>): Promise<Response> => {
+    try {
+      return await f(...a);
+    } catch (e) {
+      console.error("odkaz /v/:", e);
+      return new Response(
+        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ProSapiens</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 20px;color:#1A2E24;line-height:1.5"><h1 style="font-size:20px">Stránku se teď nepodařilo načíst</h1><p>Zkuste to prosím za chvíli znovu. Pokud to nepůjde, ozvěte se nám.</p></body>`,
+        { status: 503, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } },
+      );
+    }
+  }) as F;
+}
+
 export const Route = createFileRoute("/v/$token")({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: sChybou(async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
         const { DB, ANAMNEZA_KLUC } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database; ANAMNEZA_KLUC?: string };
         const prec = (text: string, status: number) => new Response(
@@ -286,7 +306,7 @@ export const Route = createFileRoute("/v/$token")({
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
         });
-      },
+      }),
 
       /**
        * ODPOVEĎ NA TRI OTÁZKY. Autorizuje TOKEN v adrese — ten istý, ktorý

@@ -531,6 +531,78 @@ export function rozdelenieZFaktury(text: string, suma: number, faktury: FakturaV
   return null;
 }
 
+/**
+ * FAKTURAČNÝ KONTAKT, KTORÝ PATRÍ VIACERÝM KLIENTOM.
+ *
+ * 21. 10. 2026: `fakturacne_kontakty.klient` nie je vždy jedno meno. Pri
+ * spárovaní sa mená PRIDÁVAJÚ (Lenka Přinosilová platí za seba aj za dve
+ * deti), takže v stĺpci stojí „Lenka Prinosilova, Anetka Přinosilová, Maty
+ * Přínosil“. Párovanie platieb to dovtedy bralo ako JEDNO meno — z troch
+ * ľudí vznikol klient „A, B, C“, ktorý neexistuje, a ten sa ponúkol ako
+ * najistejší návrh (číslo faktúry), dal sa zapísať dávkou a naučiť ako
+ * pravidlo. Zoznam sa preto vždy rozloží na mená.
+ */
+export function klientiKontaktu(klient: string | null | undefined): string[] {
+  const out: string[] = [];
+  for (const kus of String(klient || "").split(",")) {
+    const m = kus.trim();
+    if (m && !out.some((x) => normName(x) === normName(m))) out.push(m);
+  }
+  return out;
+}
+
+/**
+ * Faktúry z iDokladu → klienti. Meno na doklade býva firma, preto cez
+ * spárované kontakty; keď je vystavená priamo na človeka, hľadá sa medzi
+ * klientmi.
+ *
+ * Kontakt s viacerými klientmi dá faktúre VIAC riadkov s tým istým číslom —
+ * `klientPodlaFaktury` potom vráti všetkých a návrh je na výber (rozhodne
+ * človek, alebo ho zúži PTminder na jedného, viď `nepriradene`). Dva kontakty
+ * s tou istou firmou sa zjednotia, neprepíšu: tichá výhra posledného by bola
+ * ďalší spôsob, ako sa z dvoch možností stane jedna.
+ */
+export function fakturyZIdokladu(
+  doklady: { cislo: string; nazov: string }[],
+  kontakty: { firma: string; klient: string }[],
+  menaKlientov: string[],
+): FakturaVzor[] {
+  const podlaFirmy = new Map<string, string[]>();
+  for (const k of kontakty) {
+    const f = normName(k.firma || "");
+    if (!f) continue;
+    const uz = podlaFirmy.get(f) || [];
+    for (const m of klientiKontaktu(k.klient)) if (!uz.some((x) => normName(x) === normName(m))) uz.push(m);
+    podlaFirmy.set(f, uz);
+  }
+  const out: FakturaVzor[] = [];
+  for (const d of doklady) {
+    if (!d.cislo) continue;
+    const zKontaktu = podlaFirmy.get(normName(d.nazov || "")) || [];
+    const priamo = zKontaktu.length ? [] : menaKlientov.filter((m) => normName(m) === normName(d.nazov || "")).slice(0, 1);
+    for (const klient of zKontaktu.length ? zKontaktu : priamo) out.push({ cislo: d.cislo, klient });
+  }
+  return out;
+}
+
+/**
+ * Smie sa platba zapísať (alebo pravidlo naučiť) na toto meno?
+ *
+ * 21. 10. 2026: mená oddelené čiarkou sú zoznam z fakturačného kontaktu, nie
+ * klient. Zápis na „A, B“ by vyrobil platbu človeku, ktorý neexistuje —
+ * tržba by chýbala všetkým trom a nikto by to nezbadal, lebo súčet v banke
+ * sedí. Server preto také meno odmietne, pokiaľ to nie je presne meno
+ * známeho klienta. Vracia vetu pre človeka, alebo `null`, keď je meno v
+ * poriadku.
+ */
+export function chybaZoznamuMien(klient: string, znamiKlienti: string[]): string | null {
+  if (!klient.includes(",")) return null;
+  const k = normName(klient);
+  if (znamiKlienti.some((m) => normName(m) === k)) return null;
+  const mena = klientiKontaktu(klient);
+  return `„${klient.slice(0, 120)}“ nie je jeden klient, ale zoznam ${mena.length} mien. Vyber jedného z nich, alebo platbu rozdeľ medzi nich.`;
+}
+
 export function nepriradene(
   fio: FioRiadok[],
   platby: Platba[],
@@ -559,7 +631,14 @@ export function nepriradene(
     // Vlastný vklad hotovosti nie je príjem od klienta — tie isté peniaze
     // sú už v zošite a v banke by sa započítali druhýkrát.
     if (/vklad do bankomatu|vklad hotovosti/i.test(text)) continue;
-    const naucene = mapovanie[vzorPlatby(r)];
+    /**
+     * Naučené pravidlo platí, len keď ukazuje na JEDNÉHO človeka. Pred
+     * 21. 10. 2026 sa vedelo naučiť aj zo zoznamu z fakturačného kontaktu
+     * („A, B, C“, viď `klientiKontaktu`) — také pravidlo nie je rozhodnutie
+     * človeka o jednom klientovi, takže sa ignoruje a rozhodnú ostatné dôkazy.
+     */
+    const pravidlo = klientiKontaktu(mapovanie[vzorPlatby(r)]);
+    const naucene = pravidlo.length === 1 ? pravidlo[0] : "";
     /**
      * PORADIE DÔVERY, a miešať sa nesmie: čo už človek potvrdil → číslo
      * faktúry (variabilný symbol) → firma alebo IČO klienta → meno v texte →

@@ -9,7 +9,8 @@ import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
 import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
-import { pravidloCelehoMena, zapisTrening } from "../../lib/psb/nahodTrening.server";
+import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from "../../lib/psb/nahodTrening.server";
+import { normName } from "../../lib/psb/format";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
@@ -52,12 +53,8 @@ type ZdrojStav = {
 };
 type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; typ_rucne: number | null; klient_rucne: number | null; zmizla_at: string | null; prvy_raz: string | null };
 
-/** Mená známych klientov — pre istú zhodu celého mena (sťahovanie aj stráž pravidla mena). */
-async function znamiKlienti(DB: D1Database): Promise<string[]> {
-  return (((await DB.prepare(
-    "SELECT DISTINCT client_name m FROM sessions UNION SELECT DISTINCT klient FROM balicky UNION SELECT DISTINCT klient FROM kal_mapovanie WHERE klient IS NOT NULL",
-  ).all().catch(() => ({ results: [] }))).results || []) as { m: string }[]).map((x) => String(x.m || "")).filter(Boolean);
-}
+// Mená známych klientov skladá `znamiKlienti` (nahodTrening.server) — sessions
+// z PTmindera stoja od 19. 10. 2026, nový klient by v nich nebol (21. 10. 2026).
 
 function okno() {
   // Hranice v PRAŽSKOM čase — `kal_udalosti.zaciatok` nesie miestny čas bez
@@ -194,7 +191,9 @@ async function snimka(DB: D1Database, z: Zdroj) {
 
   // Ktoré zmeny sa hlásia, rozhoduje `ohlasitZmenu` — pravidlo žije vo
   // vlastnom module, lebo sa dá zlomiť ticho a je otestované.
-  const dnesDen = kedy.slice(0, 10);
+  // Pražský deň, nie UTC: časy udalostí sú pražské a medzi polnocou a 1–2 h
+  // by `kedy.slice(0, 10)` bol ešte včerajšok (21. 10. 2026).
+  const dnesDen = dnesPraha(new Date(kedy));
 
   let zmien = 0;
   for (const x of sparujZmeny(surove)) {
@@ -399,9 +398,9 @@ export const Route = createFileRoute("/api/kalendar")({
          * poznalo len jednu a appka o tom mlčala. Osemnásť krstných mien má
          * v PSB viac než jedného klienta, takže mlčať sa nedá.
          */
-        const menaKlientov = ((await DB.prepare(
-          "SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')",
-        ).all()).results || []).map((r) => String((r as { client_name: string }).client_name));
+        // Ten istý zoznam ako pri sťahovaní, len za 400 dní (21. 10. 2026:
+        // samotné sessions od 19. 10. nového klienta nepoznajú).
+        const menaKlientov = await znamiKlienti(DB, 400);
         const nazvyVKalendari = [...new Set(((udalosti.results || []) as unknown as Ulozena[])
           .filter((u) => u.typ === "trening" || u.typ === "uvodny")
           .map((u) => u.nazov))];
@@ -625,10 +624,30 @@ export const Route = createFileRoute("/api/kalendar")({
             `INSERT INTO trening_druh (klient, den, druh, kto, kedy) VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT(klient, den) DO UPDATE SET druh = ?3, kto = ?4, kedy = ?5`,
           ).bind(klient, den, typ, kto, kedy).run();
-          await DB.prepare(
-            "UPDATE kal_udalosti SET typ = ?1, typ_rucne = 1, naposledy = ?2 WHERE klient = ?3 AND substr(zaciatok, 1, 10) = ?4 AND zmizla_at IS NULL",
-          ).bind(typ, kedy, klient, den).run().catch(() => null);
+          /**
+           * Udalosť sa hľadá podľa `normName`, nie `klient = ?` (21. 10. 2026):
+           * meno z karty a meno na udalosti sa vedia líšiť dĺžňom či veľkosťou
+           * písmen a prepnutie by sa ticho minulo udalosti — dochádzka a cena
+           * by ostali podľa starého druhu. Chyba zápisu sa vráti, nezhltne.
+           */
+          let chybaUdalosti = "";
+          try {
+            const kandidati = ((await DB.prepare(
+              "SELECT uid, trener, klient FROM kal_udalosti WHERE substr(zaciatok, 1, 10) = ?1 AND zmizla_at IS NULL AND klient IS NOT NULL",
+            ).bind(den).all<{ uid: string; trener: string; klient: string }>()).results || [])
+              .filter((u) => normName(u.klient) === normName(klient));
+            if (kandidati.length) {
+              await DB.batch(kandidati.map((u) => DB.prepare(
+                "UPDATE kal_udalosti SET typ = ?1, typ_rucne = 1, naposledy = ?2 WHERE uid = ?3 AND trener = ?4",
+              ).bind(typ, kedy, u.uid, u.trener)));
+            }
+          } catch (e) {
+            chybaUdalosti = String(e instanceof Error ? e.message : e);
+          }
           await audit(DB, { action: "trening-druh", predmet: `${klient} · ${den}`, neu: typ, actor: kto || undefined });
+          if (chybaUdalosti) {
+            return Response.json({ ok: false, error: `Druh sa k dňu zapísal, ale udalosť v kalendári sa neprepla: ${chybaUdalosti}` }, { status: 500 });
+          }
           return Response.json({ ok: true, typ });
         }
 
@@ -692,11 +711,12 @@ export const Route = createFileRoute("/api/kalendar")({
           const noveUid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
           const kedy = teraz();
           await DB.batch([
+            // Úvodný si nesie ručnú značku — pravidlo mena je `trening` (21. 10. 2026).
             DB.prepare(
-              `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?7, ?7, NULL)`,
-            ).bind(noveUid, novy, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej),
-            ...pravidloCelehoMena(DB, klient, novy, typNovej),
+              `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, prvy_raz, naposledy, zmizla_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?9, ?7, ?7, NULL)`,
+            ).bind(noveUid, novy, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej, typRucnePreNovu(typNovej)),
+            ...pravidloCelehoMena(DB, klient, novy),
           ]);
           try {
             const zasah = await idPreZasah(kluc, kalendar, ics.replace(/@google\.com$/, ""), r.zaciatok);
@@ -931,7 +951,7 @@ export const Route = createFileRoute("/api/kalendar")({
            */
           if (klient) {
             const presne = klientPodlaCelehoMena(nazov, await znamiKlienti(DB));
-            if (presne && presne !== klient) {
+            if (presne && normName(presne) !== normName(klient)) {
               return Response.json({ ok: false, error: `„${nazov}“ je celé meno klienta ${presne} — všetky jeho udalosti klientovi ${klient} dať nejde. Ak na jednom tréningu bol ${klient}, zmeň klienta len pri tej jednej udalosti.` }, { status: 400 });
             }
           }
@@ -952,14 +972,16 @@ export const Route = createFileRoute("/api/kalendar")({
           // prejavilo až pri ďalšom stiahnutí a človek by mal pocit, že sa nič nestalo.
           // Pri mapovaní na čas sa prepíšu len udalosti v tom čase.
           if (cas) {
-            await DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = ? WHERE nazov = ? AND trener = ? AND substr(zaciatok, 12, 5) = ?")
+            // Druh, ktorý určil človek (`typ_rucne`), pravidlo mena neprepíše —
+            // rovnako ako sťahovanie (21. 10. 2026).
+            await DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = CASE WHEN COALESCE(typ_rucne, 0) = 1 THEN typ ELSE ? END WHERE nazov = ? AND trener = ? AND substr(zaciatok, 12, 5) = ?")
               .bind(klient, typ, nazov, trener, cas).run();
           } else {
             // Udalosti, pre ktoré platí presnejšie mapovanie na čas, sa
             // nesmú prepísať všeobecným — inak by oprava zmizla pri prvom
             // uložení všeobecného pravidla.
             await DB.prepare(
-              `UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = ?
+              `UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = CASE WHEN COALESCE(typ_rucne, 0) = 1 THEN typ ELSE ? END
                 WHERE nazov = ? AND trener = ?
                   AND substr(zaciatok, 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
             ).bind(klient, typ, nazov, trener, nazov, trener).run();
@@ -971,15 +993,27 @@ export const Route = createFileRoute("/api/kalendar")({
            * a Workspace ho ukazoval pri cudzom človeku („to sú dve odlišné
            * osoby"). Zmena nesie meno z chvíle zápisu, tak sa opraví tu.
            */
-          if (cas) {
-            await DB.prepare("UPDATE kal_zmeny SET klient = ? WHERE nazov = ? AND trener = ? AND substr(COALESCE(po, pred), 12, 5) = ?")
-              .bind(klient, nazov, trener, cas).run().catch(() => undefined);
-          } else {
-            await DB.prepare(
-              `UPDATE kal_zmeny SET klient = ?
-                WHERE nazov = ? AND trener = ?
-                  AND substr(COALESCE(po, pred), 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
-            ).bind(klient, nazov, trener, nazov, trener).run().catch(() => undefined);
+          // Zmeny udalostí s ručne určeným klientom (`klient_rucne`) sa
+          // neprepisujú — nesú to, čo povedal človek, nie pravidlo. Chyba sa
+          // vráti: pravidlo je už zapísané, ale zmeny by ticho ostali pri
+          // cudzom človeku (21. 10. 2026).
+          try {
+            if (cas) {
+              await DB.prepare(
+                `UPDATE kal_zmeny SET klient = ?1
+                  WHERE nazov = ?2 AND trener = ?3 AND substr(COALESCE(po, pred), 12, 5) = ?4
+                    AND uid NOT IN (SELECT uid FROM kal_udalosti WHERE trener = ?3 AND COALESCE(klient_rucne, 0) = 1)`,
+              ).bind(klient, nazov, trener, cas).run();
+            } else {
+              await DB.prepare(
+                `UPDATE kal_zmeny SET klient = ?1
+                  WHERE nazov = ?2 AND trener = ?3
+                    AND substr(COALESCE(po, pred), 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ?2 AND trener = ?3 AND cas <> '')
+                    AND uid NOT IN (SELECT uid FROM kal_udalosti WHERE trener = ?3 AND COALESCE(klient_rucne, 0) = 1)`,
+              ).bind(klient, nazov, trener).run();
+            }
+          } catch (e) {
+            return Response.json({ ok: false, error: `Pravidlo je uložené, ale zmeny v kalendári sa neprepísali: ${String(e instanceof Error ? e.message : e)}` }, { status: 500 });
           }
           return Response.json({ ok: true });
         }
@@ -1008,7 +1042,14 @@ export const Route = createFileRoute("/api/kalendar")({
           }
           await DB.prepare("UPDATE kal_udalosti SET klient = ?, klient_rucne = ? WHERE uid = ? AND trener = ?")
             .bind(novy, klient ? 1 : 0, kluc, trener).run();
-          await DB.prepare("UPDATE kal_zmeny SET klient = ? WHERE uid = ? AND trener = ?").bind(novy, kluc, trener).run().catch(() => undefined);
+          // Udalosť je už prepísaná; keby padla zmena, ostala by ticho pri
+          // starom klientovi — preto sa chyba vráti (audit sa zapíše aj tak).
+          let chybaZmeny = "";
+          try {
+            await DB.prepare("UPDATE kal_zmeny SET klient = ? WHERE uid = ? AND trener = ?").bind(novy, kluc, trener).run();
+          } catch (e) {
+            chybaZmeny = String(e instanceof Error ? e.message : e);
+          }
           await audit(DB, {
             action: "kalendar-klient-udalosti",
             predmet: `${trener}: ${r.nazov} · ${r.zaciatok.slice(0, 16)}`,
@@ -1016,6 +1057,9 @@ export const Route = createFileRoute("/api/kalendar")({
             neu: klient ? novy || "" : `podľa pravidla: ${novy || "(bez klienta)"}`,
             actor: await currentUser(request) || undefined,
           });
+          if (chybaZmeny) {
+            return Response.json({ ok: false, error: `Klient udalosti je zapísaný, ale zmena v kalendári sa neprepísala: ${chybaZmeny}` }, { status: 500 });
+          }
           return Response.json({ ok: true, klient: novy });
         }
 
@@ -1049,7 +1093,7 @@ export const Route = createFileRoute("/api/kalendar")({
           await DB.batch(dvojice.flatMap((d) => [
             DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?,?,'',NULL,?,?,1)")
               .bind(d.nazov, d.trener, typ, kedy2),
-            DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE NULL END, typ = ? WHERE nazov = ? AND trener = ?")
+            DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE NULL END, typ = CASE WHEN COALESCE(typ_rucne,0) = 1 THEN typ ELSE ? END WHERE nazov = ? AND trener = ?")
               .bind(typ, d.nazov, d.trener),
           ]));
           await audit(DB, {
@@ -1098,7 +1142,8 @@ export const Route = createFileRoute("/api/kalendar")({
           }
           const klient = String(b.klient || "").trim();
           if (!klient) return Response.json({ ok: false, error: "chýba klient" }, { status: 400 });
-          const kedy = String(b.datum || "").slice(0, 10) || teraz().slice(0, 10);
+          // Predvolený deň je pražský dnešok, nie UTC (21. 10. 2026).
+          const kedy = String(b.datum || "").slice(0, 10) || dnesPraha();
           // Ručný zápis zostáva VIDITEĽNÝ (vysvetlene = 0), aj keď k nemu Jerry
           // rovno napísal dôvod. Prvá verzia ho brala ako vybavený a riadok
           // hneď zmizol zo zoznamu — človek niečo zapísal a nič sa nestalo,

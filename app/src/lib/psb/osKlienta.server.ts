@@ -16,6 +16,7 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import { terazPraha } from "./cas";
+import { normName } from "./format";
 import { osCasuKlienta, type Udalost } from "./klientOsCasu";
 import type { PSBData } from "./types";
 
@@ -31,18 +32,36 @@ export async function osKlientaZoServera(
   meno: string,
   teraz: string = terazPraha(),
 ): Promise<{ os: Udalost[]; kalUdalosti: KalUdalostServer[]; balicky: BalicekServer[] }> {
-  const kalUdalosti = ((await DB.prepare(
+  /**
+   * MENO SA POROVNÁVA CEZ normName, NIE PRESNE V SQL (21. 10. 2026).
+   *
+   * Kokpit v appke páruje klienta s balíčkami aj kalendárom cez `normName`
+   * (bez diakritiky, veľkosti písmen a dvojitých medzier). Stránka `/v/`
+   * a mail tu mali `WHERE klient = ?1` — balíček zapísaný ako „Stigut“
+   * k „Štigut“ tak v appke bol a na stránke klienta chýbal; klient videl
+   * mínus hodiny, ktoré Kokpit nevidel. SQL LIKE diakritiku nezjednotí,
+   * preto sa berú všetky riadky a filtruje sa v JS tým istým pravidlom.
+   *
+   * A BEZ `.catch(() => ({ results: [] }))`: prázdny zoznam pri výpadku D1
+   * vyzerá presne ako „žiadny balíček“ a stránka by klientovi ukázala
+   * zlé hodiny a QR na doplatok. Chyba nech radšej spadne — stránka
+   * ukáže chybu, nie nepravdu.
+   */
+  const kto = normName(meno);
+  const kalUdalosti = (((await DB.prepare(
     `SELECT u.klient, u.trener, u.zaciatok, u.koniec, u.nazov, u.typ
        FROM kal_udalosti u
        LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
-      WHERE u.klient = ?1 AND u.typ IN ('trening','uvodny')
+      WHERE u.klient IS NOT NULL AND u.typ IN ('trening','uvodny')
         AND (u.zmizla_at IS NULL OR k.konal = 1)`,
-  ).bind(meno).all().catch(() => ({ results: [] }))).results || []) as unknown as KalUdalostServer[];
+  ).all()).results || []) as unknown as KalUdalostServer[])
+    .filter((u) => normName(u.klient) === kto);
 
-  const balicky = ((await DB.prepare(
+  const balicky = (((await DB.prepare(
     `SELECT klient, nazov, hodiny, cena_czk, platnost_od, platnost_do, zdroj, zrusene_at
-       FROM balicky WHERE klient = ?1`,
-  ).bind(meno).all().catch(() => ({ results: [] }))).results || []) as unknown as BalicekServer[];
+       FROM balicky`,
+  ).all()).results || []) as unknown as BalicekServer[])
+    .filter((b) => normName(b.klient) === kto);
 
   const os = osCasuKlienta(meno, {
     sessions: data.sessions, payments: data.payments, packages: data.packages,

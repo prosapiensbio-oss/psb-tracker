@@ -418,8 +418,15 @@ export const Route = createFileRoute("/api/fio")({
             // každý ďalší import by pridal duplicitný riadok. Posledné
             // zaradenie vyhráva — keď Jerry preradí Adobe inam, staré pravidlo
             // nesmie ďalej hlasovať.
+            //
+            // Maže sa KAŽDÉ pravidlo s tým istým vzorom, nielen z importu
+            // (21. 10. 2026). Pravidlá sa čítajú podľa priority a vyhráva
+            // prvé; staršie „uprava“ (priorita 40) alebo „faktura“ s tým
+            // istým vzorom by nové rozhodnutie z importu (50) ticho prebilo
+            // a pohyb by sa nabudúce zaradil postaru. Pravidlá s iným vzorom
+            // sa nemenia.
             const r = await DB.batch([
-              DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'import'").bind(vzor),
+              DB.prepare("DELETE FROM vzas_rules WHERE lower(trim(text_pattern)) = ?1").bind(vzor),
               DB.prepare(
                 `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
                  VALUES (?1, NULL, NULL, ?2, ?3, 50, 0, 1, 'import', ?4)`,
@@ -557,11 +564,18 @@ export const Route = createFileRoute("/api/fio")({
           // Vzor sa berie z protistrany toho istého pohybu; tú v tele požiadavky
           // nemáme, tak sa dotiahne z databázy.
           const kluce = zmeny.map((z) => String(z.kluc || "")).filter(Boolean);
+          /** Vzory, ktorých pravidlo sa nezapísalo — idú von ako chyba. */
+          const pravidlaZlyhane: string[] = [];
           if (kluce.length) {
             const otazniky = kluce.map((_, i) => `?${i + 1}`).join(",");
+            // Keď sa protistrany nedajú prečítať, nenaučí sa nič — a povie sa
+            // to (prázdny zoznam by vyzeral ako „nebolo sa čo učiť“).
             const rs = await DB.prepare(
               `SELECT dedup_key, counterparty FROM fio_transactions WHERE dedup_key IN (${otazniky})`,
-            ).bind(...kluce).all().catch(() => ({ results: [] as Record<string, unknown>[] }));
+            ).bind(...kluce).all().catch(() => {
+              if (zmeny.some((z) => z.kategoria && !jeKategoriaPrijmu(String(z.kategoria)))) pravidlaZlyhane.push("(protistrany sa nedali prečítať)");
+              return { results: [] as Record<string, unknown>[] };
+            });
             const podlaKluca = new Map(
               (rs.results as Record<string, unknown>[]).map((r) => [String(r.dedup_key), String(r.counterparty || "")]),
             );
@@ -578,22 +592,46 @@ export const Route = createFileRoute("/api/fio")({
             for (const [vzor, kategoria] of naucene) {
               // Rovnaká zásada ako pri importe: DELETE+INSERT atomicky (batch),
               // zlyhanie sa nesmie prehltnúť bez stopy.
-              await DB.batch([
-                DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by IN ('import','uprava')").bind(vzor),
+              //
+              // Ručné zaradenie človekom zmaže KAŽDÉ staršie pravidlo s tým
+              // istým vzorom (21. 10. 2026) — aj „faktura“ s rovnakou
+              // prioritou, ktoré by inak mohlo vyhrať poradím. Jarvisov návrh
+              // (`potvrd: false`) nie je rozhodnutie človeka; ten maže len to,
+              // čo mazal doteraz.
+              const zmaz = b.potvrd === false
+                ? DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by IN ('import','uprava')").bind(vzor)
+                : DB.prepare("DELETE FROM vzas_rules WHERE lower(trim(text_pattern)) = ?1").bind(vzor);
+              const ok = await DB.batch([
+                zmaz,
                 DB.prepare(
                   `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
                    VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'uprava', ?4)`,
                 ).bind(uid(), vzor, kategoria, kedy),
-              ]).catch(() => null);
+              ]).then(() => true, () => false);
+              if (!ok) pravidlaZlyhane.push(vzor);
             }
           }
 
           await audit(DB, {
             action: "uprava-banka",
             predmet: `${zmenene} pohybov`,
-            neu: zmeny[0]?.kategoria || "(vyprázdnené)",
+            neu: `${zmeny[0]?.kategoria || "(vyprázdnené)"}${pravidlaZlyhane.length ? ` · ${pravidlaZlyhane.length} pravidiel sa NEULOŽILO: ${pravidlaZlyhane.join(", ").slice(0, 300)}` : ""}`,
             actor: await currentUser(request) || undefined,
           });
+          /**
+           * Pravidlo, ktoré sa neuložilo, sa nesmie tváriť ako úspech
+           * (21. 10. 2026 — dovtedy `.catch(() => null)` napriek komentáru).
+           * Kategórie pohybov sú zapísané; nenaučené je len pravidlo, takže
+           * ďalší výpis by sa na tú istú vec spýtal znova.
+           */
+          // Kategórie SÚ zapísané — odpoveď je úspech s upozornením, aby
+          // obrazovky obnovili peniaze a Jarvis nehlásil, že zaradenie zlyhalo.
+          if (pravidlaZlyhane.length) {
+            return Response.json({
+              ok: true, zmenene, zamknute, pravidlaZlyhane: pravidlaZlyhane.length,
+              upozornenie: `Kategórie sa zapísali (${zmenene}), ale ${pravidlaZlyhane.length} pravidiel sa neuložilo — ďalší výpis sa na ne spýta znova. Skús zaradenie zopakovať.`,
+            });
+          }
           return Response.json({ ok: true, zmenene, zamknute });
         }
 

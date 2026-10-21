@@ -147,12 +147,19 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
     if (r.ok) {
-      if (!lenPoznamka) setSprava(`${uzavierka && kategoria ? "Zaradené a potvrdené" : "Prehodené"}: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. ⌘Z vráti.`);
+      if (!lenPoznamka) setSprava(`${uzavierka && kategoria ? "Zaradené a potvrdené" : "Prehodené"}: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. ⌘Z vráti.${r.upozornenie ? ` ${r.upozornenie}` : ""}`);
       if (!kluce) setOznacene(new Set());
       nacitaj();
       oznam("peniaze");
-      setTimeout(() => setSprava(""), 5000);
-    } else setSprava("Zmena sa nepodarila.");
+      // Upozornenie nesmie zmiznúť za 5 s (pamäť „Tichá chyba“).
+      if (!r.upozornenie) setTimeout(() => setSprava(""), 5000);
+    } else {
+      // Server vie povedať, že kategórie sa zapísali a nepodarilo sa len
+      // pravidlo (21. 10. 2026) — vtedy treba ukázať jeho vetu a načítať
+      // zoznam, inak by obrazovka tvrdila, že sa nestalo nič.
+      setSprava(r.error || "Zmena sa nepodarila.");
+      nacitaj();
+    }
   };
 
   /** Potvrdí (alebo so `zrus` vráti medzi návrhy) dané výdavky. */

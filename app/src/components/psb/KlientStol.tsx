@@ -143,6 +143,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [zdarmaDovod, setZdarmaDovod] = useState("");
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
   const [balicky, setBalicky] = useState<Balicek[]>([]);
+  /**
+   * /api/balicky zlyhalo (21. 10. 2026). Dovtedy sa chyba prehltla a karta
+   * počítala hodiny bez balíčkov z Kokpitu — klient vyzeral v mínuse a nič
+   * nenaznačilo, že číslo je neúplné.
+   */
+  const [balickyChyba, setBalickyChyba] = useState(false);
   const [vlastnePlatby, setVlastnePlatby] = useState<Platba[]>([]);
   /** Príjmy z výpisu, ktoré ešte nemajú klienta — na návrh „nie je to jeho?". */
   const [cakajuce, setCakajuce] = useState<{ fioId: string; datum: string; suma: number; text: string; kandidati: string[]; zdrojNavrhu?: string }[]>([]);
@@ -213,7 +219,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
   const nacitajBalicky = useCallback(async () => {
     const r = await fetch("/api/balicky", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
-    if (r?.ok) setBalicky(r.balicky || []);
+    if (r?.ok) { setBalicky(r.balicky || []); setBalickyChyba(false); } else setBalickyChyba(true);
   }, []);
   const nacitajPlatby = useCallback(async () => {
     const r = await fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
@@ -1181,6 +1187,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             </div>
           )}
         </div>
+
+        {balickyChyba && (
+          <div role="alert" style={{ padding: "9px 12px", borderRadius: 10, background: mix(C.orange, 14), border: `1px solid ${mix(C.orange, 55)}`, color: C.text, fontSize: 12, lineHeight: 1.5 }}>
+            <b>Balíčky z Kokpitu sa nenačítali</b> — hodiny môžu byť zlé.{" "}
+            <button onClick={() => void nacitajBalicky()} style={{ ...navrhTlacidlo, marginLeft: 4 }}>Skúsiť znova</button>
+          </div>
+        )}
 
         {c && c.packageTotal > 0 && (
           <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 40)}` }}>
@@ -2814,12 +2827,32 @@ function NovyKlient({ zapis, onHotovo }: {
     // Kontakt ide do tabuľky, z ktorej sa berie aj faktúra — nie vedľa nej.
     // Bez tohto by sa mail musel dopisovať až pri prvej faktúre (Jerry,
     // 26. 9. 2026: „pri tvorbe nového klienta mi chýba vyplnenie profilu").
+    //
+    // Odpoveď sa číta (21. 10. 2026). Predtým sa zahodila: server pri zlom
+    // e-maile vráti 400, kontakt sa neuložil a karta aj tak hlásila
+    // „založený“ — mail sa zistil chýbať až pri prvej faktúre. Klient už
+    // existuje (polia vyššie prešli), takže formulár ostáva otvorený
+    // s chybou: oprava a nové „Založiť“ zapíše polia znova rovnako
+    // a pošle len opravený kontakt.
     if (f.email.trim() || f.telefon.trim()) {
-      await fetch("/api/vydane-faktury", {
+      const odp = await fetch("/api/vydane-faktury", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "udaje", klient: meno, email: f.email.trim(), telefon: f.telefon.trim() }),
-      }).catch(() => null);
+      })
+        .then(async (r) => {
+          const text = await r.text();
+          let j: { ok?: boolean; error?: string } | null = null;
+          try { j = JSON.parse(text) as { ok?: boolean; error?: string }; } catch { j = null; }
+          if (r.ok && j?.ok) return "";
+          return j?.error || `HTTP ${r.status}: ${text.slice(0, 300)}`;
+        })
+        .catch((e: unknown) => `spojenie zlyhalo (${String(e).slice(0, 200)})`);
+      if (odp) {
+        setPracujem(false);
+        setChyba(`Klient je založený, ale kontakt sa neuložil: ${odp}. Oprav e-mail alebo telefón a klikni Založiť znova.`);
+        return;
+      }
     }
     setPracujem(false);
     onHotovo(meno);

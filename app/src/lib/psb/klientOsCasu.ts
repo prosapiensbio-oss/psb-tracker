@@ -146,6 +146,32 @@ type BalicekKokpitu = {
 const den = (s: string) => (s || "").slice(0, 10);
 
 /**
+ * RUČNE URČENÉ DRUHY JEDNÉHO KLIENTA PODĽA DŇA (21. 10. 2026).
+ *
+ * Kľúče `klient|deň` stavia `loadData` zo surového mena v `trening_druh`
+ * („Luky Križ“), kým os sa pýtala tvarom z hlavičky aj `normName` („luky
+ * kriz“) — zápis pod iným tvarom mena (bez dĺžňa, iná veľkosť písmen) sa
+ * tak ticho nenašiel a prepnutie na úvodný na osi nezabralo. Porovnáva sa
+ * normalizované meno; presný tvar mena má pri zhode toho istého dňa prednosť.
+ */
+export function druhyPodlaDna(druhy: Record<string, string> | undefined, meno: string): Map<string, string> {
+  const k = normName(meno);
+  const von = new Map<string, string>();
+  const presne = new Set<string>();
+  for (const [kluc, druh] of Object.entries(druhy || {})) {
+    const i = kluc.lastIndexOf("|");
+    if (i < 0) continue;
+    const kto = kluc.slice(0, i);
+    if (normName(kto) !== k) continue;
+    const d = den(kluc.slice(i + 1));
+    if (presne.has(d)) continue;
+    von.set(d, druh);
+    if (kto === meno) presne.add(d);
+  }
+  return von;
+}
+
+/**
  * PLATBY Z OBOCH SVETOV, TÁ ISTÁ RAZ (5. 10. 2026).
  *
  * Do toho dňa os poznala len platby z PTmindera. Platba, ktorú Kokpit videl
@@ -591,11 +617,11 @@ export function osCasuKlienta(
    * platí jeho slovo — a platí rovnako na tréning z kalendára aj na sedenie,
    * ktoré v kalendári nikdy nebolo (Luky Kríž začal rovno tréningom).
    */
-  const rucneDruhy = zdroj.druhyTreningov || {};
-  if (Object.keys(rucneDruhy).length) {
+  const rucneDruhy = druhyPodlaDna(zdroj.druhyTreningov, meno);
+  if (rucneDruhy.size) {
     for (const u of out) {
       if (u.druh !== "trening") continue;
-      const d = rucneDruhy[`${meno}|${u.den}`] ?? rucneDruhy[`${k}|${u.den}`];
+      const d = rucneDruhy.get(u.den);
       if (d === "uvodny") u.uvodny = true;
       else if (d === "trening") delete u.uvodny;
     }

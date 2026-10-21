@@ -134,3 +134,12 @@ describe("online tréning ide z online balíčka (Marcela Hrůzová)", () => {
     expect(off.price).toBe(1450);
   });
 });
+
+describe("cenaHodiny — meno cez normName (21. 10. 2026)", () => {
+  it("balíček pod iným zápisom mena (diakritika, veľkosť, medzery) je ten istý človek", () => {
+    const b = [bal("Jakub Štigut", "2026-09-10", "2026-10-09", 6, 6990)];
+    expect(cenaHodiny(b, "Jakub Stigut", "2026-10-02")).toBe(1165);
+    expect(cenaHodiny(b, "jakub  štigut ", "2026-10-02")).toBe(1165);
+    expect(cenaHodiny(b, "Jakub Novák", "2026-10-02")).toBe(0);
+  });
+});

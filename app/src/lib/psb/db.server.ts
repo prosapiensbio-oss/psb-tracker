@@ -34,6 +34,18 @@ import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
 
 const uid = () => crypto.randomUUID();
 
+/**
+ * BEZ TICHÝCH `.catch` NA PENIAZE A HODINY (21. 10. 2026).
+ *
+ * Platby, balíčky, kalendár od KOKPIT_OD, poplatky, druh tréningu, tréningy
+ * zdarma, doplnenia hodín a mesiac prechodu na peniaze z Kokpitu mali
+ * `.catch(() => ({ results: [] }))`. Jeden prechodný výpadok D1 tak urobil
+ * z prázdneho zoznamu platieb dlžníka z každého klienta a z prázdnych
+ * balíčkov nulu hodín — a obrazovka to ukázala ako pravdu. Teraz loadData
+ * spadne nahlas a /api/data vráti chybu; ticho zostáva len na voliteľných
+ * tabuľkách (leads, Jarvis, merania, kontroly webu), kde prázdno nikoho
+ * nevyrobí dlžníkom.
+ */
 export async function loadData(DB: D1Database): Promise<PSBData> {
   const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
@@ -58,18 +70,18 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // Nezaplatené poplatky z PTminderu. Tabuľka je zrkadlo exportu: čo v nej
     // je, to je otvorené (viď migráciu 0063).
     DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky ORDER BY datum DESC")
-      .all().catch(() => ({ results: [] })),
+      .all(),
     // Tréningy, ktoré sa z členstva neodpočítavajú — viď migráciu 0081.
     DB.prepare("SELECT id, client_name, den, dovod, kto FROM treningy_zdarma ORDER BY den DESC")
-      .all().catch(() => ({ results: [] })),
+      .all(),
     // Vlastná evidencia platieb — potrebná na to, aby sa z otvorených
     // poplatkov odrátali tie, ktoré už niekto zaplatil (viď nižšie).
     DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby")
-      .all().catch(() => ({ results: [] })),
+      .all(),
     // Koľko hodín pridalo „Doplnenie členstva" — viď migráciu 0085.
-    DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all().catch(() => ({ results: [] })),
+    DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all(),
     // Ručne určený druh tréningu (úvodný ↔ bežný) — platí na oba zdroje.
-    DB.prepare("SELECT klient, den, druh FROM trening_druh").all().catch(() => ({ results: [] })),
+    DB.prepare("SELECT klient, den, druh FROM trening_druh").all(),
     // Dochádzka z kalendára od KOKPIT_OD (viď sedeniaZKalendara.ts). Zmiznutá
     // udalosť sa berie len vtedy, keď o nej Jerry povedal „bol tam".
     DB.prepare(
@@ -79,10 +91,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         WHERE u.klient IS NOT NULL AND u.typ IN ('trening','uvodny')
           AND (u.zmizla_at IS NULL OR k.konal = 1)
           AND u.zaciatok >= ?1`,
-    ).bind(KOKPIT_OD).all().catch(() => ({ results: [] })),
+    ).bind(KOKPIT_OD).all(),
     // Balíčky v Kokpite — z nich cena tréningu z kalendára.
     DB.prepare("SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
-      .all().catch(() => ({ results: [] })),
+      .all(),
     /**
      * Pocitovka — tri otázky 1–10, ktoré si klepne klient sám na svojej
      * verejnej stránke. Ide to cez `loadData`, lebo to isté číslo číta
@@ -186,8 +198,21 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     doplneniaHodiny: Object.fromEntries(
       (doplneniaH.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, Number(r.hodiny) || 0]),
     ),
+    /**
+     * Kľúč `klient|deň` v DVOCH tvaroch (21. 10. 2026): surové meno, ako je
+     * zapísané, aj `normName(klient)|deň`. Os času hľadá podľa normName,
+     * staršie miesta podľa surového mena — s jedným tvarom sa ručne
+     * prepnutý úvodný pri inom zápise mena („Stigut“ / „Štigut“) stratil
+     * a tréning sa odpísal z balíčka ako bežný.
+     */
     druhyTreningov: Object.fromEntries(
-      (druhy.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, String(r.druh || "")]),
+      (druhy.results as any[]).flatMap((r) => {
+        const den = String(r.den).slice(0, 10);
+        const druh = String(r.druh || "");
+        const surovy = `${r.klient}|${den}`;
+        const norm = `${normName(String(r.klient || ""))}|${den}`;
+        return norm === surovy ? [[surovy, druh]] : [[norm, druh], [surovy, druh]];
+      }),
     ),
     webKontroly: (webKontroly.results as any[]).map((r) => ({
       kluc: String(r.kluc), nazov: String(r.nazov), stav: String(r.stav) as "ok" | "varovanie" | "chyba",
@@ -383,7 +408,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
        * sedí (`mozePrepnut`) — bez neho sa nemení nič.
        */
       const peniazeOd = String(
-        (await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>().catch(() => null))?.value || "",
+        // Bez `.catch` (21. 10. 2026): výpadok by tu ticho vrátil peniaze
+        // na PTminder a P&L by ukázal iné tržby, než aké platia.
+        (await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>())?.value || "",
       ).replace(/"/g, "");
       data.peniazeOd = /^\d{4}-\d{2}$/.test(peniazeOd) ? peniazeOd : "";
       data.paymentsPtminder = data.payments;

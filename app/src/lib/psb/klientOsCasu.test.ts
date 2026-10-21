@@ -1,7 +1,7 @@
 // Os času klienta — odpoveď na „nevychádzajú mu tréningy".
 import { describe, expect, it } from "bun:test";
 
-import { osCasuKlienta, treningovVBalicku } from "./klientOsCasu";
+import { druhyPodlaDna, osCasuKlienta, treningovVBalicku } from "./klientOsCasu";
 
 const DNES = "2026-09-23";
 const zdroj = {
@@ -291,5 +291,26 @@ describe("ručne určený druh tréningu", () => {
 
     const bata = osCasuKlienta("Petr Baťa", zdroj, "2026-10-08");
     expect((bata.find((x) => x.den === "2026-10-05") as { uvodny?: boolean }).uvodny).toBeUndefined();
+  });
+});
+
+describe("ručne určený druh — iný tvar mena v kľúči (21. 10. 2026)", () => {
+  it("nájde zápis bez dĺžňa a s inou veľkosťou písmen", () => {
+    const zdroj = {
+      sessions: [{ client: "Luky Križ", date: "2026-09-28", sessionName: "OFFLINE - 60min", duration: 60 }],
+      payments: [], packages: [],
+      druhyTreningov: { "luky kriz|2026-09-28": "uvodny" },
+    } as never;
+    const os = osCasuKlienta("Luky Križ", zdroj, "2026-10-08");
+    expect((os.find((x) => x.den === "2026-09-28") as { uvodny?: boolean }).uvodny).toBe(true);
+  });
+
+  it("presný tvar mena má prednosť a cudzí klient sa nepriplete", () => {
+    const m = druhyPodlaDna({
+      "Luky Kriz|2026-09-28": "trening",
+      "Luky Križ|2026-09-28": "uvodny",
+      "Lukáš Kríž|2026-09-28": "trening",
+    }, "Luky Križ");
+    expect([...m]).toEqual([["2026-09-28", "uvodny"]]);
   });
 });

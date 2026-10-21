@@ -22,6 +22,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { terazPraha } from "./cas";
 import type { ClientAgg } from "./compute";
 import { dlhJednehoKlienta } from "./dlznici";
+import { normName } from "./format";
 import { historiaPreMail } from "./historiaMail";
 import type { VypisKlienta } from "./mailKlientovi";
 import { nazovProduktu } from "./nazvyProduktov";
@@ -74,9 +75,19 @@ export async function obsahOdkazu(
   const sPlatbou = moznosti.sPlatbou ?? true;
 
   const { os, balicky } = await osKlientaZoServera(DB, data, c.name, teraz);
-  const dalsi = ((await DB.prepare(
-    "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-  ).bind(c.name, teraz).first<{ z: string | null }>().catch(() => null))?.z) || undefined;
+  // Najbližší termín — meno cez normName, nie presne v SQL (21. 10. 2026):
+  // udalosť zapísaná iným tvarom mena („Stigut“ / „Štigut“) inak na stránke
+  // chýbala, hoci Kokpit ju klientovi priradil. Berie sa najskorší budúci
+  // termín každého mena a vyberie sa ten, ktorého meno sedí. Výpadok tu
+  // necháva prázdno zámerne: je to len riadok „ďalší tréning“, nie hodiny
+  // ani peniaze — kvôli nemu nemá padnúť celá stránka.
+  const kto = normName(c.name);
+  const dalsi = ((((await DB.prepare(
+    "SELECT klient, MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND typ IN ('trening','uvodny') AND zaciatok > ?1 GROUP BY klient",
+  ).bind(teraz).all<{ klient: string; z: string | null }>().catch(() => null))?.results) || [])
+    .filter((r) => normName(r.klient) === kto && r.z)
+    .map((r) => r.z as string)
+    .sort()[0]) || undefined;
 
   /**
    * DLH — otvorené poplatky z PTmindera aj balíčky z Kokpitu bez platby;

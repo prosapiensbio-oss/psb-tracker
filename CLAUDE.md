@@ -71,9 +71,12 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   (nie len verziu) a prípadne `nasad.sh --bez-buildu` zopakuj.
 - **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
   je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
-- **Meno klienta je v siedmich tabuľkách** a v troch z nich aj v `dedup_key`.
-  Premenovať sa smie len cez `/api/premenuj`, ktorý mení oboje naraz — inak
-  najbližší import založí klienta druhýkrát.
+- **Meno klienta je v ~40 tabuľkách** (zoznam je v `routes/api/premenuj.ts`)
+  a v troch z nich aj v `dedup_key`. Premenovať sa smie len cez
+  `/api/premenuj`, ktorý mení všetko naraz — inak najbližší import založí
+  klienta druhýkrát. **Nová tabuľka s menom klienta = riadok v `premenuj.ts`
+  aj v `client-delete.ts`** (21. 10. 2026 v nich chýbalo 17 tabuliek: faktúry,
+  odkazy, anamnézy, fotky… — po premenovaní by klientovi zhasol odkaz `/v/`).
 - **Schéma, ktorú Jarvis dostáva** (`SCHEMA_DB` v `chat.ts`), je samostatná
   kópia. Nový stĺpec do nej treba dopísať ručne — Jarvis má SQL prístup, ale
   nevie sa spýtať na to, o čom nevie. To bol 14. 8. celý dôvod, prečo o dôvodoch
