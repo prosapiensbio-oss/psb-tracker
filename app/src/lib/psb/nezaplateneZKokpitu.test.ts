@@ -21,8 +21,14 @@ describe("nezaplateneZKokpitu", () => {
   it("čiastočná platba nestačí: 7 790 na 18 h je nezaplatené", () => {
     expect(nezaplateneZKokpitu([b("2026-11-05", 21150)], [p("2026-11-06", 7790)]).length).toBe(1);
   });
-  it("platba spred balíčka bez príznaku vopred sa nepočíta", () => {
-    expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-11-01", 7790)]).length).toBe(1);
+  it("platba viac než dva týždne pred prvým balíčkom bez príznaku vopred sa nepočíta", () => {
+    expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-10-20", 7790)]).length).toBe(1);
+  });
+  // Kateřina Matlová, 21. 10. 2026: augustový balíček zaplatila 4 dni pred
+  // začiatkom a ten si potom zobral jej októbrovú platbu — nový ostal v mínuse.
+  it("platba pár dní pred prvým balíčkom ho zaplatí a novšia ostane novšiemu", () => {
+    const n = nezaplateneZKokpitu([b("2026-08-27", 7790), b("2026-10-20", 7790)], [p("2026-08-23", 7790), p("2026-10-14", 7790)]);
+    expect(n).toEqual([]);
   });
   it("platba vopred pokryje balíček, ktorý vznikol až prvým tréningom", () => {
     expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-11-01", 7790, true)])).toEqual([]);

@@ -77,9 +77,22 @@ const balickyKokpitu = (balicky: BalicekDlh[]): BalicekDlh[] => balicky
   .filter((b) => !b.zruseneAt && (b.cena || 0) > 0 && !jeOtvaraciZostatok(b))
   .sort((a, b) => a.platnostOd.localeCompare(b.platnostOd));
 
-/** Platby, ktoré sa na balíčky z Kokpitu počítajú: od prvého z nich, alebo vopred. */
-const zapocitanePlatby = (platby: PlatbaDlh[], od: string): PlatbaDlh[] =>
-  platby.filter((p) => !p.zruseneAt && (p.datum >= od || !!p.vopred));
+/**
+ * Platby, ktoré sa na balíčky z Kokpitu počítajú: od dvoch týždňov pred
+ * prvým z nich, alebo vopred.
+ *
+ * DVA TÝŽDNE PRED, NIE OD ZAČIATKU (Kateřina Matlová, 21. 10. 2026): balíček
+ * od 27. 8. zaplatila 23. 8. — vopred, ako väčšina klientov. Platba pred
+ * prvým balíčkom sa nepočítala, takže si augustový balíček zobral jej
+ * platbu zo 14. 10. a októbrový nový ostal nezaplatený — v mínuse, hoci
+ * zaplatila. Okno −14 dní je to isté ako pri párovaní a v PTminderi.
+ */
+const zapocitanePlatby = (platby: PlatbaDlh[], od: string): PlatbaDlh[] => {
+  const ms = Date.parse(`${od.slice(0, 10)}T00:00:00Z`);
+  // Krivý dátum nesmie zhodiť loadData všetkým — vtedy platí pôvodná hranica.
+  const hranica = Number.isFinite(ms) ? new Date(ms - 14 * 86400000).toISOString().slice(0, 10) : od;
+  return platby.filter((p) => !p.zruseneAt && (p.datum >= hranica || !!p.vopred));
+};
 
 /**
  * KTORÉ BALÍČKY Z KOKPITU NIE SÚ ZAPLATENÉ.
