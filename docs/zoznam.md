@@ -111,7 +111,11 @@ je kde pozrieť).
          1. 10.; poplatky PTmindera od 1. 10. dlh nerobia; rozpory → notifikácia
          `ptrozpor|` (Veronika, Natália, Iva, Monika); barter Sofie nie je dlh.
        - [ ] **Audit 21. 10. 2026 — čo ešte stojí na PTminderi** (Jerry: „sú ešte
-         nejaké veci, ktoré by mali byť, ale nie sú?"):
+         nejaké veci, ktoré by mali byť, ale nie sú?"). **Body 1–5 hotové
+         21. 10. 2026** (os bez predajov PTmindera od 1. 10.; mená do párovania
+         aj z kalendára a balíčkov; barter z balíčkov Kokpitu; report bez
+         dvojitých platieb; 6M = počet předplatných, v procese kto mal
+         předplatné do 62 dní). Ostávajú 6–9:
          1. Os času berie predaje z PTmindera (`services`) aj po 1. 10. — Monikin
             predaj 9. 10. stál ako „nezaplatený balíček", takže Kokpit nezaložil
             vlastný a mala −2 h bez balíčka. Predaje PTmindera od 1. 10. na os nepúšťať.

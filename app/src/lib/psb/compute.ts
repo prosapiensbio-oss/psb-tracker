@@ -10,7 +10,7 @@ import { menoZNazvuUvodneho } from "./kalendar";
 import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
 import { sedeniaMimoKalendara } from "./mimoKalendara";
-import { BARTER_KLIENTI } from "./vzas";
+import { barterovePredaje } from "./barter";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
@@ -193,28 +193,55 @@ export type ClientAgg = {
   lenDoplnky: boolean;
 };
 
-// A client is in the 6M process if a "S viazanostou" service was sold to them
-// OR their current membership is a předplatné (Kokpit balíčky, else the
-// PTminder Packages snapshot).
-// The service report attributes all such sales to the seller (Jerry), so the
-// packages source is essential to catch the other trainer's 6M clients.
+/**
+ * 6M PROCES SA POČÍTA LEN Z PŘEDPLATNÉHO (Jerry, 21. 10. 2026).
+ *
+ * Martin Vaško dostal „5. mesiac — hodnotiaci rozhovor", keď bol na štvrtom:
+ * appka rátala kalendárne mesiace od prvého predplatného, hoci medzi nimi
+ * mal prestávky (a pred nimi balíček). Mesiac procesu je POČET predplatných,
+ * nie čas od začiatku. Začiatky sa berú pred 1. 10. 2026 z PTmindera (kniha
+ * predajov + história členstiev), od toho dňa z balíčkov v Kokpite; ten istý
+ * predaj v oboch je jeden (do 10 dní).
+ */
+export function zaciatkyPredplatneho(data: PSBData): Map<string, string[]> {
+  const dni = new Map<string, Set<string>>();
+  const meno = new Map<string, string>();
+  const pridaj = (klient: string, den: string) => {
+    if (!klient || !/^\d{4}-\d{2}-\d{2}$/.test(den)) return;
+    const k = normName(klient);
+    if (!meno.has(k)) meno.set(k, klient);
+    (dni.get(k) || dni.set(k, new Set()).get(k)!).add(den);
+  };
+  for (const s of data.services || []) if (s.is6m && s.date.slice(0, 10) < KOKPIT_OD) pridaj(s.client, s.date.slice(0, 10));
+  for (const h of data.historiaBalickov || []) {
+    const od = (h.validFrom || "").slice(0, 10);
+    if (od && od < KOKPIT_OD && jePredplatne(h.package)) pridaj(h.client, od);
+  }
+  for (const b of data.balickyKokpit || []) {
+    if (!b.zruseneAt && !b.kotva && jePredplatne(b.nazov)) pridaj(b.klient, b.platnostOd.slice(0, 10));
+  }
+  const out = new Map<string, string[]>();
+  for (const [k, set] of dni) {
+    const zoradene = [...set].sort();
+    const jedno: string[] = [];
+    for (const d of zoradene) if (!jedno.length || daysBetween(jedno[jedno.length - 1], d) > 10) jedno.push(d);
+    out.set(meno.get(k)!, jedno);
+  }
+  return out;
+}
+
+/**
+ * Kto je v 6M procese: má předplatné, posledné začalo najviac pred 62 dňami
+ * (mesiac předplatného + prestávka, akú mal Vaško medzi májom a júlom).
+ * Do 21. 10. 2026 bol v procese navždy každý, komu sa raz predalo „S
+ * viazanostou".
+ */
 export function sixMClientSet(data: PSBData): Set<string> {
   const set = new Set<string>();
-  for (const s of data.services) if (s.is6m) set.add(s.client);
-  /**
-   * Bežiace předplatné: z balíčkov v Kokpite, keď ich appka má (Jerry,
-   * 15. 10. 2026 — vypínanie PTmindera). `balicky` nesú aj členstvá naliate
-   * z PTmindera, takže sú nadmnožinou snímky `packages`; snímka by po
-   * poslednom exporte zamrzla a nového predplatiteľa by nikdy nepoznala.
-   * Zmerané nad ostrými dátami: tá istá množina 6M klientov ako zo snímky.
-   */
-  if (data.balickyKokpit?.length) {
-    const dnes = dnesPraha();
-    for (const b of data.balickyKokpit) {
-      if (!b.zruseneAt && jePredplatne(b.nazov) && (!b.platnostDo || b.platnostDo >= dnes)) set.add(b.klient);
-    }
-  } else {
-    for (const p of data.packages) if (jePredplatne(p.package)) set.add(p.client);
+  const dnes = dnesPraha();
+  for (const [klient, dni] of zaciatkyPredplatneho(data)) {
+    const posledny = dni.filter((d) => d <= dnes).pop();
+    if (posledny && daysBetween(posledny, dnes) <= 62) set.add(klient);
   }
   // Ručná oprava má posledné slovo. Pravidlo hore je správne a zostáva
   // (balíček „S viazanostou" a platba 6 990 Kč SÚ 6M členstvo — Jerry to
@@ -742,26 +769,20 @@ export type SixMRow = {
 
 export function deriveSixM(data: PSBData, clients: Record<string, ClientAgg>): SixMRow[] {
   const members = sixMClientSet(data);
-  // Earliest 6M signal per client: a "S viazanostou" service, or a 6990 monthly
-  // payment (the recurring price). This recovers the true start for clients
-  // whose sale isn't in the service report (e.g. the other trainer's clients).
-  const first: Record<string, { date: string; trainer: string; price: number }> = {};
-  const consider = (client: string, date: string, trainer: string, price: number) => {
-    if (!members.has(client)) return;
-    if (!first[client] || date < first[client].date) first[client] = { date, trainer, price };
-  };
-  for (const s of data.services) if (s.is6m) consider(s.client, s.date, s.trainer, s.price);
-  for (const p of data.payments) if (Math.round(p.amount) === 6990) consider(p.client, p.date, "", 6990);
-  // Any 6M member still without a start date: fall back to their first session.
+  const zaciatky = zaciatkyPredplatneho(data);
+  const dnes = dnesPraha();
+  const first: Record<string, { date: string; trainer: string; price: number; pocet: number }> = {};
   for (const client of members) {
-    if (first[client]) continue;
+    const dni = (zaciatky.get(client) || [...zaciatky.entries()].find(([m]) => normName(m) === normName(client))?.[1] || []).filter((d) => d <= dnes);
     const cl = clients[client];
-    if (cl) first[client] = { date: cl.firstSession, trainer: cl.primaryTrainer, price: 6990 };
+    // Ručne zaradený bez předplatného: od prvého tréningu, ako doteraz.
+    if (!dni.length) { if (cl) first[client] = { date: cl.firstSession, trainer: cl.primaryTrainer, price: 6990, pocet: Math.max(1, monthsBetween(cl.firstSession, new Date())) }; continue; }
+    first[client] = { date: dni[0], trainer: cl?.primaryTrainer || "", price: 6990, pocet: dni.length };
   }
-  const now = new Date();
   return Object.entries(first)
     .map(([client, info]) => {
-      const months = monthsBetween(info.date, now);
+      // Mesiac procesu = počet předplatných (Jerry 21. 10. 2026), nie kalendár.
+      const months = info.pocet;
       let phase: SixMRow["phase"];
       let monthInPhase: number;
       if (months <= 6) {
@@ -3166,8 +3187,7 @@ export function deriveRegister(
   // Barterové členstvo je vzdaná tržba, nie darček — a keď na jeho započítanie
   // nikto neupozorní, ticho zmizne z Jarkovho dlhu. Appka to zachytí v mesiaci,
   // keď členstvo začalo; započítanie prebehne samo, toto je len na overenie.
-  for (const p of data.packages) {
-    if (!BARTER_KLIENTI.some((b) => normName(b) === normName(p.client)) || !p.payment || !p.validFrom) continue;
+  for (const p of barterovePredaje(data)) {
     const mk = p.validFrom.slice(0, 7);
     if (mk < "2026-07") continue;
     add(

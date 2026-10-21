@@ -438,6 +438,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       zruseneAt: r.zrusene_at || null,
       kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
       ukonceny: jeUkonceny(r),
+      cena: r.cena_czk == null ? null : Number(r.cena_czk),
     }));
   }
 

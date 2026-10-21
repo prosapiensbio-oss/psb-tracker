@@ -356,7 +356,11 @@ async function stavPlatieb(DB: D1Database) {
     DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 AND COALESCE(category, '') NOT IN ('prijem.produkt', 'prijem.ine') ORDER BY date DESC"),
     DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
     DB.prepare("SELECT fio_id FROM platba_nie_klient"),
-    DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')"),
+    // Mená klientov: export PTmindera stojí od 19. 10. 2026, preto aj kalendár
+    // a balíčky z Kokpitu — inak by sa platba nového klienta nikdy nenavrhla.
+    DB.prepare(`SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')
+      UNION SELECT DISTINCT klient FROM kal_udalosti WHERE klient IS NOT NULL AND zmizla_at IS NULL AND typ IN ('trening','uvodny') AND zaciatok >= date('now','-400 days')
+      UNION SELECT DISTINCT klient FROM balicky WHERE zrusene_at IS NULL`),
     DB.prepare("SELECT client_name, date, amount_czk, payment_method FROM payments"),
     DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
     // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
@@ -777,7 +781,8 @@ export const Route = createFileRoute("/api/platby")({
           const kniha = Array.isArray(b.platby) ? (b.platby as { klient: string | null; datum: string; czk: number | null; sats?: number }[]).slice(0, 2000) : [];
           const od = String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, "") || dnesPraha().slice(0, 7);
           const [s1, s2] = await DB.batch([
-            DB.prepare("SELECT DISTINCT client_name m FROM sessions WHERE date >= date('now','-400 days')"),
+            DB.prepare(`SELECT DISTINCT client_name m FROM sessions WHERE date >= date('now','-400 days')
+              UNION SELECT DISTINCT klient FROM kal_udalosti WHERE klient IS NOT NULL AND zmizla_at IS NULL AND typ IN ('trening','uvodny') AND zaciatok >= date('now','-400 days')`),
             DB.prepare("SELECT DISTINCT klient m FROM balicky WHERE zrusene_at IS NULL"),
           ]);
           const mena = [...new Set([...(s1.results || []), ...(s2.results || [])].map((x) => String((x as { m: string }).m || "")).filter(Boolean))];

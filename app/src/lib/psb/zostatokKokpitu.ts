@@ -55,6 +55,8 @@ export type BalicekPreZostatok = {
    * čokoľvek iný, formálne ešte platný balíček.
    */
   ukonceny?: boolean;
+  /** Cena balíčka v Kokpite (barter Sofie, `barterovePredaje`). */
+  cena?: number | null;
 };
 
 export type SedeniePreZostatok = { client: string; date: string; duration?: number };

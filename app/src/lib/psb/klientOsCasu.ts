@@ -23,6 +23,7 @@
  */
 
 import { normName } from "./format";
+import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { dnesPraha, terazPraha } from "./cas";
 
 export type Udalost =
@@ -436,7 +437,9 @@ export function osCasuKlienta(
     const d = den(b.platnost_od);
     if (!d || d > dnes) continue;
     const oprava = opravenyNaliaty(b, d);
-    if (b.zdroj !== "rucne" && !oprava) continue;
+    // Od 1. 10. 2026 je každý riadok v Kokpite balíček, aj naliaty z PTmindera
+    // (Lucia Podolová 2. 10.) — predaj z exportu od toho dňa na os nejde.
+    if (b.zdroj !== "rucne" && !oprava && d < KOKPIT_OD) continue;
     if (oprava) zKokpitu.add(`${d}|oprava`);
     /**
      * BALÍČOK Z KOKPITU PREBÍJA ČLENSTVO Z EXPORTU V TEN ISTÝ DEŇ, aj keď
@@ -478,7 +481,14 @@ export function osCasuKlienta(
     if (p.den <= dnes) out.push({ druh: "balicekDo", den: p.den, nazov: "prepadnuté hodiny", hodin: p.hodin, prepadlo: p.hodin });
   }
 
-  for (const b of bezDuplicitBalickov(moje(zdroj.packages), zdroj.services)) {
+  /**
+   * PREDAJ Z PTMINDERA OD 1. 10. 2026 NA OS NEJDE — balíčky od toho dňa vedie
+   * Kokpit (Jerry, 21. 10. 2026). Monika Schonwalderová mala v PTminderi
+   * predaj 9. 10. bez platby; os ho brala ako jej nezaplatený balíček, takže
+   * Kokpit nezaložil vlastný a ona mala −2 h bez balíčka.
+   */
+  const predPrechodom = (d: string) => !d || d < KOKPIT_OD;
+  for (const b of bezDuplicitBalickov(moje(zdroj.packages), zdroj.services).filter((b) => predPrechodom(den(b.validFrom || b.added || "")))) {
     /**
      * DOKÚPENÉ HODINY MAJÚ DEŇ AJ POČET — len inde.
      *
@@ -565,7 +575,7 @@ export function osCasuKlienta(
     return hodin > 0 ? { hodin, doDna: den(naj.validTo || "") || undefined } : null;
   };
 
-  for (const sl of (zdroj.services || []).filter((x) => normName(x.client) === k)) {
+  for (const sl of (zdroj.services || []).filter((x) => normName(x.client) === k && predPrechodom(den(x.date)))) {
     if (!SLUZBA_JE_BALICEK(sl.serviceType)) continue;
     const d = den(sl.date);
     if (!d || d > dnes) continue;

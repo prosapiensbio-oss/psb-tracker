@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
-import { BARTER_KLIENTI, breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prveTreningy, retencia6 } from "../../lib/psb/metrikyKlientov";
@@ -78,6 +78,7 @@ import { Assistant, useAssistantChat } from "./Assistant";
 import { REKLAMA_AGENT } from "./ReklamaDozor";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
+import { barterovePredaje } from "../../lib/psb/barter";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { jeBeta } from "../../lib/psb/beta";
 import { C, S, mix, tab } from "../../lib/psb/theme";
@@ -1039,8 +1040,7 @@ export function PSBApp() {
   useEffect(() => {
     void (async () => {
       const podlaMesiaca: Record<string, number> = {};
-      for (const p of data.packages) {
-        if (!BARTER_KLIENTI.some((b) => normName(b) === normName(p.client)) || !p.payment || !p.validFrom) continue;
+      for (const p of barterovePredaje(data)) {
         const mk = p.validFrom.slice(0, 7);
         podlaMesiaca[mk] = (podlaMesiaca[mk] || 0) + p.payment;
       }
@@ -1051,7 +1051,7 @@ export function PSBApp() {
       if (pribudlo) void saveVzasSetting("barter_jarek", spolu);
       if (nastavJarekZTrackera(spolu)) setFioTik((x) => x + 1);
     })();
-  }, [data.packages]);
+  }, [data.packages, data.balickyKokpit]);
 
   // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
@@ -2587,11 +2587,11 @@ function skupinaFaktur(
     // 12 mesiacov: priemer šiestich pred mesiacom aj troch štvrťrokov pred kvartálom.
     const kluceMes = Array.from({ length: 13 }, (_, k) => new Date(Date.UTC(y, m - 1 - (12 - k), 1)).toISOString().slice(0, 7));
     const klientiMes = (mm: string) => new Set(data.sessions.filter((x) => x.date.slice(0, 7) === mm).map((x) => x.client));
-    // Platby na obnovu balíčkov a koncentráciu: Kokpit aj PTminder (kým beží súbežne).
-    const platbyVsetky = [
-      ...(data.platbyKokpit || []).map((x) => ({ klient: x.klient, datum: x.datum, suma: x.suma })),
-      ...(data.payments || []).map((x) => ({ klient: x.client, datum: x.date.slice(0, 10), suma: x.amount })),
-    ];
+    // Platby na obnovu balíčkov a koncentráciu: `data.payments` už JE zložené
+    // (PTminder pred `peniazeOd`, Kokpit od neho — peniazeZKokpitu.ts).
+    // Do 21. 10. 2026 sa k nemu pridávali aj platby Kokpitu a od októbra
+    // sa rátali dvakrát (hodnota klienta v reporte vyšla nafúknutá).
+    const platbyVsetky = (data.payments || []).map((x) => ({ klient: x.client, datum: x.date.slice(0, 10), suma: x.amount }));
     const prve = prveTreningy(data.sessions);
     const pctZ = (a: number, b: number) => (b ? (a / b) * 100 : undefined);
     for (const mm of kluceMes.slice(1)) {
