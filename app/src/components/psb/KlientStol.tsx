@@ -3371,7 +3371,7 @@ function PlatiZa({ meno, mena, hodnota, zapis }: {
  * koľko peňazí prišlo. Preto je tlačidlo neaktívne, kým súčet nesedí, a
  * zvyšok je vidieť pri každom písmene.
  */
-function RozdelitPlatbu({ id, platitel, suma, mena, zaKoho, onHotovo }: {
+export function RozdelitPlatbu({ id, platitel, suma, mena, zaKoho, onHotovo }: {
   /** Id riadku v `platby`, ktorý sa delí. */
   id: string;
   platitel: string;

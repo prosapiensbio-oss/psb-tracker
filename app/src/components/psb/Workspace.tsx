@@ -36,8 +36,8 @@ import { KrokDopyty, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } fr
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
-import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
-import { platiteliaZOverridov } from "../../lib/psb/platiZa";
+import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
+import { menaPlatiZa, platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
@@ -46,10 +46,10 @@ type BalicekRiadok = {
   platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
   poznamka?: string | null; created_at?: string | null;
 };
-type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null; created_at?: string | null };
+type PlatbaRiadok = { id?: string; klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null; created_at?: string | null };
 import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import type { PSBData } from "../../lib/psb/types";
-import { KlientStol } from "./KlientStol";
+import { KlientStol, RozdelitPlatbu } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
 import { Card } from "./ui";
 import { useUzke } from "./useUzke";
@@ -62,7 +62,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
  * ako ho číta sťahovanie kalendára (`typZNazvu`).
  */
 const typPriradenia = (nazov: string) => (typZNazvu(nazov) === "uvodny" ? "uvodny" : "trening");
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
 /**
  * Otázka pre Jarvisa k mesačnej kontrole.
@@ -188,6 +188,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [hromadna, setHromadna] = useState(false);
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
+  const [delimPlatbu, setDelimPlatbu] = useState("");
   /**
    * „Príjmy z banky" v kroku Platby a balíčky sú ROZBALENÉ.
    *
@@ -1554,6 +1555,49 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                               po posledné stiahnutie; nové príjmy stiahneš hore v tomto kroku.
                             </div>
                           )}
+                          {/* ZAPLATIL ZA NEHO NIEKTO INÝ (Jerry, 21. 10. 2026: „mohlo by sa to
+                              zobraziť aj vo Workspace platby"). Dan zaplatí celú faktúru za seba
+                              aj za Moniku a platba je jeho — Monika tu svieti ako dlžníčka. Pri nej
+                              sa ukážu platiteľove posledné platby s tým istým rozdelením ako
+                              v profile (`RozdelitPlatbu`, akcia `rozdel-platbu`). */}
+                          {x.platiZaNeho && (() => {
+                            const p0 = normName(x.platiZaNeho);
+                            const od = posunDen(dnesPraha(), -90);
+                            const jeho = vlastnePlatby
+                              .filter((p) => p.id && !p.zrusene_at && normName(p.klient) === p0 && p.datum.slice(0, 10) >= od)
+                              .sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3);
+                            const zaKoho = menaPlatiZa(data.clientOverrides?.[x.platiZaNeho]?.platiZa)
+                              .map((m) => ({ klient: m, dlzi: dlhJednehoKlienta(data.dlhy, m).dlzi }));
+                            return (
+                              <div style={{ padding: "2px 0 6px" }}>
+                                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>
+                                  Platí za {x.meno.split(" ")[0]} {x.platiZaNeho}{jeho.length ? " — jeho posledné platby:" : " — za posledné 3 mesiace od neho platba nie je."}
+                                </div>
+                                {jeho.map((p) => (
+                                  <div key={p.id}>
+                                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "4px 0" }}>
+                                      <span style={{ fontSize: 12, color: C.textDim, minWidth: 74 }}>{fmtDMY(p.datum.slice(0, 10))}</span>
+                                      <span style={{ fontSize: 13, fontWeight: 700, minWidth: 80, textAlign: "right" }}>{kc(Math.round(p.suma_czk))}</span>
+                                      <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 220px" }}>zapísaná ako {x.platiZaNeho}</span>
+                                      <button onClick={() => setDelimPlatbu(delimPlatbu === p.id ? "" : String(p.id))} style={hlavne(true)}>
+                                        {delimPlatbu === p.id ? "zavrieť" : "rozdeliť"}
+                                      </button>
+                                    </div>
+                                    {delimPlatbu === p.id && (
+                                      <RozdelitPlatbu
+                                        id={String(p.id)}
+                                        platitel={x.platiZaNeho!}
+                                        suma={Math.round(p.suma_czk)}
+                                        mena={mena}
+                                        zaKoho={zaKoho}
+                                        onHotovo={() => { setDelimPlatbu(""); oznam("peniaze"); poZapise(); }}
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           {pary.map((p) => (
                             <div key={p.fioId} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "4px 0" }}>
                               <span style={{ fontSize: 12, color: C.textDim, minWidth: 74 }}>{fmtDMY(p.datum)}</span>
