@@ -508,8 +508,8 @@ export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
   return zmena;
 }
 
-/** Klienti, ktorých členstvo je barter proti Jarkovmu dlhu, nie tržba. */
-export const BARTER_KLIENTI = ["Sofia Resnerová"];
+/** Klienti, ktorých členstvo je barter proti Jarkovmu dlhu, nie tržba (jedna definícia v barter.ts). */
+export { BARTER_KLIENTI } from "./barter";
 
 /**
  * Výplaty vyplatené v bitcoine — z appky PSB Bitcoin.

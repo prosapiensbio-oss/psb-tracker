@@ -1027,7 +1027,7 @@ export function PSBApp() {
     void (async () => {
       const podlaMesiaca: Record<string, number> = {};
       for (const p of data.packages) {
-        if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
+        if (!BARTER_KLIENTI.some((b) => normName(b) === normName(p.client)) || !p.payment || !p.validFrom) continue;
         const mk = p.validFrom.slice(0, 7);
         podlaMesiaca[mk] = (podlaMesiaca[mk] || 0) + p.payment;
       }

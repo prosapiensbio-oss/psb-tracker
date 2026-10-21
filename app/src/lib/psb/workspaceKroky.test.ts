@@ -91,8 +91,11 @@ describe("platba nesedí na balíček", () => {
     expect(otazky([bal("b1", "6h Balíček", 7790)], [])).toEqual([]);
     expect(otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7790 }])).toEqual([]);
   });
-  it("balíček, ktorý PTminder pozná ako zaplatený, sa nepýta", () => {
-    expect(otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7011 }], [{ klient: "A", datum: "2026-11-05", suma: 7790 }])).toEqual([]);
+  it("balíček spred 1. 10., ktorý PTminder pozná ako zaplatený, sa nepýta", () => {
+    expect(otazky([bal("b1", "6h Balíček", 7790, "2026-09-05")], [{ klient: "A", datum: "2026-09-06", suma: 7011 }], [{ klient: "A", datum: "2026-09-05", suma: 7790 }])).toEqual([]);
+  });
+  it("od 1. 10. platba len v PTminderi otázku neumlčí — pravdou je Kokpit", () => {
+    expect(otazky([bal("b1", "6h Balíček", 7790)], [{ klient: "A", datum: "2026-11-06", suma: 7011 }], [{ klient: "A", datum: "2026-11-05", suma: 7790 }])).toHaveLength(1);
   });
 });
 

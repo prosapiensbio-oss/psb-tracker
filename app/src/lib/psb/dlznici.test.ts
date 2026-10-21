@@ -168,16 +168,16 @@ describe("poistka z PTmindera", () => {
   });
   it("zrušený balíček nezoberie platbu PTmindera náhradnému (nezávislá kontrola 15. 10.)", () => {
     const v = dlhy({
-      balicky: [{ ...bal("X", "2026-10-02", 6990), zruseneAt: "2026-10-02" }, bal("X", "2026-10-02", 6990)],
-      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-10-02" }],
+      balicky: [{ ...bal("X", "2026-09-02", 6990), zruseneAt: "2026-09-02" }, bal("X", "2026-09-02", 6990)],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-09-02" }],
     });
     expect(v).toEqual([]);
   });
   it("balíček zaplatený v Kokpite nezoberie platbu PTmindera, ktorá patrí ďalšiemu (nezávislá kontrola 15. 10.)", () => {
     const v = dlhy({
-      balicky: [bal("X", "2026-09-10", 6990), bal("X", "2026-10-09", 6990)],
-      platby: [{ klient: "X", suma: 6990, datum: "2026-09-12" }],
-      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-10-10" }],
+      balicky: [bal("X", "2026-08-10", 6990), bal("X", "2026-09-09", 6990)],
+      platby: [{ klient: "X", suma: 6990, datum: "2026-08-12" }],
+      ptPlatby: [{ klient: "X", suma: 6990, datum: "2026-09-10" }],
     });
     expect(v).toEqual([]);
   });
@@ -243,9 +243,11 @@ describe("splátky — Markéta Lozias, 17. 10. 2026", () => {
     expect(bezHodinZDlhov([{ klient: "X", den: "2026-10-20", nazov: "6h", cena: 7790, doplatit: 7780, zdroj: "kokpit" }], [])).toHaveLength(1);
   });
 
-  it("dve polovice v PTminderi poistka uzná ďalej", () => {
+  // Od 1. 10. 2026 je pravdou Kokpit (Jerry, 21. 10. 2026): platby, ktoré
+  // má len PTminder, októbrový balíček nezaplatia.
+  it("dve polovice len v PTminderi októbrový balíček nezaplatia", () => {
     const { polozky } = dlhyKlientov({ ...vstup, platby: [], ptPlatby: [{ klient: "Marketa Lozias", datum: "2026-10-06", suma: 3895 }, { klient: "Marketa Lozias", datum: "2026-11-03", suma: 3895 }] } as never);
-    expect(polozky).toEqual([]);
+    expect(polozky.map((p) => p.doplatit)).toEqual([7790]);
   });
 });
 
@@ -268,12 +270,12 @@ describe("BTC platba v deň nového balíčka — Jan Kalmus, 20. 10. 2026", () 
     const { polozky } = dlhyKlientov({
       poplatky: [],
       balicky: [
-        { id: "a", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-10-02", zdroj: "rucne" },
-        { id: "b", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-10-25", zdroj: "rucne" },
+        { id: "a", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-09-02", zdroj: "rucne" },
+        { id: "b", klient: "Jan Kalmus", nazov: "8h Balíček", cena: 8460, platnostOd: "2026-09-25", zdroj: "rucne" },
       ],
-      platby: [{ klient: "Jan Kalmus", datum: "2026-10-25", suma: 8436, sposob: "bitcoin" }],
+      platby: [{ klient: "Jan Kalmus", datum: "2026-09-25", suma: 8436, sposob: "bitcoin" }],
       ptPlatby: [],
-      ptHistoria: [{ klient: "Jan Kalmus", od: "2026-10-02" }],
+      ptHistoria: [{ klient: "Jan Kalmus", od: "2026-09-02" }],
     } as never);
     expect(polozky).toEqual([]);
   });
@@ -323,5 +325,53 @@ describe("ten istý predaj so zľavou — Peter Gažo, 11. 10. 2026", () => {
 
   it("týždeň od seba je iný predaj aj so zľavou", () => {
     expect(bezZdvojenych(poplatok(21150, "2026-10-01"), balicek(20093, "2026-10-09"))).toHaveLength(1);
+  });
+});
+
+describe("Kokpit je pravda od 1. 10. 2026 (Jerry, 21. 10. 2026)", () => {
+  it("barter (Sofia Resnerová) nie je dlh", () => {
+    const { polozky } = dlhyKlientov({
+      poplatky: [{ id: "p", klient: "Sofia Resnerová", datum: "2026-09-07", popis: "6h", suma: 7790 }],
+      balicky: [{ id: "s", klient: "Sofia Resnerová", nazov: "6h Balíček", cena: 7790, platnostOd: "2026-10-07", zdroj: "rucne" }],
+      platby: [], ptPlatby: [], ptHistoria: [],
+    } as never);
+    expect(polozky).toEqual([]);
+  });
+  it("poplatok z PTmindera od 1. 10. dlh nerobí, ale hodiny nedá", async () => {
+    const { bezHodinZDlhov } = await import("./zaplatene");
+    const { polozky, dvojcata } = dlhyKlientov({
+      poplatky: [{ id: "p", klient: "X Y", datum: "2026-10-14", popis: "OFF - 6h", suma: 7790 }],
+      balicky: [], platby: [], ptPlatby: [], ptHistoria: [],
+    } as never);
+    expect(polozky).toEqual([]);
+    expect(bezHodinZDlhov(polozky, dvojcata)).toEqual([{ klient: "X Y", den: "2026-10-14", dvojca: true }]);
+  });
+  it("platba len v PTminderi októbrový balíček nezaplatí (Lenka Divinová)", () => {
+    const { polozky } = dlhyKlientov({
+      poplatky: [],
+      balicky: [{ id: "l", klient: "Lenka Divinova", nazov: "6h Balíček", cena: 7790, platnostOd: "2026-10-16", zdroj: "rucne" }],
+      platby: [], ptPlatby: [{ klient: "Lenka Divinova", datum: "2026-10-20", suma: 7790 }], ptHistoria: [],
+    } as never);
+    expect(polozky.map((p) => p.doplatit)).toEqual([7790]);
+  });
+});
+
+describe("PTminder a Kokpit: iný balíček (21. 10. 2026)", () => {
+  it("predaj z PTmindera od 1. 10. bez rovnakého balíčka v Kokpite je rozpor, nie dlh", () => {
+    const r = dlhyKlientov({
+      poplatky: [{ id: "p", klient: "Veronika Stoklaskova", datum: "2026-10-06", popis: "ON - 6h BEZ viazanosti - from 06/10/2026 to 01/12/2026", suma: 6590 }],
+      balicky: [{ id: "a", klient: "Veronika Stoklaskova", nazov: "1h Balíček", cena: 1450, platnostOd: "2026-10-06", zdroj: "rucne" }],
+      platby: [], ptPlatby: [], ptHistoria: [],
+    } as never);
+    expect(r.rozporyPtminder).toEqual([{ klient: "Veronika Stoklaskova", den: "2026-10-06", popis: "ON - 6h BEZ viazanosti - from 06/10/2026 to 01/12/2026", suma: 6590, kokpit: [{ den: "2026-10-06", nazov: "1h Balíček", cena: 1450 }] }]);
+    expect(r.polozky.map((p) => p.cena)).toEqual([1450]);
+  });
+  it("ten istý predaj v oboch nie je rozpor", () => {
+    const r = dlhyKlientov({
+      poplatky: [{ id: "p", klient: "X", datum: "2026-10-09", popis: "OFF - 6h", suma: 7790 }],
+      balicky: [{ id: "a", klient: "X", nazov: "6h Balíček", cena: 7790, platnostOd: "2026-10-09", zdroj: "rucne" }],
+      platby: [], ptPlatby: [], ptHistoria: [],
+    } as never);
+    expect(r.rozporyPtminder).toEqual([]);
   });
 });

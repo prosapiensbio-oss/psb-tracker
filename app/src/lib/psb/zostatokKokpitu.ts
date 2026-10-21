@@ -171,8 +171,8 @@ export function zostatokKokpitu(
  * (`jeBeta()` = adresa kokpit-beta). Server (push, /v/, automatické
  * balíčky) beží vždy podľa `..._NAOSTRO` — v bete je to len náhľad obrazovky.
  *
- * Poistka `zaplateneVPtminderi` (zaplatene.ts) sa tým NEMENÍ: o peniazoch
- * rozhoduje `dlhyKlientov`, nie toto.
+ * O peniazoch rozhoduje `dlhyKlientov`, nie toto; poistka
+ * `zaplateneVPtminderi` v ňom od 21. 10. 2026 platí len pre balíčky spred 1. 10.
  */
 // ZAPNUTÉ NAOSTRO 20. 10. 2026 — Jerry: „nechaj ich odtrénovať". Obom
 // Stoklasovým sa doplnenie 2 h zapísalo do Kokpitu (balicky, zdroj rucne);

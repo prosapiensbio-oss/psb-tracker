@@ -2,6 +2,7 @@
 // no browser globals. Reused across every module.
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { klucNezaplateneho, treningyBezBalicka, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
+import { nazovProduktu } from "./nazvyProduktov";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
@@ -2175,6 +2176,24 @@ export function deriveAnomalies(
       c.name, undefined, posledny);
   }
 
+  /**
+   * PTMINDER A KOKPIT HOVORIA O BALÍČKU INÉ (Jerry, 21. 10. 2026: „sprav
+   * správu v notifikáciách, nech to dovysvetlí"). Pri poslednom nahratí
+   * exportov mala Veronika Stoklasková v PTminderi online 6 h za 6 590 Kč
+   * a Kokpit jej založil dva 1h balíčky; Natália Krivdová předplatné za
+   * 6 990 a Kokpit „Prenesené hodiny" za 0 Kč. Od 1. 10. je pravda Kokpit,
+   * takže dlh počíta z neho — ale ktorá verzia je SPRÁVNA, vie len tréner.
+   * PTminder sa od 19. 10. nepíše, zoznam teda už nepribúda.
+   */
+  for (const r of data.rozporyPtminder || []) {
+    const kokpit = r.kokpit.length
+      ? r.kokpit.map((b) => `„${nazovProduktu(b.nazov)}" za ${b.cena.toLocaleString("sk-SK")} Kč (${fmtDMY(b.den)})`).join(" a ")
+      : "";
+    push(`ptrozpor|${r.klient}|${r.den}`, "orange", "PTminder a Kokpit: iný balíček",
+      `${r.klient}: v PTminderi je od ${fmtDMY(r.den)} „${nazovProduktu(r.popis.split(/\s+-\s+from\s+/i)[0].trim())}" za ${r.suma.toLocaleString("sk-SK")} Kč, ${kokpit ? `Kokpit má ${kokpit}` : "Kokpit tam nemá žiadny balíček"}. Dovysvetli, čo si klient naozaj kúpil — podľa Kokpitu sa počíta dlh aj hodiny, tak ho prípadne oprav v profile klienta.`,
+      r.klient);
+  }
+
   // ── Narodeniny ───────────────────────────────────────────────────────────
   //
   // Pripomienka sa OPAKUJE: 7 dní pred, 3 dni pred, deň pred a v deň samotný.
@@ -3148,7 +3167,7 @@ export function deriveRegister(
   // nikto neupozorní, ticho zmizne z Jarkovho dlhu. Appka to zachytí v mesiaci,
   // keď členstvo začalo; započítanie prebehne samo, toto je len na overenie.
   for (const p of data.packages) {
-    if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
+    if (!BARTER_KLIENTI.some((b) => normName(b) === normName(p.client)) || !p.payment || !p.validFrom) continue;
     const mk = p.validFrom.slice(0, 7);
     if (mk < "2026-07") continue;
     add(

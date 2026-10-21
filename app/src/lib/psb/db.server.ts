@@ -350,7 +350,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * čítajú ten istý zoznam `data.dlhy`.
      */
     {
-      const { polozky, otvorenePoplatky, dvojcata } = dlhyKlientov({
+      const { polozky, otvorenePoplatky, dvojcata, rozporyPtminder } = dlhyKlientov({
         poplatky: (poplatky.results as any[]).map((r) => ({
           id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
         })),
@@ -373,6 +373,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         .filter((r) => !r.zrusene_at)
         .map((r) => ({ klient: String(r.klient), datum: String(r.datum || "").slice(0, 10), suma: Number(r.suma_czk) || 0, sposob: String(r.sposob || "") }));
       data.dlhy = polozky;
+      data.rozporyPtminder = rozporyPtminder;
       /**
        * PENIAZE: PRED ZVOLENÝM MESIACOM PTMINDER, OD NEHO KOKPIT.
        *

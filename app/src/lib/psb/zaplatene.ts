@@ -48,7 +48,8 @@
  * nie medzi tých, čo si majú kúpiť nový).
  */
 
-import { jeOtvaraciZostatok, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
+import { BARTER_KLIENTI } from "./barter";
+import { jeOtvaraciZostatok, KURZ_BTC, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { poplatkyPoOdrataniPlatieb, type Platba } from "./platbyEvidencia";
@@ -83,6 +84,11 @@ export type VstupDlhov = {
 
 const den = (s: string) => String(s || "").slice(0, 10);
 const dni = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000;
+const posunDni = (d: string, o: number) => {
+  const ms = Date.parse(`${d.slice(0, 10)}T00:00:00Z`);
+  // Krivý dátum nesmie zhodiť loadData všetkým.
+  return Number.isFinite(ms) ? new Date(ms + o * 86400000).toISOString().slice(0, 10) : d;
+};
 
 /**
  * Krok 4: poplatok z PTmindera, ktorý je ten istý predaj ako balíček
@@ -131,6 +137,11 @@ export function bezZdvojenych<T extends { datum: string; suma: number }>(
   });
 }
 
+export type RozporPtminder = {
+  klient: string; den: string; popis: string; suma: number;
+  kokpit: { den: string; nazov: string; cena: number }[];
+};
+
 /**
  * Všetko, čo klienti dlžia, ako zoznam predajov. Volá ho `loadData` (raz pre
  * všetkých) a `/api/platby` pri príznaku „vopred" (pre jedného klienta).
@@ -146,7 +157,14 @@ export function dlhyKlientov(v: VstupDlhov): {
    * (alebo z nezaplateného predaja). Tak to bolo aj pred jedným pravidlom.
    */
   dvojcata: { klient: string; den: string }[];
+  /**
+   * Predaje z PTmindera od 1. 10., ku ktorým Kokpit nemá ten istý balíček
+   * (rovnakú cenu do 3 dní). Dlhom nie sú — od 1. 10. je pravda Kokpit — ale
+   * niekto má povedať, ktorá verzia platí (notifikácia `ptrozpor|`).
+   */
+  rozporyPtminder: RozporPtminder[];
 } {
+  const barter = new Set(BARTER_KLIENTI.map(normName));
   // 1. Poplatky mínus platby z Kokpitu.
   const otvorene = poplatkyPoOdrataniPlatieb(
     v.poplatky,
@@ -186,15 +204,62 @@ export function dlhyKlientov(v: VstupDlhov): {
     // dva predaje a odpustenie jedného nesmie zasiahnuť druhý.
     const bs = bsPovodne.map((b, i) => ({ ...b, poradie: i }));
     const prve = nezaplateneZKokpitu(bs, pl.get(k) || []).map((b) => ({ ...b, klient }));
-    const nezaplatene = zaplateneVPtminderi(
-      prve, v.ptPlatby, v.ptHistoria,
+    // KOKPIT JE PRAVDA OD 1. 10. 2026 (Jerry, 21. 10. 2026: „nemal by byť už
+    // Kokpit zdroj pravdy?"). Poistka z PTmindera odpúšťa len balíčky spred
+    // prechodu; novší balíček zaplatí len platba v Kokpite (banka, zošit,
+    // bitcoin). Do toho dňa Lenku Divinovú zaplatila platba, ktorú mal len
+    // PTminder, hoci v banke čakala nespárovaná.
+    const predPrechodom = (b: { platnostOd: string }) => b.platnostOd < KOKPIT_OD;
+    const pytat = prve.filter(predPrechodom);
+    // STARŠÍ BALÍČEK ZAPLATENÝ LEN V PTMINDERI. Keď ostal nezaplatený balíček
+    // od 1. 10., mohli ho pripraviť o peniaze starší balíčky, ktorých platbu
+    // Kokpit nikdy nevidel (Janka Malinová: úvodný 17. 8. za 1 100 Kč je len
+    // v PTminderi, FIFO mu dal peniaze z ďalšej platby a o 1 100 prišiel
+    // októbrový balíček). Taký starší sa odpustí — ale LEN keď jeho platba
+    // v PTminderi nemá dvojča v Kokpite. Lucia Podolová má augustový balíček
+    // zaplatený neskoro (21. 9.) a tá platba v Kokpite je; odpustiť ho by
+    // preplatok, ktorý patrí októbru, rozdal inam.
+    const kokpitPlatby = (pl.get(k) || []).filter((p) => !p.zruseneAt);
+    const ptVOkne = (b: { platnostOd: string }, p: { datum: string }) =>
+      den(p.datum) >= posunDni(b.platnostOd, -14) && den(p.datum) <= posunDni(b.platnostOd, 45);
+    // Najprv poistka nad nepokrytými (ako vždy).
+    const ostali = new Set(zaplateneVPtminderi(
+      pytat, v.ptPlatby, v.ptHistoria,
       otvorene.map((p) => ({ klient: p.klient, datum: den(p.datum) })),
       normName,
       v.platby.filter((p) => !p.zruseneAt).map((p) => ({ klient: p.klient, datum: den(p.datum), suma: p.suma, sposob: p.sposob })),
-    );
-    if (nezaplatene.length === prve.length) return nezaplatene;
-    const ostali = new Set(nezaplatene.map((b) => b.poradie));
-    const odpustene = new Set(prve.filter((b) => !ostali.has(b.poradie)).map((b) => b.poradie));
+    ).map((b) => b.poradie));
+    const odpusteneP = pytat.filter((b) => !ostali.has(b.poradie));
+    // Platby PTmindera, ktoré poistka zrejme použila, výnimka nižšie nedostane
+    // — každá platba odpustí najviac jeden balíček (nezávislá kontrola 21. 10.).
+    const pouzite = new Set<number>();
+    for (const b of odpusteneP) {
+      const i = v.ptPlatby.findIndex((p, j) => !pouzite.has(j) && normName(p.klient) === k
+        && Math.abs(Math.round(p.suma) - Math.round(b.cena || 0)) <= 1 && ptVOkne(b, p));
+      if (i >= 0) pouzite.add(i);
+    }
+    // Dvojča v Kokpite: platba do 10 dní na podobnú sumu (bitcoin s kurzom,
+    // zľava do 10 %), alebo viac platieb v tých dňoch, ktoré sa na ňu zložia
+    // (splátky). Platba, ktorú Kokpit takto pozná, nie je „len v PTminderi".
+    const maDvojca = (p: { datum: string; suma: number }) => {
+      const blizko = kokpitPlatby.filter((q) => dni(den(q.datum), den(p.datum)) <= 10);
+      return blizko.some((q) => Math.abs(q.suma - p.suma) <= p.suma * KURZ_BTC)
+        || Math.abs(blizko.reduce((a, q) => a + q.suma, 0) - p.suma) <= Math.max(50, p.suma * 0.01);
+    };
+    const lenVPtminderi = (b: { platnostOd: string; cena: number | null }) => {
+      const cena = Math.round(b.cena || 0);
+      const i = v.ptPlatby.findIndex((p, j) => !pouzite.has(j) && normName(p.klient) === k
+        && Math.abs(Math.round(p.suma) - cena) <= 1 && ptVOkne(b, p) && !maDvojca({ datum: p.datum, suma: p.suma }));
+      if (i < 0) return false;
+      pouzite.add(i);
+      return true;
+    };
+    const navyse = prve.some((b) => !predPrechodom(b))
+      ? bs.filter((b) => predPrechodom(b) && !b.zruseneAt && (b.cena || 0) > 0 && !jeOtvaraciZostatok(b)
+        && !pytat.some((x) => x.poradie === b.poradie) && lenVPtminderi(b)).map((b) => b.poradie)
+      : [];
+    const odpustene = new Set([...odpusteneP.map((b) => b.poradie), ...navyse]);
+    if (!odpustene.size) return prve;
     return nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie))
       .map((b) => ({ ...b, klient }));
   });
@@ -205,7 +270,20 @@ export function dlhyKlientov(v: VstupDlhov): {
     const k = normName(p.klient);
     poKlientoch.set(k, [...(poKlientoch.get(k) || []), p]);
   }
-  const poplatky = [...poKlientoch.entries()].flatMap(([k, ps]) => bezZdvojenych(ps, bal.get(k) || []));
+  const poKroku4 = [...poKlientoch.entries()].flatMap(([k, ps]) => bezZdvojenych(ps, bal.get(k) || []));
+  // Poplatok z PTmindera od 1. 10. dlhom nie je — predaj od toho dňa vedie
+  // Kokpit a jeho balíček nesie dlh sám. Hodiny ale dať nesmie (pod ním stojí
+  // v PTminderi riadok toho istého predaja), preto ide medzi dvojčatá.
+  const poplatky = poKroku4.filter((p) => den(p.datum) < KOKPIT_OD);
+  const rozporyPtminder: RozporPtminder[] = poKroku4
+    .filter((p) => den(p.datum) >= KOKPIT_OD && !barter.has(normName(p.klient)))
+    .map((p) => ({
+      klient: p.klient, den: den(p.datum), popis: p.popis, suma: Math.round(p.suma || 0),
+      // Čo má Kokpit okolo toho dňa — aby sa dalo porovnať bez preklikávania.
+      kokpit: (bal.get(normName(p.klient)) || [])
+        .filter((b) => !b.zruseneAt && !jeOtvaraciZostatok(b) && !/^doplnenie/i.test(b.nazov || "") && dni(den(b.platnostOd), den(p.datum)) <= 21)
+        .map((b) => ({ den: den(b.platnostOd), nazov: b.nazov || "", cena: Math.round(b.cena || 0) })),
+    }));
   const zostali = new Set(poplatky);
   const dvojcata = otvorene.filter((p) => !zostali.has(p)).map((p) => ({ klient: p.klient, den: den(p.datum) }));
 
@@ -219,9 +297,11 @@ export function dlhyKlientov(v: VstupDlhov): {
       doplatit: Math.round(b.doplatit), zdroj: "kokpit", id: (b as { id?: string }).id,
     })),
   ].filter((x) => x.doplatit > 0)
+    // Barter (Sofia) sa peniazmi neplatí nikdy — splácá Jarkov dlh (vzas.ts).
+    .filter((x) => !barter.has(normName(x.klient)))
     .sort((a, b) => a.den.localeCompare(b.den) || a.klient.localeCompare(b.klient));
 
-  return { polozky, otvorenePoplatky: otvorene, dvojcata };
+  return { polozky, otvorenePoplatky: otvorene, dvojcata, rozporyPtminder };
 }
 
 /**

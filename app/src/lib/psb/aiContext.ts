@@ -1019,6 +1019,12 @@ export function buildAiContext(
       })),
       poznamka: "Aktívni klienti, ktorým nezostala ani hodina — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z PTmindera AJ z vlastnej evidencie balíčkov naraz, takže kto má balíček nahodený v Kokpite, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail — tam je len zostatok z exportu.",
     },
+    // Predaje z PTmindera od 1. 10., ktoré Kokpit nemá v rovnakej podobe
+    // (notifikácia „PTminder a Kokpit: iný balíček", 21. 10. 2026).
+    rozporyPtminder: {
+      poznamka: "Od 1. 10. 2026 je pravda Kokpit: dlh a hodiny sa počítajú z jeho balíčkov, tieto predaje z PTmindera dlh NEROBIA. Každý riadok je otázka pre trénera, ktorá verzia platí — kým neodpovie, nehovor, že klient dlží sumu z PTmindera.",
+      polozky: (data.rozporyPtminder || []).map((r) => ({ klient: r.klient, od: r.den, ptminder: r.popis, sumaCzk: r.suma, kokpit: r.kokpit })),
+    },
     dlznici: {
       pocet: (fronty?.dlznici || []).length,
       spoluCzk: r0((fronty?.dlznici || []).reduce((a, d) => a + d.spolu, 0)),

@@ -72,6 +72,8 @@ export const KURZ_BTC = 0.1;
  * PTminder zostáva poistkou: `zaplateneVPtminderi` ďalej odpúšťa balíčky,
  * ktoré on pozná ako zaplatené — bez toho by sa do dlhu vrátili všetky
  * naliate členstvá, ktoré klienti dávno zaplatili ešte pred Kokpitom.
+ * Od 21. 10. 2026 len balíčky spred 1. 10. (KOKPIT_OD) — novšie platí len
+ * platba v Kokpite (`dlhyKlientov`).
  */
 const balickyKokpitu = (balicky: BalicekDlh[]): BalicekDlh[] => balicky
   .filter((b) => !b.zruseneAt && (b.cena || 0) > 0 && !jeOtvaraciZostatok(b))

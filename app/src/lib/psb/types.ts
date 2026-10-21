@@ -201,6 +201,11 @@ export type PSBData = {
    */
   bezHodin?: { klient: string; den: string; dvojca?: boolean }[];
   /**
+   * Predaje z PTmindera od 1. 10. 2026, ku ktorým Kokpit nemá ten istý
+   * balíček (`dlhyKlientov`). Notifikácia `ptrozpor|` a Jarvis.
+   */
+  rozporyPtminder?: { klient: string; den: string; popis: string; suma: number; kokpit: { den: string; nazov: string; cena: number }[] }[];
+  /**
    * Platby zapísané v Kokpite (tabuľka `platby`, nezrušené). Na osi času sa
    * zlučujú s platbami z PTmindera — tá istá platba v oboch je raz.
    */
