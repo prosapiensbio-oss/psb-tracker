@@ -24,6 +24,7 @@ import { Premenovanie } from "./Klienti";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { VyberMena } from "./VyberMena";
 import { menaPlatiZa } from "../../lib/psb/platiZa";
+import { dlhJednehoKlienta } from "../../lib/psb/dlznici";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -347,6 +348,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * v oboch — Vaškovi tak ukazoval dvojnásobok, kým karta dlžníkov nie.
    */
   const mojeDlhy = useMemo(() => dlhyKlienta(data.dlhy, meno), [data.dlhy, meno]);
+  /**
+   * Dlh tých, ZA KOHO tento klient platí (`plati_za`, 21. 10. 2026). Jeho
+   * odkaz `/v/` pýta súčet, tak podľa súčtu musí ísť aj to, či sa dá poslať
+   * SMS — inak tlačidlo chýba práve u človeka, ktorý má zaplatiť najviac.
+   */
+  const dlhZaKoho = useMemo(
+    () => menaPlatiZa(c?.platiZa).reduce((a, m) => a + dlhJednehoKlienta(data.dlhy, m).dlzi, 0),
+    [c?.platiZa, data.dlhy],
+  );
   /** Za balíčky z Kokpitu — rozpis „balíček za X, zaplatené Y". */
   const dlh = useMemo(() => {
     const kokpit = mojeDlhy.filter((d) => d.zdroj === "kokpit");
@@ -1174,16 +1184,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               z dlaždice na dashboarde — teda z inej obrazovky, než na ktorej
               človek dlh číta.
 
-              Tlačidlo sa kreslí LEN pri dlhu. Keď je zaplatené, nemá čo
-              poslať: správa znie „tady máš přehled hodin a QR na platbu"
-              a QR na nulu je výzva na omyl — to isté pravidlo, podľa
-              ktorého platobný blok chýba aj na stránke klienta. */}
-          {dlzi + dlh.dlzi > 0 && (
+              Tlačidlo sa kreslí LEN keď je na stránke čo zaplatiť — QR na
+              nulu je výzva na omyl, to isté pravidlo, podľa ktorého platobný
+              blok chýba aj na stránke klienta.
+
+              21. 10. 2026 k vlastnému dlhu pribudol dlh tých, ZA KTORÝCH
+              klient platí (`plati_za`): Jakub Kaňovský sám nedlžil nič,
+              takže tlačidlo tu nebolo — a pritom jeho odkaz pýtal 14 802 Kč
+              za seba aj za Annu. Suma v texte sa nepíše, ale podľa nej sa
+              rozhoduje, či sa SMS vôbec dá poslať. */}
+          {dlzi + dlh.dlzi + dlhZaKoho > 0 && (
             <div style={{ marginTop: 9 }}>
               <SmsKlientovi
                 meno={meno}
                 trener={c?.primaryTrainer || ""}
-                platba={{ suma: dlzi + dlh.dlzi, datum: datumDlhu }}
+                platba={{ suma: dlzi + dlh.dlzi + dlhZaKoho, datum: datumDlhu }}
                 maly
               />
             </div>
