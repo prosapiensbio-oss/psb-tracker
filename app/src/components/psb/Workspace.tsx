@@ -52,6 +52,15 @@ import { KlientStol } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
 import { Card } from "./ui";
 import { useUzke } from "./useUzke";
+import { typZNazvu } from "../../lib/psb/kalendar";
+
+/**
+ * „Je to on" ukladal pravidlo vždy ako tréning — aj pri „Linda Muth-uvodny
+ * trening" (16. 10. 2026). Úvodný je ale vlastný balíček 1 h / 1 100 Kč;
+ * ako tréning by mu Kokpit založil šesťhodinový. Druh sa berie z názvu tak,
+ * ako ho číta sťahovanie kalendára (`typZNazvu`).
+ */
+const typPriradenia = (nazov: string) => (typZNazvu(nazov) === "uvodny" ? "uvodny" : "trening");
 import { dnesPraha } from "../../lib/psb/cas";
 
 /**
@@ -1178,7 +1187,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     )}
                     <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="kto to je…" style={vstup(!!t && !mena.includes(t))} />
                     <button
-                      onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })}
+                      onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: typPriradenia(n.nazov), klient: t.trim() })}
                       disabled={pracujem === kluc || t.trim().length < 3}
                       title={t.trim().length >= 3 ? `Priradiť ${n.nazov} klientovi ${t.trim()}` : "Najprv napíš, kto to je — bez mena nie je čo priradiť"}
                       style={hlavne(t.trim().length >= 3)}

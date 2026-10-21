@@ -68,6 +68,15 @@ export function nejednoznacneMena(
   return von;
 }
 
+/** Odstráni z názvu udalosti značku druhu tréningu (online/offline) ako celé slovo. */
+export function bezZnackyDruhu(nazov: string): string {
+  return (nazov || "")
+    .replace(/(^|[\s\-–—(,/])(on-?line|off-?line)(?=$|[\s\-–—),/])/giu, " ")
+    .replace(/[\s\-–—(),/]+$/u, "")
+    .replace(/^[\s\-–—(),/]+/u, "")
+    .trim();
+}
+
 /**
  * ISTÁ ZHODA: názov udalosti je CELÉ MENO práve jedného klienta (6. 10. 2026).
  *
@@ -79,7 +88,9 @@ export function nejednoznacneMena(
  * krstné meno, prezývka („Barborka") alebo preklep ostávajú na potvrdenie.
  */
 export function klientPodlaCelehoMena(nazov: string, menaKlientov: string[]): string | null {
-  const n = normName(nazov);
+  // Dovetok „online/offline“ (21. 10. 2026: „Veronika Stoklásková-online“ sa
+  // nikomu nepripísal a tréning sa nepočítal) nie je časť mena.
+  const n = normName(bezZnackyDruhu(nazov));
   if (n.split(" ").length < 2) return null;
   const zhody = [...new Set(menaKlientov.filter((m) => normName(m) === n))];
   return zhody.length === 1 ? zhody[0] : null;

@@ -56,4 +56,12 @@ describe("istá zhoda celého mena (6. 10. 2026)", () => {
   it("dvaja klienti s tým istým menom = nikto", () => {
     expect(klientPodlaCelehoMena("Jan Novak", ["Jan Novák", "Jan Novak"])).toBeNull();
   });
+  it("dovetok online/offline nie je časť mena (Veronika, 21. 10. 2026)", () => {
+    const k = [...klienti, "Veronika Stoklaskova"];
+    expect(klientPodlaCelehoMena("Veronika Stoklásková-online", k)).toBe("Veronika Stoklaskova");
+    expect(klientPodlaCelehoMena("Jarek Heinrich (online)", k)).toBe("Jarek Heinrich");
+    expect(klientPodlaCelehoMena("ONLINE - Marketa Lozias", k)).toBe("Marketa Lozias");
+    expect(klientPodlaCelehoMena("Jarek Heinrich offline", k)).toBe("Jarek Heinrich");
+    expect(klientPodlaCelehoMena("Veronika-online", k)).toBeNull();
+  });
 });
