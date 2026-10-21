@@ -107,6 +107,38 @@ je kde pozrieť).
          „Vybavené" pri notifikácii s možnosťami sa odteraz pýta ako
          (doplnenie / prepadnutie / presun) — 1. 10. holé vybavené nechalo
          Stoklasových hodiny bez rozhodnutia.
+       - [x] **21. 10. 2026 — peniaze**: poistka PTmindera len pre balíčky spred
+         1. 10.; poplatky PTmindera od 1. 10. dlh nerobia; rozpory → notifikácia
+         `ptrozpor|` (Veronika, Natália, Iva, Monika); barter Sofie nie je dlh.
+       - [ ] **Audit 21. 10. 2026 — čo ešte stojí na PTminderi** (Jerry: „sú ešte
+         nejaké veci, ktoré by mali byť, ale nie sú?"):
+         1. Os času berie predaje z PTmindera (`services`) aj po 1. 10. — Monikin
+            predaj 9. 10. stál ako „nezaplatený balíček", takže Kokpit nezaložil
+            vlastný a mala −2 h bez balíčka. Predaje PTmindera od 1. 10. na os nepúšťať.
+         2. Párovanie bankových platieb pozná mená len zo `sessions` PTmindera
+            (`api/platby.ts` ~226) — klient s prvým tréningom po 19. 10. sa
+            platbe nikdy nenavrhne. Brať aj kalendár a `balicky`.
+         3. Sofiin barter (App.tsx ~1029, compute.ts ~3169) číta len snímku
+            `packages` — nový balíček z Kokpitu Jarkov dlh nezníži.
+         4. Mesačný report „hodnota klienta / obnova" (App.tsx ~2571) sčíta
+            `data.payments` + `platbyKokpit` → od 10/2026 dvakrát.
+         5. 6M: začiatok (compute.ts ~753) zo `services`/platby 6 990, nie
+            z balíčka v Kokpite; príslušnosť (compute.ts ~203) z „S viazanostou"
+            navždy.
+         6. „Prečo neprišiel znova" (compute.ts ~4586) hľadá v `packages` pole,
+            ktoré tam nie je, a balíčky Kokpitu nevidí.
+         7. „Jedno meno, viac klientov" (api/kalendar.ts ~396) a „Bol tam, alebo
+            nie?" (~355, `NOT EXISTS FROM sessions` = vždy pravda) stoja na
+            `sessions` PTmindera.
+         8. Istota obnovy `serviceCount` (compute.ts ~372) zamrznutá.
+         9. Staré výzvy na nahratie exportov: rituals.ts ~100, karta „Balíček
+            dojde" („Podľa reportu z…"), krok „PTminder (kým beží súbežne)"
+            vo Workspace, register banka vs. tržby píše „PTminder".
+       - [ ] **Veronika: offline tréning počas online balíčka = samostatná 1 h
+         za 1 450 Kč** (Jerry 21. 10.). Os to už vie, keď 1h balíček existuje;
+         automatický balíček ho pri offline tréningu nezaloží — offline zje
+         hodinu z ON. Prísne podľa druhu len pre vybraných klientov (Lucia
+         Podolová má ON a tréningy vedené ako offline).
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
