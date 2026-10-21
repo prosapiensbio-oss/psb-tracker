@@ -27,6 +27,8 @@
  * DMARC `p=none` a obrázkový mail je pre spamový filter horší.
  */
 import { vokativ } from "./oslovenie";
+import type { PolozkaPlatby } from "./platiZa";
+
 
 
 /** Farby značky. Tmavá zelená je pozadie, svetlá je platba. */
@@ -93,6 +95,16 @@ export type BodOsi = {
   prevzateDni?: string[];
 };
 
+/**
+ * Rozpis spoločnej platby jednou vetou — „za tebe 7 401 Kč, za Annu
+ * Kadličkovou 7 401 Kč". Pri jednej položke je prázdny.
+ */
+function rozpisTextom(v: VypisKlienta): string {
+  const p = v.platba?.polozky || [];
+  if (p.length < 2) return "";
+  return `\n(${p.map((x) => `${x.ja ? "za tebe" : x.klient} ${czk(x.suma)}`).join(", ")})`;
+}
+
 export type VypisKlienta = {
   klient: string;
   /** Oslovenie — krstné meno. */
@@ -120,6 +132,12 @@ export type VypisKlienta = {
    */
   platba?: {
     popis: string; suma: number; ucet: string; sprava: string;
+    /**
+     * Rozpis — za koho koľko. Pri bežnej platbe je položka jedna; keď klient
+     * platí aj za niekoho druhého (`client_overrides.plati_za`), je ich viac
+     * a suma je ich súčet. Viď `lib/psb/platiZa.ts`.
+     */
+    polozky?: PolozkaPlatby[];
     /** Koľko hodín sa z nového balíčka hneď odpíše (tréningy nad rámec). */
     odpocet?: number;
     /**
@@ -130,6 +148,11 @@ export type VypisKlienta = {
      */
     novy?: boolean;
   };
+  /**
+   * Za koho platí niekto iný — jeho meno. Vtedy sa platobný blok ani QR
+   * nekreslia (zaplatiť dvakrát sa nedá vrátiť), len sa to povie.
+   */
+  platiZaNeho?: string;
   /**
    * Platba BITCOINOM namiesto prevodu na účet.
    *
@@ -363,7 +386,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     "",
     ...staty.map(([cislo, popis]) => `${popis}: ${cislo}`),
     v.platba
-      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}`
+      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}${rozpisTextom(v)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}`
       : null,
     v.uplna ? null : `\nChceš celú históriu tréningov a platieb? Napíš na ${ADRESA_HISTORIE}.`,
     "",
@@ -454,6 +477,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       <tr>
         <td style="padding:20px 22px;font-size:14px;color:${F.platbaText};line-height:1.7">
           ${esc(v.platba.popis)}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
+          ${esc(rozpisTextom(v).trim())}${rozpisTextom(v) ? "<br>" : ""}
           <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>do poznámky: ${esc(v.platba.sprava)}</span>
         </td>
         ${v.qrCid || v.qrUrl ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">

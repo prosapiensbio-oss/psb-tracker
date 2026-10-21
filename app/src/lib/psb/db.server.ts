@@ -7,6 +7,7 @@ import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
+import { zapisPlatiZa } from "./platiZa";
 import { dlhyKlientov, bezHodinZDlhov } from "./zaplatene";
 import { jeUkonceny } from "./ukoncenieBalicka";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
@@ -285,6 +286,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       primaryTrainer: r.primary_trainer,
       bitcoin: !!r.bitcoin,
       btcZlava: r.btc_zlava == null ? null : Number(r.btc_zlava),
+      platiZa: String(r.plati_za || ""),
       duch: String(r.duch || ""),
       zdroj: String(r.zdroj || ""),
       zdrojKto: String(r.zdroj_kto || ""),
@@ -1062,6 +1064,7 @@ export async function setOverride(
     primaryTrainer: "primary_trainer",
     bitcoin: "bitcoin",
     btcZlava: "btc_zlava",
+    platiZa: "plati_za",
     duch: "duch",
     zdroj: "zdroj",
     zdrojKto: "zdroj_kto",
@@ -1080,6 +1083,8 @@ export async function setOverride(
   if ((col === "status" || col === "primary_trainer") && (value === "" || value == null)) v = null;
   // Zľava je číslo 0–100; prázdno znamená „žiadna dohoda", nie nulu.
   if (col === "btc_zlava") v = value === "" || value == null ? null : Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+  // „Platí za" príde z obrazovky ako pole mien; v stĺpci je jeden reťazec.
+  if (col === "plati_za") v = zapisPlatiZa(value);
 
   const r = await DB.prepare(
     `INSERT INTO client_overrides (name, ${col}, updated_at) VALUES (?1, ?2, ?3)

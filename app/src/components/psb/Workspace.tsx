@@ -37,6 +37,7 @@ import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
+import { platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
@@ -336,8 +337,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     const treneri: Record<string, string> = {};
     for (const [meno, c] of Object.entries(clients)) treneri[meno] = c.primaryTrainer || "";
     // Jedno pravidlo „zaplatený" — dlžníci sú len zoskupený `data.dlhy`.
-    return spocitajDlznikov(data.dlhy, treneri);
-  }, [data.dlhy, clients]);
+    return spocitajDlznikov(data.dlhy, treneri, undefined, platiteliaZOverridov(data.clientOverrides));
+  }, [data.dlhy, data.clientOverrides, clients]);
 
   const nacitajAnamnezy = useCallback(async () => {
     const r = await fetch("/api/anamneza?zoznam=1", { credentials: "same-origin" })
@@ -1500,6 +1501,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         ? `${den(x.polozky[0].datum)} ${x.polozky[0].popis.slice(0, 40)}${x.polozky.length > 1 ? ` (+${x.polozky.length - 1})` : ""}`
                         : "nezaplatený balíček z Kokpitu"}
                       {x.zBalickov > 0 && x.zPoplatkov > 0 ? ` · z toho ${kc(x.zBalickov)} za balíčky` : ""}
+                      {/* Za koho platí niekto iný, toho netreba zháňať — QR mu
+                          chodí v odkaze platiteľa (Jerry, 21. 10. 2026). */}
+                      {x.platiZaNeho ? <span style={{ color: C.accent, fontWeight: 600 }}> · platí {x.platiZaNeho}</span> : null}
                     </div>
                     <div style={{ fontSize: 11.5, color: x.dni > 30 ? C.orange : C.textDim, minWidth: 80, textAlign: "right" }}>
                       {x.dni >= 0 ? `${x.dni} dní` : ""}

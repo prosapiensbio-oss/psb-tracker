@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { menaPlatiZa, zapisPlatiZa } from "../../lib/psb/platiZa";
 
 // Zmazanie jedného klienta zo všetkých tabuliek.
 //
@@ -108,12 +109,21 @@ export const Route = createFileRoute("/api/client-delete")({
           .map((k) => ({ id: k.id, zoznam: String(k.klient || "").split(",").map((x) => x.trim()).filter(Boolean) }))
           .filter((k) => k.zoznam.includes(name));
 
+        // Kto zaňho platil (`plati_za`), má ho v zozname mien — zmazaný
+        // klient tam ostať nesmie, inak by platiteľov odkaz `/v/` počítal
+        // dlh človeka, ktorý v appke už nie je.
+        const platiaR = await DB.prepare("SELECT name, plati_za FROM client_overrides WHERE plati_za LIKE ?1")
+          .bind(`%${name}%`).all<{ name: string; plati_za: string }>().catch(() => null);
+        const platia = ((platiaR?.results) || []).filter((x) => menaPlatiZa(x.plati_za).includes(name));
+
         const teraz = new Date().toISOString();
         const prikazy = [
           ...MAZAT.map(([t, c]) => DB.prepare(`DELETE FROM ${t} WHERE ${c} = ?1`).bind(name)),
           ...ZRUSIT.map(([t, c]) => DB.prepare(`UPDATE ${t} SET zrusene_at = ?2 WHERE ${c} = ?1 AND zrusene_at IS NULL`).bind(name, teraz)),
           ...kontakty.map((k) => DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2 WHERE id = ?1")
             .bind(k.id, k.zoznam.filter((x) => x !== name).join(", "))),
+          ...platia.map((p) => DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
+            .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).filter((x) => x !== name)))),
         ];
 
         /**

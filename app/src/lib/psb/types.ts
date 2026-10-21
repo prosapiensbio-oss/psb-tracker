@@ -120,6 +120,14 @@ export type ClientOverride = {
    * a 20 % kamarátska), preto je to číslo pri klientovi, nie pravidlo z kódu.
    */
   btcZlava?: number | null;
+  /**
+   * Za koho tento klient platí — mená oddelené zvislicou.
+   *
+   * Jerry, 21. 10. 2026: Jakub Kaňovský platí jednou bitcoinovou platbou aj
+   * za Annu Kadličkovú. Odkaz `/v/` tak pýta súčet oboch dlhov a prijatá
+   * platba sa rozdelí na dve. Viď `lib/psb/platiZa.ts`.
+   */
+  platiZa?: string;
   /** Odpoveď na otázku „je duch?" — "" = nepýtané, "ano", "nie". */
   duch?: string;
   /** Odkiaľ sa o nás dozvedel — pevný zoznam, viď ZDROJE. */

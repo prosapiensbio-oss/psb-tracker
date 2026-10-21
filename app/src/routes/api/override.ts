@@ -17,6 +17,7 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "primaryTrainer",
   "bitcoin",
   "btcZlava",
+  "platiZa",
   "duch",
   "zdroj",
   "zdrojKto",

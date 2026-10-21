@@ -27,6 +27,7 @@ import { historiaPreMail } from "./historiaMail";
 import type { VypisKlienta } from "./mailKlientovi";
 import { nazovProduktu } from "./nazvyProduktov";
 import { osKlientaZoServera } from "./osKlienta.server";
+import { menaPlatiZa, platiteliaZOverridov, type PolozkaPlatby } from "./platiZa";
 import { DODAVATEL } from "./vydanaFaktura";
 import type { PSBData } from "./types";
 
@@ -96,6 +97,32 @@ export async function obsahOdkazu(
   // Jedno pravidlo „zaplatený" — dlh je súčet položiek klienta v `data.dlhy`.
   const dlh = dlhJednehoKlienta(data.dlhy, c.name);
 
+  /**
+   * ZA KOHO EŠTE PLATÍ (Jerry, 21. 10. 2026: Jakub Kaňovský platí aj za Annu
+   * Kadličkovú). Berie sa dlh každého z nich tou istou funkciou ako vlastný —
+   * jedno pravidlo „zaplatený" platí aj tu. Kto práve nič nedlží, v rozpise
+   * nie je: suma na stránke je to, čo sa má teraz poslať.
+   */
+  const zaKoho = menaPlatiZa(data.clientOverrides?.[c.name]?.platiZa)
+    .map((m) => {
+      const kanon = Object.keys(data.clientOverrides || {}).find((x) => normName(x) === normName(m)) || m;
+      const d = dlhJednehoKlienta(data.dlhy, kanon);
+      const polozky = (data.dlhy || []).filter((x) => normName(x.klient) === normName(kanon));
+      return { klient: kanon, dlzi: d.dlzi, nazov: polozky.length === 1 ? polozky[0].nazov : d.popis };
+    })
+    .filter((x) => x.dlzi > 0);
+
+  /**
+   * A NAOPAK: KOMU PLATÍ NIEKTO INÝ, TOMU SA QR NEKRESLÍ.
+   *
+   * Anna má svoj odkaz na hodiny rovnako ako ktokoľvek iný, ale platbu za ňu
+   * posiela Jakub. QR na tú istú sumu na oboch stránkach je návod zaplatiť
+   * dvakrát — a späť sa to vracia horšie, než sa to vybralo.
+   */
+  const zaNehoPlati = platiteliaZOverridov(data.clientOverrides)[
+    Object.keys(data.clientOverrides || {}).find((x) => normName(x) === normName(c.name)) || c.name
+  ];
+
   const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
 
   /**
@@ -126,14 +153,33 @@ export async function obsahOdkazu(
     .filter((b) => !b.zrusene_at && (b.cena_czk || 0) > 0)
     .sort((a, b) => b.platnost_od.localeCompare(a.platnost_od))[0];
   const nadramec = (vypis.zostatok ?? 1) <= 0;
-  const suma = !sPlatbou ? 0 : dlh.dlzi > 0 ? dlh.dlzi : (nadramec ? Math.round(poslednyBal?.cena_czk || 0) : 0);
+  const vlastna = !sPlatbou || zaNehoPlati ? 0 : dlh.dlzi > 0 ? dlh.dlzi : (nadramec ? Math.round(poslednyBal?.cena_czk || 0) : 0);
+  const vlastnyNazov = dlh.dlzi > 0
+    ? ((data.dlhy || []).filter((x) => normName(x.klient) === normName(c.name))[0]?.nazov || dlh.popis)
+    : (poslednyBal?.nazov || "");
+  /**
+   * ROZPIS — aj keď je položka jedna. Stránka a faktúra tak majú jednu cestu
+   * a nemôže sa stať, že spoločná platba ide inou vetvou než bežná.
+   */
+  const polozky: PolozkaPlatby[] = [];
+  if (vlastna > 0) polozky.push({ klient: c.name, suma: vlastna, nazov: vlastnyNazov, ja: true });
+  if (sPlatbou && !zaNehoPlati) for (const z of zaKoho) polozky.push({ klient: z.klient, suma: z.dlzi, nazov: z.nazov, ja: false });
+  const suma = polozky.reduce((a, p) => a + p.suma, 0);
+  if (sPlatbou && zaNehoPlati) vypis.platiZaNeho = zaNehoPlati;
   if (suma > 0) {
+    const vlastnyPopis = vlastna > 0
+      ? (dlh.dlzi > 0 ? popisPoplatku(dlh.popis) : nazovProduktu(poslednyBal?.nazov || "") || "Nový balíček")
+      : "";
     vypis.platba = {
-      popis: dlh.dlzi > 0 ? popisPoplatku(dlh.popis) : nazovProduktu(poslednyBal?.nazov || "") || "Nový balíček",
+      // Keď platiteľ sám nič nedlží, popis hovorí, za koho to je — inak by
+      // stránka pýtala sumu bez dôvodu.
+      // Dvojbodka namiesto predložky — meno sa neskloňuje (viď rozpis).
+      popis: vlastnyPopis || `za: ${zaKoho.map((z) => z.klient).join(", ")}`,
       suma, ucet: DODAVATEL.ucet, sprava: c.name,
+      polozky,
       // Koľko hodín mu po zaplatení naozaj zostane.
-      odpocet: dlh.dlzi > 0 ? 0 : Math.max(0, -(vypis.zostatok ?? 0)),
-      novy: dlh.dlzi === 0,
+      odpocet: dlh.dlzi > 0 || vlastna === 0 ? 0 : Math.max(0, -(vypis.zostatok ?? 0)),
+      novy: vlastna > 0 && dlh.dlzi === 0,
     };
   }
 

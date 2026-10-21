@@ -1041,10 +1041,13 @@ export function buildAiContext(
         return {
           klient: d.meno, trener: d.trener, spoluCzk: d.spolu,
           zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
+          // Za koho platí niekto iný, toho appka nemá zháňať — QR mu chodí
+          // v odkaze platiteľa (Jerry, 21. 10. 2026).
+          ...(d.platiZaNeho ? { zaNehoPlati: d.platiZaNeho } : {}),
           ...(bitcoin ? { platiBitcoinom: true, btcZlavaPct: Number(data.clientOverrides?.[d.meno]?.btcZlava) || 0, poslednePlatbyZBtcKnihy: btcPlatby } : {}),
         };
       }),
-      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto. Pri klientovi s platiBitcoinom NEHĽADAJ platbu vo Fio: platí cez Lightning, jeho platby sú v BTC knihe (Bitcoin appka) — poslednePlatbyZBtcKnihy sú tri najnovšie odtiaľ (czkVtedy = koruny podľa kurzu v deň platby). Platba z BTC knihy sa do Kokpitu prevezme sama a ak je do 10 % od ceny balíčka, dlh zmaže; keď v knihe platba je, ale dlh ostal, povedz to nahlas (napr. iný deň alebo meno sa nespárovalo).",
+      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto. Pri klientovi s platiBitcoinom NEHĽADAJ platbu vo Fio: platí cez Lightning, jeho platby sú v BTC knihe (Bitcoin appka) — poslednePlatbyZBtcKnihy sú tri najnovšie odtiaľ (czkVtedy = koruny podľa kurzu v deň platby). Platba z BTC knihy sa do Kokpitu prevezme sama a ak je do 10 % od ceny balíčka, dlh zmaže; keď v knihe platba je, ale dlh ostal, povedz to nahlas (napr. iný deň alebo meno sa nespárovalo). Keď má dlžník `zaNehoPlati`, platí zaňho ten druhý (client_overrides.plati_za) — výzvu posielaj platiteľovi, nie jemu; v jeho odkaze /v/ je QR na súčet oboch dlhov a prijatá platba sa rozdelí späť na dve.",
     },
     platnostAHodiny: {
       pocet: (fronty?.platnost || []).length,

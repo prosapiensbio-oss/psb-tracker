@@ -408,13 +408,26 @@ const dniMedzi = (a: string, b: string) =>
  * nie z ručného zoznamu: Dan Kouřil a Monika Schonwalderova sa tak stali
  * dvojicou 3. 4. 2026, keď Jerry rozdelil prvý spoločný prevod.
  */
-export function spolocniPlatitelia(platby: Platba[]): Map<string, Set<string>> {
+export function spolocniPlatitelia(
+  platby: Platba[],
+  /**
+   * Dvojice zapísané rukou (`client_overrides.plati_za`, 21. 10. 2026).
+   * Odvodenie z histórie pozná len to, čo sa už raz rozdelilo — prvý spoločný
+   * prevod novej dvojice by tak zostal bez návrhu. Keď to Jerry povie dopredu,
+   * sedí hneď napoprvé.
+   */
+  zapisane: { platitel: string; za: string[] }[] = [],
+): Map<string, Set<string>> {
   const poPohybe = new Map<string, Set<string>>();
   for (const p of platby) {
     if (p.zruseneAt || !p.fioId) continue;
     const s = poPohybe.get(p.fioId) || new Set<string>();
     s.add(p.klient);
     poPohybe.set(p.fioId, s);
+  }
+  for (const d of zapisane) {
+    const mena = [d.platitel, ...d.za].filter(Boolean);
+    if (mena.length > 1) poPohybe.set(`zapis:${normName(d.platitel)}`, new Set(mena));
   }
   const out = new Map<string, Set<string>>();
   for (const s of poPohybe.values()) {
@@ -617,9 +630,11 @@ export function nepriradene(
   firmy: FirmaKlienta[] = [],
   /** Ceny balíčkov — na rozdelenie spoločného prevodu, keď PTminder mlčí. */
   ceny: CenaBalicka[] = [],
+  /** Kto platí za koho podľa zápisu pri klientovi (`plati_za`). */
+  dvojice: { platitel: string; za: string[] }[] = [],
 ): NepriradenaPlatba[] {
   const uz = new Set(platby.filter((p) => !p.zruseneAt && p.fioId).map((p) => p.fioId as string));
-  const spolocni = spolocniPlatitelia(platby);
+  const spolocni = spolocniPlatitelia(platby, dvojice);
   // Platba z PTmindera, ktorú už vysvetľuje priradený pohyb, nesmie byť
   // kandidátom pre druhý — viď `volnePtPlatby`.
   const volne = volnePtPlatby(ptPlatby, platby);

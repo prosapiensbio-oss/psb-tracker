@@ -3125,3 +3125,35 @@ server, push, /v/ a automatické balíčky idú vždy podľa konštanty).
 Overenie: snímka všetkých klientov nad kópiou ostrej DB, `deriveClients(data,
 { bezZalohyPtmindera })` vypnuté = zhodné s HEAD, zapnuté = zmena len tam,
 kde zostatok stál na exporte.
+
+## Jeden človek platí za viacerých — zápis, nie dedukcia (21. 10. 2026)
+
+Jerry: „Jakub Kaňovský platí aj za Kadličkovú v BTC — ako vyriešime túto
+platbu, aby som mu poslal odkaz s QR?" Dvojice appka dovtedy poznala len
+SPÄTNE (`spolocniPlatitelia` ich odvodzuje z už rozdelených pohybov). To
+stačí na zaradenie platby, ktorá prišla; nestačí na QR, ktoré ide klientovi
+PRED ňou, a už vôbec nie na lightningovú faktúru — tá znie na presnú sumu
+a musí sedieť napoprvé.
+
+`client_overrides.plati_za` (migrácia 0124, mená oddelené zvislicou),
+pravidlá v `lib/psb/platiZa.ts`. Nastavuje sa v profile klienta → Peniaze.
+
+- **Zľava je per človek, nie per platba.** Každá položka rozpisu sa počíta
+  z CENNÍKA a zo zľavy TOHO klienta, za ktorého je (`czkZaPolozky`). Knapčok
+  má 30 %, ostatní 5 % — jedna zľava na celok by bola zle. Dve rôzne zľavy
+  sa na stránku nepíšu vôbec.
+- **Súčet musí sedieť, inak sa platba NEDELÍ.** Keď Jakub pošle 7 401 a
+  čakalo sa 14 802, zaplatil za seba — roztrhnúť to by bola zle priradená
+  platba, a tá je horšia než nepriradená. Pri platiteľovi sa do očakávanej
+  sumy počíta aj ponuka nového balíčka (dočerpaný balíček, nový vzniká až
+  prvým tréningom) — bez toho sa dvojica rozpadne presne v ten deň.
+- **Komu platí niekto iný, tomu sa QR NEKRESLÍ** (`blokPlatiZaNeho`) — dve
+  QR na tú istú sumu je návod zaplatiť dvakrát. Mlčať sa ale nedá: v nadpise
+  stojí „Nezaplaceno 1 h", tak stránka povie, kto to platí.
+- **Mená sa neskloňujú.** V rozpise stojí „za tebe" a HOLÉ MENO, nie „za Annu
+  Kadličkovou" — `oslovenie.ts` zvláda len 5. pád a krivý tvar na stránke pre
+  klienta je horší než zoznam bez predložky.
+- **Stĺpec, ktorý nesie mená INÝCH klientov, patrí do `premenuj.ts` aj
+  `client-delete.ts`** — nie ako `WHERE name = ?`, ale ako položka zoznamu
+  (rovnako ako `fakturacne_kontakty.klient`). Bez toho by premenovanie ticho
+  zmenšilo sumu v platiteľovom odkaze a nikto by si to nevšimol.

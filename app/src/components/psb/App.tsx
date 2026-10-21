@@ -66,6 +66,7 @@ import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov } from "../../lib/psb/dlznici";
+import { platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { zostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby`, ktoré kŕmia fronty Workspace. */
@@ -2860,7 +2861,7 @@ function skupinaFaktur(
         (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
       ),
       // Jedno pravidlo „zaplatený" — dlžníci sú len zoskupený `data.dlhy`.
-      dlznici: spocitajDlznikov(data.dlhy, treneri),
+      dlznici: spocitajDlznikov(data.dlhy, treneri, undefined, platiteliaZOverridov(data.clientOverrides)),
     };
   }, [clients, balickyRiadky, data, kalUdalosti]);
 

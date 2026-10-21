@@ -14,7 +14,8 @@ import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
-import { casKurzu, cenaPoZlave, katalogovaCena, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import { czkZaPolozky } from "../lib/psb/platiZa";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -161,12 +162,15 @@ export const Route = createFileRoute("/v/$token")({
            * naozaj zaplatil — teda už po zľave (Gažo 20 092,50 = 21 150 − 5 %).
            * Odpočítať z toho znova by znamenalo zľavu dvakrát.
            */
-          const zlavaKlienta = Number(prepis?.btcZlava) || 0;
-          const katalog = vypis.platba ? katalogovaCena(vypis.platba.popis) : null;
-          const plna = katalog ?? suma;
-          // Bez katalógovej ceny sa zľava neuplatňuje — nevedno, či v sume už nie je.
-          const zlava = katalog ? zlavaKlienta : 0;
-          const czk = cenaPoZlave(plna, zlava);
+          /**
+           * Rozpis sa počíta POLOŽKA PO POLOŽKE a zľavou TOHO klienta, za
+           * ktorého položka je (Jerry, 21. 10. 2026: Jakub platí aj za Annu;
+           * Knapčok má 30 %, ostatní 5 % — jedna zľava na celok by bola zle).
+           */
+          const polozky = vypis.platba?.polozky
+            || (vypis.platba ? [{ klient: c.name, suma, nazov: vypis.platba.popis, ja: true }] : []);
+          const zlavaKlienta = (meno: string) => Number(data.clientOverrides?.[meno]?.btcZlava) || 0;
+          const { czk, plna, zlava } = czkZaPolozky(polozky, zlavaKlienta);
           // „Aktualizovat kurz" (?kurz=1) chce kurz najviac minútu starý.
           const obnovKurz = new URL(request.url).searchParams.get("kurz") === "1";
           const kurz = await kurzBtc(DB, Date.now(), obnovKurz ? 60_000 : undefined).catch(() => null);

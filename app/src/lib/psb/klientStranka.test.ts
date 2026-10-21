@@ -451,3 +451,50 @@ describe("os ukáže začiatok a zvyšok schová", () => {
     expect(h).not.toContain("…a dalších");
   });
 });
+
+describe("spoločná platba na stránke", () => {
+  // Jerry, 21. 10. 2026: „Jakub Kaňovský platí aj za Kadličkovú v BTC."
+  // Jedna suma bez vysvetlenia by na stránke vyzerala ako chyba — klient
+  // pozná cenu svojho balíčka a videl by dvojnásobok.
+  const spolu: VypisKlienta = {
+    ...zaklad,
+    klient: "Jakub Kaňovský", oslovenie: "Jakub", trener: "Jerry", zostatok: 0,
+    platba: {
+      popis: "6h Balíček", suma: 14802, ucet: "123/456", sprava: "Jakub Kaňovský", novy: true,
+      polozky: [
+        { klient: "Jakub Kaňovský", suma: 7401, nazov: "6h Balíček", ja: true },
+        { klient: "Anna Kadličkova", suma: 7401, nazov: "6h Balíček", ja: false },
+      ],
+    },
+  };
+
+  it("rozpis stojí pri sume — za seba aj za druhého", () => {
+    const h = klientStranka(spolu);
+    expect(h).toContain("za tebe");
+    expect(h).toContain("Anna Kadličkova");
+    expect(h).toContain("14 802 Kč");
+  });
+
+  it("pri jednej položke sa rozpis nekreslí", () => {
+    const h = klientStranka({ ...spolu, platba: { ...spolu.platba!, suma: 7401, polozky: [spolu.platba!.polozky![0]] } });
+    expect(h).not.toContain("za tebe");
+  });
+
+  it("rovnaký rozpis dostane aj bitcoinový blok", () => {
+    const h = klientStranka({
+      ...spolu,
+      lightning: { sats: "321 783", czk: 14802, plnaCena: 15580, zlava: 5, kurz: "2 300 000", kurzKedy: "17:00", adresa: "x@blink.sv" },
+    });
+    expect(h).toContain("Anna Kadličkova");
+    expect(h).toContain("sleva 5 % z 15 580 Kč");
+  });
+});
+
+describe("za koho platí niekto iný", () => {
+  it("namiesto QR stojí veta, kto to platí", () => {
+    const h = klientStranka({ ...zaklad, zostatok: -1, platiZaNeho: "Jakub Kaňovský" });
+    expect(h).toContain("Balíček za tebe platí");
+    expect(h).toContain("Jakub Kaňovský");
+    expect(h).not.toContain("Načti QR");
+  });
+});

@@ -13,6 +13,7 @@ import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
 import { btcNaPlatby, mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
 import { najdiKlienta } from "../../lib/psb/compute";
 
 /**
@@ -223,12 +224,25 @@ function fakturyKokpitu(faktury: FakturaRiadok[], polozky: PolozkaRiadok[]): Fak
  * Vtedy nepatrí ničomu, čo už existuje, a čaká na balíček, ktorý príde.
  */
 async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
+  return ((await dlhyMien(DB, [klient])).get(normName(klient)) || 0) === 0;
+}
+
+/**
+ * KOĽKO KTO DLŽÍ — pre zopár mien naraz, tým istým pravidlom ako `loadData`.
+ *
+ * Volá to príznak „vopred" pri zápise platby a rozdelenie bitcoinovej platby
+ * medzi ľudí, za ktorých prišla (`plati_za`). Jedno čítanie pre všetky mená:
+ * tabuľky sú malé, ale štyri dopyty na každého klienta v dávke by neboli.
+ */
+async function dlhyMien(DB: D1Database, mena: string[]): Promise<Map<string, number>> {
   // Jedno pravidlo „zaplatený" (`dlhyKlientov`, 5. 10. 2026) — to isté, čo
   // počíta `loadData`, aj s poistkou z PTmindera a bez zdvojeného predaja.
   // Dovtedy tu bola vlastná kópia bez nich a platbu klienta, ktorého
   // PTminder vedie ako zaplateného, neoznačila ako vopred.
-  const k = normName(klient);
-  // Len riadky tohto klienta (LIKE na prvé písmeno priezviska by bolo krehké;
+  const kluce = new Set(mena.map((m) => normName(m)).filter(Boolean));
+  const out = new Map<string, number>();
+  if (!kluce.size) return out;
+  // Len riadky týchto klientov (LIKE na prvé písmeno priezviska by bolo krehké;
   // tabuľky sú malé). História môže chýbať (pred migráciou 0095) — vtedy
   // poistka beží bez nej; ide súbežne, nech platba nečaká na dve kolá.
   const [[bal, pl, pop, ptp], hist] = await Promise.all([
@@ -245,7 +259,7 @@ async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
   type O = { id: string; datum: string; client_name: string; popis: string; suma_czk: number };
   type T = { client_name: string; date: string; amount_czk: number };
   type H = { klient: string; od: string | null };
-  const moje = <X,>(xs: X[], meno: (x: X) => string) => xs.filter((x) => normName(meno(x)) === k);
+  const moje = <X,>(xs: X[], meno: (x: X) => string) => xs.filter((x) => kluce.has(normName(meno(x))));
   const { polozky } = dlhyKlientov({
     poplatky: moje((pop.results || []) as unknown as O[], (x) => x.client_name)
       .map((p) => ({ id: p.id, klient: p.client_name, datum: p.datum, popis: p.popis || "", suma: Number(p.suma_czk) || 0 })),
@@ -258,7 +272,13 @@ async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
     ptHistoria: moje((hist.results || []) as unknown as H[], (x) => x.klient)
       .map((h) => ({ klient: h.klient, od: String(h.od || "").slice(0, 10) })),
   });
-  return polozky.length === 0;
+  for (const k of kluce) out.set(k, 0);
+  for (const x of polozky) {
+    const k = normName(x.klient);
+    if (kluce.has(k)) out.set(k, (out.get(k) || 0) + x.doplatit);
+  }
+  for (const [k, v] of out) out.set(k, Math.max(0, Math.round(v)));
+  return out;
 }
 
 /**
@@ -431,6 +451,8 @@ async function stavPlatieb(DB: D1Database) {
     ), ...zIdokladu],
     ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
     (ceny.results || []) as unknown as CenaBalicka[],
+    (((await DB.prepare("SELECT name, plati_za FROM client_overrides WHERE plati_za IS NOT NULL AND plati_za <> ''").all<{ name: string; plati_za: string }>().catch(() => null))?.results) || [])
+      .map((r) => ({ platitel: r.name, za: menaPlatiZa(r.plati_za) })),
   );
   const celkomNepriradenych = vsetkyNepriradene.length;
   const btcNes = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'btc_nesparovane'").first().catch(() => null);
@@ -787,14 +809,54 @@ export const Route = createFileRoute("/api/platby")({
           ]);
           const mena = [...new Set([...(s1.results || []), ...(s2.results || [])].map((x) => String((x as { m: string }).m || "")).filter(Boolean))];
           const { zapisat, nesparovane } = btcNaPlatby(kniha, (m) => najdiKlienta(mena, m) || null, `${od}-01`);
-          let nove = 0;
-          for (const z of zapisat) {
-            const r = await DB.prepare(
-              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'bitcoin',?,?,?,?,?)",
-            ).bind(uid(), z.klient, z.datum, z.suma, z.kluc, `z BTC knihy${z.sats ? ` · ${z.sats.toLocaleString("sk-SK")} sats` : ""}`, teraz(), "btc-kniha", (await jeVopred(DB, z.klient)) ? 1 : 0).run();
-            nove += r.meta?.changes || 0;
+          /**
+           * JEDEN PLATÍ ZA VIACERÝCH (Jerry, 21. 10. 2026: Jakub Kaňovský
+           * platí aj za Annu Kadličkovú). V knihe stojí jedno meno a jedna
+           * suma — zapísať ju celú platiteľovi by znamenalo, že jemu platba
+           * prebýva a druhému chýba. Delí sa podľa toho, koľko kto dlží, a
+           * len keď sa suma od ich súčtu nelíši o viac než desatinu (kurz).
+           */
+          const dvojice = new Map<string, string[]>();
+          for (const r of ((await DB.prepare("SELECT name, plati_za FROM client_overrides WHERE plati_za IS NOT NULL AND plati_za <> ''").all<{ name: string; plati_za: string }>().catch(() => null))?.results) || []) {
+            const za = menaPlatiZa(r.plati_za).map((m) => najdiKlienta(mena, m) || m);
+            if (za.length) dvojice.set(normName(r.name), za);
           }
-          if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
+          let nove = 0;
+          let rozdelenych = 0;
+          for (const z of zapisat) {
+            const za = dvojice.get(normName(z.klient)) || [];
+            let diely: { klient: string; suma: number }[] = [{ klient: z.klient, suma: z.suma }];
+            if (za.length) {
+              const dlhy = await dlhyMien(DB, [z.klient, ...za]);
+              /**
+               * Pri PLATITEĽOVI sa počíta aj ponuka nového balíčka — jeho
+               * stránka ju pýta vtedy, keď dočerpal a nový mu ešte nevznikol
+               * (vzniká až prvým tréningom). Bez toho by sa dvojica rozpadla
+               * presne v ten deň. Pri ostatných sa nič nedomýšľa: kto
+               * nedlží, v rozdelení nie je.
+               */
+              let ocakavaneOdNeho = dlhy.get(normName(z.klient)) || 0;
+              if (!ocakavaneOdNeho) {
+                const b = await DB.prepare(
+                  "SELECT cena_czk c FROM balicky WHERE klient = ?1 AND zrusene_at IS NULL AND cena_czk > 0 ORDER BY platnost_od DESC LIMIT 1",
+                ).bind(z.klient).first<{ c: number }>().catch(() => null);
+                ocakavaneOdNeho = Math.round(Number(b?.c) || 0);
+              }
+              const r = rozdelPodlaDlhov(z.suma, [
+                { klient: z.klient, dlzi: ocakavaneOdNeho },
+                ...za.map((m) => ({ klient: m, dlzi: dlhy.get(normName(m)) || 0 })),
+              ]);
+              if (r) { diely = r; rozdelenych += 1; }
+            }
+            for (const d of diely) {
+              const popis = `z BTC knihy${z.sats ? ` · ${z.sats.toLocaleString("sk-SK")} sats` : ""}${diely.length > 1 ? ` · spoločná platba (${z.klient})` : ""}`;
+              const r = await DB.prepare(
+                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'bitcoin',?,?,?,?,?)",
+              ).bind(uid(), d.klient, z.datum, d.suma, z.kluc, popis, teraz(), "btc-kniha", (await jeVopred(DB, d.klient)) ? 1 : 0).run();
+              nove += r.meta?.changes || 0;
+            }
+          }
+          if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy${rozdelenych ? ` · ${rozdelenych} rozdelená` : ""}`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
           // Nespoznané mená sa ODLOŽIA — inak by ticho chýbali v tržbách a
           // nikto by sa to nedozvedel. Karta Platieb ich ukáže (GET).
           await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('btc_nesparovane',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")

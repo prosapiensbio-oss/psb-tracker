@@ -199,6 +199,43 @@ function tlacidloKurzu(farba: string): string {
 <div style="margin-top:6px;font-size:12px;line-height:1.5;color:#4d5940">Přepočítá satoshi podle aktuálního kurzu a vytvoří novou fakturu. Korunová částka zůstává stejná.</div>`;
 }
 
+/**
+ * ROZPIS SPOLOČNEJ PLATBY — za koho koľko.
+ *
+ * Jerry, 21. 10. 2026: Jakub platí jednou platbou aj za Annu. Jedna suma bez
+ * vysvetlenia by na stránke vyzerala ako chyba — klient pozná cenu svojho
+ * balíčka a tu by videl dvojnásobok. Pri jednej položke sa nekreslí nič.
+ */
+function rozpisPlatby(v: VypisKlienta): string {
+  const p = v.platba?.polozky || [];
+  if (p.length < 2) return "";
+  const s = SADZBA;
+  const riadky = p
+    // Pri druhom človeku stojí HOLÉ MENO, nie „za Annu Kadličkovou" —
+    // appka mená skloňovať nevie (`oslovenie.ts` zvláda len 5. pád) a krivý
+    // tvar na stránke pre klienta je horší než zoznam bez predložky.
+    .map((x) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0"><span>${esc(x.ja ? "za tebe" : x.klient)}</span><b>${esc(kc(x.suma))}</b></div>`)
+    .join("\n");
+  return `<div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.45);font-size:13.5px;line-height:1.5;color:${s.pozadie};text-align:left">
+${riadky}
+</div>`;
+}
+
+/**
+ * KOMU PLATÍ NIEKTO INÝ, TOMU SA QR NEKRESLÍ — ALE DOZVIE SA PREČO.
+ *
+ * Jerry, 21. 10. 2026: Jakub platí aj za Annu. QR na tú istú sumu na oboch
+ * stránkach je návod zaplatiť dvakrát. Mlčať sa ale tiež nedá: v nadpise
+ * stojí „Nezaplaceno 1 h" a klient by nevedel, čo s tým má robiť.
+ */
+function blokPlatiZaNeho(kto: string): string {
+  const s = SADZBA;
+  return `<div id="platba" style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:18px 20px;text-align:center">
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">Platba</div>
+<div style="margin-top:6px;font-size:15px;line-height:1.6;color:${s.pozadie}">Balíček za tebe platí <b>${esc(kto)}</b> — ty nemusíš posílat nic.</div>
+</div>`;
+}
+
 function blokLightning(v: VypisKlienta, qrUrl?: string): string {
   const s = SADZBA;
   const l = v.lightning;
@@ -231,6 +268,7 @@ ${tlacidloUlozQr(qrUrl, "platba-lightning.gif", s.pozadie)}
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba?.novy === false ? "K úhradě" : "Nový balíček"} · bitcoin</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(l.czk))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(l.sats)} sats${l.zlava ? ` · sleva ${l.zlava} % z ${esc(kc(l.plnaCena))}` : ""}</div>
+${rozpisPlatby(v)}
 ${qr}
 ${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:${s.pozadie}">Načti QR v Lightning peněžence. Faktura má omezenou platnost — když ji peněženka odmítne, stačí stránku obnovit.</div>` : ""}
 <label style="display:block;margin-top:12px;text-align:left">
@@ -284,6 +322,7 @@ ${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.novy ? "Nový balíček" : "K úhradě"}</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}${v.platba.odpocet ? ` · ${esc(hod(v.platba.odpocet))} se hned odečte` : ""}</div>
+${rozpisPlatby(v)}
 ${qr}
 <div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.pozadie}">
 Do zprávy pro příjemce napiš <b>${esc(v.platba.sprava)}</b> — podle toho platbu spárujeme.
@@ -624,7 +663,7 @@ ${dalsi}
 ${ctaNaPlatbu(v)}
 
 ${blokOsi(v, false)}
-${v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl)}
+${v.platiZaNeho ? blokPlatiZaNeho(v.platiZaNeho) : v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl)}
 ${pocitovka}
 ${blokHistorie(!!v.historiaPoslana)}
 

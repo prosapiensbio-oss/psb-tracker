@@ -22,6 +22,8 @@ import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/
 import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { VyberMena } from "./VyberMena";
+import { menaPlatiZa } from "../../lib/psb/platiZa";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -1509,6 +1511,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               </button>
             )}
           </div>
+        )}
+        {filter === "peniaze" && (
+          <PlatiZa meno={meno} mena={mena} hodnota={c?.platiZa || ""} zapis={zapisOverride} />
         )}
         {filter === "vsetko" && pisemTrening && <FormularTreningu t={tr} setT={setTr} pracujem={pracujem} onUloz={() => void nahodTrening()} />}
         {filter === "balicky" && pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
@@ -3247,5 +3252,70 @@ function GrafPocitov({ rady }: { rady: Rad[] }) {
         );
       })}
     </svg>
+  );
+}
+
+/**
+ * KTO PLATÍ ZA KOHO (Jerry, 21. 10. 2026: „Jakub Kaňovský platí aj za
+ * Kadličkovú v BTC — ako mu pošlem odkaz s QR?").
+ *
+ * Zápis pri klientovi, nie dedukcia z histórie: QR a lightningová faktúra
+ * idú klientovi PRED platbou a musia sedieť napoprvé. Odkaz `/v/` tohto
+ * klienta potom pýta súčet dlhov a prijatá platba sa rozdelí späť na toľko
+ * platieb, koľko je ľudí (`lib/psb/platiZa.ts`).
+ */
+function PlatiZa({ meno, mena, hodnota, zapis }: {
+  meno: string;
+  mena: string[];
+  hodnota: string;
+  zapis: (kluc: string, hodnota: unknown) => Promise<void>;
+}) {
+  const [zoznam, setZoznam] = useState<string[]>(() => menaPlatiZa(hodnota));
+  const [pridavam, setPridavam] = useState("");
+  const [otvorene, setOtvorene] = useState(false);
+  // Dáta zhora prebijú lokálnu kópiu — zápis sa premieta cez celú appku
+  // (`actions.setOverride`) a vráti sa sem; bez toho by karta držala staré.
+  useEffect(() => { setZoznam(menaPlatiZa(hodnota)); }, [hodnota]);
+
+  const uloz = (novy: string[]) => { setZoznam(novy); void zapis("platiZa", novy); };
+  const ini = { fontSize: 12, color: C.textMuted };
+
+  if (!zoznam.length && !otvorene) {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <button onClick={() => setOtvorene(true)} style={{ ...ini, background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}>
+          + platí aj za niekoho ďalšieho
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={ini}>Platí aj za</span>
+      {zoznam.map((m) => (
+        <span key={m} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.accent, background: mix(C.accent, 12), border: `1px solid ${mix(C.accent, 35)}`, borderRadius: 999, padding: "3px 9px" }}>
+          {m}
+          <button onClick={() => uloz(zoznam.filter((x) => x !== m))} title="Odobrať" style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", padding: 0, fontSize: 13 }}>×</button>
+        </span>
+      ))}
+      <div style={{ width: 200 }}>
+        <VyberMena
+          hodnota={pridavam}
+          mena={mena.filter((m) => normName(m) !== normName(meno) && !zoznam.some((x) => normName(x) === normName(m)))}
+          onZmen={(v) => {
+            setPridavam(v);
+            // Zapisuje sa až meno, ktoré sedí na klienta — polovica mena by
+            // vyrobila dlh človeka, ktorý neexistuje.
+            const sedi = mena.find((m) => normName(m) === normName(v));
+            if (sedi) { uloz([...zoznam, sedi]); setPridavam(""); }
+          }}
+          placeholder="meno klienta…"
+          style={{ fontSize: 12, padding: "5px 8px" }}
+        />
+      </div>
+      <span style={{ fontSize: 11, color: C.textDim }}>
+        Jeho odkaz `/v/` potom pýta súčet dlhov a prijatá platba sa rozdelí.
+      </span>
+    </div>
   );
 }

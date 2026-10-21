@@ -39,6 +39,13 @@ export type Dlznik = {
   najstarsi: string;
   /** Dní od najstaršieho nezaplateného predaja; −1 = nedá sa povedať. */
   dni: number;
+  /**
+   * Kto za neho platí (`client_overrides.plati_za`, 21. 10. 2026).
+   * Dlh zostáva jeho, ale SMS a QR idú platiteľovi — bez tohto riadku by ho
+   * Jerry zháňal zbytočne a klient by dostal výzvu na peniaze, ktoré posiela
+   * niekto iný.
+   */
+  platiZaNeho?: string;
 };
 
 /**
@@ -66,14 +73,17 @@ export function dlznici(
   /** Ku ktorému trénerovi klient patrí; chýbajúci zostáva bez mena trénera. */
   treneri: Record<string, string> = {},
   dnes: string = dnesPraha(),
+  /** Kto za koho platí — meno dlžníka → meno platiteľa. */
+  platitelia: Record<string, string> = {},
 ): Dlznik[] {
+  const platiZa = new Map(Object.entries(platitelia).map(([dlznik, kto]) => [normName(dlznik), kto]));
   const podla = new Map<string, Dlznik>();
   for (const x of dlhy || []) {
     const k = normName(x.klient);
     let d = podla.get(k);
     if (!d) {
       const meno = Object.keys(treneri).find((m) => normName(m) === k) || x.klient;
-      d = { meno, trener: treneri[meno] || "", spolu: 0, zPoplatkov: 0, zBalickov: 0, polozky: [], najstarsi: "", dni: -1 };
+      d = { meno, trener: treneri[meno] || "", spolu: 0, zPoplatkov: 0, zBalickov: 0, polozky: [], najstarsi: "", dni: -1, platiZaNeho: platiZa.get(k) || undefined };
       podla.set(k, d);
     }
     if (x.zdroj === "ptminder") d.zPoplatkov += x.doplatit; else d.zBalickov += x.doplatit;

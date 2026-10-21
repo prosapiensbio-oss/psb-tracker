@@ -130,6 +130,8 @@ export type ClientAgg = {
   trainerNote: string;
   contractSigned: boolean;
   bitcoin: boolean;
+  /** Za koho ešte platí — mená oddelené zvislicou (`client_overrides.plati_za`). */
+  platiZa: string;
   duch: string;
   /** Skutočný koniec platnosti balíčka z exportu — prázdne, ak ho export nemá. */
   packageValidTo: string;
@@ -286,6 +288,7 @@ function prazdnyKlient(meno: string, den: string): ClientAgg {
   trainerNote: "",
   contractSigned: false,
   bitcoin: false,
+  platiZa: "",
   duch: "",
   packageValidTo: "",
   zdroj: "",
@@ -515,6 +518,7 @@ export function deriveClients(
     c.trainerNote = ov?.trainerNote || "";
     c.contractSigned = !!ov?.contractSigned;
     c.bitcoin = !!ov?.bitcoin;
+    c.platiZa = String(ov?.platiZa || "");
     c.duch = ov?.duch || "";
     c.zdroj = ov?.zdroj || "";
     c.zdrojKto = ov?.zdrojKto || "";

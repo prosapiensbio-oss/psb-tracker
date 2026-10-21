@@ -4,6 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { menaPlatiZa, zapisPlatiZa } from "../../lib/psb/platiZa";
 
 /**
  * Premenovanie klienta naprieč celou databázou.
@@ -119,6 +120,18 @@ async function kontaktySMenom(DB: D1Database, meno: string): Promise<{ id: strin
   return (r.results || []).filter((k) => zoznamMien(k.klient).includes(meno));
 }
 
+/**
+ * `client_overrides.plati_za` je ZOZNAM mien oddelený zvislicou (kto platí za
+ * koho, 21. 10. 2026). Premenovaný klient sa musí zmeniť aj TAM, inak by
+ * platiteľov odkaz `/v/` prestal pýtať jeho dlh a nikto by si toho nevšimol —
+ * suma by len ticho klesla.
+ */
+async function platitelia(DB: D1Database, meno: string): Promise<{ name: string; plati_za: string }[]> {
+  const r = await DB.prepare("SELECT name, plati_za FROM client_overrides WHERE plati_za LIKE ?1")
+    .bind(`%${meno}%`).all<{ name: string; plati_za: string }>().catch(() => null);
+  return ((r?.results) || []).filter((x) => menaPlatiZa(x.plati_za).includes(meno));
+}
+
 // Bez `.catch(() => ({ n: 0 }))` (21. 10. 2026): chýbajúca tabuľka by sa
 // v náhľade tvárila ako „nič sa netýka“ a samotné premenovanie by potom
 // spadlo — alebo horšie, kolízia by sa prehliadla.
@@ -202,6 +215,8 @@ export const Route = createFileRoute("/api/premenuj")({
           }
           const kontakty = await kontaktySMenom(DB, zo);
           if (kontakty.length) { dotknute.fakturacne_kontakty = kontakty.length; spolu += kontakty.length; }
+          const platia = await platitelia(DB, zo);
+          if (platia.length) { dotknute["client_overrides.plati_za"] = platia.length; spolu += platia.length; }
           if (!spolu) return Response.json({ ok: false, error: `Pod menom „${zo}“ nič nie je.` }, { status: 404 });
           if (!naozaj) return Response.json({ ok: true, nahlad: true, dotknute, spolu });
 
@@ -223,6 +238,12 @@ export const Route = createFileRoute("/api/premenuj")({
             prikazy.push(
               DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2 WHERE id = ?1")
                 .bind(k.id, [...new Set(novy)].join(", ")),
+            );
+          }
+          for (const p of platia) {
+            prikazy.push(
+              DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
+                .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).map((x) => (x === zo ? na : x)))),
             );
           }
           // Jedna dávka = jedna transakcia: keď spadne ktorýkoľvek UPDATE,
