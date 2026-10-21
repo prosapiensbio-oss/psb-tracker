@@ -301,6 +301,7 @@ async function zapisDiely(
   // Bez try/catch vracia worker HTML stránku „This page didn't load"
   // a na obrazovke to vyzerá, že sa neudialo nič. Presne tak vyzerala
   // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
+  let vratPovodne: () => Promise<void> = async () => {};
   try {
     for (const d of kusy) {
       const zle = await chybaMena(DB, d.klient);
@@ -315,11 +316,42 @@ async function zapisDiely(
      * najprv zrušiť a diely spolu so starými nesmú prerásť sumu pohybu.
      */
     const suma = Math.round(r.amount_czk);
-    const zive = ((await DB.prepare("SELECT klient, suma_czk FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL")
-      .bind(r.id).all()).results || []) as unknown as { klient: string; suma_czk: number }[];
+    let zive = ((await DB.prepare("SELECT id, klient, suma_czk FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL")
+      .bind(r.id).all()).results || []) as unknown as { id: string; klient: string; suma_czk: number }[];
+    /**
+     * ROZDELENIE NA JEDEN KLIK (Jerry, 21. 10. 2026: „áno, uprav to na jeden
+     * klik“). Keď na pohybe visia platby LEN klientov, ktorí sú aj v dieloch
+     * (Dan dostal celých 15 580, rozdeľuje sa na Dana a Moniku), staré
+     * priradenie sa zruší samo a diely sa zapíšu namiesto neho — zrušený
+     * riadok toho istého klienta `zapisPriradenie` oživí s novou sumou.
+     * Keď na pohybe visí niekto, kto v dieloch NIE JE, rozhodne človek:
+     * jeho platba by ticho zmizla.
+     */
+    const vDieloch = new Set(kusy.map((d) => normName(d.klient)));
+    const nahradit = zive.length && zive.every((x) => vDieloch.has(normName(x.klient))) ? zive : [];
+    const povodne = nahradit.map((x) => ({ id: x.id, suma: Number(x.suma_czk) || 0 }));
+    if (nahradit.length) {
+      const kedy = teraz();
+      await DB.batch(nahradit.map((x) => DB.prepare("UPDATE platby SET zrusene_at = ?2 WHERE id = ?1").bind(x.id, kedy)));
+      zive = [];
+    }
+    /**
+     * Keď sa diely nezapíšu, vráti sa pôvodné priradenie — nič nesmie zostať
+     * napoly: nové diely sa zrušia, pôvodné riadky oživia s pôvodnou sumou.
+     */
+    vratPovodne = async () => {
+      if (!povodne.length) return;
+      const ids = new Set(povodne.map((x) => x.id));
+      const teraz2 = teraz();
+      const nove = ((await DB.prepare("SELECT id FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL").bind(r.id).all()).results || []) as { id: string }[];
+      await DB.batch([
+        ...nove.filter((x) => !ids.has(x.id)).map((x) => DB.prepare("UPDATE platby SET zrusene_at = ?2 WHERE id = ?1").bind(x.id, teraz2)),
+        ...povodne.map((x) => DB.prepare("UPDATE platby SET zrusene_at = NULL, suma_czk = ?2 WHERE id = ?1").bind(x.id, x.suma)),
+      ]);
+    };
     const cely = zive.find((x) => Math.abs(Math.round(Number(x.suma_czk) || 0) - suma) <= 1);
     if (cely) {
-      return { ok: false, error: `Tento pohyb už je celý priradený klientovi ${cely.klient} (${suma} Kč). Najprv tú platbu zruš, potom ho rozdeľ.` };
+      return { ok: false, error: `Tento pohyb už je celý priradený klientovi ${cely.klient} (${suma} Kč), ktorý v dieloch nie je. Najprv tú platbu zruš, potom ho rozdeľ.` };
     }
     const uzZapisane = zive.reduce((n, x) => n + Math.round(Number(x.suma_czk) || 0), 0);
     const pribudne = kusy.filter((d) => !zive.some((x) => normName(x.klient) === normName(d.klient))).reduce((n, d) => n + d.suma, 0);
@@ -340,10 +372,15 @@ async function zapisDiely(
         poznamka: `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, kto, vopred: vopred[i],
       }, true);
       if (!v.ok) {
+        if (povodne.length) {
+          await vratPovodne();
+          return { ok: false, error: `${v.error} Pôvodné priradenie som vrátil, nič sa nezmenilo.` };
+        }
         return { ok: false, error: `${v.error}${i ? ` Zapísané už sú diely: ${kusy.slice(0, i).map((x) => x.klient).join(", ")}.` : ""}` };
       }
     }
   } catch (e) {
+    await vratPovodne().catch(() => undefined);
     const t = String(e instanceof Error ? e.message : e);
     return {
       ok: false,
