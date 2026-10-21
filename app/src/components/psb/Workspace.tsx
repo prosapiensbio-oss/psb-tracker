@@ -37,7 +37,7 @@ import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
-import { zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
+import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
 type BalicekRiadok = {
@@ -1443,7 +1443,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       </button>
                       {x.predplatne && (
                         <button
-                          onClick={() => void odpovedz(`presun z členstva do ${x.platnostDo} (max 2 h)`, x.presunHodin, "Prenesené hodiny")}
+                          onClick={() => void odpovedz(`presun z členstva do ${x.platnostDo} (max 2 h)`, x.presunHodin, NAZOV_PRENESENYCH)}
                           disabled={pracujem === kluc}
                           style={vedlajsie}
                         >

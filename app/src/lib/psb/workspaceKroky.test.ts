@@ -157,6 +157,21 @@ describe("úvodný tréning je vlastný balíček", () => {
   });
 });
 
+describe("prenesené hodiny nie sú vzor (Natália Krivdová 19. 10. 2026)", () => {
+  it("nový balíček je podľa předplatného, nie podľa prenesených hodín", () => {
+    const os = zorad([
+      balicek("2026-09-09", 6, "OFF - 6h S viazanostou", "2026-10-08"),
+      balicek("2026-10-08", 1, "Prenesené hodiny"),
+      ...["2026-09-10", "2026-09-17", "2026-09-24", "2026-09-29", "2026-10-01", "2026-10-06", "2026-10-13", "2026-10-19"].map(trening),
+    ]);
+    const { stavy } = priebehBalickov(os, -1, "2026-10-20");
+    const n = navrhNovehoBalicka("Natalia Krivdova", os, stavy, [{ den: "2026-09-09", cena: 6990 }]);
+    expect(n?.nazov).not.toBe("Prenesené hodiny");
+    expect(n?.hodiny).toBe(6);
+    expect(n?.cena).toBe(6990);
+  });
+});
+
 describe("po úvodnom nevznikne druhý úvodný (Lenka Divinová 16. 10. 2026)", () => {
   it("prvý riadny tréning po úvodnom nemá vzor — balíček zakladá tréner", () => {
     const uv = { druh: "trening", den: "2026-08-28", cas: "09:00", uvodny: true } as Udalost;

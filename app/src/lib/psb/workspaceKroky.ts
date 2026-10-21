@@ -18,6 +18,7 @@ import { UVODNY } from "./uvodnaStranka";
 import { normName } from "./format";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
+import { NAZOV_PRENESENYCH } from "./platnostZostatok";
 import type { StavRiadku } from "./vypisHodin";
 
 const den = (s: string) => String(s || "").slice(0, 10);
@@ -160,7 +161,10 @@ export function navrhNovehoBalicka(
    * appka ho len pripomenie, že trénoval bez balíčka.
    */
   const jeVzor = (u: Udalost): u is Extract<Udalost, { druh: "balicekOd" }> =>
-    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO;
+    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO
+    // Prenesené hodiny nie sú predaj (Natália Krivdová, 19. 10. 2026: nový
+    // balíček vznikol ako „Prenesené hodiny" za 0 Kč namiesto předplatného).
+    && u.nazov !== NAZOV_PRENESENYCH;
   const posledny = os.find(jeVzor);
   if (!posledny) return null;
 

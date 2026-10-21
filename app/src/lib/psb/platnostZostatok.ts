@@ -1,4 +1,7 @@
 import { dnesPraha } from "./cas";
+
+/** Hodiny prenesené zo skončeného předplatného (najviac 2) — nie je to predaj. */
+export const NAZOV_PRENESENYCH = "Prenesené hodiny";
 /**
  * PLATNOSŤ SKONČILA, HODINY ZOSTALI.
  *
@@ -128,7 +131,7 @@ export function moznostiPlatnosti(x: ZostavaPoPlatnosti): {
     out.push({
       popis: `preniesť ${x.presunHodin} h do ďalšieho`,
       poznamka: `presun z členstva do ${x.platnostDo} (najviac 2 h, zvyšok prepadá)`,
-      balicek: { klient: x.meno, nazov: "Prenesené hodiny", hodiny: x.presunHodin, platnostOd: x.platnostDo },
+      balicek: { klient: x.meno, nazov: NAZOV_PRENESENYCH, hodiny: x.presunHodin, platnostOd: x.platnostDo },
     });
   }
   return out;
