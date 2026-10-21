@@ -4625,11 +4625,18 @@ export function pripomienkySlubov(
  */
 export function poUvodnomNikdy(
   clients: Record<string, ClientAgg>,
-  balicky: { client_name?: string; clientName?: string; sessionsRemaining?: number; sessions_remaining?: number; validTo?: string; valid_to?: string }[],
+  /**
+   * Balíčky zo snímky PTmindera (`client`, `package`) aj z Kokpitu (`klient`,
+   * `nazov`). Do 21. 10. 2026 sa meno hľadalo v `client_name`, ktoré snímka
+   * nemá — balíček teda nerozhodoval nikdy a z Kokpitu sa sem ani neposielal.
+   */
+  balicky: { client?: string; klient?: string; client_name?: string; clientName?: string; package?: string; nazov?: string; zruseneAt?: string | null; sessions_remaining?: number; sessionsRemaining?: number; valid_to?: string; validTo?: string }[],
   udalosti: { klient: string | null; zaciatok: string; typ: string | null; zmizlaAt?: string | null }[],
 ): { meno: string; uvodny: string; trener: string | null; preco: string | null }[] {
-  const menoBalicka = (b: (typeof balicky)[number]) => b.client_name ?? b.clientName ?? "";
-  const sBalickom = new Set(balicky.filter((b) => menoBalicka(b)).map((b) => normName(menoBalicka(b))));
+  const menoBalicka = (b: (typeof balicky)[number]) => b.client ?? b.klient ?? b.client_name ?? b.clientName ?? "";
+  // Úvodný je od 8. 10. 2026 tiež balíček v Kokpite — ten pokračovanie nie je.
+  const jeUvodny = (b: (typeof balicky)[number]) => /^\s*(úvodní|uvodni|úvodný|uvodny)/i.test(b.nazov ?? b.package ?? "");
+  const sBalickom = new Set(balicky.filter((b) => menoBalicka(b) && !b.zruseneAt && !jeUvodny(b)).map((b) => normName(menoBalicka(b))));
 
   return Object.values(clients)
     .filter((c) => (c.sessions || []).length === 1 && c.sessions[0]?.sessionType === "UVODNE")

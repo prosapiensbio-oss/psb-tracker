@@ -86,7 +86,7 @@ export function registerZoServera(
     ...dnesneTreningy(clients, sixM, { udalosti: ud, zmeny: zm }, data.anomalyAck || {}, dnes),
     ...deriveRegister(data, clients, sixM, capacityByTrainer(clients, data.sessions), { udalosti: ud, zmeny: zm }),
     ...pripomienkySlubov(ud as never, (data.leads || []) as never, data.anomalyAck, dnes, zm as never),
-    ...pripomienkaDovodu(clients, (data.packages || []) as never, ud as never, data.anomalyAck, dnes),
+    ...pripomienkaDovodu(clients, [...(data.packages || []), ...(data.balickyKokpit || [])], ud as never, data.anomalyAck, dnes),
     // Posledná hodina / mínus — tá istá funkcia ako v appke (9. 10. 2026).
     ...(smsOdoslane ? polozkyHodin(clients, ud, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, dnes) : []),
     // `nezapisaneDoRegistra` vracia položky BEZ stavu odpovede — doplní sa tu,

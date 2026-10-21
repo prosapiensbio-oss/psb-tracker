@@ -2258,11 +2258,11 @@ function skupinaFaktur(
   const dovody = useMemo(
     () => pripomienkaDovodu(
       clients,
-      data.packages || [],
+      [...(data.packages || []), ...(data.balickyKokpit || [])],
       kalUdalosti.map((u) => ({ klient: u.klient, zaciatok: u.zaciatok, typ: u.typ, zmizlaAt: (u as { zmizlaAt?: string | null }).zmizlaAt ?? null })),
       data.anomalyAck || {},
     ),
-    [clients, data.packages, kalUdalosti, data.anomalyAck],
+    [clients, data.packages, data.balickyKokpit, kalUdalosti, data.anomalyAck],
   );
 
   const pripomienky = useMemo(

@@ -362,6 +362,17 @@ export const Route = createFileRoute("/api/kalendar")({
                    WHERE s.client_name = u.klient
                      AND substr(s.date,1,10) = substr(u.zaciatok,1,10)
                 )
+                /*
+                 * PTminder od 19. 10. 2026 nepíše, takže zápis v ňom už nič
+                 * nedokazuje. Čo ostáva: udalosť len preložená v ten istý deň
+                 * (iný čas, nové uid) sa konala — na tú sa nepýta.
+                 */
+                AND NOT EXISTS (
+                  SELECT 1 FROM kal_udalosti v
+                   WHERE v.klient = u.klient AND v.zmizla_at IS NULL AND v.uid <> u.uid
+                     AND v.typ IN ('trening','uvodny')
+                     AND substr(v.zaciatok,1,10) = substr(u.zaciatok,1,10)
+                )
               ORDER BY u.zaciatok DESC`,
           ).all(),
         ]);

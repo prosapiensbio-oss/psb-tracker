@@ -115,7 +115,11 @@ je kde pozrieť).
          21. 10. 2026** (os bez predajov PTmindera od 1. 10.; mená do párovania
          aj z kalendára a balíčkov; barter z balíčkov Kokpitu; report bez
          dvojitých platieb; 6M = počet předplatných, v procese kto mal
-         předplatné do 62 dní). Ostávajú 6–9:
+         předplatné do 62 dní). **6 a 7 hotové 21. 10.** („Prečo neprišiel"
+         vidí balíčky PTmindera aj Kokpitu, úvodný nie; „Jedno meno" berie
+         `znamiKlienti`; „Bol tam?" nepýta, keď je v ten deň iná živá udalosť
+         klienta). Pribudla stráž: doplnenie, prenesené hodiny ani 0 Kč
+         automaticky nevzniknú (`smieVzniknutAutomaticky`). Ostávajú 8–9:
          1. Os času berie predaje z PTmindera (`services`) aj po 1. 10. — Monikin
             predaj 9. 10. stál ako „nezaplatený balíček", takže Kokpit nezaložil
             vlastný a mala −2 h bez balíčka. Predaje PTmindera od 1. 10. na os nepúšťať.

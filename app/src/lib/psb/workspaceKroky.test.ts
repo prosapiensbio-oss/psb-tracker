@@ -251,3 +251,15 @@ describe("doplnenie z Kokpitu nie je vzor (Jakub Kaňovský 21. 10. 2026)", () =
     expect(n?.cena).toBe(7790);
   });
 });
+
+describe("doplnenie vzniká len rozhodnutím (Jerry, 21. 10. 2026)", () => {
+  it("stráž: doplnenie, prenesené hodiny ani 0 Kč automaticky nevzniknú", async () => {
+    const { smieVzniknutAutomaticky } = await import("./workspaceKroky");
+    expect(smieVzniknutAutomaticky({ nazov: "Doplnenie členstva", cena: 0, hodiny: 1 })).toBe(false);
+    expect(smieVzniknutAutomaticky({ nazov: "Doplnenie členstva", cena: 500, hodiny: 1 })).toBe(false);
+    expect(smieVzniknutAutomaticky({ nazov: "Prenesené hodiny", cena: 0, hodiny: 1 })).toBe(false);
+    expect(smieVzniknutAutomaticky({ nazov: "SILVER členství", cena: 0, hodiny: 6 })).toBe(false);
+    expect(smieVzniknutAutomaticky({ nazov: "6h Balíček", cena: 7790, hodiny: 6 })).toBe(true);
+    expect(smieVzniknutAutomaticky({ nazov: "Úvodní trénink", cena: 1100, hodiny: 1 })).toBe(true);
+  });
+});

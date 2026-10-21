@@ -78,7 +78,18 @@ export type NavrhNovehoBalicka = {
  */
 export const NAZOV_UVODNEHO = "Úvodní trénink";
 
-export function navrhNovehoBalicka(
+/**
+ * ČO SMIE KOKPIT ZALOŽIŤ SÁM. Doplnenie členstva a prenesené hodiny sú
+ * ROZHODNUTIE trénera, nie predaj (Jerry, 21. 10. 2026: „doplnenie členstva
+ * môžeme dať iba my naším rozhodnutím"). Jakub Kaňovský dostal automaticky
+ * „Doplnenie členstva" za 0 Kč, Natália Krivdová „Prenesené hodiny" za 0 Kč.
+ * Automaticky vzniká len predaj s cenou a hodinami — inak nič; návrh, ktorý
+ * týmto neprejde, je chyba vo vzore, nie dôvod niečo zapísať.
+ */
+export const smieVzniknutAutomaticky = (n: { nazov: string; cena: number; hodiny: number }): boolean =>
+  !/^\s*(doplnenie|prenesen)/i.test(n.nazov) && n.cena > 0 && n.hodiny > 0;
+
+function navrhNovehoBalickaBezStraze(
   klient: string,
   os: Udalost[],
   stavy: Map<Udalost, StavRiadku>,
@@ -568,4 +579,10 @@ export function kandidatiPlatby(
   }
   const vaha = { "meno+suma": 0, meno: 1, suma: 2 } as const;
   return out.sort((a, b) => vaha[a.preco] - vaha[b.preco] || b.datum.localeCompare(a.datum));
+}
+
+/** Návrh nového balíčka — len taký, aký smie vzniknúť sám (`smieVzniknutAutomaticky`). */
+export function navrhNovehoBalicka(...args: Parameters<typeof navrhNovehoBalickaBezStraze>): NavrhNovehoBalicka | null {
+  const n = navrhNovehoBalickaBezStraze(...args);
+  return n && smieVzniknutAutomaticky(n) ? n : null;
 }

@@ -750,7 +750,7 @@ export function buildAiContext(
             // Balíček a kalendár rozhodujú spolu so sedeniami — samotný export
             // z PTmindera chodí neskoro a robí z pokračujúcich klientov
             // stratené prípady (Roman Pavlik, 17. 8. 2026).
-            const von = poUvodnomNikdy(clients, data.packages || [], kalendar?.udalosti || []);
+            const von = poUvodnomNikdy(clients, [...(data.packages || []), ...(data.balickyKokpit || [])], kalendar?.udalosti || []);
             return {
               poznamka: "Prišli na úvodný tréning, zaplatili zaň (1 100 Kč) a nikdy sa nevrátili. Kto si po úvodnom kúpil balíček alebo má v kalendári ďalší tréning, v zozname NIE JE — aj keď to v exporte z PTmindera ešte nevidno. `preco` je zapisané ručne v Marketing → Odkiaľ prišli klienti; `null` znamená, že to nikto nezapísal — nie že dôvod neexistuje. Keď sa dôvody opakujú, je to jediná vec z celého lievika, s ktorou sa dá niečo urobiť.",
               spolu: von.length,

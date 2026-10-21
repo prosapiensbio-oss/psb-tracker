@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { navrhyNovychBalickov } from "../../lib/psb/automatickeBalicky.server";
+import { smieVzniknutAutomaticky } from "../../lib/psb/workspaceKroky";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
@@ -309,6 +310,8 @@ export const Route = createFileRoute("/api/balicky")({
               "SELECT id FROM balicky WHERE klient = ?1 AND platnost_od = ?2 AND zrusene_at IS NULL AND zdroj = 'rucne' LIMIT 1",
             ).bind(n.klient, n.odDna).first().catch(() => null);
             if (uz) continue;
+            // Druhá stráž priamo pri zápise: doplnenie ani 0 Kč sám nevznikne.
+            if (!smieVzniknutAutomaticky(n)) continue;
             const den = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}`;
             const poznamka = [
               `automaticky — vznikol prvým tréningom ${den(n.odDna)}`,
