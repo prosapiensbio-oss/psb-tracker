@@ -148,3 +148,30 @@ export function platiteliaZOverridov(
   }
   return out;
 }
+
+/**
+ * KONTROLA RUČNÉHO ROZDELENIA JEDNEJ PLATBY.
+ *
+ * Jerry, 21. 10. 2026: „som schopný to nastaviť aj v Kokpite — takto
+ * rozdeliť tú BTC platbu?" Automatické rozdelenie zabere len vtedy, keď
+ * súčet očakávaných sedí; keď nesedí, musí sa to dať spraviť rukou. Diely
+ * sa musia zložiť PRESNE na sumu platby (tolerancia koruna) — platba je
+ * záznam v knihe a rozdelením sa nesmie zmeniť, koľko peňazí prišlo.
+ *
+ * Vracia vetu pre človeka, alebo `null`, keď je rozdelenie v poriadku.
+ */
+export function chybaDielov(
+  suma: number,
+  diely: { klient: string; suma: number }[],
+): string | null {
+  if (diely.length < 2) return "Na rozdelenie treba aspoň dvoch klientov.";
+  if (diely.some((d) => !String(d.klient || "").trim())) return "Každý diel potrebuje klienta.";
+  if (diely.some((d) => !(d.suma > 0))) return "Každý diel potrebuje kladnú sumu.";
+  if (new Set(diely.map((d) => normName(d.klient))).size !== diely.length) {
+    return "Ten istý klient je v dieloch dvakrát — spoj jeho diely do jedného.";
+  }
+  const spolu = diely.reduce((a, d) => a + Math.round(d.suma), 0);
+  const cela = Math.round(suma);
+  if (Math.abs(spolu - cela) > 1) return `Diely dávajú ${spolu} Kč, platba je ${cela} Kč.`;
+  return null;
+}

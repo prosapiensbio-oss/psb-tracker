@@ -1,7 +1,7 @@
 // Jeden človek platí za viacerých — Jakub Kaňovský a Anna Kadličkova (21. 10. 2026).
 import { describe, expect, it } from "bun:test";
 
-import { czkZaPolozky, menaPlatiZa, platiteliaZOverridov, rozdelPodlaDlhov, vetaZaKoho, zapisPlatiZa, type PolozkaPlatby } from "./platiZa";
+import { chybaDielov, czkZaPolozky, menaPlatiZa, platiteliaZOverridov, rozdelPodlaDlhov, vetaZaKoho, zapisPlatiZa, type PolozkaPlatby } from "./platiZa";
 
 const JAKUB = "Jakub Kaňovský";
 const ANNA = "Anna Kadličkova";
@@ -85,5 +85,26 @@ describe("obrátený pohľad", () => {
   });
   it("zápis na seba samého sa ignoruje", () => {
     expect(platiteliaZOverridov({ [JAKUB]: { platiZa: JAKUB } })).toEqual({});
+  });
+});
+
+describe("ručné rozdelenie platby", () => {
+  it("diely musia dať presne sumu platby", () => {
+    expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 7401 }])).toBeNull();
+    // Koruna tolerancie: zaokrúhlenie pri troch dieloch.
+    expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 7402 }])).toBeNull();
+    expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 5000 }]))
+      .toBe("Diely dávajú 12401 Kč, platba je 14802 Kč.");
+  });
+  it("jeden diel nie je rozdelenie", () => {
+    expect(chybaDielov(7401, [{ klient: JAKUB, suma: 7401 }])).toBe("Na rozdelenie treba aspoň dvoch klientov.");
+  });
+  it("ten istý klient dvakrát sa odmietne", () => {
+    expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: JAKUB.toUpperCase(), suma: 7401 }]))
+      .toContain("dvakrát");
+  });
+  it("diel bez mena alebo s nulou sa odmietne", () => {
+    expect(chybaDielov(14802, [{ klient: "", suma: 7401 }, { klient: ANNA, suma: 7401 }])).toContain("klienta");
+    expect(chybaDielov(7401, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 0 }])).toContain("kladnú sumu");
   });
 });

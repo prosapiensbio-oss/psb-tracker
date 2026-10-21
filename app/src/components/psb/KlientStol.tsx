@@ -23,7 +23,7 @@ import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { VyberMena } from "./VyberMena";
-import { menaPlatiZa } from "../../lib/psb/platiZa";
+import { chybaDielov, menaPlatiZa } from "../../lib/psb/platiZa";
 import { dlhJednehoKlienta } from "../../lib/psb/dlznici";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -161,6 +161,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [mazemOtvorene, setMazemOtvorene] = useState(false);
   /** Čo sa práve upravuje — id riadku, alebo prázdno. */
   const [upravaPlatby, setUpravaPlatby] = useState("");
+  /** Ktorú platbu práve delí medzi klientov (id riadku). */
+  const [delimPlatbu, setDelimPlatbu] = useState("");
   const [upravaBalicka, setUpravaBalicka] = useState("");
   /** Balíček, ktorý sa práve ukončuje s vrátením peňazí (13. 10. 2026, Radek Baláž). */
   const [ukoncenie, setUkoncenie] = useState<{ id: string; odtrenovane: number } | null>(null);
@@ -1859,10 +1861,22 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       {x.poznamka ? <span style={{ color: C.textDim }}> · {x.poznamka}</span> : ""}
                     </span>
                     <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(x.suma_czk)}</span>
+                    {/* ROZDELIŤ MEDZI KLIENTOV (Jerry, 21. 10. 2026: „som
+                        schopný to rozdeliť aj v Kokpite?"). Bankový pohyb sa
+                        delí nad výpisom, ale bitcoinová platba žiadny riadok
+                        výpisu nemá — a tá je práve tá, pri ktorej jeden platí
+                        za dvoch. */}
+                    <button
+                      onClick={() => { setDelimPlatbu(delimPlatbu === x.id ? "" : x.id); setUpravaPlatby(""); setPisemPlatbu(false); }}
+                      title="Rozdeliť túto platbu medzi viacerých klientov"
+                      style={{ ...navrhTlacidlo, fontSize: 11 }}
+                    >
+                      {delimPlatbu === x.id ? "zavrieť" : "rozdeliť"}
+                    </button>
                     {x.fio_id ? <span style={{ width: 46 }} /> : (
                       <Upravit
                         naUpravu={() => {
-                          setUpravaPlatby(x.id); setPisemPlatbu(false);
+                          setUpravaPlatby(x.id); setPisemPlatbu(false); setDelimPlatbu("");
                           setPl({ datum: x.datum.slice(0, 10), suma: String(x.suma_czk), sposob: x.sposob, poznamka: x.poznamka || "" });
                         }}
                         naZrusenie={() => void zrusPlatbu(x.id)}
@@ -1871,6 +1885,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       />
                     )}
                   </div>
+                  {delimPlatbu === x.id && (
+                    <RozdelitPlatbu
+                      id={x.id}
+                      platitel={meno}
+                      suma={Math.round(x.suma_czk)}
+                      mena={mena}
+                      zaKoho={menaPlatiZa(c?.platiZa).map((m) => ({ klient: m, dlzi: dlhJednehoKlienta(data.dlhy, m).dlzi }))}
+                      onHotovo={() => { setDelimPlatbu(""); void nacitajPlatby(); oznam("peniaze"); }}
+                    />
+                  )}
                   {upravaPlatby === x.id && (
                     <FormularPlatby p={pl} setP={setPl} pracujem={pracujem} onUloz={() => void upravPlatbu(x.id)} popis="Uložiť zmenu" />
                   )}
@@ -3331,6 +3355,110 @@ function PlatiZa({ meno, mena, hodnota, zapis }: {
       <span style={{ fontSize: 11, color: C.textDim }}>
         Jeho odkaz `/v/` potom pýta súčet dlhov a prijatá platba sa rozdelí.
       </span>
+    </div>
+  );
+}
+
+/**
+ * ROZDELENIE JEDNEJ PLATBY MEDZI KLIENTOV.
+ *
+ * Jerry, 21. 10. 2026: „som schopný to nastaviť aj v Kokpite — takto
+ * rozdeliť tú BTC platbu?" Automatické rozdelenie podľa `plati_za` zaberie
+ * len vtedy, keď súčet očakávaných sedí (inak by appka roztrhla platbu, čo
+ * klient poslal len za seba). Toto je to isté rukou.
+ *
+ * Diely sa musia zložiť PRESNE na sumu platby — rozdelením sa nesmie zmeniť,
+ * koľko peňazí prišlo. Preto je tlačidlo neaktívne, kým súčet nesedí, a
+ * zvyšok je vidieť pri každom písmene.
+ */
+function RozdelitPlatbu({ id, platitel, suma, mena, zaKoho, onHotovo }: {
+  /** Id riadku v `platby`, ktorý sa delí. */
+  id: string;
+  platitel: string;
+  suma: number;
+  mena: string[];
+  /** Za koho klient platí a koľko kto dlží — predvyplnenie dielov. */
+  zaKoho: { klient: string; dlzi: number }[];
+  onHotovo: () => void;
+}) {
+  const navrh = () => {
+    const cudzi = zaKoho.filter((z) => z.dlzi > 0 && z.dlzi < suma);
+    const zvysok = suma - cudzi.reduce((a, z) => a + z.dlzi, 0);
+    return cudzi.length && zvysok > 0
+      ? [{ klient: platitel, suma: String(zvysok) }, ...cudzi.map((z) => ({ klient: z.klient, suma: String(z.dlzi) }))]
+      : [{ klient: platitel, suma: String(suma) }, { klient: "", suma: "" }];
+  };
+  const [diely, setDiely] = useState<{ klient: string; suma: string }[]>(navrh);
+  const [pracujem, setPracujem] = useState(false);
+  const [chyba, setChyba] = useState("");
+
+  const cisla = diely.map((d) => ({ klient: d.klient.trim(), suma: Math.round(Number(d.suma) || 0) }));
+  const spolu = cisla.reduce((a, d) => a + d.suma, 0);
+  const zvysok = suma - spolu;
+  const problem = chybaDielov(suma, cisla);
+
+  const uloz = async () => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "rozdel-platbu", id, diely: cisla }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa rozdeliť"); return; }
+    onHotovo();
+  };
+
+  return (
+    <div style={{ margin: "6px 0 10px", padding: "10px 12px", borderRadius: 11, background: mix(C.accent, 8), border: `1px solid ${mix(C.accent, 30)}` }}>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 7 }}>
+        Rozdeliť {fmtCZK(suma)} medzi klientov — diely musia dať presne túto sumu.
+      </div>
+      {diely.map((d, i) => (
+        <div key={i} style={{ display: "flex", gap: 7, alignItems: "center", marginBottom: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <VyberMena
+              hodnota={d.klient}
+              mena={mena}
+              onZmen={(v) => setDiely(diely.map((y, j) => (j === i ? { ...y, klient: v } : y)))}
+              placeholder="meno klienta…"
+              style={{ fontSize: 12, padding: "5px 8px" }}
+              varovanie={!!d.klient && !mena.some((m) => normName(m) === normName(d.klient))}
+            />
+          </div>
+          <input
+            value={d.suma}
+            onChange={(e) => setDiely(diely.map((y, j) => (j === i ? { ...y, suma: e.target.value } : y)))}
+            inputMode="numeric"
+            placeholder="Kč"
+            style={{ width: 90, fontSize: 12, padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, textAlign: "right" }}
+          />
+          {diely.length > 2 && (
+            <button onClick={() => setDiely(diely.filter((_, j) => j !== i))} title="Odobrať diel" style={{ ...navrhTlacidlo, fontSize: 11 }}>×</button>
+          )}
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={() => setDiely([...diely, { klient: "", suma: zvysok > 0 ? String(zvysok) : "" }])} style={{ ...navrhTlacidlo, fontSize: 11 }}>
+          + ďalší klient
+        </button>
+        <span style={{ fontSize: 11.5, color: zvysok === 0 ? C.green : C.orange }}>
+          {zvysok === 0 ? "súčet sedí" : zvysok > 0 ? `chýba ${fmtCZK(zvysok)}` : `o ${fmtCZK(-zvysok)} viac`}
+        </span>
+        <button
+          onClick={() => void uloz()}
+          disabled={pracujem || !!problem}
+          style={{
+            padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, marginLeft: "auto",
+            cursor: pracujem || problem ? "not-allowed" : "pointer", opacity: problem ? 0.5 : 1,
+            border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green,
+          }}
+        >
+          {pracujem ? "delím…" : "Rozdeliť"}
+        </button>
+      </div>
+      {(chyba || problem) && (
+        <div role="alert" style={{ fontSize: 11.5, color: chyba ? C.red : C.textMuted, marginTop: 6 }}>{chyba || problem}</div>
+      )}
     </div>
   );
 }

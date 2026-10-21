@@ -13,7 +13,7 @@ import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
 import { btcNaPlatby, mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
-import { menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
+import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
 import { najdiKlienta } from "../../lib/psb/compute";
 
 /**
@@ -753,6 +753,75 @@ export const Route = createFileRoute("/api/platby")({
           ).bind(datum, suma, sposob, String(b.poznamka || "").slice(0, 300) || null, id).run();
           await audit(DB, { action: "platba-upravena", predmet: id, neu: `${suma} Kč · ${datum}`, actor: kto });
           return Response.json({ ok: true });
+        }
+
+        /**
+         * RUČNÉ ROZDELENIE JEDNEJ PLATBY MEDZI KLIENTOV.
+         *
+         * Jerry, 21. 10. 2026: „som schopný to rozdeliť aj v Kokpite?" Pri
+         * BANKOVOM pohybe sa to dalo odjakživa (`rozdel` nad nepriradeným
+         * riadkom výpisu), ale bitcoinová platba žiadny riadok výpisu nemá —
+         * príde z BTC knihy pod kľúčom `btc:…`. A `uprav` ju odmieta, lebo
+         * má `fio_id`. Jediná cesta zostávala zrušiť ju a nahodiť dve ručne.
+         *
+         * Automatické rozdelenie (`plati_za`) zaberie len vtedy, keď súčet
+         * očakávaných sedí; toto je to, čo robí človek, keď nesedí.
+         *
+         * NEMENÍ, KOĽKO PEŇAZÍ PRIŠLO. Pôvodný riadok si nechá diel platiteľa
+         * (keď v dieloch je) alebo sa zruší; ostatné diely pribudnú s TÝM
+         * ISTÝM `fio_id`, takže sa nič nezdvojí a v knihe zostáva jedna
+         * platba rozpísaná na ľudí.
+         */
+        if (akcia === "rozdel-platbu") {
+          const id = String(b.id || "");
+          const diely = (Array.isArray(b.diely) ? b.diely : []) as { klient?: unknown; suma?: unknown }[];
+          const kusy = diely.map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
+          if (!id) return Response.json({ ok: false, error: "Chýba platba." }, { status: 400 });
+          const p = await DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby WHERE id = ?1")
+            .bind(id).first<{ id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null }>();
+          if (!p) return Response.json({ ok: false, error: "Platba sa nenašla." }, { status: 404 });
+          if (p.zrusene_at) return Response.json({ ok: false, error: "Táto platba je zrušená — rozdeliť sa dá len živá." }, { status: 400 });
+          const zle = chybaDielov(Number(p.suma_czk) || 0, kusy);
+          if (zle) return Response.json({ ok: false, error: zle }, { status: 400 });
+          for (const d of kusy) {
+            const zlePole = await chybaMena(DB, d.klient);
+            if (zlePole) return Response.json({ ok: false, error: zlePole }, { status: 400 });
+          }
+          // Iná ŽIVÁ platba na tom istom kľúči by sa s dielom zrazila na
+          // unikáte (fio_id, klient) — a zrazený zápis vracia HTML stránku,
+          // nie vetu (migrácia 0082). Povie sa to vopred a menom.
+          if (p.fio_id) {
+            const zive = (((await DB.prepare("SELECT klient FROM platby WHERE fio_id = ?1 AND id <> ?2 AND zrusene_at IS NULL")
+              .bind(p.fio_id, p.id).all<{ klient: string }>().catch(() => null))?.results) || []);
+            const zrazka = zive.find((x) => kusy.some((d) => normName(d.klient) === normName(x.klient)));
+            if (zrazka) {
+              return Response.json({ ok: false, error: `${zrazka.klient} už na tejto platbe diel má. Najprv ho zruš, potom rozdeľ znova.` }, { status: 409 });
+            }
+          }
+          const mojDiel = kusy.find((d) => normName(d.klient) === normName(p.klient));
+          const poznamka = `${String(p.poznamka || "").slice(0, 240)}${String(p.poznamka || "").includes("rozdelené") ? "" : " · rozdelené"}`.trim();
+          const prikazy = [
+            mojDiel
+              ? DB.prepare("UPDATE platby SET suma_czk = ?2, poznamka = ?3 WHERE id = ?1").bind(p.id, mojDiel.suma, poznamka)
+              : DB.prepare("UPDATE platby SET zrusene_at = ?2 WHERE id = ?1").bind(p.id, teraz()),
+          ];
+          const ostatni = kusy.filter((d) => d !== mojDiel);
+          const vopred = await Promise.all(ostatni.map((d) => jeVopred(DB, d.klient)));
+          ostatni.forEach((d, i) => {
+            prikazy.push(DB.prepare(
+              "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ).bind(uid(), d.klient, String(p.datum).slice(0, 10), d.suma, p.sposob, p.fio_id, poznamka, teraz(), kto || null, vopred[i] ? 1 : 0));
+          });
+          try {
+            await DB.batch(prikazy);
+          } catch (e) {
+            return Response.json({ ok: false, error: `Rozdelenie neprebehlo, nezmenilo sa nič: ${String(e).slice(0, 200)}` }, { status: 500 });
+          }
+          await audit(DB, {
+            action: "platba-rozdelena", predmet: `${p.klient} · ${Math.round(Number(p.suma_czk) || 0)} Kč`,
+            neu: kusy.map((d) => `${d.klient} ${d.suma}`).join(" · "), actor: kto,
+          });
+          return Response.json({ ok: true, dielov: kusy.length });
         }
 
         /** Zrušenie NEMAŽE — platba je záznam v knihe, nie riadok v tabuľke. */
