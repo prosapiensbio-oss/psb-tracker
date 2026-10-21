@@ -26,3 +26,19 @@ describe("6M z předplatného", () => {
     expect(sixMClientSet(d).has("X")).toBe(false);
   });
 });
+
+describe("předplatné zaplatené vopred (Robin Martinek, 21. 10. 2026)", () => {
+  it("platba na předplatné po skončení posledného sa počíta ako ďalší mesiac", () => {
+    const d = data({
+      balickyKokpit: [
+        { klient: "Robin Martinek", nazov: "OFF - 6h S viazanostou", hodiny: 6, platnostOd: "2026-08-03", platnostDo: "2026-09-02" },
+        { klient: "Robin Martinek", nazov: "OFF - 6h S viazanostou", hodiny: 8, platnostOd: "2026-09-21", platnostDo: "2026-10-20" },
+      ],
+      platbyKokpit: [
+        { klient: "Robin Martinek", datum: "2026-09-21", suma: 6990 },
+        { klient: "Robin Martinek", datum: "2026-10-16", suma: 6990 },
+      ],
+    });
+    expect(zaciatkyPredplatneho(d).get("Robin Martinek")).toEqual(["2026-08-03", "2026-09-21", "2026-10-16"]);
+  });
+});

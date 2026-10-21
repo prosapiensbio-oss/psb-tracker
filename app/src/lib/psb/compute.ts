@@ -3,6 +3,7 @@
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { klucNezaplateneho, treningyBezBalicka, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
 import { nazovProduktu } from "./nazvyProduktov";
+import { CENNIK } from "./cennik";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
@@ -222,11 +223,26 @@ export function zaciatkyPredplatneho(data: PSBData): Map<string, string[]> {
   for (const b of data.balickyKokpit || []) {
     if (!b.zruseneAt && !b.kotva && jePredplatne(b.nazov)) pridaj(b.klient, b.platnostOd.slice(0, 10));
   }
+  /**
+   * ZAPLATENÉ VOPRED JE TIEŽ MESIAC (Jerry, 21. 10. 2026: „prečo je Martinek
+   * na 3 a nie 4, keď má 4 platby za 6 990?"). Robin zaplatil 16. 10. ďalšie
+   * předplatné, ale balíček vznikne až jeho ďalším tréningom. Platba v Kokpite
+   * na cenu předplatného, ktorá prišla viac než 20 dní po poslednom začiatku
+   * (tá skoršia je zvyčajne neskorá platba bežiaceho), sa počíta ako ďalší
+   * mesiac — kým balíček nevznikne; potom ju nahradí jeho začiatok.
+   */
+  const cenyPredplatneho = new Set(CENNIK.filter((c) => jePredplatne(c.nazov) && c.cena).map((c) => Math.round(c.cena!)));
+  const dnes = dnesPraha();
   const out = new Map<string, string[]>();
   for (const [k, set] of dni) {
     const zoradene = [...set].sort();
     const jedno: string[] = [];
     for (const d of zoradene) if (!jedno.length || daysBetween(jedno[jedno.length - 1], d) > 10) jedno.push(d);
+    const posledny = jedno[jedno.length - 1];
+    const vopred = (data.platbyKokpit || [])
+      .filter((p) => normName(p.klient) === k && cenyPredplatneho.has(Math.round(p.suma)) && p.datum <= dnes && p.datum > posledny && daysBetween(posledny, p.datum) > 20)
+      .map((p) => p.datum).sort()[0];
+    if (vopred) jedno.push(vopred);
     out.set(meno.get(k)!, jedno);
   }
   return out;

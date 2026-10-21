@@ -295,7 +295,8 @@ export function kanalBalicka(nazov: string): "on" | "off" | null {
   if (/^\s*OFF\b|offline/i.test(n)) return "off";
   return CENNIK.find((s) => s.nazov === n.trim())?.skupina === "Offline" ? "off" : null;
 }
-const kanalTreningu = (u: Extract<Udalost, { druh: "trening" }>): "on" | "off" | null =>
+/** Druh tréningu z názvu sedenia: „ONLINE - 60min" / „OFFLINE - 60min" (z kalendára podľa slova „online"). */
+export const kanalTreningu = (u: Extract<Udalost, { druh: "trening" }>): "on" | "off" | null =>
   /online/i.test(u.nazov || "") ? "on" : /offline/i.test(u.nazov || "") ? "off" : null;
 
 export function priebehBalickov(

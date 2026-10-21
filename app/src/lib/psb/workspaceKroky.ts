@@ -19,7 +19,8 @@ import { normName } from "./format";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { NAZOV_PRENESENYCH } from "./platnostZostatok";
-import type { StavRiadku } from "./vypisHodin";
+import { kanalBalicka, kanalTreningu, type StavRiadku } from "./vypisHodin";
+import { KOKPIT_OD } from "./sedeniaZKalendara";
 
 const den = (s: string) => String(s || "").slice(0, 10);
 const dniMedzi = (a: string, b: string) =>
@@ -150,6 +151,9 @@ export function navrhNovehoBalicka(
     };
   }
 
+  const offline = samostatnaOfflineHodina(klient, os);
+  if (offline) return offline;
+
   if (!nekryte.length) return null;
   const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
 
@@ -164,7 +168,11 @@ export function navrhNovehoBalicka(
     u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO
     // Prenesené hodiny nie sú predaj (Natália Krivdová, 19. 10. 2026: nový
     // balíček vznikol ako „Prenesené hodiny" za 0 Kč namiesto předplatného).
-    && u.nazov !== NAZOV_PRENESENYCH;
+    && u.nazov !== NAZOV_PRENESENYCH
+    // Doplnenie zapísané v Kokpite nemá na osi príznak `doplnenie` (je to
+    // riadok z `balicky`) — Jakub Kaňovský dostal 21. 10. automaticky
+    // „Doplnenie členstva" za 0 Kč. Doplnenie nie je predaj.
+    && !/^\s*doplnenie/i.test(u.nazov);
   const posledny = os.find(jeVzor);
   if (!posledny) return null;
 
@@ -210,6 +218,55 @@ export function navrhNovehoBalicka(
     pauzaDni,
     cenaPoznamka,
   };
+}
+
+/**
+ * OFFLINE TRÉNING POČAS ONLINE ČLENSTVA = SAMOSTATNÁ HODINA (Jerry, 21. 10.
+ * 2026: „Veronika keď príde na offline, tak platí 1 h za 1 450, keď online,
+ * má cenu, čo má.“ Terezka jej online tréningy píše do kalendára so slovom
+ * „online“; bez neho je tréning offline).
+ *
+ * Os už vie, že 1h offline balíček popri online členstve pokryje svoj
+ * tréning a členstvo beží ďalej. Chýbalo, aby ho Kokpit sám založil — offline
+ * tréning inak zjedol hodinu z online balíčka.
+ *
+ * LEN PRE KLIENTA, KTORÝ SI TAKÚ HODINU UŽ RAZ KÚPIL (Veronika 2. 9., Marcela
+ * Hrůzová 18. 9.). Lucia Podolová má online balíček a väčšinu tréningov
+ * v kalendári bez slova „online“ — všeobecné pravidlo by jej každý z nich
+ * účtovalo zvlášť. A len od 1. 10. 2026: minulosť appka sama nepíše.
+ */
+export function samostatnaOfflineHodina(klient: string, os: Udalost[]): NavrhNovehoBalicka | null {
+  const balicky = os.filter((u): u is Extract<Udalost, { druh: "balicekOd" }> => u.druh === "balicekOd" && !u.doplnenie);
+  const jeHodinaOff = (b: { hodin: number; nazov: string }) => b.hodin === 1 && kanalBalicka(b.nazov) === "off" && b.nazov !== NAZOV_UVODNEHO;
+  if (!balicky.some(jeHodinaOff)) return null;
+  const sablona = CENNIK.find((x) => x.nazov === "1h Balíček");
+  if (!sablona?.hodiny) return null;
+  const treningy = os
+    .filter((u): u is Extract<Udalost, { druh: "trening" }> => u.druh === "trening" && !u.uvodny && u.zdarma === undefined && u.den >= KOKPIT_OD)
+    .sort((a, b) => a.den.localeCompare(b.den));
+  for (const t of treningy) {
+    if (kanalTreningu(t) !== "off") continue;
+    if (balicky.some((b) => b.den === t.den && jeHodinaOff(b))) continue;
+    // Bežiace členstvo v ten deň: posledný balíček s viac hodinami.
+    const clenstvo = balicky
+      .filter((b) => b.hodin > 1 && b.den <= t.den && (!b.doDna || b.doDna >= t.den))
+      .sort((a, b) => b.den.localeCompare(a.den))[0];
+    if (!clenstvo || kanalBalicka(clenstvo.nazov) !== "on") continue;
+    return {
+      klient,
+      odDna: t.den,
+      nekrytych: 1,
+      nazov: sablona.nazov,
+      hodiny: sablona.hodiny,
+      cena: sablona.cena ?? 1450,
+      platnostDo: platnostDo(t.den, sablona.tyzdnov, sablona.mesiacov),
+      predosly: { nazov: clenstvo.nazov, od: clenstvo.den, cena: null },
+      navrat: false,
+      pauzaDni: -1,
+      cenaPoznamka: "offline tréning popri online členstve — samostatná hodina",
+    };
+  }
+  return null;
 }
 
 /* ───────────────────────── 3 · PLATBY: SUMA NESEDÍ ───────────────────────── */
