@@ -9,7 +9,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
 import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
-import { zapisTrening } from "../../lib/psb/nahodTrening.server";
+import { pravidloCelehoMena, zapisTrening } from "../../lib/psb/nahodTrening.server";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
@@ -50,7 +50,14 @@ type ZdrojStav = {
   id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null;
   snimka_kedy: string | null; snimka_ok: number | null; snimka_chyba: string | null;
 };
-type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; typ_rucne: number | null; zmizla_at: string | null; prvy_raz: string | null };
+type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; typ_rucne: number | null; klient_rucne: number | null; zmizla_at: string | null; prvy_raz: string | null };
+
+/** Mená známych klientov — pre istú zhodu celého mena (sťahovanie aj stráž pravidla mena). */
+async function znamiKlienti(DB: D1Database): Promise<string[]> {
+  return (((await DB.prepare(
+    "SELECT DISTINCT client_name m FROM sessions UNION SELECT DISTINCT klient FROM balicky UNION SELECT DISTINCT klient FROM kal_mapovanie WHERE klient IS NOT NULL",
+  ).all().catch(() => ({ results: [] }))).results || []) as { m: string }[]).map((x) => String(x.m || "")).filter(Boolean);
+}
 
 function okno() {
   // Hranice v PRAŽSKOM čase — `kal_udalosti.zaciatok` nesie miestny čas bez
@@ -100,7 +107,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   }
 
   const stare = ((await DB.prepare(
-    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, zmizla_at, prvy_raz FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
+    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, klient_rucne, zmizla_at, prvy_raz FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
   ).bind(z.trener, od, do_).all()).results || []) as unknown as Ulozena[];
   const prveStiahnutie = stare.length === 0;
   const podlaUid = new Map(stare.map((s) => [s.uid, s]));
@@ -109,9 +116,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const mapovanie = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
     .bind(z.trener).all()).results || []) as unknown as Mapa[];
   // Známi klienti — pre ISTÚ zhodu celého mena (`klientPodlaCelehoMena`).
-  const menaKlientov = (((await DB.prepare(
-    "SELECT DISTINCT client_name m FROM sessions UNION SELECT DISTINCT klient FROM balicky UNION SELECT DISTINCT klient FROM kal_mapovanie WHERE klient IS NOT NULL",
-  ).all().catch(() => ({ results: [] }))).results || []) as { m: string }[]).map((x) => String(x.m || "")).filter(Boolean);
+  const menaKlientov = await znamiKlienti(DB);
 
   const prikazy: D1PreparedStatement[] = [];
   // Zmeny sa najprv nazbierajú a až potom zapíšu — treba ich vidieť naraz, aby
@@ -133,13 +138,15 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // Bez naučeného mapovania: celé meno práve jedného klienta je istá zhoda
     // a nepýta sa (Jerry 6. 10. 2026: „istá zhoda smie ísť sama“).
     const presne = m ? null : klientPodlaCelehoMena(u.nazov, menaKlientov);
-    const klient = m?.klient ?? presne;
+    // Klienta JEDNEJ udalosti, ktorého určil človek, pravidlo mena neprepíše
+    // (21. 10. 2026 — „Albert Matl“ ↔ Richard Matl).
+    const s = podlaUid.get(u.uid);
+    const klient = s?.klient_rucne ? s.klient : (m?.klient ?? presne);
     // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
     // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie
     // človeka je horšie než žiadne, sedenie by sa pripísalo cudziemu.
     const typZPravidiel = m?.typ ?? typZNazvu(u.nazov) ?? (presne ? "trening" : null);
-    const s = podlaUid.get(u.uid);
     /**
      * ČO URČIL ČLOVEK, STIAHNUTIE NEPREPÍŠE.
      *
@@ -689,9 +696,7 @@ export const Route = createFileRoute("/api/kalendar")({
               `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?7, ?7, NULL)`,
             ).bind(noveUid, novy, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej),
-            DB.prepare(
-              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, ?3, 1)`,
-            ).bind(klient, novy, typNovej),
+            ...pravidloCelehoMena(DB, klient, novy, typNovej),
           ]);
           try {
             const zasah = await idPreZasah(kluc, kalendar, ics.replace(/@google\.com$/, ""), r.zaciatok);
@@ -916,20 +921,45 @@ export const Route = createFileRoute("/api/kalendar")({
           // s vedomím, že to meno sedí na viacerých ľudí. Staré mapovania
           // vznikli bez tej informácie, preto sa za rozhodnutie nepočítajú.
           const vedome = b.vedome ? 1 : 0;
+          /**
+           * STRÁŽ CELÉHO MENA (21. 10. 2026). Udalosť „Albert Matl“ sa od
+           * septembra pripisovala Richardovi Matlovi — pravidlo mena pre CELÝ
+           * názov ukazovalo na iného človeka, než ktorého meno v názve stojí.
+           * Keď je názov celé meno práve jedného známeho klienta, pravidlo ho
+           * nesmie poslať inam. Jeden tréning iného klienta pod cudzím názvom
+           * sa rieši v okne udalosti (len tá jedna, `klient-udalosti`).
+           */
+          if (klient) {
+            const presne = klientPodlaCelehoMena(nazov, await znamiKlienti(DB));
+            if (presne && presne !== klient) {
+              return Response.json({ ok: false, error: `„${nazov}“ je celé meno klienta ${presne} — všetky jeho udalosti klientovi ${klient} dať nejde. Ak na jednom tréningu bol ${klient}, zmeň klienta len pri tej jednej udalosti.` }, { status: 400 });
+            }
+          }
+          const predtym = await DB.prepare("SELECT klient FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas = ?")
+            .bind(nazov, trener, cas).first<{ klient: string | null }>().catch(() => null);
           await DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?,?,?,?,?,?,?)")
             .bind(nazov, trener, cas, klient, typ, teraz(), vedome).run();
+          // Pravidlo mena sa zapisuje do auditu — 21. 10. 2026 sa nedalo zistiť,
+          // kedy a odkiaľ „Albert Matl“ dostal Richarda; tabuľka drží len posledný zápis.
+          await audit(DB, {
+            action: "kalendar-pravidlo-mena",
+            predmet: `${trener}: ${nazov}${cas ? ` · ${cas}` : ""}`,
+            old: predtym ? (predtym.klient || "(bez klienta)") : undefined,
+            neu: `${klient || "(bez klienta)"} · ${typ}`,
+            actor: await currentUser(request) || undefined,
+          });
           // Doplní sa spätne aj na už uložené udalosti — inak by sa mapovanie
           // prejavilo až pri ďalšom stiahnutí a človek by mal pocit, že sa nič nestalo.
           // Pri mapovaní na čas sa prepíšu len udalosti v tom čase.
           if (cas) {
-            await DB.prepare("UPDATE kal_udalosti SET klient = ?, typ = ? WHERE nazov = ? AND trener = ? AND substr(zaciatok, 12, 5) = ?")
+            await DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = ? WHERE nazov = ? AND trener = ? AND substr(zaciatok, 12, 5) = ?")
               .bind(klient, typ, nazov, trener, cas).run();
           } else {
             // Udalosti, pre ktoré platí presnejšie mapovanie na čas, sa
             // nesmú prepísať všeobecným — inak by oprava zmizla pri prvom
             // uložení všeobecného pravidla.
             await DB.prepare(
-              `UPDATE kal_udalosti SET klient = ?, typ = ?
+              `UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE ? END, typ = ?
                 WHERE nazov = ? AND trener = ?
                   AND substr(zaciatok, 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
             ).bind(klient, typ, nazov, trener, nazov, trener).run();
@@ -952,6 +982,41 @@ export const Route = createFileRoute("/api/kalendar")({
             ).bind(klient, nazov, trener, nazov, trener).run().catch(() => undefined);
           }
           return Response.json({ ok: true });
+        }
+
+        /**
+         * KLIENT JEDNEJ UDALOSTI (21. 10. 2026). Okno udalosti menilo pravidlo
+         * pre celý názov, takže „na tomto tréningu bol Richard“ prepísalo aj
+         * všetky Albertove. Toto mení len jednu udalosť a značka
+         * `klient_rucne` ju chráni pred sťahovaním aj pred pravidlom mena.
+         * Prázdny klient značku zruší — udalosť sa vráti k pravidlu.
+         */
+        if (akcia === "klient-udalosti") {
+          const kluc = String(b.uid || "");
+          const trener = String(b.trener || "");
+          const klient = String(b.klient || "").trim();
+          if (!kluc || !trener) return Response.json({ ok: false, error: "chýba udalosť" }, { status: 400 });
+          const r = await DB.prepare("SELECT nazov, klient, zaciatok FROM kal_udalosti WHERE uid = ? AND trener = ?")
+            .bind(kluc, trener).first<{ nazov: string; klient: string | null; zaciatok: string }>();
+          if (!r) return Response.json({ ok: false, error: "Takú udalosť Kokpit nepozná." }, { status: 404 });
+          let novy: string | null = klient || null;
+          if (!klient) {
+            const pravidla = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
+              .bind(trener).all()).results || []) as unknown as Mapa[];
+            const m = vyberMapu(pravidla, r.nazov, trener, casUdalosti(r.zaciatok));
+            novy = m?.klient ?? klientPodlaCelehoMena(r.nazov, await znamiKlienti(DB));
+          }
+          await DB.prepare("UPDATE kal_udalosti SET klient = ?, klient_rucne = ? WHERE uid = ? AND trener = ?")
+            .bind(novy, klient ? 1 : 0, kluc, trener).run();
+          await DB.prepare("UPDATE kal_zmeny SET klient = ? WHERE uid = ? AND trener = ?").bind(novy, kluc, trener).run().catch(() => undefined);
+          await audit(DB, {
+            action: "kalendar-klient-udalosti",
+            predmet: `${trener}: ${r.nazov} · ${r.zaciatok.slice(0, 16)}`,
+            old: r.klient || "(bez klienta)",
+            neu: klient ? novy || "" : `podľa pravidla: ${novy || "(bez klienta)"}`,
+            actor: await currentUser(request) || undefined,
+          });
+          return Response.json({ ok: true, klient: novy });
         }
 
         /**
@@ -984,7 +1049,7 @@ export const Route = createFileRoute("/api/kalendar")({
           await DB.batch(dvojice.flatMap((d) => [
             DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?,?,'',NULL,?,?,1)")
               .bind(d.nazov, d.trener, typ, kedy2),
-            DB.prepare("UPDATE kal_udalosti SET klient = NULL, typ = ? WHERE nazov = ? AND trener = ?")
+            DB.prepare("UPDATE kal_udalosti SET klient = CASE WHEN klient_rucne = 1 THEN klient ELSE NULL END, typ = ? WHERE nazov = ? AND trener = ?")
               .bind(typ, d.nazov, d.trener),
           ]));
           await audit(DB, {

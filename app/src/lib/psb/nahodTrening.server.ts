@@ -13,6 +13,30 @@ import { icsUid, pripravTrening, type VstupTreningu } from "./nahodTrening";
  * najbližšia snímka ho len potvrdí. Meno udalosti je plné meno klienta
  * a mapovanie sa doučí samo.
  */
+/**
+ * PRAVIDLO „NÁZOV = CELÉ MENO KLIENTA“ (21. 10. 2026). Kokpit nahadzuje
+ * udalosť s názvom presne podľa klienta, takže pravidlo pre ten názov MUSÍ
+ * ukazovať naňho. Do 21. 10. to bolo `INSERT OR IGNORE`: staré zlé pravidlo
+ * („Albert Matl“ → Richard Matl) prežilo, Jerry Albertov tréning zmazal
+ * a nahodil znova — a znova ho dostal Richard. Teraz pravidlo prepíše
+ * a opraví aj udalosti s tým názvom (okrem ručne určených a tých, kde platí
+ * pravidlo na čas).
+ */
+export function pravidloCelehoMena(DB: D1Database, klient: string, trener: string, typ: string) {
+  return [
+    DB.prepare(
+      `INSERT INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?1, ?2, '', ?1, ?3, ?4, 1)
+       ON CONFLICT(nazov, trener, cas) DO UPDATE SET klient = excluded.klient, vedome = 1, potvrdene_at = excluded.potvrdene_at
+       WHERE kal_mapovanie.klient IS NOT excluded.klient`,
+    ).bind(klient, trener, typ, new Date().toISOString()),
+    DB.prepare(
+      `UPDATE kal_udalosti SET klient = ?1
+        WHERE nazov = ?1 AND trener = ?2 AND klient_rucne = 0 AND klient IS NOT ?1
+          AND substr(zaciatok, 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ?1 AND trener = ?2 AND cas <> '')`,
+    ).bind(klient, trener),
+  ];
+}
+
 export async function zapisTrening(
   DB: D1Database,
   kluc: string | undefined,
@@ -50,9 +74,7 @@ export async function zapisTrening(
     ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej),
     // Mapovanie: plné meno klienta ako názov → klient. Bez času,
     // platí pre všetky jeho budúce udalosti s týmto názvom.
-    DB.prepare(
-      `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, ?3, 1)`,
-    ).bind(klient, v.t.trener, typNovej),
+    ...pravidloCelehoMena(DB, klient, v.t.trener, typNovej),
   ]);
   await audit(DB, { action: akciaAuditu, predmet: `${v.t.nazov} · ${v.t.zaciatok} · ${v.t.trener}`, neu: uid, actor: kto });
   return { ok: true, uid, zaciatok: v.t.zaciatok };

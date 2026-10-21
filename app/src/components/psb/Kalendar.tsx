@@ -1751,6 +1751,15 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     vyber.den !== u.zaciatok.slice(0, 10) || vyber.cas !== u.zaciatok.slice(11, 16) || vyber.minut !== trvanieMin(u)
   );
   const mapaZmenena = !!u && (typ !== (u.typ || "") || (sMenom ? klient.trim() : "") !== (u.klient || ""));
+  /**
+   * Klient JEDNEJ udalosti (Jerry, 21. 10. 2026). Keď udalosť klienta už má
+   * a človek ho tu zmení, myslí „na tomto tréningu bol niekto iný“ — nie
+   * „všetky udalosti s týmto názvom sú odteraz jeho“. Zmena pravidla pre
+   * celý názov preklopila všetky Albertove tréningy na Richarda Matla.
+   * Pravidlo pre názov sa učí len tam, kde udalosť klienta ešte nemá.
+   */
+  const typZmeneny = !!u && typ !== (u.typ || "");
+  const lenTatoUdalost = !!u && !!u.klient && sMenom && klient.trim() !== "" && klient.trim() !== u.klient;
   const daSa = !uklada && (u ? (casZmeneny || mapaZmenena) : (sMenom && klient.trim().length >= 3));
 
   const pole = { padding: "6px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" } as const;
@@ -1773,8 +1782,15 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — presun sa nezapísal" }));
           if (!j.ok) { setChyba(j.error || "Presun sa nepodaril."); return; }
         }
-        if (mapaZmenena) {
-          const j = await posli({ akcia: "mapuj", nazov: u.nazov, trener: u.trener, typ, klient: sMenom ? klient.trim() : null })
+        if (lenTatoUdalost) {
+          const j = await posli({ akcia: "klient-udalosti", uid: u.uid, trener: u.trener, klient: klient.trim() })
+            .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — klient sa nezmenil" }));
+          if (!j.ok) { setChyba(j.error || "Nepodarilo sa zmeniť klienta tejto udalosti."); return; }
+        }
+        if (lenTatoUdalost ? typZmeneny : mapaZmenena) {
+          // Pri zmene len tejto udalosti ostáva pravidlu pôvodný klient.
+          const klientPravidla = lenTatoUdalost ? u.klient : (sMenom ? klient.trim() : null);
+          const j = await posli({ akcia: "mapuj", nazov: u.nazov, trener: u.trener, typ, klient: klientPravidla })
             .catch(() => ({ ok: false as const, error: "spojenie" }));
           if (!j.ok) { setChyba(j.error || "Nepodarilo sa uložiť meno a druh."); return; }
         }
@@ -1951,7 +1967,9 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
 
       {u && mapaZmenena && (
         <div style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.5, marginBottom: 8 }}>
-          Meno a druh platia na <b>všetky udalosti „{u.nazov}"</b> u tohto trénera. Čas sa mení len tejto jednej.
+          {lenTatoUdalost
+            ? <>Klient sa zmení <b>len pri tomto tréningu</b> — ostatné udalosti „{u.nazov}“ ostávajú {u.klient}.{typZmeneny && <> Druh platí na všetky udalosti „{u.nazov}“.</>}</>
+            : <>Meno a druh platia na <b>všetky udalosti „{u.nazov}“</b> u tohto trénera. Čas sa mení len tejto jednej.</>}
         </div>
       )}
       {chyba && <div style={{ fontSize: 11.5, color: C.red, lineHeight: 1.5, marginBottom: 8 }}>{chyba}</div>}
