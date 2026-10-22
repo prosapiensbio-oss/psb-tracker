@@ -126,6 +126,40 @@ function odpocetPoBalickoch(
   zadarmo: Set<string>,
   jeNezaplateny: (b: BalicekPreZostatok) => boolean,
 ): number {
+  const { zvysok, minus } = prebehOdpoctu(balickyKlienta, k, sedenia, dnes, zadarmo, jeNezaplateny);
+  let spolu = 0;
+  for (const [b, r] of zvysok) if (jeAktivnyBalicek(b, dnes)) spolu += r;
+  return Math.round((spolu - minus) * 100) / 100;
+}
+
+/**
+ * Koľko hodín balíčku zostalo v posledný deň platnosti — to isté pravidlo
+ * ako karta. Z toho sa berie prenos do ďalšieho mesiaca předplatného.
+ */
+export function zvysokNaKonci(
+  balicky: BalicekPreZostatok[],
+  klient: string,
+  sedenia: SedeniePreZostatok[],
+  balicek: BalicekPreZostatok,
+  zadarmo: Set<string> = new Set(),
+  nezaplatene: Set<string> = new Set(),
+): number {
+  const k = normName(klient);
+  const koniecDna = den(balicek.platnostDo || "");
+  if (!koniecDna) return 0;
+  const { zvysok } = prebehOdpoctu(balicky.filter((b) => normName(b.klient) === k), k, sedenia, koniecDna, zadarmo,
+    (b) => nezaplatene.has(klucNezaplateneho(b.klient, b.platnostOd)));
+  return Math.round((zvysok.get(balicek) || 0) * 100) / 100;
+}
+
+function prebehOdpoctu(
+  balickyKlienta: BalicekPreZostatok[],
+  k: string,
+  sedenia: SedeniePreZostatok[],
+  dnes: string,
+  zadarmo: Set<string>,
+  jeNezaplateny: (b: BalicekPreZostatok) => boolean,
+): { zvysok: Map<BalicekPreZostatok, number>; minus: number } {
   const moje = balickyKlienta.filter((b) => !b.zruseneAt && den(b.platnostOd) <= dnes && b.hodiny != null);
   const koniec = (b: BalicekPreZostatok) => (b.platnostDo ? den(b.platnostDo) : "9999-12-31");
   // Reťaz: platné balíčky a všetko, čo sa s nimi prekrýva (aj už skončené) —
@@ -174,9 +208,7 @@ function odpocetPoBalickoch(
     minus += h;
   }
   while (i < retaz.length) zacni(retaz[i++]);
-  let spolu = 0;
-  for (const [b, r] of zvysok) if (jeAktivnyBalicek(b, dnes)) spolu += r;
-  return Math.round((spolu - minus) * 100) / 100;
+  return { zvysok, minus };
 }
 
 export function zostatokKokpitu(

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { navrhyNovychBalickov } from "../../lib/psb/automatickeBalicky.server";
+import { navrhyNovychBalickov, navrhyPokracovaniaPredplatneho } from "../../lib/psb/automatickeBalicky.server";
 import { smieVzniknutAutomaticky } from "../../lib/psb/workspaceKroky";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -303,8 +303,46 @@ export const Route = createFileRoute("/api/balicky")({
          */
         if (akcia === "automaticky") {
           const dnes = dnesPraha();
-          const navrhy = await navrhyNovychBalickov(DB, dnes);
           const vznikli: { klient: string; nazov: string; od: string; navrat: boolean }[] = [];
+          const den = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}`;
+          /**
+           * PŘEDPLATNÉ POKRAČUJE V DEŇ PO KONCI (22. 10. 2026) — najprv, aby
+           * tréning v novom mesiaci už bol krytý a nezaložil balíček druhýkrát.
+           * Prenos do 2 h ide cez `balicky_presun`, ako ručný presun: ten istý
+           * zápis ho pripočíta. Keď presun z toho konca už je (Jerry ho
+           * zapísal sám) alebo sú hodiny prenesené ako „Prenesené hodiny",
+           * nepridáva sa nič.
+           */
+          for (const p of await navrhyPokracovaniaPredplatneho(DB, dnes)) {
+            const uz = await DB.prepare(
+              "SELECT id FROM balicky WHERE klient = ?1 AND platnost_od = ?2 AND zrusene_at IS NULL LIMIT 1",
+            ).bind(p.klient, p.odDna).first().catch(() => null);
+            if (uz) continue;
+            if (p.prenos > 0) {
+              const presun = await DB.prepare("SELECT id FROM balicky_presun WHERE klient = ?1 AND z_platnosti_do = ?2 LIMIT 1")
+                .bind(p.klient, p.predosle.do).first().catch(() => null);
+              const prenesene = await DB.prepare(
+                "SELECT id FROM balicky WHERE klient = ?1 AND platnost_od = ?2 AND zrusene_at IS NULL AND (nazov LIKE '%renesen%' OR nazov LIKE '%oplnenie%') LIMIT 1",
+              ).bind(p.klient, p.predosle.do).first().catch(() => null);
+              // „Nechať prepadnúť" na otázke pred koncom mesiaca = neprenáša sa nič.
+              const odpoved = await DB.prepare("SELECT note FROM anomaly_ack WHERE anomaly_key = ?1")
+                .bind(`platnost|${p.klient}|${p.predosle.do}`).first<{ note: string | null }>().catch(() => null);
+              const prepadlo = /prepadl|prepadnú/i.test(String(odpoved?.note || ""));
+              if (!presun && !prenesene && !prepadlo) {
+                await DB.prepare("INSERT INTO balicky_presun (id, klient, hodiny, z_platnosti_do, created_at, autor) VALUES (?1,?2,?3,?4,?5,?6)")
+                  .bind(uid(), p.klient, p.prenos, p.predosle.do, teraz(), "kokpit").run();
+              }
+            }
+            const poznamka = [
+              `automaticky — pokračovanie předplatného od ${den(p.odDna)} (${p.mesiac}. mesiac zo 6)`,
+              p.nevycerpane > p.prenos ? `zostalo ${p.nevycerpane} h, prenášajú sa najviac 2` : "",
+              p.cenaPoznamka || "",
+            ].filter(Boolean).join(" · ");
+            await zapisBalicek(DB, { klient: p.klient, nazov: p.nazov, hodiny: p.hodiny, od: p.odDna, doDna: p.doDna, cena: p.cena, poznamka },
+              kto || "kokpit", "balicek-predplatne-pokracuje");
+            vznikli.push({ klient: p.klient, nazov: p.nazov, od: p.odDna, navrat: false });
+          }
+          const navrhy = await navrhyNovychBalickov(DB, dnes);
           for (const n of navrhy) {
             const uz = await DB.prepare(
               "SELECT id FROM balicky WHERE klient = ?1 AND platnost_od = ?2 AND zrusene_at IS NULL AND zdroj = 'rucne' LIMIT 1",
@@ -312,7 +350,6 @@ export const Route = createFileRoute("/api/balicky")({
             if (uz) continue;
             // Druhá stráž priamo pri zápise: doplnenie ani 0 Kč sám nevznikne.
             if (!smieVzniknutAutomaticky(n)) continue;
-            const den = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}`;
             const poznamka = [
               `automaticky — vznikol prvým tréningom ${den(n.odDna)}`,
               n.navrat ? `návrat po ${n.pauzaDni} dňoch — over, či sedí` : "",

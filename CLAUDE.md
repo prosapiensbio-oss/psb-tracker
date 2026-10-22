@@ -3157,3 +3157,33 @@ pravidlá v `lib/psb/platiZa.ts`. Nastavuje sa v profile klienta → Peniaze.
   `client-delete.ts`** — nie ako `WHERE name = ?`, ale ako položka zoznamu
   (rovnako ako `fakturacne_kontakty.klient`). Bez toho by premenovanie ticho
   zmenšilo sumu v platiteľovom odkaze a nikto by si to nevšimol.
+
+## Předplatné pokračuje samo, hodiny sa míňajú po balíčkoch (22. 10. 2026)
+
+Jerry, keď Robin Martinek ráno nemal žiadne hodiny, hoci 16. 10. zaplatil
+předplatné od 21. 10.: „predplatné má pravidlo, že 2 h môžeš preniesť do
+ďalšieho balíčka." Podmienky: 6 mesiacov, 6 h mesačne, prenos max 2 h.
+
+- **Ďalší mesiac vzniká V DEŇ PO KONCI** (`pokracovaniePredplatneho.ts`,
+  akcia `automaticky` v `/api/balicky` — beží PRED zakladaním z prvého
+  tréningu). Len počas 6 mesiacov od prvého předplatného v rade (medzera do
+  31 dní je ten istý záväzok; staršie obdobia z `ptminder_historia`). Po 6
+  mesiacoch rozhoduje tréning ako pri balíčku. Kto po konci mesiac neprišiel,
+  nepokračuje.
+- **Minul hodiny skôr = nové obdobie skôr** (Jerry: pravidlo A) — zakladá ho
+  tréning (`navrhNovehoBalicka`) a pokračovanie sa potom nezakladá, lebo
+  ďalší balíček už je. Stalo sa 3× (Hanus 2. 10., Malinová a Vaško 19. 10.).
+- **Prenos najviac 2 h ide sám** cez `balicky_presun` (ten istý zápis ako
+  ručný presun). Nepridá sa, keď presun z toho konca už je, keď v deň konca
+  stojí „Prenesené hodiny"/„Doplnenie", alebo keď na otázku `platnost|…`
+  padlo „prepadlo". Otázka (`zostavaPoPlatnosti`) sa pri předplatnom ukáže
+  len nad 2 h — o zvyšku.
+- **Zostatok na karte sa počíta po balíčkoch** (`prebehOdpoctu`
+  v `zostatokKokpitu.ts`): tréning minie hodinu z najstaršieho platného
+  balíčka s hodinami, nevyčerpané pri konci platnosti prepadne, mínus prepíše
+  prvý ďalší zaplatený balíček, kotva ruší mínus pred sebou, doplnenie
+  a prenesené vynulujú balíčky končiace najneskôr v ich deň (inak zvyšok
+  dvakrát). Staré pravidlo „hodiny aktívnych mínus tréningy od najstaršieho"
+  dávalo po konci prekrývajúceho sa balíčka nezmysel (Vaško by 26. 10. mal
+  −7 namiesto −1; zistila nezávislá kontrola Fable). Overené: dnes 0 zmien
+  u 80 klientov, 200 dní dopredu sa líši len tam, kde staré chybovalo.

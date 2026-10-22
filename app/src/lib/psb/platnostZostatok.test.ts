@@ -38,9 +38,15 @@ describe("zostavaPoPlatnosti", () => {
 
   it("pri balíčku sa presun neponúka, pri predplatnom áno", () => {
     const balicek = zostavaPoPlatnosti([kl({ name: "A" })], DNES)[0];
-    const predplatne = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné" })], DNES)[0];
+    const predplatne = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné", packageRemaining: 3 })], DNES)[0];
     expect(balicek.presunHodin).toBe(0);
     expect(predplatne.presunHodin).toBe(2);
+  });
+
+  it("pri předplatnom do 2 h sa nepýta — prenesú sa samy s ďalším mesiacom (22. 10. 2026)", () => {
+    expect(zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné", packageRemaining: 2 })], DNES)).toHaveLength(0);
+    expect(zostavaPoPlatnosti([kl({ name: "C", membership: "OFF - 6h S viazanostou", packageRemaining: 1 })], DNES)).toHaveLength(0);
+    expect(zostavaPoPlatnosti([kl({ name: "D", clientType: "6M Predplatné", packageRemaining: 3 })], DNES)).toHaveLength(1);
   });
 
   it("preniesť sa dajú najviac dve hodiny", () => {
@@ -83,7 +89,7 @@ describe("vetaPlatnosti", () => {
 describe("moznostiPlatnosti", () => {
   it("balíček má dve možnosti, predplatné tri", () => {
     const b = zostavaPoPlatnosti([kl({ name: "A" })], DNES)[0];
-    const p = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné" })], DNES)[0];
+    const p = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné", packageRemaining: 3 })], DNES)[0];
     expect(moznostiPlatnosti(b).map((x) => x.popis)).toEqual(["nechať prepadnúť", "dopísať 2 h ako doplnenie"]);
     expect(moznostiPlatnosti(p).map((x) => x.popis)).toContain("preniesť 2 h do ďalšieho");
   });

@@ -1,4 +1,5 @@
 import { dnesPraha } from "./cas";
+import { jePredplatne } from "./nazvyProduktov";
 
 /** Hodiny prenesené zo skončeného předplatného (najviac 2) — nie je to predaj. */
 export const NAZOV_PRENESENYCH = "Prenesené hodiny";
@@ -75,7 +76,10 @@ export function zostavaPoPlatnosti(
     if (!doDna || c.packageRemaining <= 0) continue;
     const dni = dniMedzi(doDna, dnes);
     if (dni < -VOPRED_DNI) continue;
-    const predplatne = c.clientType === "6M Predplatné";
+    const predplatne = c.clientType === "6M Predplatné" || jePredplatne(c.membership);
+    // Do 2 h sa pri předplatnom prenesú samy s ďalším mesiacom
+    // (`pokracovaniePredplatneho`, 22. 10. 2026); pýta sa len o zvyšku nad 2 h.
+    if (predplatne && c.packageRemaining <= PRESUN_MAX_HODIN) continue;
     out.push({
       meno: c.name,
       trener: c.primaryTrainer,

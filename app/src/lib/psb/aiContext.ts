@@ -1055,7 +1055,7 @@ export function buildAiContext(
         klient: x.meno, trener: x.trener, hodin: x.hodin, platnostDo: x.platnostDo,
         dniPoPlatnosti: x.dni, predplatne: x.predplatne, prenositelnychHodin: x.presunHodin,
       })),
-      poznamka: "Komu končí (alebo do troch dní skončí) platnosť členstva a ešte mu zostávajú hodiny — karta „Platnosť končí, hodiny zostávajú“ vo Workspace a rovnaká notifikácia pod kľúčom platnost|. Sú z toho tri východiská a appka ani jedno nevyberá sama: hodiny prepadnú, dopíšu sa ako doplnenie (klient ich odtrénuje nad rámec platnosti), alebo sa pri PREDPLATNOM prenesú do ďalšieho balíčka — najviac dve hodiny, zvyšok prepadá aj tam. Keď sa Jerry rozhodne, odpoveď sa zapíše do anomaly_ack pod tým istým kľúčom.",
+      poznamka: "Komu končí (alebo do troch dní skončí) platnosť členstva a ešte mu zostávajú hodiny — karta „Platnosť končí, hodiny zostávajú“ vo Workspace a rovnaká notifikácia pod kľúčom platnost|. Sú z toho tri východiská a appka ani jedno nevyberá sama: hodiny prepadnú, dopíšu sa ako doplnenie (klient ich odtrénuje nad rámec platnosti), alebo sa pri PREDPLATNOM prenesú do ďalšieho balíčka — najviac dve hodiny, zvyšok prepadá aj tam. Od 22. 10. 2026 předplatné pokračuje SAMO: ďalší mesiac vznikne v deň po konci predošlého (počas 6 mesiacov záväzku od prvého předplatného v rade) a nevyčerpané hodiny do 2 sa prenesú automaticky; pri předplatnom sa preto pýta len o hodinách nad 2. Keď sa Jerry rozhodne, odpoveď sa zapíše do anomaly_ack pod tým istým kľúčom.",
     },
     tyzdenneHodiny,
     tyzdennePodlaTrenera,

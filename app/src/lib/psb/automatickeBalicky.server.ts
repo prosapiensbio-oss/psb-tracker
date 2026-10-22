@@ -22,6 +22,41 @@ import { osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
 import { navrhNovehoBalicka, type NavrhNovehoBalicka } from "./workspaceKroky";
 import { sBtcZlavou } from "./btcZlavaBalicka";
+import { pokracovaniePredplatneho, type PokracovaniePredplatneho } from "./pokracovaniePredplatneho";
+import { jeUkonceny } from "./ukoncenieBalicka";
+import { klucNezaplateneho } from "./zostatokKokpitu";
+
+/**
+ * Předplatné, ktorým včera skončil mesiac — ďalší vznikne sám v deň po konci
+ * (`pokracovaniePredplatneho`, Jerry 22. 10. 2026). Cena so zľavou za
+ * bitcoin rovnako ako pri balíčku z prvého tréningu.
+ */
+export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: string): Promise<PokracovaniePredplatneho[]> {
+  const data = await loadData(DB);
+  const clients = deriveClients(data);
+  const bal = await DB.prepare(
+    "SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at, poznamka FROM balicky",
+  ).all();
+  const balicky = ((bal.results || []) as any[]).map((r) => ({
+    klient: String(r.klient), nazov: String(r.nazov || ""), hodiny: r.hodiny == null ? null : Number(r.hodiny),
+    platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
+    zruseneAt: r.zrusene_at || null, kotva: /^\s*zostatok prevzatý/i.test(String(r.poznamka || "")), ukonceny: jeUkonceny(r),
+    cena: r.cena_czk == null ? null : Number(r.cena_czk), zdroj: String(r.zdroj || ""),
+  }));
+  const zadarmo = new Set((data.treningyZdarma || []).map((z) => `${normName(z.klient)}|${z.den}`));
+  const nezaplatene = new Set((data.bezHodin || []).filter((d) => !d.dvojca).map((d) => klucNezaplateneho(d.klient, d.den)));
+  const out: PokracovaniePredplatneho[] = [];
+  for (const c of Object.values(clients)) {
+    if (c.status === "Neaktívny") continue;
+    const k = normName(c.name);
+    const historia = (data.historiaBalickov || []).filter((h) => normName(h.client) === k)
+      .map((h) => ({ nazov: h.package, od: String(h.validFrom || "").slice(0, 10), do: String(h.validTo || "").slice(0, 10) }));
+    const p = pokracovaniePredplatneho(c.name, balicky, historia,
+      c.sessions.map((s) => ({ client: c.name, date: s.date, duration: s.duration })), dnes, zadarmo, nezaplatene);
+    if (p) out.push(sBtcZlavou(p, data.clientOverrides?.[c.name]));
+  }
+  return out;
+}
 
 export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promise<NavrhNovehoBalicka[]> {
   const data = await loadData(DB);
