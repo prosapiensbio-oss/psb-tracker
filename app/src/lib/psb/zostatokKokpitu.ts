@@ -113,8 +113,12 @@ export function zostatokKokpitu(
    * (18 h − 23). Kto má balíček ukončený a vrátené peniaze, má nula —
    * kým si nekúpi nový (vtedy rozhoduje bežné pravidlo nižšie).
    */
+  // Len skutočný balíček. Ukončený PREVZATÝ ZOSTATOK z PTmindera (kotva —
+  // „Doplnenie členstva“ k 20. 9.) je upratanie, nie koniec spolupráce
+  // (22. 10. 2026: Panagiotis Tsiolis mal 18 h od 10. 9. a karta ukázala
+  // 0 h, lebo jeho doplnenie bolo „ukončené 29. 9. — v PTminderi už nie je“).
   const ukonceny = balicky
-    .filter((b) => normName(b.klient) === k && !b.zruseneAt && b.ukonceny && den(b.platnostOd) <= dnes)
+    .filter((b) => normName(b.klient) === k && !b.zruseneAt && b.ukonceny && !b.kotva && den(b.platnostOd) <= dnes)
     .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
   if (ukonceny && !balicky.some((b) => normName(b.klient) === k && !b.zruseneAt && !b.ukonceny && den(b.platnostOd) > den(ukonceny.platnostOd))) {
     const hod = ukonceny.hodiny || 0;

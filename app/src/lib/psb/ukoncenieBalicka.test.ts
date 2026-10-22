@@ -108,3 +108,19 @@ describe("karta po ukončení — Radek Baláž ukazoval −5 (14. 10. 2026)", (
     expect(jeUkonceny({ poznamka: null })).toBe(false);
   });
 });
+
+describe("ukončený prevzatý zostatok nie je koniec — Panagiotis Tsiolis ukazoval 0 h (22. 10. 2026)", () => {
+  // 18 h od 10. 9.; „Doplnenie členstva“ k 20. 9. (kotva z PTmindera) ukončené 29. 9.
+  const balicky = [
+    { klient: "Panagiotis Tsiolis", nazov: "OFF - 18 hodín offline", hodiny: 18, platnostOd: "2026-09-10", platnostDo: "2027-03-09" },
+    { klient: "Panagiotis Tsiolis", nazov: "Doplnenie členstva", hodiny: 1, platnostOd: "2026-09-20", platnostDo: "2026-09-29", kotva: true, ukonceny: true },
+  ];
+  const sedenia = ["2026-09-10", "2026-09-17", "2026-09-24", "2026-10-01", "2026-10-09"]
+    .map((d) => ({ client: "Panagiotis Tsiolis", date: `${d}T00:00:00.000Z` }));
+
+  it("zostatok ide z 18 h balíčka: 18 − 5 = 13", () => {
+    const z = zostatokKokpitu(balicky, "Panagiotis Tsiolis", sedenia, "2026-10-22")!;
+    expect(z.zostatok).toBe(13);
+    expect(z.nazov).toBe("OFF - 18 hodín offline");
+  });
+});
