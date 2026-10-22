@@ -80,7 +80,10 @@ const doplneniaHodiny = Object.fromEntries(
 const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
   poplatky: poplatky.map((p: any) => ({ id: p.id, klient: p.klient, datum: p.datum, popis: p.popis, suma: Number(p.suma) || 0 })),
   platby: platby.map((p: any) => ({ id: p.id, klient: p.klient, datum: den(p.datum), suma: Number(p.suma_czk) || 0, zruseneAt: p.zrusene_at || null, vopred: !!p.vopred, sposob: p.sposob, fioId: p.fio_id })),
-  balicky: balicky.map((b: any) => ({ id: b.id, klient: b.klient, nazov: String(b.nazov || ""), cena: b.cena_czk == null ? null : Number(b.cena_czk), platnostOd: den(b.platnost_od), zdroj: String(b.zdroj || ""), zruseneAt: b.zrusene_at || null })),
+  balicky: balicky.map((b: any) => ({ id: b.id, klient: b.klient, nazov: String(b.nazov || ""), cena: b.cena_czk == null ? null : Number(b.cena_czk), platnostOd: den(b.platnost_od), zdroj: String(b.zdroj || ""), zruseneAt: b.zrusene_at || null,
+    // Bez poznámky by prevzatý zostatok (Krčmar ONE YEAR 68 h) bol nový predaj
+    // a kontrola mu hlásila dlh 77 240 Kč aj −6 h — appka ju posiela (22. 10. 2026).
+    poznamka: b.poznamka || null })),
   ptPlatby: payments.map((p: any) => ({ klient: String(p.client || ""), datum: den(p.date), suma: Number(p.amount) || 0 })),
   ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
 });
