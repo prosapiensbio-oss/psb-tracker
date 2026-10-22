@@ -97,7 +97,7 @@ const KONTROLY: { tyzden: number; id: string; nadpis: string; detail: string; ci
   },
   {
     tyzden: 4, id: "jarvis", nadpis: "Mesačná kontrola: Jarvis & dáta",
-    detail: "Polož Jarvisovi tri otázky, na ktoré poznáš odpoveď z obrazovky (tržby mesiaca, posledné sedenie konkrétneho klienta, niečo z prázdnej tabuľky) — musí sedieť, a pri prázdnej tabuľke povedať „nemerali sme“, nie si vymýšľať. Over vek importov v záložke Upload: PTminder a Instagram nemajú byť staršie než dva týždne.",
+    detail: "Polož Jarvisovi tri otázky, na ktoré poznáš odpoveď z obrazovky (tržby mesiaca, posledné sedenie konkrétneho klienta, niečo z prázdnej tabuľky) — musí sedieť, a pri prázdnej tabuľke povedať „nemerali sme“, nie si vymýšľať. Over vek importov: Instagram (Metricool) nemá byť starší než dva týždne a banka sa má sťahovať každú noc (Fio). PTminder sa od 19. 10. 2026 nenahráva.",
     ciel: { tab: "jarvis" },
   },
 ];

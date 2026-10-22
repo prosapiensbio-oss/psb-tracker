@@ -414,8 +414,18 @@ export function deriveClients(
   }
 
   const sixMSet = sixMClientSet(data);
+  // Počet nákupov (istota obnovy v predikcii): do 1. 10. 2026 kniha predajov
+  // PTmindera, od toho dňa balíčky v Kokpite — PTminder od 19. 10. nepíše
+  // a nový klient by inak navždy vyzeral ako jednorazový (audit 21. 10.).
   const serviceCounts: Record<string, number> = {};
-  for (const s of data.services) serviceCounts[s.client] = (serviceCounts[s.client] || 0) + 1;
+  for (const s of data.services) if (s.date.slice(0, 10) < KOKPIT_OD) serviceCounts[s.client] = (serviceCounts[s.client] || 0) + 1;
+  for (const b of data.balickyKokpit || []) {
+    if (b.zruseneAt || b.kotva || b.platnostOd < KOKPIT_OD || !((b.cena || 0) > 0) || /^\s*(doplnenie|prenesen)/i.test(b.nazov)) continue;
+    serviceCounts[b.klient] = (serviceCounts[b.klient] || 0) + 1;
+  }
+  // Meno v balíčku nemusí mať tú istú diakritiku ako v sedeniach.
+  const nakupyPodlaMena: Record<string, number> = {};
+  for (const [m, n] of Object.entries(serviceCounts)) nakupyPodlaMena[normName(m)] = (nakupyPodlaMena[normName(m)] || 0) + n;
   const packByClient: Record<string, PackageRow[]> = {};
   // Snímka balíčkov môže mať duplicitu (Anna Nová: dva rovnaké riadky v jeden
   // deň, v knihe predajov jeden). Bez toho si karta vyberie ten netknutý
@@ -550,7 +560,7 @@ export function deriveClients(
     c.balicekKDatumu = String(ov?.balicekKDatumu || "");
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
-    c.serviceCount = serviceCounts[c.name] || 0;
+    c.serviceCount = nakupyPodlaMena[normName(c.name)] || 0;
 
     const packs = packByClient[c.name] || [];
     // Dva riadky toho istého balíčka sú NORMÁLNY stav, nie chyba v dátach.

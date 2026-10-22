@@ -1199,7 +1199,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
                 aria-expanded={otvorene}
                 style={{ background: "none", border: "none", padding: 0, cursor: maObsah ? "pointer" : "default", fontFamily: "inherit", textAlign: "left", fontSize: 13, fontWeight: 600, color: C.text, minWidth: 190 }}
               >
-                {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder (kým beží súbežne)" : k.label}
+                {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder — posledný export" : k.label}
                 {nahrate[k.id] && <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.textDim, marginLeft: maObsah ? 14 : 0 }}>nahraté {nahrate[k.id]}</span>}
               </button>
               <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>

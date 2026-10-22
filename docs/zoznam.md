@@ -119,7 +119,7 @@ je kde pozrieť).
          vidí balíčky PTmindera aj Kokpitu, úvodný nie; „Jedno meno" berie
          `znamiKlienti`; „Bol tam?" nepýta, keď je v ten deň iná živá udalosť
          klienta). Pribudla stráž: doplnenie, prenesené hodiny ani 0 Kč
-         automaticky nevzniknú (`smieVzniknutAutomaticky`). Ostávajú 8–9:
+         automaticky nevzniknú (`smieVzniknutAutomaticky`). **8 a 9 hotové 22. 10.** (počet nákupov od 1. 10. z balíčkov Kokpitu, doplnenie sa neráta; karta „Balíček dojde" má „Teraz" namiesto „PTminder" a bez výzvy na import; mesačná kontrola bez PTmindera; krok PTminder v uzávierke len do októbra; „banka a Kokpit" od mesiaca s peniazmi z Kokpitu). Audit je celý zavretý.
          1. Os času berie predaje z PTmindera (`services`) aj po 1. 10. — Monikin
             predaj 9. 10. stál ako „nezaplatený balíček", takže Kokpit nezaložil
             vlastný a mala −2 h bez balíčka. Predaje PTmindera od 1. 10. na os nepúšťať.

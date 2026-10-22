@@ -2012,14 +2012,18 @@ function skupinaFaktur(
     for (const [mk, v] of Object.entries(btcPrijmy)) prijmySpolu[mk] = (prijmySpolu[mk] || 0) + v;
     for (const n of nezhodyPrijmov(prijmySpolu, ptPodlaMesiaca)) {
       const key = `prijmy|${n.mesiac}`;
+      // Od mesiaca s peniazmi z Kokpitu sú tržby `data.payments` platby
+      // zapísané v Kokpite, nie PTminder (22. 10. 2026 — veta klamala).
+      const zdrojTrzieb = data.peniazeOd && n.mesiac >= data.peniazeOd ? "Kokpit" : "PTminder";
+      const chybaZapis = zdrojTrzieb === "Kokpit" ? "chýba zapísaná platba v Kokpite (nespárovaná z banky, zošit, bitcoin)" : "chýba platba v PTminderi";
       out.push({
         key, category: "Zmena", tone: "orange",
         // Peniaze má na starosti Jerry (31. 8. 2026).
         trener: "Jerry",
-        title: `${monthLabel(n.mesiac)}: banka a PTminder sa v príjmoch líšia o ${n.rozdiel.toLocaleString("cs-CZ")} Kč`,
+        title: `${monthLabel(n.mesiac)}: banka a ${zdrojTrzieb} sa v príjmoch líšia o ${n.rozdiel.toLocaleString("cs-CZ")} Kč`,
         detail: n.bankaViac
-          ? `Za ${monthLabel(n.mesiac)} prišlo tromi cestami (účet + zošit + BTC) ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
-          : `Za ${monthLabel(n.mesiac)} hlási PTminder tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale tromi cestami (účet + zošit + BTC) prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišla ďalšou cestou, o ktorej appka nevie, alebo je to barter.`,
+          ? `Za ${monthLabel(n.mesiac)} prišlo tromi cestami (účet + zošit + BTC) ${n.banka.toLocaleString("cs-CZ")} Kč, ale ${zdrojTrzieb} hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď ${chybaZapis}, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
+          : `Za ${monthLabel(n.mesiac)} hlási ${zdrojTrzieb} tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale tromi cestami (účet + zošit + BTC) prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišla ďalšou cestou, o ktorej appka nevie, alebo je to barter.`,
         // Mesiac stačí — príjmy nemajú kategóriu; Zapísané pohyby sa naň
         // nafiltrujú a je vidieť, čo v ten mesiac naozaj prišlo.
         ...stavPolozky(key), priority: 6, client: `vzas|pnl|${n.mesiac}`,
@@ -2407,14 +2411,16 @@ function skupinaFaktur(
       return chyba.sort((a, b) => a.localeCompare(b, "sk"));
     })();
     return [
-      {
+      // PTminder sa od 19. 10. 2026 nepíše — export patrí len k uzávierke
+      // októbra (posledný, kým sa účet nezruší). Novšia uzávierka ho nechce.
+      ...(mk <= "2026-10" ? [{
         id: "ptminder",
         label: "PTminder",
         hotovo: !!k.plny && k.plny >= mk,
         detail: k.den ? `nahratý po ${fmtDMY(k.den)}` : "nič nie je nahraté",
         tab: "workspace",
         sub: "uzavierka",
-      },
+      }] : []),
       {
         id: "fio",
         label: "Výpis z Fio",
