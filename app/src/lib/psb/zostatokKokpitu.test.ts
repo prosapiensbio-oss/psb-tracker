@@ -82,3 +82,60 @@ describe("nezaplatený balíček je nula (Jerry, 3. 10. 2026)", () => {
     expect(z).toMatchObject({ zostatok: -3, spolu: 0, nezaplateneHodin: 8, nazov: "OFF - 8 hodín offline" });
   });
 });
+
+describe("odpočet po balíčkoch — skončenie platnosti nič nepreskupí (Fable, 22. 10. 2026)", () => {
+  const v = (od: string, doDna: string | null, hodiny: number, nazov: string, extra: Partial<BalicekPreZostatok> = {}): BalicekPreZostatok =>
+    ({ klient: "Martin Vaško", nazov, hodiny, platnostOd: od, platnostDo: doDna, ...extra });
+  const t = (d: string) => ({ client: "Martin Vaško", date: `${d}T00:00:00.000Z`, duration: 60 });
+  // Kotva 1 h k 20. 9., členstvo 6 h 27. 9.–25. 10., předplatné od 19. 10. nezaplatené.
+  const balicky = [
+    v("2026-09-20", null, 1, "Doplnenie členstva", { kotva: true }),
+    v("2026-09-27", "2026-10-25", 6, "OFF - 6h S viazanostou"),
+    v("2026-10-19", "2026-11-18", 6, "6h Předplatné"),
+  ];
+  const treningy = ["2026-09-23", "2026-09-27", "2026-09-29", "2026-10-01", "2026-10-08", "2026-10-11", "2026-10-16", "2026-10-19"].map(t);
+  const nez = new Set([klucNezaplateneho("Martin Vaško", "2026-10-19")]);
+
+  it("Vaško: −1 dnes aj po konci členstva 25. 10. (staré pravidlo dávalo −7)", () => {
+    expect(zostatokKokpitu(balicky, "Martin Vaško", treningy, "2026-10-22", new Set(), nez)?.zostatok).toBe(-1);
+    expect(zostatokKokpitu(balicky, "Martin Vaško", treningy, "2026-10-26", new Set(), nez)?.zostatok).toBe(-1);
+  });
+
+  it("po zaplatení předplatného: 6 − 1 = 5, aj po konci členstva", () => {
+    expect(zostatokKokpitu(balicky, "Martin Vaško", treningy, "2026-10-26")?.zostatok).toBe(5);
+  });
+
+  it("prekrývajúce sa balíčky: keď starší skončí vyčerpaný, nič sa nestratí", () => {
+    const g = [v("2026-05-18", "2026-11-17", 18, "OFF 18"), v("2026-07-24", "2027-01-23", 18, "OFF 18")];
+    // 20 tréningov: 18 minie starší, 2 novší → 16, aj po 17. 11.
+    const tr = Array.from({ length: 20 }, (_, i) => t(new Date(Date.parse("2026-05-20T00:00:00Z") + i * 7 * 864e5).toISOString().slice(0, 10)));
+    expect(zostatokKokpitu(g, "Martin Vaško", tr, "2026-11-01")?.zostatok).toBe(16);
+    expect(zostatokKokpitu(g, "Martin Vaško", tr, "2026-11-20")?.zostatok).toBe(16);
+  });
+
+  it("nevyčerpané hodiny skončeného balíčka prepadnú (ako doteraz)", () => {
+    const b6 = [v("2026-10-07", "2026-12-01", 6, "6h Balíček")];
+    const tr = ["2026-10-07", "2026-10-14", "2026-10-21"].map(t);
+    expect(zostatokKokpitu(b6, "Martin Vaško", tr, "2026-10-22")?.zostatok).toBe(3);
+    expect(zostatokKokpitu([...b6, v("2026-12-02", "2027-01-26", 6, "6h Balíček")], "Martin Vaško", tr, "2026-12-03")?.zostatok).toBe(6);
+  });
+
+  it("doplnenie v deň konca členstva nezdvojí zvyšok (Barbora Vaňková 23. 10.)", () => {
+    const b = [v("2026-09-24", "2026-10-23", 6, "OFF - 6h S viazanostou"), v("2026-10-23", null, 1, "Doplnenie členstva")];
+    const tr = ["2026-09-24", "2026-09-29", "2026-10-06", "2026-10-09", "2026-10-13"].map(t);
+    expect(zostatokKokpitu(b, "Martin Vaško", tr, "2026-10-22")?.zostatok).toBe(1);
+    expect(zostatokKokpitu(b, "Martin Vaško", tr, "2026-10-23")?.zostatok).toBe(1);
+  });
+
+  it("ukončený prevzatý zostatok nedáva hodinu (Jitka Heinrichová: 4, nie 5)", () => {
+    const b = [v("2026-09-20", "2026-09-29", 1, "Doplnenie členstva", { kotva: true, ukonceny: true }), v("2026-09-21", "2026-11-15", 6, "OFF - 6h BEZ viazanosti")];
+    expect(zostatokKokpitu(b, "Martin Vaško", ["2026-09-21", "2026-10-05"].map(t), "2026-10-22")?.zostatok).toBe(4);
+  });
+
+  it("mínus pred nezaplateným balíčkom prepíše prvý zaplatený (Lutonský: −1, po platbe 7)", () => {
+    const b = [v("2026-09-20", null, 4, "Doplnenie členstva", { kotva: true }), v("2026-10-21", "2026-12-15", 8, "8h Balíček")];
+    const tr = ["2026-10-07", "2026-10-12", "2026-10-14", "2026-10-19", "2026-10-21"].map(t);
+    expect(zostatokKokpitu(b, "Martin Vaško", tr, "2026-10-22", new Set(), new Set([klucNezaplateneho("Martin Vaško", "2026-10-21")]))?.zostatok).toBe(-1);
+    expect(zostatokKokpitu(b, "Martin Vaško", tr, "2026-10-22")?.zostatok).toBe(7);
+  });
+});

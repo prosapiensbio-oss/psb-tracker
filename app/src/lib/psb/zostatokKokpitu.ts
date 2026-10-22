@@ -90,6 +90,95 @@ export const jeAktivnyBalicek = (b: BalicekPreZostatok, dnes: string): boolean =
 /** Kľúč nezaplateného balíčka: `normName(klient)|platnostOd` — deň otvoreného poplatku. */
 export const klucNezaplateneho = (klient: string, den: string): string => `${normName(klient)}|${String(den || "").slice(0, 10)}`;
 
+/**
+ * ODPOČET PO BALÍČKOCH — ako to robí človek s kartičkou (22. 10. 2026).
+ *
+ * Do 22. 10. 2026 platilo „hodiny aktívnych balíčkov mínus tréningy od
+ * začiatku najstaršieho z nich". Kým žiadny balíček neskončí, je to to isté.
+ * Keď ale skončí platnosť balíčka, ktorý sa prekrýval s ďalším, pravidlo
+ * zahodilo jeho hodiny a tréningy, ktoré z neho odišli, nechalo visieť na
+ * ostatných. Nezávislá kontrola (Fable) to overila na ostrých dátach: Martin
+ * Vaško mal 22. 10. správne −1, ale 26. 10., keď mu skončí členstvo, by
+ * ukázal −7 — doplnenie bez konca platnosti (kotva k 20. 9.) držalo začiatok
+ * odpočtu a šesť tréningov skončeného členstva by sa odpočítalo druhýkrát.
+ * To isté hrozilo Lozias, Sofii a každému s prekrývajúcimi sa balíčkami.
+ *
+ * Odteraz každý tréning minie hodinu z najstaršieho platného balíčka, ktorý
+ * ešte hodiny má. Čo balíček nevyčerpal do konca platnosti, prepadne (ako
+ * doteraz). Tréning, na ktorý hodina nezostala, je mínus a prvý ďalší
+ * zaplatený balíček ho prepíše na hodiny („mínus je dočasná značka").
+ *
+ * KOTVA (zostatok prevzatý z PTmindera) je otváracia položka: PTminder v nej
+ * má všetko do toho dňa, takže mínus spred nej sa ruší a tréning z toho dňa
+ * sa neodpočíta.
+ *
+ * DOPLNENIE A PRENESENÉ HODINY sú zvyšok balíčka, ktorý práve skončil. Keď
+ * začnú, balíčky končiace najneskôr v ten deň už nič nedávajú — inak by sa
+ * zvyšok rátal dvakrát (raz v starom balíčku, raz v doplnení).
+ *
+ * Vráti zostatok: hodiny platných balíčkov mínus nepokrytý mínus.
+ */
+function odpocetPoBalickoch(
+  balickyKlienta: BalicekPreZostatok[],
+  k: string,
+  sedenia: SedeniePreZostatok[],
+  dnes: string,
+  zadarmo: Set<string>,
+  jeNezaplateny: (b: BalicekPreZostatok) => boolean,
+): number {
+  const moje = balickyKlienta.filter((b) => !b.zruseneAt && den(b.platnostOd) <= dnes && b.hodiny != null);
+  const koniec = (b: BalicekPreZostatok) => (b.platnostDo ? den(b.platnostDo) : "9999-12-31");
+  // Reťaz: platné balíčky a všetko, čo sa s nimi prekrýva (aj už skončené) —
+  // skončený balíček minul tréningy, ktoré sa nesmú pripísať ďalším.
+  let start = moje.filter((b) => jeAktivnyBalicek(b, dnes)).reduce((a, b) => (den(b.platnostOd) < a ? den(b.platnostOd) : a), dnes);
+  for (let zmena = true; zmena;) {
+    zmena = false;
+    for (const b of moje) {
+      if (den(b.platnostOd) < start && koniec(b) >= start) { start = den(b.platnostOd); zmena = true; }
+    }
+  }
+  const retaz = moje.filter((b) => koniec(b) >= start)
+    .sort((a, b) => den(a.platnostOd).localeCompare(den(b.platnostOd)) || koniec(a).localeCompare(koniec(b)));
+  const zvysok = new Map<BalicekPreZostatok, number>();
+  const jeZvysok = (b: BalicekPreZostatok) => !b.kotva && /doplnenie|prenesen/i.test(b.nazov);
+  const dniKotvy = new Set(retaz.filter((b) => b.kotva).map((b) => den(b.platnostOd)));
+
+  const treningy = sedenia
+    .filter((s) => normName(s.client) === k)
+    .map((s) => ({ d: den(s.date), h: (s.duration || 60) / 60 }))
+    .filter((t) => t.d >= start && t.d <= dnes && !zadarmo.has(`${k}|${t.d}`) && !dniKotvy.has(t.d))
+    .sort((a, b) => a.d.localeCompare(b.d));
+
+  let minus = 0;
+  let i = 0;
+  const zacni = (b: BalicekPreZostatok) => {
+    const d = den(b.platnostOd);
+    if (b.kotva) minus = 0;
+    if (jeZvysok(b)) for (const [x] of zvysok) if (koniec(x) <= d) zvysok.set(x, 0);
+    // Ukončený prevzatý zostatok Jerry uzavrel („v PTminderi už nie je") —
+    // nedáva nič (Jitka Heinrichová: inak by mala 5 h namiesto 4).
+    let h = jeNezaplateny(b) || (b.kotva && b.ukonceny) ? 0 : b.hodiny || 0;
+    const vezmi = Math.min(h, minus);
+    h -= vezmi; minus -= vezmi;
+    zvysok.set(b, h);
+  };
+  for (const t of treningy) {
+    while (i < retaz.length && den(retaz[i].platnostOd) <= t.d) zacni(retaz[i++]);
+    let h = t.h;
+    for (const [b, r] of zvysok) {
+      if (h <= 0) break;
+      if (r <= 0 || koniec(b) < t.d) continue;
+      const vezmi = Math.min(r, h);
+      zvysok.set(b, r - vezmi); h -= vezmi;
+    }
+    minus += h;
+  }
+  while (i < retaz.length) zacni(retaz[i++]);
+  let spolu = 0;
+  for (const [b, r] of zvysok) if (jeAktivnyBalicek(b, dnes)) spolu += r;
+  return Math.round((spolu - minus) * 100) / 100;
+}
+
 export function zostatokKokpitu(
   balicky: BalicekPreZostatok[],
   klient: string,
@@ -151,7 +240,10 @@ export function zostatokKokpitu(
   }
   minute = Math.round(minute * 100) / 100;
 
-  const rozdiel = Math.round((spolu - minute) * 100) / 100;
+  // Paušál hodiny nepočíta; inak rozhoduje odpočet po balíčkoch.
+  const rozdiel = pausal ? Math.round((spolu - minute) * 100) / 100
+    : odpocetPoBalickoch(balicky.filter((b) => normName(b.klient) === k), k, sedenia, dnes, zadarmo, jeNezaplateny);
+  if (!pausal) minute = Math.round((spolu - rozdiel) * 100) / 100;
   return {
     zostatok: pausal ? 0 : rozdiel,
     nadRamec: pausal ? 0 : Math.max(0, -rozdiel),
