@@ -142,11 +142,13 @@ je kde pozrieť).
          9. Staré výzvy na nahratie exportov: rituals.ts ~100, karta „Balíček
             dojde" („Podľa reportu z…"), krok „PTminder (kým beží súbežne)"
             vo Workspace, register banka vs. tržby píše „PTminder".
-       - [ ] **Veronika: offline tréning počas online balíčka = samostatná 1 h
-         za 1 450 Kč** (Jerry 21. 10.). Os to už vie, keď 1h balíček existuje;
-         automatický balíček ho pri offline tréningu nezaloží — offline zje
-         hodinu z ON. Prísne podľa druhu len pre vybraných klientov (Lucia
-         Podolová má ON a tréningy vedené ako offline).
+       - [x] **Veronika: offline tréning počas online balíčka = samostatná 1 h
+         za 1 450 Kč** (Jerry 21. 10.) — hotové 21. 10. (`samostatnaOfflineHodina`,
+         a6965e9): online = slovo „online" v názve udalosti; pravidlo len pre
+         klienta, ktorý si 1h offline už raz kúpil (Veronika, Marcela), nie
+         Lucia. Overené 22. 10. simuláciou 27. 10. nad ostrými dátami: návrh
+         „1h Balíček 1 450" na 27. 10., po založení offline tréning kryje 1h
+         a online balíček sa nemíňa.
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
