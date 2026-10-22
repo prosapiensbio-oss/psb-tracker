@@ -1291,7 +1291,16 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
    * neho; do Googlu sa píše až tlačidlom. Omyl v ťahu tak nič nepokazí.
    */
   const mriezkaRef = useRef<HTMLDivElement | null>(null);
-  const tah = useRef<{ u: KalUdalost | null; posunuty: boolean; offsetMin: number; minut: number; startX: number; startY: number } | null>(null);
+  const tah = useRef<{ u: KalUdalost | null; posunuty: boolean; offsetMin: number; minut: number; startX: number; startY: number; drzi: boolean } | null>(null);
+  /**
+   * PRESÚVA SA AŽ PO PODRŽANÍ (Jerry, 22. 10. 2026: „omylom posúvam niektoré
+   * udalosti — chcem ju stlačiť, chvíľku držať a potom posúvať; keď prejdem
+   * prstom po displeji, nesmie sa posunúť"). Kým prst neodstojí `DRZ_MS`,
+   * udalosť sa nehýbe a pohyb je obyčajné rolovanie alebo švih týždňa.
+   * Podržaná udalosť sa zvýrazní (a telefón krátko zavibruje) — až potom ťah.
+   */
+  const [drzana, setDrzana] = useState("");
+  const drzCasovac = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Klik, ktorý príde hneď po ťahu, patrí ťahu — stĺpec ho nesmie čítať ako „nová udalosť". */
   const ignorujKlikDo = useRef(0);
 
@@ -1366,35 +1375,69 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 
   const zacniTah = (e: React.PointerEvent, u: KalUdalost | null, den: string, cas: string, minut: number) => {
     if (e.button !== 0) return;
-    e.preventDefault();
+    // Bez preventDefault: prst musí vedieť rolovať, kým udalosť nepodrží.
     e.stopPropagation();
     const el = mriezkaRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const zac = Number(cas.slice(0, 2)) * 60 + Number(cas.slice(3, 5));
     const bod = od * 60 + ((e.clientY - r.top) / VYSKA) * 60;
-    tah.current = { u, posunuty: false, offsetMin: bod - zac, minut, startX: e.clientX, startY: e.clientY };
+    tah.current = { u, posunuty: false, offsetMin: bod - zac, minut, startX: e.clientX, startY: e.clientY, drzi: false };
+    const kluc = u ? `${u.uid}|${u.trener}` : "vyber";
+    const startCas = e.timeStamp;
+    // Myš je presná, prst nie — prst drží dlhšie, aby rolovanie nikdy nechytilo udalosť.
+    const DRZ_MS = e.pointerType === "mouse" ? 250 : 450;
+    if (drzCasovac.current) clearTimeout(drzCasovac.current);
+    drzCasovac.current = setTimeout(() => {
+      const t = tah.current;
+      if (!t) return;
+      t.drzi = true;
+      setDrzana(kluc);
+      try { navigator.vibrate?.(15); } catch { /* bez vibrácie */ }
+    }, DRZ_MS);
 
+    const upratat = () => {
+      if (drzCasovac.current) { clearTimeout(drzCasovac.current); drzCasovac.current = null; }
+      window.removeEventListener("pointermove", pohyb);
+      window.removeEventListener("pointerup", koniec);
+      window.removeEventListener("pointercancel", zrus);
+      window.removeEventListener("touchmove", blokujRolovanie);
+      setDrzana("");
+    };
+    // Podržaná udalosť sa ťahá — vtedy prehliadač nesmie rolovať pod prstom.
+    const blokujRolovanie = (ev: TouchEvent) => { if (tah.current?.drzi) ev.preventDefault(); };
     const pohyb = (ev: PointerEvent) => {
       const t = tah.current;
       if (!t) return;
-      if (!t.posunuty && Math.hypot(ev.clientX - t.startX, ev.clientY - t.startY) < 6) return;
+      const vzdialenost = Math.hypot(ev.clientX - t.startX, ev.clientY - t.startY);
+      if (!t.drzi) {
+        // Pohyb skôr, než prst odstál: to je rolovanie alebo švih, nie presun.
+        if (vzdialenost >= 8) {
+          tah.current = null;
+          upratat();
+          if (ev.pointerType !== "mouse") zacniSvih(svih.current, t.startX, t.startY, startCas);
+        }
+        return;
+      }
+      if (!t.posunuty && vzdialenost < 6) return;
       t.posunuty = true;
       const nove = casZBodu(ev.clientX, ev.clientY, t.minut, t.offsetMin);
       if (nove) setVyber({ u: t.u, den: nove.den, cas: nove.cas, minut: t.minut });
     };
+    const zrus = () => { tah.current = null; upratat(); };
     const koniec = () => {
-      window.removeEventListener("pointermove", pohyb);
-      window.removeEventListener("pointerup", koniec);
       const t = tah.current;
       tah.current = null;
+      upratat();
       if (!t) return;
       if (t.posunuty) { ignorujKlikDo.current = Date.now() + 250; return; }
-      // Klik bez ťahu na udalosť = označiť ju a otvoriť okno.
+      // Klik bez ťahu na udalosť = označiť ju a otvoriť okno (aj po podržaní bez pohybu).
       if (t.u) setVyber({ u: t.u, den: t.u.zaciatok.slice(0, 10), cas: t.u.zaciatok.slice(11, 16), minut: trvanieMin(t.u) });
     };
     window.addEventListener("pointermove", pohyb);
     window.addEventListener("pointerup", koniec);
+    window.addEventListener("pointercancel", zrus);
+    window.addEventListener("touchmove", blokujRolovanie, { passive: false });
   };
 
   const vybranaUdalost = (u: KalUdalost) => !!vyber?.u && vyber.u.uid === u.uid && vyber.u.trener === u.trener;
@@ -1409,7 +1452,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            text="Týždeň tak, ako ho vidíš v Google Kalendári. Medzi týždňami sa dá prepínať posunom prsta alebo dvoma prstami na touchpade doľava a doprava. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Označený blok sa dá ťahať myšou; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
+            text="Týždeň tak, ako ho vidíš v Google Kalendári. Medzi týždňami sa dá prepínať posunom prsta alebo dvoma prstami na touchpade doľava a doprava. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Presun: udalosť chyť a chvíľu podrž, kým sa zvýrazní, potom ťahaj; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
             label="Týždeň"
           />
         </H3>
@@ -1550,7 +1593,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                       key={`${u.uid}|${u.trener}`}
                       onPointerDown={(e) => zacniTah(e, u, u.zaciatok.slice(0, 10), u.zaciatok.slice(11, 16), trvanieMin(u))}
                       onClick={(e) => e.stopPropagation()}
-                      title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, ťahaj: presunúť`}
+                      title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, podrž a ťahaj: presunúť`}
                       style={{
                         position: "absolute", top, height: vyska,
                         left: `calc(${(stlpec / zo) * 100}% + 2px)`,
@@ -1559,7 +1602,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                         background: mix(f, 16), borderLeft: `${uzke ? 2 : 3}px solid ${f}`,
                         border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "grab",
                         fontSize: uzke ? 9.5 : 10.5, lineHeight: uzke ? 1.1 : 1.25, color: C.text, fontFamily: "inherit",
-                        touchAction: "none",
+                        // Prst po udalosti roluje; presun až po podržaní (`zacniTah`).
+                        touchAction: "manipulation", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
+                        ...(drzana === `${u.uid}|${u.trener}` ? { boxShadow: `0 0 0 2px ${f}, 0 4px 12px rgba(0,0,0,.35)`, transform: "scale(1.04)", zIndex: 4, cursor: "grabbing" } : {}),
                       }}
                     >
                       <div style={{
@@ -1591,9 +1636,10 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                       borderRadius: 5, padding: "2px 4px", overflow: "hidden",
                       background: mix(C.green, 22),
                       border: `1.5px dashed ${C.green}`,
-                      cursor: "grab", zIndex: 3,
+                      cursor: drzana === "vyber" ? "grabbing" : "grab", zIndex: 3,
                       fontSize: 10.5, lineHeight: 1.25, color: C.text,
-                      touchAction: "none",
+                      touchAction: "manipulation", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
+                      ...(drzana === "vyber" ? { boxShadow: `0 0 0 2px ${C.green}, 0 4px 12px rgba(0,0,0,.35)`, transform: "scale(1.04)" } : {}),
                     }}
                   >
                     <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -2242,7 +2288,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
    * posledného reportu. Keď sa tie dve čísla rozídu, nie je to chyba — je to
    * presne tá medzera, v ktorej sa 19. 8. stratilo Natálii päť hodín.
    */
-  const [zdroj, setZdroj] = useState<"kalendar" | "ptminder">("kalendar");
+  const [zdroj, setZdroj] = useState<"kalendar" | "karta">("kalendar");
   const vsetky = useMemo(() => {
     const teraz = new Date();
     const dnes = dnesPraha(teraz);
@@ -2370,7 +2416,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
    * PTminder podľa toho, čo naozaj stojí v poslednom reporte.
    */
   const riadky = useMemo(() => {
-    if (zdroj === "ptminder") {
+    if (zdroj === "karta") {
       return vsetky.filter((r) => r.zostava <= 1).sort((a, b) => a.zostava - b.zostava || a.meno.localeCompare(b.meno));
     }
     /**
@@ -2427,11 +2473,11 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
-            text={zdroj === "ptminder"
-              ? "POTVRDENÝ stav: presne to číslo, ktoré stojí v poslednom reporte z PTminderu, bez akéhokoľvek dopočítania. Hodina odtrénovaná po tom reporte tu ešte nie je — na to je pohľad Kalendár. Toto je účtovníctvo: pomalšie, zato isté. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."
+            text={zdroj === "karta"
+              ? "STAV TERAZ: to isté číslo ako na karte klienta v Kokpite — balíčky z Kokpitu mínus tréningy, ktoré už prebehli. Objednané termíny sa neodčítavajú; na to je pohľad Kalendár. Klienti s paušálnym členstvom sa nezobrazujú. Mení sa podľa prepínača trénera."
               : "PREDBEŽNÝ stav: zostatok z PTminderu mínus to, čo o ňom vie kalendár. Odznak je koľko má TERAZ (po hodinách, ktoré prebehli, ale do exportu sa ešte nedostali); text pod menom hovorí, čo s tým spravia objednané termíny. Kalendár je len vrstva medzi dvoma exportmi — zrušený tréning sa vráti sám, len čo ho z neho vymažeš. Potvrdené číslo je v pohľade PTminder. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."}
-            label={zdroj === "ptminder"
-              ? `Balíček dochádza podľa PTminderu (${riadky.length})`
+            label={zdroj === "karta"
+              ? `Balíček dochádza — stav teraz (${riadky.length})`
               : `Balíček dojde po objednaných hodinách (${riadky.length})`}
           />
         </H3>
@@ -2440,13 +2486,13 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
               kalendár odpovedá na „ako to vyzerá dnes", PTminder na „čo je
               potvrdené". Keď sa rozídu, rozdiel je práve tá nezaúčtovaná
               medzera — a tú treba vedieť prečítať, nie ju schovať. */}
-          {([["kalendar", "Kalendár"], ["ptminder", "PTminder"]] as const).map(([id, popis]) => (
+          {([["kalendar", "Kalendár"], ["karta", "Teraz"]] as const).map(([id, popis]) => (
             <button
               key={id}
               onClick={() => setZdroj(id)}
               title={id === "kalendar"
-                ? "Dopočítané cez kalendár — vrátane hodín, ktoré v PTminderi ešte nie sú"
-                : "Presne to, čo stojí v poslednom reporte z PTminderu"}
+                ? "Stav teraz mínus termíny objednané v kalendári"
+                : "Stav na karte klienta, bez objednaných termínov"}
               style={{
                 padding: "4px 10px", borderRadius: 8, fontSize: 11.5, cursor: "pointer",
                 border: `1px solid ${zdroj === id ? C.accent : C.border}`,
@@ -2480,15 +2526,10 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
         <div style={{ fontSize: 11.5, color: C.red, marginTop: 4 }}>{chybaObnovy}</div>
       )}
       {/* Potvrdené číslo bez dátumu je na nič — treba vedieť, ako staré je. */}
-      {zdroj === "ptminder" && (
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: -2, marginBottom: 8 }}>
-          {poslednyReport
-            ? `Podľa reportu z ${fmtDMY(poslednyReport.date.slice(0, 10))}. Novší stav dostaneš ďalším importom v záložke Upload.`
-            : "Report z PTminderu zatiaľ v appke nie je — nahraj ho v záložke Upload."}
-        </div>
-      )}
+      {/* Riadok „Podľa reportu z … nahraj import" je preč (22. 10. 2026):
+          od 20. 10. stojí číslo na karte na Kokpite, nie na exporte. */}
       {!riadky.length ? (
-        <Empty>{zdroj === "ptminder" ? "Podľa posledného reportu nikomu balíček nedochádza 🌿" : "Nikomu balíček po objednaných hodinách nedochádza 🌿"}</Empty>
+        <Empty>{zdroj === "karta" ? "Podľa karty klienta nikomu balíček nedochádza 🌿" : "Nikomu balíček po objednaných hodinách nedochádza 🌿"}</Empty>
       ) : (
         /* Tri stĺpce namiesto jedného dlhého — sedemnásť riadkov pod sebou
            znamenalo rolovať cez pol obrazovky; v mriežke je celý zoznam
@@ -2512,10 +2553,10 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   riadok po riadku bez rátania v hlave. */}
               <span style={{
                 fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
-                color: (zdroj === "ptminder" ? r.zostava : r.po) <= 0 ? C.red : C.orange,
-                background: mix((zdroj === "ptminder" ? r.zostava : r.po) <= 0 ? C.red : C.orange, 12),
+                color: (zdroj === "karta" ? r.zostava : r.po) <= 0 ? C.red : C.orange,
+                background: mix((zdroj === "karta" ? r.zostava : r.po) <= 0 ? C.red : C.orange, 12),
               }}>
-                {zdroj === "ptminder" ? r.zostava : Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
+                {zdroj === "karta" ? r.zostava : Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {onKlient ? (
@@ -2539,7 +2580,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                     zámerne nepíšu — to je práve to, čo v tom čísle NIE JE.
                     Zostáva platnosť, ktorá je z toho istého reportu. */}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {zdroj === "ptminder" ? (
+                  {zdroj === "karta" ? (
                     <>
                       {r.platnostDo ? `platnosť do ${fmtDMY(r.platnostDo)}` : "bez zapísanej platnosti"}
                       {r.uz || r.kusov ? ` · kalendár vie o ${[r.uz ? `${r.uz} odtrénovanej` : "", r.kusov ? `${r.kusov} objednaných` : ""].filter(Boolean).join(" a ")}` : ""}
@@ -2553,7 +2594,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                       <span style={{ color: r.uzDosiel ? C.red : C.orange, fontWeight: 600 }}>
                         {r.uzDosiel ? "hodiny minuté" : r.dojde ? `dôjde ${fmtDMY(r.dojde)}` : "dôjde po objednaných"}
                       </span>
-                      {r.uz ? ` · ${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
+                      {r.uz ? ` · ${r.uz} h odtrénovaná, na karte ešte nie` : null}
                       {r.kusov ? ` · obj. ${r.kusov}` : null}
                       {r.platnostDo ? `${r.poPlatnosti ? " · členstvo v appke platilo do " : " · do "}${fmtDMY(r.platnostDo)}` : ""}
                     </>
