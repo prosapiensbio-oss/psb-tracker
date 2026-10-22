@@ -334,7 +334,7 @@ export const Route = createFileRoute("/api/balicky")({
               }
             }
             const poznamka = [
-              `automaticky — pokračovanie předplatného od ${den(p.odDna)} (${p.mesiac}. mesiac zo 6)`,
+              `automaticky — pokračovanie předplatného od ${den(p.odDna)} (${p.mesiac}. mesiac${p.polrok > 1 ? ` ${p.polrok}. polroka` : " zo 6"})`,
               p.nevycerpane > p.prenos ? `zostalo ${p.nevycerpane} h, prenášajú sa najviac 2` : "",
               p.cenaPoznamka || "",
             ].filter(Boolean).join(" · ");

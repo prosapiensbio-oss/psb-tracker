@@ -39,14 +39,14 @@ describe("předplatné pokračuje v deň po konci (Jerry, 22. 10. 2026)", () => 
     expect(pokracovaniePredplatneho(R, k, historia, treningy, "2026-10-22")?.odDna).toBe("2026-10-21");
   });
 
-  it("po 6 mesiacoch záväzku sa samo nepredlžuje", () => {
+  it("po 6 mesiacoch pokračuje ďalší polrok (Jerry, 22. 10. 2026)", () => {
     const dlho = [{ nazov: "OFF - 6h S viazanostou", od: "2026-03-01", do: "2026-03-31" },
       { nazov: "OFF - 6h S viazanostou", od: "2026-04-01", do: "2026-04-30" },
       { nazov: "OFF - 6h S viazanostou", od: "2026-05-01", do: "2026-05-31" },
       { nazov: "OFF - 6h S viazanostou", od: "2026-06-01", do: "2026-07-01" },
       { nazov: "OFF - 6h S viazanostou", od: "2026-07-02", do: "2026-08-01" }];
     const b = [p("2026-08-02", "2026-09-01"), p("2026-09-02", "2026-10-01")];
-    expect(pokracovaniePredplatneho(R, b, dlho, [], "2026-10-03")).toBeNull();
+    expect(pokracovaniePredplatneho(R, b, dlho, [], "2026-10-03")).toMatchObject({ odDna: "2026-10-02", mesiac: 2, polrok: 2, zaciatokZavazku: "2026-03-01" });
   });
 
   it("kto po konci mesiac neprišiel, nepokračuje", () => {

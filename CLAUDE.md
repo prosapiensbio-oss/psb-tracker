@@ -3166,10 +3166,11 @@ předplatné od 21. 10.: „predplatné má pravidlo, že 2 h môžeš preniesť
 
 - **Ďalší mesiac vzniká V DEŇ PO KONCI** (`pokracovaniePredplatneho.ts`,
   akcia `automaticky` v `/api/balicky` — beží PRED zakladaním z prvého
-  tréningu). Len počas 6 mesiacov od prvého předplatného v rade (medzera do
-  31 dní je ten istý záväzok; staršie obdobia z `ptminder_historia`). Po 6
-  mesiacoch rozhoduje tréning ako pri balíčku. Kto po konci mesiac neprišiel,
-  nepokračuje.
+  tréningu). Kým předplatné ide v rade (medzera do 31 dní je ten istý
+  záväzok; staršie obdobia z `ptminder_historia`) — aj po 6 mesiacoch ďalší
+  polrok (Jerry, 22. 10. 2026). Polroky sa rátajú od prvého předplatného
+  v rade, poznámka balíčka nesie „N. mesiac M. polroka". Kto po konci mesiac
+  neprišiel, nepokračuje.
 - **Minul hodiny skôr = nové obdobie skôr** (Jerry: pravidlo A) — zakladá ho
   tréning (`navrhNovehoBalicka`) a pokračovanie sa potom nezakladá, lebo
   ďalší balíček už je. Stalo sa 3× (Hanus 2. 10., Malinová a Vaško 19. 10.).

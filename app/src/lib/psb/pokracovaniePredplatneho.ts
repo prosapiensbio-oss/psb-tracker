@@ -8,9 +8,9 @@
  * sa posúval o deň, keď prišiel o deň neskôr.
  *
  * Odteraz ďalší mesiac vznikne V DEŇ PO KONCI predošlého:
- *  - len počas 6 mesiacov od začiatku záväzku (prvé předplatné v rade
- *    za sebou — Jerry: „áno, od prvého"); potom rozhoduje tréning ako
- *    pri balíčku,
+ *  - kým předplatné ide v rade za sebou — aj po 6 mesiacoch ďalší polrok
+ *    (Jerry, 22. 10. 2026: „nech pokračuje aj ďalší polrok"); polroky sa
+ *    rátajú od prvého předplatného v rade („áno, od prvého"),
  *  - hodiny a cena podľa cenníka (stála iná cena dvakrát po sebe sa drží,
  *    ako pri `navrhNovehoBalicka`),
  *  - nevyužité hodiny sa prenesú samy, najviac 2 (na tie má klient podľa
@@ -43,9 +43,10 @@ export type PokracovaniePredplatneho = {
   nevycerpane: number;
   /** Koľko sa prenesie samo — najviac 2 h. */
   prenos: number;
-  /** Začiatok 6 mesiacov a koľký mesiac to je. */
+  /** Začiatok záväzku, koľký mesiac polroka a koľký polrok to je. */
   zaciatokZavazku: string;
   mesiac: number;
+  polrok: number;
   cenaPoznamka?: string;
 };
 
@@ -92,9 +93,7 @@ export function pokracovaniePredplatneho(
       if (o.od < zaciatok && o.do >= posunDni(zaciatok, -MEDZERA_DNI)) { zaciatok = o.od; zmena = true; }
     }
   }
-  const koniecZavazku = platnostDo(zaciatok, null, ZAVAZOK_MESIACOV);
-  if (odDna > koniecZavazku) return null;
-  const mesiac = obdobia.filter((o) => o.od >= zaciatok && o.od <= den(posledne.platnostOd))
+  const poradie = obdobia.filter((o) => o.od >= zaciatok && o.od <= den(posledne.platnostOd))
     .reduce((s, o, i, xs) => (i > 0 && o.od === xs[i - 1].od ? s : s + 1), 0) + 1;
 
   const pekny = nazovProduktu(posledne.nazov);
@@ -117,7 +116,8 @@ export function pokracovaniePredplatneho(
     nevycerpane,
     prenos: Math.min(nevycerpane, PRESUN_MAX_HODIN),
     zaciatokZavazku: zaciatok,
-    mesiac: Math.min(mesiac, ZAVAZOK_MESIACOV),
+    mesiac: ((poradie - 1) % ZAVAZOK_MESIACOV) + 1,
+    polrok: Math.floor((poradie - 1) / ZAVAZOK_MESIACOV) + 1,
     cenaPoznamka: stalaInaCena ? `platí stále ${cena} Kč, cenník je ${katalog}` : undefined,
   };
 }
