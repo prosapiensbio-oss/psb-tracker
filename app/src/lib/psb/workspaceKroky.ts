@@ -184,7 +184,14 @@ function navrhNovehoBalickaBezStraze(
     // riadok z `balicky`) — Jakub Kaňovský dostal 21. 10. automaticky
     // „Doplnenie členstva" za 0 Kč. Doplnenie nie je predaj.
     && !/^\s*doplnenie/i.test(u.nazov);
-  const posledny = os.find(jeVzor);
+  /**
+   * SAMOSTATNÁ HODINA NIE JE VZOR, KEĎ MÁ KLIENT ČLENSTVO (Marcela Hrůzová,
+   * 22. 10. 2026). Jej posledný balíček bola offline hodina z 18. 9. popri
+   * online členstve; po konci členstva vznikol z online tréningu „1h Balíček"
+   * za 1 450 Kč namiesto online 6 h. Hodinový balíček je vzor len pre toho,
+   * kto si nikdy nič väčšie nekupoval.
+   */
+  const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> => jeVzor(u) && u.hodin > 1) ?? os.find(jeVzor);
   if (!posledny) return null;
 
   const predtym = os.find((u) => u.druh === "trening" && u.den < odDna && stavy.get(u)?.buduca == null);
@@ -196,7 +203,7 @@ function navrhNovehoBalickaBezStraze(
 
   const cenaDna = (d: string) => ceny.find((c) => den(c.den) === den(d))?.cena ?? null;
   const cenaPoslednych = os
-    .filter(jeVzor)
+    .filter((u) => jeVzor(u) && (posledny.hodin === 1 || u.hodin > 1))
     .slice(0, 2)
     .map((u) => cenaDna(u.den));
   const katalog = sablona?.cena ?? null;

@@ -175,6 +175,25 @@ describe("prenesené hodiny nie sú vzor (Natália Krivdová 19. 10. 2026)", () 
   });
 });
 
+describe("samostatná hodina nie je vzor (Marcela Hrůzová 22. 10. 2026)", () => {
+  it("po konci online členstva vznikne online 6 h, nie 1h Balíček", () => {
+    const os = zorad([
+      balicek("2026-08-27", 6, "ON - 6h BEZ viazanosti", "2026-10-21"),
+      balicek("2026-09-18", 1, "OFF - 1 hodina offline", "2026-10-15"),
+      ...["2026-09-18", "2026-09-24", "2026-10-01", "2026-10-08", "2026-10-22"].map(trening),
+    ]);
+    const { stavy } = priebehBalickov(os, -1, "2026-10-23");
+    const n = navrhNovehoBalicka("Marcela Hruzova", os, stavy, [{ den: "2026-08-27", cena: 6590 }, { den: "2026-09-18", cena: 1450 }]);
+    expect(n?.hodiny).toBe(6);
+    expect(n?.cena).toBe(6590);
+  });
+  it("kto kupuje len po hodine, dostane zase hodinu", () => {
+    const os = zorad([balicek("2026-10-01", 1, "1h Balíček", "2026-10-29"), trening("2026-10-01"), trening("2026-10-22")]);
+    const { stavy } = priebehBalickov(os, -1, "2026-10-23");
+    expect(navrhNovehoBalicka("X", os, stavy)?.hodiny).toBe(1);
+  });
+});
+
 describe("po úvodnom nevznikne druhý úvodný (Lenka Divinová 16. 10. 2026)", () => {
   it("prvý riadny tréning po úvodnom nemá vzor — balíček zakladá tréner", () => {
     const uv = { druh: "trening", den: "2026-08-28", cas: "09:00", uvodny: true } as Udalost;
