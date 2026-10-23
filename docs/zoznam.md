@@ -57,6 +57,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9m. [x] Kalendár: presun príspevku ťahaním na iný deň – hotové 19. 10. (kalendarPresun.ts; overené 20. 10. v kóde).
 9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
 9o. [ ] Strih cvičebných videí je mdlý (Jerry 22. 10.): diagnóza (strih vs. natočenie), výskum techník (strih v pohybe medzi uhlami, rytmus, zrýchlenie/spomalenie, detail) a štýl „Cvičenie v pohybe“ v Strižni; skúšobné zábery v ~/Downloads/filip_stranavsky fp insta.
+9p. [ ] Strižňa – Vložky (Jerry 23. 10.): filmové reakcie (obraz, hlas ide ďalej) aj hlášky so zvukom, CZ/SK klasiky aj Hollywood; banka vložiek, hľadanie scén na YouTube cez titulky, návrhy z prepisu. Vzor: @nadacia_zastavmekorupciu (vložka každé 3–4 s, Poirot ako vizuálny vtip).
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
