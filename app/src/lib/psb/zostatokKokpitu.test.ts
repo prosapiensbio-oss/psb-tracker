@@ -139,3 +139,22 @@ describe("odpočet po balíčkoch — skončenie platnosti nič nepreskupí (Fab
     expect(zostatokKokpitu(b, "Martin Vaško", tr, "2026-10-22")?.zostatok).toBe(7);
   });
 });
+
+describe("prenesené hodiny nie sú viac, než zostalo (Jaroslav Kalva, 23. 10. 2026)", () => {
+  const k = (od: string, doDna: string | null, hodiny: number, nazov: string): BalicekPreZostatok =>
+    ({ klient: "Jaroslav Kalva", nazov, hodiny, platnostOd: od, platnostDo: doDna });
+  const t = (d: string) => ({ client: "Jaroslav Kalva", date: `${d}T00:00:00.000Z`, duration: 60 });
+  // 8 h 17. 9.–16. 10., presun 2 h zapísaný 13. 10. (vtedy zostávali 2), 15. 10. ešte tréning → zostala 1.
+  const b = [k("2026-09-17", "2026-10-16", 8, "OFF - 6h S viazanostou"), k("2026-10-16", null, 2, "Prenesené hodiny"),
+    k("2026-10-17", "2026-11-16", 6, "6h Předplatné")];
+  const tr = ["2026-09-17", "2026-09-24", "2026-10-01", "2026-10-05", "2026-10-08", "2026-10-12", "2026-10-15", "2026-10-19"].map(t);
+
+  it("prenesie sa 1 h, nie 2: po zaplatení 1 + 6 − 1 = 6", () => {
+    expect(zostatokKokpitu(b, "Jaroslav Kalva", tr, "2026-10-23")?.zostatok).toBe(6);
+  });
+
+  it("doplnenie sa nestrihá — môže byť aj hodina navyše", () => {
+    const d = b.map((x) => (x.nazov === "Prenesené hodiny" ? { ...x, nazov: "Doplnenie členstva" } : x));
+    expect(zostatokKokpitu(d, "Jaroslav Kalva", tr, "2026-10-23")?.zostatok).toBe(7);
+  });
+});

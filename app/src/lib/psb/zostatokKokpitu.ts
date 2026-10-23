@@ -188,10 +188,19 @@ function prebehOdpoctu(
   const zacni = (b: BalicekPreZostatok) => {
     const d = den(b.platnostOd);
     if (b.kotva) minus = 0;
-    if (jeZvysok(b)) for (const [x] of zvysok) if (koniec(x) <= d) zvysok.set(x, 0);
+    // Čo zo skončených balíčkov naozaj zostalo — prenesené hodiny viac byť nemôžu.
+    let zdroj = 0, zdrojov = 0;
+    if (jeZvysok(b)) for (const [x, r] of zvysok) if (koniec(x) <= d) { zdroj += Math.max(0, r); zdrojov++; zvysok.set(x, 0); }
     // Ukončený prevzatý zostatok Jerry uzavrel („v PTminderi už nie je") —
     // nedáva nič (Jitka Heinrichová: inak by mala 5 h namiesto 4).
     let h = jeNezaplateny(b) || (b.kotva && b.ukonceny) ? 0 : b.hodiny || 0;
+    /**
+     * PRENESENÉ HODINY NIE SÚ VIAC, NEŽ ZOSTALO (Jaroslav Kalva, 23. 10. 2026).
+     * Presun sa zapisuje tri dni pred koncom s vtedajším zostatkom: Kalvovi
+     * 13. 10. zostávali 2 h, 15. 10. jednu ešte odtrénoval a prenieslo sa 2.
+     * Doplnenie sa nestrihá — to môže byť aj hodina navyše z dobrej vôle.
+     */
+    if (/prenesen/i.test(b.nazov) && zdrojov > 0) h = Math.min(h, zdroj);
     const vezmi = Math.min(h, minus);
     h -= vezmi; minus -= vezmi;
     zvysok.set(b, h);
