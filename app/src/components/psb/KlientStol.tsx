@@ -164,6 +164,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [upravaPlatby, setUpravaPlatby] = useState("");
   /** Ktorú platbu práve delí medzi klientov (id riadku). */
   const [delimPlatbu, setDelimPlatbu] = useState("");
+  const [presunPlatbu, setPresunPlatbu] = useState("");
   const [upravaBalicka, setUpravaBalicka] = useState("");
   /** Balíček, ktorý sa práve ukončuje s vrátením peňazí (13. 10. 2026, Radek Baláž). */
   const [ukoncenie, setUkoncenie] = useState<{ id: string; odtrenovane: number } | null>(null);
@@ -1890,6 +1891,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     >
                       {delimPlatbu === x.id ? "zavrieť" : "rozdeliť"}
                     </button>
+                    <button
+                      onClick={() => { setPresunPlatbu(presunPlatbu === x.id ? "" : x.id); setDelimPlatbu(""); setUpravaPlatby(""); setPisemPlatbu(false); }}
+                      title="Platba je priradená zlému klientovi — presunúť ju správnemu"
+                      style={{ ...navrhTlacidlo, fontSize: 11 }}
+                    >
+                      {presunPlatbu === x.id ? "zavrieť" : "patrí inému"}
+                    </button>
                     {x.fio_id ? <span style={{ width: 46 }} /> : (
                       <Upravit
                         naUpravu={() => {
@@ -1910,6 +1918,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       mena={mena}
                       zaKoho={menaPlatiZa(c?.platiZa).map((m) => ({ klient: m, dlzi: dlhJednehoKlienta(data.dlhy, m).dlzi }))}
                       onHotovo={() => { setDelimPlatbu(""); void nacitajPlatby(); oznam("peniaze"); }}
+                    />
+                  )}
+                  {presunPlatbu === x.id && (
+                    <PreraditPlatbu
+                      id={x.id}
+                      suma={Math.round(x.suma_czk)}
+                      mena={mena.filter((m) => normName(m) !== normName(meno))}
+                      onHotovo={() => { setPresunPlatbu(""); void nacitajPlatby(); oznam("peniaze"); }}
                     />
                   )}
                   {upravaPlatby === x.id && (
@@ -3388,6 +3404,50 @@ function PlatiZa({ meno, mena, hodnota, zapis }: {
  * koľko peňazí prišlo. Preto je tlačidlo neaktívne, kým súčet nesedí, a
  * zvyšok je vidieť pri každom písmene.
  */
+/**
+ * PLATBA PATRÍ INÉMU (Jerry, 23. 10. 2026). Presunie celú platbu (alebo
+ * tento diel rozdelenej) správnemu klientovi; server zruší starú, zapíše
+ * novú s tým istým pohybom z banky a opraví naučené pravidlo platiteľa.
+ */
+function PreraditPlatbu({ id, suma, mena, onHotovo }: { id: string; suma: number; mena: string[]; onHotovo: () => void }) {
+  const [klient, setKlient] = useState("");
+  const [pracujem, setPracujem] = useState(false);
+  const [chyba, setChyba] = useState("");
+  const znamy = mena.some((m) => normName(m) === normName(klient));
+  const presun = async () => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "prerad", id, klient: klient.trim() }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa presunúť"); return; }
+    onHotovo();
+  };
+  return (
+    <div style={{ margin: "6px 0 10px", padding: "10px 12px", borderRadius: 11, background: mix(C.accent, 8), border: `1px solid ${mix(C.accent, 30)}` }}>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 7 }}>
+        Komu patrí {fmtCZK(suma)}? Tomuto klientovi sa platba zruší a zapíše sa správnemu.
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <VyberMena hodnota={klient} mena={mena} onZmen={setKlient} placeholder="meno klienta…" style={{ fontSize: 12, padding: "5px 8px" }} varovanie={!!klient && !znamy} />
+        </div>
+        <button
+          onClick={() => void presun()}
+          disabled={pracujem || !znamy}
+          style={{
+            padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+            cursor: pracujem || !znamy ? "not-allowed" : "pointer", opacity: znamy ? 1 : 0.5,
+            border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green,
+          }}
+        >{pracujem ? "…" : "Presunúť"}</button>
+      </div>
+      {chyba && <div style={{ fontSize: 11.5, color: C.red, marginTop: 6 }}>{chyba}</div>}
+    </div>
+  );
+}
+
 export function RozdelitPlatbu({ id, platitel, suma, mena, zaKoho, onHotovo }: {
   /** Id riadku v `platby`, ktorý sa delí. */
   id: string;

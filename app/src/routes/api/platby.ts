@@ -822,6 +822,71 @@ export const Route = createFileRoute("/api/platby")({
           return Response.json({ ok: true, dielov: kusy.length });
         }
 
+        /**
+         * PLATBA PATRÍ INÉMU KLIENTOVI (Jerry, 23. 10. 2026: „ako môžeme
+         * upraviť chybu s platbou, ak ju omylom priradíme zlému človeku?").
+         * Terezka dala Ivinu platbu z 21. 10. („IVA STOKLÁSKOVÁ“) Lenke
+         * Divinovej. Dovtedy sa to dalo opraviť len okľukou: zrušiť platbu
+         * a hľadať pohyb znova medzi nepriradenými, alebo „rozdeliť“ ju na
+         * jeden diel — a pravidlo platiteľa, ktoré zlé priradenie zmazalo,
+         * ostalo zmazané.
+         *
+         * Stará platba sa ZRUŠÍ (záznam v knihe ostáva), novému klientovi sa
+         * zapíše tým istým zápisom ako pri priradení, s tým istým `fio_id`.
+         * Pravidlo platiteľa sa opraví rovnako ako pri priradení.
+         */
+        if (akcia === "prerad") {
+          const id = String(b.id || "");
+          const klient = String(b.klient || "").trim();
+          if (!id || !klient) return Response.json({ ok: false, error: "Chýba platba alebo klient." }, { status: 400 });
+          const p = await DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby WHERE id = ?1")
+            .bind(id).first<{ id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null }>();
+          if (!p) return Response.json({ ok: false, error: "Platba sa nenašla." }, { status: 404 });
+          if (p.zrusene_at) return Response.json({ ok: false, error: "Táto platba je zrušená — presunúť sa dá len živá." }, { status: 400 });
+          if (normName(p.klient) === normName(klient)) return Response.json({ ok: false, error: `Platba už patrí klientovi ${p.klient}.` }, { status: 400 });
+          const zlyMeno = await chybaMena(DB, klient);
+          if (zlyMeno) return Response.json({ ok: false, error: zlyMeno }, { status: 400 });
+          const vopred = await jeVopred(DB, klient);
+          if (!p.fio_id) {
+            await DB.prepare("UPDATE platby SET klient = ?2, vopred = ?3 WHERE id = ?1").bind(p.id, klient, vopred ? 1 : 0).run();
+          } else {
+            // Iné živé diely toho istého pohybu (rozdelený prevod) ostávajú;
+            // presúva sa len tento diel, súčet pohybu sa nemení.
+            const ine = (((await DB.prepare("SELECT klient FROM platby WHERE fio_id = ?1 AND id <> ?2 AND zrusene_at IS NULL")
+              .bind(p.fio_id, p.id).all<{ klient: string }>()).results) || []);
+            if (ine.some((x) => normName(x.klient) === normName(klient))) {
+              return Response.json({ ok: false, error: `${klient} už na tejto platbe diel má. Ak má mať celú, rozdeľ ju znova.` }, { status: 409 });
+            }
+            await DB.prepare("UPDATE platby SET zrusene_at = ?2 WHERE id = ?1").bind(p.id, teraz()).run();
+            let v: VysledokZapisu;
+            try {
+              v = await zapisPriradenie(DB, {
+                klient, datum: String(p.datum).slice(0, 10), suma: Number(p.suma_czk) || 0, sposob: p.sposob, fioId: p.fio_id,
+                poznamka: String(p.poznamka || "").slice(0, 300), kto, vopred,
+              }, ine.length > 0);
+            } catch (e) {
+              v = { ok: false, error: `Platba sa nezapísala: ${textChyby(e)}` };
+            }
+            if (!v.ok) {
+              // Nič nesmie ostať napoly: stará platba sa vráti.
+              await DB.prepare("UPDATE platby SET zrusene_at = NULL WHERE id = ?1").bind(p.id).run();
+              return Response.json(v, { status: 409 });
+            }
+            const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
+              .bind(p.fio_id).first<FioRiadok>().catch(() => null);
+            if (r) {
+              try {
+                const vzor = vzorPlatby(r);
+                await opravPravidlo(DB, vzor, [klient], smieSaZapamatat(vzor, klient) ? klient : null, kto);
+              } catch (e) {
+                await audit(DB, { action: "platba-pravidlo-chyba", predmet: p.fio_id, neu: textChyby(e), actor: kto });
+              }
+            }
+          }
+          await audit(DB, { action: "platba-preradena", predmet: `${p.klient} → ${klient}`, old: p.klient, neu: `${Math.round(Number(p.suma_czk) || 0)} Kč · ${String(p.datum).slice(0, 10)}`, actor: kto });
+          return Response.json({ ok: true });
+        }
+
         /** Zrušenie NEMAŽE — platba je záznam v knihe, nie riadok v tabuľke. */
         if (akcia === "zrus" || akcia === "vrat") {
           const id = String(b.id || "");
