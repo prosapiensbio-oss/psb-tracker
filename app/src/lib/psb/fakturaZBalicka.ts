@@ -1,4 +1,5 @@
 import { normName } from "./format";
+import { nazovProduktu } from "./nazvyProduktov";
 import type { DlhPolozka } from "./zaplatene";
 
 /**
@@ -21,11 +22,14 @@ export function fakturaZBalicka(
   const cena = Math.round(b.cena || 0);
   const d = (dlhy || []).find((x) => (b.id && x.id === b.id)
     || (!x.id && normName(x.klient) === normName(klient) && !!b.platnostOd && x.den === b.platnostOd.slice(0, 10)));
-  if (!d || !(d.doplatit > 0)) return { klient, popis: b.nazov, cena, balicekId: b.id, dlh: false };
+  // Faktúra ide klientovi (česky): názov produktu, nie interný z PTmindera
+  // („ON - 6h S viazanostou" → „6h Předplatné online"), a „doplatek".
+  const nazov = nazovProduktu(b.nazov) || b.nazov;
+  if (!d || !(d.doplatit > 0)) return { klient, popis: nazov, cena, balicekId: b.id, dlh: false };
   const doplatok = d.doplatit < cena;
   return {
     klient,
-    popis: doplatok ? `${b.nazov} — doplatok` : b.nazov,
+    popis: doplatok ? `${nazov} — doplatek` : nazov,
     cena: Math.round(d.doplatit),
     balicekId: b.id,
     dlh: true,
