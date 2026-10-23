@@ -1197,13 +1197,29 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               za seba aj za Annu. Suma v texte sa nepíše, ale podľa nej sa
               rozhoduje, či sa SMS vôbec dá poslať. */}
           {dlzi + dlh.dlzi + dlhZaKoho > 0 && (
-            <div style={{ marginTop: 9 }}>
+            <div style={{ marginTop: 9, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <SmsKlientovi
                 meno={meno}
                 trener={c?.primaryTrainer || ""}
                 platba={{ suma: dlzi + dlh.dlzi + dlhZaKoho, datum: datumDlhu }}
                 maly
               />
+              {/* Faktúra rovno z dlhu (Jerry, 23. 10. 2026: „mal by som mať
+                  možnosť vystaviť mu faktúru alebo poslať SMS"). Na najnovší
+                  nezaplatený balíček a na sumu, ktorá na ňom chýba. */}
+              {onFaktura && (() => {
+                const posledny = mojeDlhy.filter((d) => d.zdroj === "kokpit" && d.id).sort((a, b) => b.den.localeCompare(a.den))[0];
+                if (!posledny) return null;
+                return (
+                  <button
+                    onClick={() => onFaktura(fakturaZBalicka(meno, { id: posledny.id, nazov: posledny.nazov, cena: posledny.cena, platnostOd: posledny.den }, data.dlhy))}
+                    title={`Faktúra na ${nazovProduktu(posledny.nazov)} z ${fmtDMY(posledny.den)} — ${fmtCZK(posledny.doplatit)}`}
+                    style={{ padding: "4px 10px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "none", color: C.text, fontFamily: "inherit" }}
+                  >
+                    faktúra · {fmtCZK(posledny.doplatit)}
+                  </button>
+                );
+              })()}
             </div>
           )}
         </div>

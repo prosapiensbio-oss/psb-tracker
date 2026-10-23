@@ -15,6 +15,8 @@ import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 import { dnesPraha } from "../../lib/psb/cas";
+import { faktureUhradeneBalickom } from "../../lib/psb/fakturaUhradena";
+import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 
 /**
  * VYDANÉ FAKTÚRY.
@@ -182,6 +184,39 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                     poznamka, odoslane_at, odoslane_komu, uhradene_at, platba_id, storno_at, storno_dovod, created_at
              FROM vydane_faktury ORDER BY cislo DESC`,
           ).all();
+          /**
+           * FAKTÚRA NA ZAPLATENÝ BALÍČEK SA ZAPÍŠE AKO UHRADENÁ (23. 10. 2026,
+           * Martin Vaško) — rozhoduje jedno pravidlo „zaplatený", nie klik.
+           * Zapisuje sa (nie len kreslí), aby to isté videl Jarvis aj počty
+           * „čaká na zaplatenie". Chyba tu zoznam faktúr nezhodí.
+           */
+          try {
+            type R = { id: string; klient: string; balicek_id: string | null; vystavene: string; celkom_czk: number; uhradene_at: string | null; storno_at: string | null; platba_id: string | null };
+            const riadky = (f.results || []) as unknown as R[];
+            const otvorene = riadky.filter((r) => !r.uhradene_at && !r.storno_at && r.balicek_id);
+            if (otvorene.length) {
+              const mena = [...new Set(otvorene.map((r) => r.klient))];
+              const [zive, pl] = await DB.batch([
+                DB.prepare(`SELECT id FROM balicky WHERE zrusene_at IS NULL AND id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(otvorene.map((r) => r.balicek_id))),
+                DB.prepare("SELECT id, klient, datum, suma_czk FROM platby WHERE zrusene_at IS NULL"),
+              ]);
+              const uhradit = faktureUhradeneBalickom(
+                otvorene.map((r) => ({ id: r.id, klient: r.klient, balicekId: r.balicek_id, vystavene: String(r.vystavene).slice(0, 10), celkom: Number(r.celkom_czk) || 0, uhradeneAt: r.uhradene_at, stornoAt: r.storno_at })),
+                new Set(((zive.results || []) as { id: string }[]).map((x) => x.id)),
+                await polozkyDlhovMien(DB, mena),
+                ((pl.results || []) as { id: string; klient: string; datum: string; suma_czk: number }[]).map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0 })),
+                dnesPraha(),
+              );
+              for (const u of uhradit) {
+                await DB.prepare("UPDATE vydane_faktury SET uhradene_at = ?2, platba_id = ?3 WHERE id = ?1 AND uhradene_at IS NULL").bind(u.id, u.den, u.platbaId).run();
+                await audit(DB, { action: "faktura-uhradena-auto", predmet: u.id, neu: `uhradená ${u.den} — balíček zaplatený` });
+                const r = riadky.find((x) => x.id === u.id);
+                if (r) { r.uhradene_at = u.den; r.platba_id = u.platbaId; }
+              }
+            }
+          } catch (e) {
+            console.error("faktúry: automatická úhrada zlyhala", e);
+          }
           const u = await DB.prepare("SELECT * FROM klient_fakturacia").all();
           /**
            * MAIL A TELEFÓN Z DOPYTU, KÝM ICH NIKTO NEPREPÍSAL.

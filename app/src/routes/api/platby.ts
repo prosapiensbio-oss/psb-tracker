@@ -10,7 +10,7 @@ import {
   sposobZRiadku, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
-import { dlhyKlientov } from "../../lib/psb/zaplatene";
+import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { dnesPraha } from "../../lib/psb/cas";
 import { btcNaPlatby, mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
 import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
@@ -227,51 +227,12 @@ async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
   return ((await dlhyMien(DB, [klient])).get(normName(klient)) || 0) === 0;
 }
 
-/**
- * KOĽKO KTO DLŽÍ — pre zopár mien naraz, tým istým pravidlom ako `loadData`.
- *
- * Volá to príznak „vopred" pri zápise platby a rozdelenie bitcoinovej platby
- * medzi ľudí, za ktorých prišla (`plati_za`). Jedno čítanie pre všetky mená:
- * tabuľky sú malé, ale štyri dopyty na každého klienta v dávke by neboli.
- */
+/** Koľko kto dlží — súčet položiek dlhu (`polozkyDlhovMien`). */
 async function dlhyMien(DB: D1Database, mena: string[]): Promise<Map<string, number>> {
-  // Jedno pravidlo „zaplatený" (`dlhyKlientov`, 5. 10. 2026) — to isté, čo
-  // počíta `loadData`, aj s poistkou z PTmindera a bez zdvojeného predaja.
-  // Dovtedy tu bola vlastná kópia bez nich a platbu klienta, ktorého
-  // PTminder vedie ako zaplateného, neoznačila ako vopred.
   const kluce = new Set(mena.map((m) => normName(m)).filter(Boolean));
   const out = new Map<string, number>();
   if (!kluce.size) return out;
-  // Len riadky týchto klientov (LIKE na prvé písmeno priezviska by bolo krehké;
-  // tabuľky sú malé). História môže chýbať (pred migráciou 0095) — vtedy
-  // poistka beží bez nej; ide súbežne, nech platba nečaká na dve kolá.
-  const [[bal, pl, pop, ptp], hist] = await Promise.all([
-    DB.batch([
-      DB.prepare("SELECT id, klient, nazov, cena_czk, platnost_od, zdroj, poznamka, zrusene_at FROM balicky"),
-      DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby"),
-      DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky"),
-      DB.prepare("SELECT client_name, date, amount_czk FROM payments"),
-    ]),
-    DB.prepare("SELECT klient, od FROM ptminder_historia").all().catch(() => ({ results: [] })),
-  ]);
-  type B = { id: string; klient: string; nazov: string; cena_czk: number | null; platnost_od: string; zdroj: string; poznamka: string | null; zrusene_at: string | null };
-  type P = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; zrusene_at: string | null; vopred: number | null };
-  type O = { id: string; datum: string; client_name: string; popis: string; suma_czk: number };
-  type T = { client_name: string; date: string; amount_czk: number };
-  type H = { klient: string; od: string | null };
-  const moje = <X,>(xs: X[], meno: (x: X) => string) => xs.filter((x) => kluce.has(normName(meno(x))));
-  const { polozky } = dlhyKlientov({
-    poplatky: moje((pop.results || []) as unknown as O[], (x) => x.client_name)
-      .map((p) => ({ id: p.id, klient: p.client_name, datum: p.datum, popis: p.popis || "", suma: Number(p.suma_czk) || 0 })),
-    platby: moje((pl.results || []) as unknown as P[], (x) => x.klient)
-      .map((p) => ({ id: p.id, klient: p.klient, datum: String(p.datum).slice(0, 10), suma: Number(p.suma_czk) || 0, zruseneAt: p.zrusene_at, vopred: p.vopred, sposob: p.sposob, fioId: p.fio_id })),
-    balicky: moje((bal.results || []) as unknown as B[], (x) => x.klient)
-      .map((b) => ({ id: b.id, klient: b.klient, nazov: b.nazov, cena: b.cena_czk, platnostOd: String(b.platnost_od).slice(0, 10), zdroj: b.zdroj, poznamka: b.poznamka, zruseneAt: b.zrusene_at })),
-    ptPlatby: moje((ptp.results || []) as unknown as T[], (x) => x.client_name)
-      .map((p) => ({ klient: p.client_name, datum: String(p.date || "").slice(0, 10), suma: Number(p.amount_czk) || 0 })),
-    ptHistoria: moje((hist.results || []) as unknown as H[], (x) => x.klient)
-      .map((h) => ({ klient: h.klient, od: String(h.od || "").slice(0, 10) })),
-  });
+  const polozky = await polozkyDlhovMien(DB, mena);
   for (const k of kluce) out.set(k, 0);
   for (const x of polozky) {
     const k = normName(x.klient);
