@@ -602,6 +602,9 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
   onKlient?: (meno: string) => void;
 }) {
   const [hodnoty, setHodnoty] = useState<Record<string, number>>({});
+  // Choroba alebo vopred ohlásená dovolenka: pri předplatnom sa smie preniesť
+  // aj viac než 2 h (podmienky předplatného, Jerry 23. 10. 2026).
+  const [vynimka, setVynimka] = useState<Record<string, boolean>>({});
   const [bezi, setBezi] = useState("");
   const [chyba, setChyba] = useState("");
   const [hotove, setHotove] = useState<Set<string>>(new Set());
@@ -668,15 +671,22 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
          * (najviac 2 h, pravidlo z 28. 9. 2026 — viac posuvník nepustí).
          */
         const predplatne = x.predplatne || /předplatn|predplatn|s viazanost/i.test(x.membership);
-        const maxOstane = predplatne ? Math.min(2, x.hodin) : x.hodin;
+        /**
+         * NAJVIAC 2 H AJ PRI BALÍČKU (Jerry, 23. 10. 2026: „ak prejdú dva
+         * mesiace a klient nestihol minúť 6 h, vzniká otázka — preniesť 2 h
+         * alebo prepadnúť?“). Viac len pri předplatnom s chorobou alebo
+         * vopred ohlásenou dovolenkou — vtedy ide celý zvyšok ako doplnenie.
+         */
+        const vyn = predplatne && !!vynimka[kluc];
+        const maxOstane = vyn ? x.hodin : Math.min(2, x.hodin);
         const minPrepadne = Math.round((x.hodin - maxOstane) * 100) / 100;
         const prepadne = Math.max(minPrepadne, Math.min(x.hodin, hodnoty[kluc] ?? minPrepadne));
         const ostane = Math.round((x.hodin - prepadne) * 100) / 100;
-        const doplnit = predplatne ? 0 : ostane;
-        const presun = predplatne ? ostane : 0;
+        const doplnit = predplatne && !vyn ? 0 : ostane;
+        const presun = predplatne && !vyn ? ostane : 0;
         const farba = predplatne ? C.blue : C.accent;
         const poznamka = [
-          ostane ? (predplatne ? `${ostane} h sa prenesie do ďalšieho balíčka` : `${ostane} h ostane ako doplnenie`) : "",
+          ostane ? (predplatne && !vyn ? `${ostane} h sa prenesie do ďalšieho balíčka` : `${ostane} h ostane ako doplnenie`) : "",
           prepadne ? `${prepadne} h prepadne` : "",
         ].filter(Boolean).join(" · ");
         return (
@@ -707,6 +717,15 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
               />
               <span style={{ fontSize: 11.5, color: C.orange }}>prepadne</span>
               <span style={{ fontSize: 12, color: C.textMuted, minWidth: 190 }}>{poznamka}</span>
+              {predplatne && x.hodin > 2 && (
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: C.textMuted, whiteSpace: "nowrap" }}>
+                  <input
+                    type="checkbox" checked={vyn}
+                    onChange={(e) => { const v = e.target.checked; setVynimka((s) => ({ ...s, [kluc]: v })); setHodnoty((s) => ({ ...s, [kluc]: v ? 0 : Math.round((x.hodin - 2) * 100) / 100 })); }}
+                  />
+                  choroba / dovolenka
+                </label>
+              )}
             </span>
             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
               <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} title={poznamka} onClick={() => void odpovedz(x, doplnit, presun)}>

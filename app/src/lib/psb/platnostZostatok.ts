@@ -123,14 +123,29 @@ export function moznostiPlatnosti(x: ZostavaPoPlatnosti): {
   poznamka: string;
   balicek?: { klient: string; nazov: string; hodiny: number; platnostOd: string };
 }[] {
-  const out = [
+  const out: { popis: string; poznamka: string; balicek?: { klient: string; nazov: string; hodiny: number; platnostOd: string } }[] = [
     { popis: "nechať prepadnúť", poznamka: `${x.hodin} h prepadlo — platnosť skončila ${x.platnostDo}` },
-    {
-      popis: `dopísať ${x.hodin} h ako doplnenie`,
-      poznamka: `nedočerpané hodiny z členstva do ${x.platnostDo} — odtrénuje ich nad rámec platnosti`,
-      balicek: { klient: x.meno, nazov: "Doplnenie členstva", hodiny: x.hodin, platnostOd: x.platnostDo },
-    },
   ];
+  /**
+   * Pri balíčku sa prenášajú najviac 2 h (Jerry, 23. 10. 2026: „preniesť 2 h
+   * alebo prepadnúť?“) — ako doplnenie, ktoré klient odtrénuje po konci
+   * platnosti. Pri předplatnom je celý zvyšok len pre chorobu alebo vopred
+   * ohlásenú dovolenku; bežné 2 h sa prenesú samy s ďalším mesiacom.
+   */
+  if (!x.predplatne) {
+    const h = Math.min(PRESUN_MAX_HODIN, x.hodin);
+    out.push({
+      popis: `preniesť ${h} h ako doplnenie`,
+      poznamka: `${h} h doplnenie z členstva do ${x.platnostDo}${x.hodin > h ? `, ${Math.round((x.hodin - h) * 100) / 100} h prepadlo` : ""} — odtrénuje ich nad rámec platnosti`,
+      balicek: { klient: x.meno, nazov: "Doplnenie členstva", hodiny: h, platnostOd: x.platnostDo },
+    });
+  } else {
+    out.push({
+      popis: `choroba / dovolenka: preniesť všetkých ${x.hodin} h`,
+      poznamka: `nedočerpané hodiny z členstva do ${x.platnostDo} — choroba alebo ohlásená dovolenka`,
+      balicek: { klient: x.meno, nazov: "Doplnenie členstva", hodiny: x.hodin, platnostOd: x.platnostDo },
+    });
+  }
   if (x.predplatne) {
     out.push({
       popis: `preniesť ${x.presunHodin} h do ďalšieho`,

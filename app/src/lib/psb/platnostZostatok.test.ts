@@ -90,8 +90,15 @@ describe("moznostiPlatnosti", () => {
   it("balíček má dve možnosti, predplatné tri", () => {
     const b = zostavaPoPlatnosti([kl({ name: "A" })], DNES)[0];
     const p = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné", packageRemaining: 3 })], DNES)[0];
-    expect(moznostiPlatnosti(b).map((x) => x.popis)).toEqual(["nechať prepadnúť", "dopísať 2 h ako doplnenie"]);
+    expect(moznostiPlatnosti(b).map((x) => x.popis)).toEqual(["nechať prepadnúť", "preniesť 2 h ako doplnenie"]);
     expect(moznostiPlatnosti(p).map((x) => x.popis)).toContain("preniesť 2 h do ďalšieho");
+  });
+
+  it("balíček prenesie najviac 2 h, aj keď zostali 4 (Jerry, 23. 10. 2026)", () => {
+    const b = zostavaPoPlatnosti([kl({ name: "A", packageRemaining: 4 })], DNES)[0];
+    const m = moznostiPlatnosti(b);
+    expect(m[1].balicek).toMatchObject({ nazov: "Doplnenie členstva", hodiny: 2 });
+    expect(m[1].poznamka).toContain("2 h prepadlo");
   });
 
   it("prepadnutie nič nezapisuje, ostatné dopisujú hodiny", () => {
