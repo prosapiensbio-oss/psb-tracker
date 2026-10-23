@@ -37,6 +37,7 @@ import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { dniDoNarodenin, trvanieText, zaciatokSpoluprace } from "../../lib/psb/spolupraca";
+import { fakturaZBalicka } from "../../lib/psb/fakturaZBalicka";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -1682,7 +1683,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     Nahodený <b>{nazovProduktu(ponukniFakturu.nazov)}</b>{ponukniFakturu.cena ? ` za ${fmtCZK(ponukniFakturu.cena)}` : ""}. Chceš naň faktúru?
                   </span>
                   <button
-                    onClick={() => { onFaktura({ klient: meno, popis: ponukniFakturu.nazov, cena: ponukniFakturu.cena, balicekId: ponukniFakturu.id }); setPonukniFakturu(null); }}
+                    onClick={() => { onFaktura(fakturaZBalicka(meno, { id: ponukniFakturu.id, nazov: ponukniFakturu.nazov, cena: ponukniFakturu.cena }, data.dlhy)); setPonukniFakturu(null); }}
                     style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontFamily: "inherit" }}
                   >
                     Vystaviť faktúru
@@ -1736,7 +1737,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     )}
                     {onFaktura && (
                       <button
-                        onClick={() => onFaktura({ klient: meno, popis: b.nazov, cena: b.cena_czk || 0, balicekId: b.id })}
+                        onClick={() => onFaktura(fakturaZBalicka(meno, { id: b.id, nazov: b.nazov, cena: b.cena_czk, platnostOd: b.platnost_od }, data.dlhy))}
                         title="Vystaviť faktúru na tento balíček"
                         style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
                       >

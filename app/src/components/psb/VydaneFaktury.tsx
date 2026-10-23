@@ -47,7 +47,8 @@ type Udaje = {
   os_priezvisko: string; os_mobil: string;
 };
 
-export type FakturaPredvolba = { klient: string; popis: string; cena: number; balicekId?: string };
+/** `dlh`: suma je to, čo klient na balíček dlží (`fakturaZBalicka`), nie jeho cena. */
+export type FakturaPredvolba = { klient: string; popis: string; cena: number; balicekId?: string; dlh?: boolean };
 
 const PRAZDNE_UDAJE: Omit<Udaje, "klient"> = {
   stat: "Česká republika", firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "",
@@ -127,6 +128,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
    * text sa odteraz mení sám, suma len keď ju nikto nenastavil.
    */
   const [cenaBalicka, setCenaBalicka] = useState<number | null>(null);
+  // Suma predvoľby je dlh, nie cena balíčka — upozornenie potom hovorí „zostáva doplatiť".
+  const [cenaZDlhu, setCenaZDlhu] = useState(false);
   const [u, setU] = useState<Omit<Udaje, "klient">>(PRAZDNE_UDAJE);
   /**
    * Ďalší klienti na tej istej faktúre. Jerry, 4. 10. 2026: „Dan a Monika
@@ -165,6 +168,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       vystavene: dnes(), balicekId: predvolba.balicekId || "",
     }));
     setCenaBalicka(predvolba.balicekId && predvolba.cena > 0 ? Math.round(predvolba.cena) : null);
+    setCenaZDlhu(!!predvolba.dlh);
     setOtvorenaNova(true);
     onPredvolbaSpracovana?.();
   }, [predvolba, onPredvolbaSpracovana]);
@@ -284,6 +288,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
     setCenaBalicka(null);
+    setCenaZDlhu(false);
   };
 
   /** Otvorí náhľad mailu — text sa zloží tu a dá sa prepísať. */
@@ -434,7 +439,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               padding: "8px 11px", borderRadius: 9, border: `1px solid ${mix(C.orange, 55)}`, background: C.orangeBg,
               fontSize: 12, color: C.orange,
             }}>
-              <span>Balíček, z ktorého faktúra vznikla, stojí <b>{suma(cenaBalicka)} Kč</b> — faktúra je na {suma((Number(f.ks) || 0) * (Number(f.cena) || 0))} Kč.</span>
+              <span>{cenaZDlhu ? "Na balíček, z ktorého faktúra vznikla, zostáva doplatiť" : "Balíček, z ktorého faktúra vznikla, stojí"} <b>{suma(cenaBalicka)} Kč</b> — faktúra je na {suma((Number(f.ks) || 0) * (Number(f.cena) || 0))} Kč.</span>
               <button
                 type="button"
                 onClick={() => setF((s) => ({ ...s, ks: "1", cena: String(cenaBalicka) }))}
