@@ -772,6 +772,24 @@ vyriešené opravami 5. 10. vyššie, ponechané ako história):
 
 ---
 
+## 7 · Rohlík asistent (nákup pre Terezku, mimo Kokpitu)
+
+Samostatná appka `~/Downloads/rohlik-asistent`, naostro https://rohlik.prosapiensbio.workers.dev,
+verzia 2 od 24. 10. 2026 (podrobnosti v README v jej repe).
+
+- [ ] **Claude kľúč pre „Napíš vlastnými slovami“** – ODLOŽENÉ (Jerry 24. 10. 2026: „zatiaľ nie, nechaj
+  Workers AI“). Teraz to robí Llama na Workers AI a vyberá slabšie (na „guláš“ dala cesnakovú pastu namiesto
+  cesnaku). Keď áno: `cd ~/Downloads/rohlik-asistent && npx wrangler secret put ANTHROPIC_API_KEY`,
+  appka prejde na Clauda sama.
+- [ ] **Poslať Rohlíku žiadosť o povolenie adresy** – text je v appke v Nastaveniach („Žiadosť pre Rohlík“).
+  Kým ju nepovolia, prihlásenie ide cez kopírovanie adresy `localhost/callback?code=…` (90 dní platí).
+- [ ] **Prvý ostrý nákup s novou verziou** – naostro po prihlásení ešte nikto neprešiel; lokálne overené na
+  Terezkiných dátach, košík skúšaný jedným banánom (vrátený).
+- [ ] **Pripomienka do telefónu** – overiť na Terezkinom telefóne (appka na ploche → Nastavenia → Povoliť
+  → Poslať skúšobnú).
+
+---
+
 ## Zavreté (aby sa neotvárali odznova)
 
 - **Strižňa – body 10, 11, 13 z poradia 13. 10. hotové:** vyhľadávač tém na reakčné videá (obrazovka Reakcie),
