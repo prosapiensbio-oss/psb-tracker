@@ -227,22 +227,21 @@ describe("úvodný v deň, keď začína bežný balíček", () => {
   });
 });
 
-describe("offline tréning popri online členstve (Veronika, 21. 10. 2026)", () => {
+describe("tréning iného druhu než členstvo = samostatná hodina (Veronika 21. 10., Jerry 25. 10. 2026)", () => {
   const off = (den: string) => ({ druh: "trening", den, cas: "18:00", nazov: "OFFLINE - 60min" }) as Udalost;
   const on = (den: string) => ({ druh: "trening", den, cas: "18:00", nazov: "ONLINE - 60min" }) as Udalost;
-  it("kto si už kúpil 1h offline, dostane na offline tréning 1h Balíček za 1 450", () => {
-    const os = zorad([
-      balicek("2026-09-02", 1, "OFF - 1 hodina offline", "2026-09-29"),
-      balicek("2026-10-06", 6, "6h Balíček online", "2026-11-30"),
-      on("2026-10-06"), off("2026-10-27"),
-    ]);
+  it("offline tréning popri online členstve → 1h Balíček za 1 450", () => {
+    const os = zorad([balicek("2026-10-06", 6, "6h Balíček online", "2026-11-30"), on("2026-10-06"), off("2026-10-27")]);
     const { stavy } = priebehBalickov(os, null, "2026-10-28");
-    const n = navrhNovehoBalicka("Veronika Stoklaskova", os, stavy);
-    expect(n).toMatchObject({ odDna: "2026-10-27", nazov: "1h Balíček", hodiny: 1, cena: 1450 });
+    expect(navrhNovehoBalicka("Veronika Stoklaskova", os, stavy)).toMatchObject({ odDna: "2026-10-27", nazov: "1h Balíček", hodiny: 1, cena: 1450 });
   });
-  it("keď 1h balíček v ten deň už je, nenavrhne ďalší", () => {
+  it("online tréning popri offline členstve → 1h Balíček online", () => {
+    const os = zorad([balicek("2026-10-05", 8, "8h Balíček", "2026-11-29"), off("2026-10-06"), on("2026-10-20")]);
+    const { stavy } = priebehBalickov(os, null, "2026-10-21");
+    expect(navrhNovehoBalicka("X", os, stavy)).toMatchObject({ odDna: "2026-10-20", nazov: "1h Balíček online", hodiny: 1 });
+  });
+  it("keď hodina toho druhu v ten deň už je, nenavrhne ďalšiu", () => {
     const os = zorad([
-      balicek("2026-09-02", 1, "OFF - 1 hodina offline", "2026-09-29"),
       balicek("2026-10-06", 6, "6h Balíček online", "2026-11-30"),
       balicek("2026-10-27", 1, "1h Balíček", "2026-11-23"),
       on("2026-10-06"), off("2026-10-27"),
@@ -250,8 +249,8 @@ describe("offline tréning popri online členstve (Veronika, 21. 10. 2026)", () 
     const { stavy } = priebehBalickov(os, null, "2026-10-28");
     expect(navrhNovehoBalicka("Veronika Stoklaskova", os, stavy)?.nazov).not.toBe("1h Balíček");
   });
-  it("online klient, ktorý si offline hodinu nikdy nekúpil, ju nedostane (Lucia Podolová)", () => {
-    const os = zorad([balicek("2026-10-02", 6, "ON - 6h S viazanostou", "2026-10-29"), off("2026-10-06")]);
+  it("tréning rovnakého druhu ako členstvo nič nezakladá", () => {
+    const os = zorad([balicek("2026-10-02", 6, "ON - 6h S viazanostou", "2026-10-29"), on("2026-10-06")]);
     const { stavy } = priebehBalickov(os, null, "2026-10-07");
     expect(navrhNovehoBalicka("Lucie Podolova", os, stavy)).toBeNull();
   });

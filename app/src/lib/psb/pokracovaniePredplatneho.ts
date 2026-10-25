@@ -7,7 +7,8 @@
  * kartu, hoci 16. 10. zaplatil 6 990 Kč za obdobie od 21. 10. — a rytmus
  * sa posúval o deň, keď prišiel o deň neskôr.
  *
- * Odteraz ďalší mesiac vznikne V DEŇ PO KONCI predošlého:
+ * Ďalší mesiac vznikne PRVÝM TRÉNINGOM po konci predošlého (od 25. 10.
+ * 2026; 22.–24. 10. vznikal v deň po konci):
  *  - kým předplatné ide v rade za sebou — aj po 6 mesiacoch ďalší polrok
  *    (Jerry, 22. 10. 2026: „nech pokračuje aj ďalší polrok"); polroky sa
  *    rátajú od prvého předplatného v rade („áno, od prvého"),
@@ -77,9 +78,22 @@ export function pokracovaniePredplatneho(
   if (!posledne || den(posledne.platnostDo) >= dnes || posledne.ukonceny) return null;
   // Ďalší balíček už je (minul skôr, kúpil iný produkt) — nič sa nezakladá.
   if (moje.some((b) => b !== posledne && !jeZvysok(b) && !b.kotva && den(b.platnostOd) > den(posledne.platnostOd))) return null;
-  const odDna = posunDni(den(posledne.platnostDo), 1);
-  // Kto po konci mesiac neprišiel a nič nezaplatil, nepokračuje automaticky.
-  if (odDna < posunDni(dnes, -MEDZERA_DNI)) return null;
+  /**
+   * NOVÝ MESIAC ZAČÍNA PRVÝM TRÉNINGOM PO KONCI (Jerry, 25. 10. 2026: „nový
+   * mesiac vždy bude začínať prvým tréningom"). Deň po konci posúval rytmus
+   * na dni, keď klient nebol — Kalva skončil 16. 10., prišiel 19. 10.
+   * a mesiac mu bežal od 17. Sedenia sú len tie, ktoré už začali, takže
+   * dnešný tréning o 18:00 ráno nič nezaloží.
+   */
+  const koniec = den(posledne.platnostDo);
+  const prvy = sedenia
+    .filter((s) => normName(s.client) === k && den(s.date) > koniec && den(s.date) <= dnes && !zadarmo.has(`${k}|${den(s.date)}`))
+    .map((s) => den(s.date))
+    .sort()[0];
+  if (!prvy) return null;
+  const odDna = prvy;
+  // Kto po konci mesiac neprišiel, nepokračuje automaticky — to je návrat.
+  if (odDna > posunDni(koniec, MEDZERA_DNI)) return null;
 
   // Začiatok záväzku: prvé předplatné v rade za sebou (Kokpit aj PTminder).
   const obdobia = [

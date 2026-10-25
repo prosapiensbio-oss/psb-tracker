@@ -2789,6 +2789,11 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
 - **Staré obdobia z PTmindera sa nesúdia** (`vyrovnane`): tréning nad rámec
   uzavretého členstva spred 1. 10. je „—", nie mínus (Jerry: „či to sedí
   v marci, je irelevantné").
+- **Druh tréningu z kalendára = druh platného členstva** (od 25. 10. 2026,
+  `jeOnlineTrening`); slovo „online"/„offline" v názve udalosti rozhoduje len
+  keď ho MENÍ a vtedy vznikne samostatná hodina toho druhu (`samostatnaHodina`:
+  1h Balíček 1 450 / 1h Balíček online). Bez členstva alebo s ON aj OFF naraz:
+  bez slova offline.
 - **Samostatná hodina iného druhu** (najviac 1 h, ON/OFF z NÁZVU balíčka)
   počas platného členstva pokryje svoj tréning a obdobie neotvára
   (`samostatne`). Druh tréningu rozhoduje len keď je známy; prísne „online
@@ -3164,7 +3169,9 @@ Jerry, keď Robin Martinek ráno nemal žiadne hodiny, hoci 16. 10. zaplatil
 předplatné od 21. 10.: „predplatné má pravidlo, že 2 h môžeš preniesť do
 ďalšieho balíčka." Podmienky: 6 mesiacov, 6 h mesačne, prenos max 2 h.
 
-- **Ďalší mesiac vzniká V DEŇ PO KONCI** (`pokracovaniePredplatneho.ts`,
+- **Ďalší mesiac vzniká PRVÝM TRÉNINGOM PO KONCI** (od 25. 10. 2026; 22.–24. 10.
+  vznikal v deň po konci — Jerry: „nový mesiac vždy bude začínať prvým
+  tréningom"; Kalva skončil 16. 10., prišiel 19. 10.) (`pokracovaniePredplatneho.ts`,
   akcia `automaticky` v `/api/balicky` — beží PRED zakladaním z prvého
   tréningu). Kým předplatné ide v rade (medzera do 31 dní je ten istý
   záväzok; staršie obdobia z `ptminder_historia`) — aj po 6 mesiacoch ďalší

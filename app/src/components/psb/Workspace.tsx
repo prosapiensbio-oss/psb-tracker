@@ -34,7 +34,7 @@ import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { ZdravieKokpitu } from "./ZdravieKokpitu";
 import { KrokDopyty, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
-import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
+import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { menaPlatiZa, platiteliaZOverridov } from "../../lib/psb/platiZa";
@@ -1257,6 +1257,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           {!delenie && (
                             <>
                               <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
+                              {mena.includes(t.trim()) && <ProfilKlienta meno={t.trim()} onKlient={naStol} />}
                               <button onClick={() => void (async () => {
                                 const j = await vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true });
                                 if (j?.navrh) setPonukaBalicka({ ...j.navrh, klient: t.trim() });
@@ -1495,6 +1496,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     >
                       {x.meno}{poKrokoch ? (denOtvoreny === kluc ? " ▴" : " ▾") : ""}
                     </button>
+                    {/* Klik na meno tu rozbalí platby z banky — profil je vedľa
+                        (Jerry, 25. 10. 2026). */}
+                    {poKrokoch && <ProfilKlienta meno={x.meno} onKlient={naStol} />}
                     {/* Koľko je v mínuse — pred sumou (Jerry, 4. 10. 2026:
                         „Daniela Šašinková −3 · 9 400 · 9. 9. OFF…"). */}
                     {poKrokoch && (
@@ -1807,10 +1811,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       return (
         <>
           <FioPrijmy onZapisane={poZapise} />
-          <OtazkyPlatieb dlhy={data.dlhy} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} />
+          <OtazkyPlatieb dlhy={data.dlhy} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} onKlient={naStol} />
           {sekcieKresli}
           <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
-          <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} />
+          <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
           {prazdne && <VsetkoVybavene text="Všetko vybavené — každá platba má klienta, nikto nedlží a o balíčkoch netreba nič rozhodnúť." />}
         </>
       );

@@ -129,9 +129,27 @@ describe("online tréning ide z online balíčka (Marcela Hrůzová)", () => {
       { ...bal("M", "2026-08-27", "2026-10-21", 6, 6590), nazov: "ON - 6h BEZ viazanosti" },
       { ...bal("M", "2026-09-18", "2026-10-15", 1, 1450), nazov: "OFF - 1 hodina offline" },
     ];
-    const [on, off] = sedeniaZKalendara([u("M", "2026-10-02T10:00", { nazov: "Marcela online" }), u("M", "2026-10-03T10:00")], b, "2026-12-31T23:59");
+    const [on, off] = sedeniaZKalendara([u("M", "2026-10-02T10:00", { nazov: "Marcela online" }), u("M", "2026-10-03T10:00", { nazov: "Marcela offline" })], b, "2026-12-31T23:59");
     expect(on.price).toBe(1098.33);
     expect(off.price).toBe(1450);
+  });
+});
+
+describe("druh tréningu je druh členstva, slovo ho len mení (Jerry, 25. 10. 2026)", () => {
+  const on = { ...bal("L", "2026-10-02", "2026-10-29", 6, 5640), nazov: "ON - 6h S viazanostou" };
+  const off = { ...bal("L", "2026-10-02", "2026-11-26", 6, 7790), nazov: "6h Balíček" };
+  const druh = (b: BalicekKokpitu[], nazov: string) => sedeniaZKalendara([u("L", "2026-10-06T10:00", { nazov })], b, "2026-12-31T23:59")[0].sessionType;
+  it("online členstvo: bez slova online, so slovom offline offline", () => {
+    expect(druh([on], "Lucka Podolová")).toBe("ONLINE");
+    expect(druh([on], "Lucka Podolová offline")).toBe("OFFLINE");
+  });
+  it("offline členstvo: bez slova offline, so slovom online online", () => {
+    expect(druh([off], "Lucka")).toBe("OFFLINE");
+    expect(druh([off], "Lucka -online")).toBe("ONLINE");
+  });
+  it("bez členstva alebo s oboma naraz platí staré pravidlo: bez slova offline", () => {
+    expect(druh([], "Lucka")).toBe("OFFLINE");
+    expect(druh([on, off], "Lucka")).toBe("OFFLINE");
   });
 });
 

@@ -434,6 +434,32 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
  * obrazovke Banka, kde sa im dáva kategória do P&L. Duplicity a zamknuté
  * mesiace stráži server (`/api/fio` zapis).
  */
+/**
+ * MENO, KTORÉ OTVORÍ PROFIL (Jerry, 25. 10. 2026: „v Platbách a balíčkoch mi
+ * daj možnosť prekliknúť na toho klienta profil"). Bodkované podčiarknutie
+ * je zámer — v Platnosti meno klikalo aj predtým, ale nebolo to na ňom vidno.
+ */
+export function MenoKlienta({ meno, onKlient, style }: { meno: string; onKlient?: (meno: string) => void; style?: React.CSSProperties }) {
+  if (!onKlient) return <span style={style}>{meno}</span>;
+  return (
+    <button
+      type="button" onClick={() => onKlient(meno)} title="Otvoriť profil klienta"
+      style={{ padding: 0, border: "none", background: "none", fontFamily: "inherit", textAlign: "left", cursor: "pointer", color: C.text,
+        textDecoration: "underline dotted", textDecorationColor: C.textDim, textUnderlineOffset: 3, ...style }}
+    >{meno}</button>
+  );
+}
+
+/** Malé „profil ›" vedľa mena, keď klik na meno robí niečo iné (rozbalí platby). */
+export function ProfilKlienta({ meno, onKlient }: { meno: string; onKlient?: (meno: string) => void }) {
+  if (!onKlient || !meno) return null;
+  return (
+    <button type="button" onClick={() => onKlient(meno)} title={`Otvoriť profil — ${meno}`}
+      style={{ padding: "2px 7px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}
+    >profil ›</button>
+  );
+}
+
 export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
   const [bezi, setBezi] = useState(false);
   const [vysledok, setVysledok] = useState<{ datum: string; suma: number; kto: string }[] | null>(null);
@@ -491,7 +517,7 @@ export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
  * SUMA NESEDÍ NA BALÍČEK — otázka a jedným klikom oprava.
  * Pravidlá v `otazkyPlatieb`; tu sa balíček len prepíše.
  */
-export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOpravene }: {
+export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOpravene, onKlient }: {
   /** Jedno pravidlo „zaplatený" — `data.dlhy`. */
   dlhy: DlhPolozka[] | undefined;
   balicky: BalicekRiadokKroku[];
@@ -499,6 +525,7 @@ export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOprave
   trener: string | null;
   clients: Record<string, ClientAgg>;
   onOpravene: () => void;
+  onKlient?: (meno: string) => void;
 }) {
   const [dovody, setDovody] = useState<Record<string, string>>({});
   const [bezi, setBezi] = useState("");
@@ -533,7 +560,7 @@ export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOprave
       {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
       {otazky.map((o) => (
         <div key={o.balicekId} style={riadok}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 160 }}>{o.klient}</span>
+          <span style={{ minWidth: 160 }}><MenoKlienta meno={o.klient} onKlient={onKlient} style={{ fontSize: 13.5, fontWeight: 600, color: C.text }} /></span>
           <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 260px" }}>{o.veta}</span>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", flexBasis: "100%" }}>
             {o.moznosti.map((m, i) => m.druh === "velkost"
@@ -692,10 +719,7 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
         return (
           <div key={kluc} style={{ ...riadok, alignItems: "center" }}>
             <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 150 }}>
-              <button
-                type="button" onClick={() => onKlient?.(x.meno)} title="Otvoriť profil klienta"
-                style={{ padding: 0, border: "none", background: "none", fontFamily: "inherit", textAlign: "left", fontSize: 13.5, fontWeight: 600, color: C.text, cursor: onKlient ? "pointer" : "default" }}
-              >{x.meno}</button>
+              <MenoKlienta meno={x.meno} onKlient={onKlient} style={{ fontSize: 13.5, fontWeight: 600 }} />
               <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                 <span style={{
                   fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",
@@ -749,12 +773,13 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene, onKlient }: {
  * automaticky a následne sa Kokpit dopýta, či novovzniknutý balíček sedí".
  * Odpoveď sa zapíše do `anomaly_ack`, takže sa nepýta znova.
  */
-export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene }: {
+export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene, onKlient }: {
   balicky: BalicekRiadokKroku[];
   acks: Record<string, unknown>;
   clients: Record<string, ClientAgg>;
   trener: string | null;
   onVybavene: () => void;
+  onKlient?: (meno: string) => void;
 }) {
   const [velkost, setVelkost] = useState<Record<string, string>>({});
   const [bezi, setBezi] = useState("");
@@ -803,7 +828,7 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene 
         return (
           <div key={id} style={{ ...riadok, alignItems: "flex-start" }}>
             <div style={{ minWidth: 170 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{b.klient}</div>
+              <MenoKlienta meno={b.klient} onKlient={onKlient} style={{ fontSize: 13.5, fontWeight: 600, display: "block" }} />
               <div style={{ fontSize: 11, color: C.textDim }}>{String(b.poznamka || "").split(" · ").find((x) => /návrat/i.test(x))}</div>
             </div>
             <div style={{ flex: "1 1 260px", fontSize: 12.5, color: C.text }}>
@@ -828,7 +853,9 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene 
       })}
       {nedavno.length > 0 && (
         <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
-          Za 14 dní vznikli prvým tréningom sami: {nedavno.map((b) => `${b.klient} (${nazovProduktu(b.nazov)}, ${fmtDMY(b.platnost_od)})`).join(" · ")}.
+          Za 14 dní vznikli prvým tréningom sami: {nedavno.map((b, i) => (
+            <span key={String(b.id ?? i)}>{i > 0 ? " · " : ""}<MenoKlienta meno={b.klient} onKlient={onKlient} style={{ color: C.textDim, fontSize: 11.5 }} /> ({nazovProduktu(b.nazov)}, {fmtDMY(b.platnost_od)})</span>
+          ))}.
           Zmeniť ich ide v profile klienta.
         </div>
       )}

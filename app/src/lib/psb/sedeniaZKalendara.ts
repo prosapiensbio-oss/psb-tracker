@@ -114,6 +114,28 @@ function platnyBalicek(balicky: BalicekKokpitu[], klient: string, isoDen: string
   return platne.find((b) => jeOnline(b) === online) || platne[0] || null;
 }
 
+/**
+ * ONLINE ALEBO OFFLINE (Jerry, 25. 10. 2026): „pokiaľ má klient kúpený
+ * balíček na online, nie je potrebné, aby tam bolo napísané online."
+ * Druh tréningu je druh členstva, ktoré v ten deň platí; slovo v názve
+ * udalosti rozhoduje len vtedy, keď ho mení — „offline" pri online klientovi
+ * alebo „online" pri offline klientovi je samostatná hodina toho druhu
+ * (`samostatnaHodina` vo workspaceKroky). Do 25. 10. platilo „bez slova
+ * online = offline" a Lucii Podolovej s online členstvom by tak každý
+ * tréning bez slova vyšiel ako offline. Klient s platným online aj offline
+ * členstvom naraz ostáva na starom pravidle — bez slova offline.
+ */
+export function jeOnlineTrening(balicky: BalicekKokpitu[], klient: string, isoDen: string, nazovUdalosti: string): boolean {
+  if (/online/i.test(nazovUdalosti)) return true;
+  if (/offline/i.test(nazovUdalosti)) return false;
+  const kto = normName(klient);
+  const clenstva = balicky.filter((b) => normName(b.klient) === kto && !b.zrusene_at && (b.hodiny || 0) > 1
+    && !/doplnenie|prenesen/i.test(b.nazov || "")
+    && den(b.platnost_od) <= isoDen && (!b.platnost_do || den(b.platnost_do) >= isoDen));
+  const druhy = new Set(clenstva.map((b) => /^\s*ON\b|online/i.test(b.nazov || "")));
+  return druhy.size === 1 && druhy.has(true);
+}
+
 const cenaZBalicka = (b: BalicekKokpitu | null): number => {
   const delitel = (b?.hodinySpolu || 0) > 0 ? b!.hodinySpolu! : (b?.hodiny || 0);
   if (!b || !b.cena_czk || !delitel) return 0;
@@ -147,7 +169,7 @@ export function sedeniaZKalendara(
     const d = den(u.zaciatok);
     if (d < od || u.zaciatok.slice(0, 16) > teraz) continue;
     const uvodny = u.typ === "uvodny";
-    const online = !uvodny && /online/i.test(u.nazov || "");
+    const online = !uvodny && jeOnlineTrening(balicky, u.klient, d, u.nazov || "");
     const minut = minutyMedzi(u.zaciatok, u.koniec);
     out.push({
       date: `${d}T00:00:00.000Z`,

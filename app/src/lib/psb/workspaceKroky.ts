@@ -162,7 +162,7 @@ function navrhNovehoBalickaBezStraze(
     };
   }
 
-  const offline = samostatnaOfflineHodina(klient, os);
+  const offline = samostatnaHodina(klient, os);
   if (offline) return offline;
 
   if (!nekryte.length) return null;
@@ -239,49 +239,48 @@ function navrhNovehoBalickaBezStraze(
 }
 
 /**
- * OFFLINE TRÉNING POČAS ONLINE ČLENSTVA = SAMOSTATNÁ HODINA (Jerry, 21. 10.
+ * TRÉNING INÉHO DRUHU NEŽ ČLENSTVO = SAMOSTATNÁ HODINA (Jerry, 21. a 25. 10.
  * 2026: „Veronika keď príde na offline, tak platí 1 h za 1 450, keď online,
- * má cenu, čo má.“ Terezka jej online tréningy píše do kalendára so slovom
- * „online“; bez neho je tréning offline).
+ * má cenu, čo má." … „keď má klient veľa hodín offline a zrazu sa v názve
+ * objaví online, tak je čas dať online hodinu.").
  *
- * Os už vie, že 1h offline balíček popri online členstve pokryje svoj
- * tréning a členstvo beží ďalej. Chýbalo, aby ho Kokpit sám založil — offline
- * tréning inak zjedol hodinu z online balíčka.
- *
- * LEN PRE KLIENTA, KTORÝ SI TAKÚ HODINU UŽ RAZ KÚPIL (Veronika 2. 9., Marcela
- * Hrůzová 18. 9.). Lucia Podolová má online balíček a väčšinu tréningov
- * v kalendári bez slova „online“ — všeobecné pravidlo by jej každý z nich
- * účtovalo zvlášť. A len od 1. 10. 2026: minulosť appka sama nepíše.
+ * Druh tréningu z kalendára je od 25. 10. druh členstva, ktoré v ten deň
+ * platí (`jeOnlineTrening`); iný druh má tréning len vtedy, keď ho v názve
+ * mení slovo „offline"/„online". Preto už netreba výnimku „len kto si takú
+ * hodinu raz kúpil" — Lucia Podolová má online členstvo a jej tréningy bez
+ * slova sú online. Os už vie, že hodina iného druhu pokryje svoj tréning
+ * a členstvo beží ďalej. Len od 1. 10. 2026: minulosť appka sama nepíše.
  */
-export function samostatnaOfflineHodina(klient: string, os: Udalost[]): NavrhNovehoBalicka | null {
+export function samostatnaHodina(klient: string, os: Udalost[]): NavrhNovehoBalicka | null {
   const balicky = os.filter((u): u is Extract<Udalost, { druh: "balicekOd" }> => u.druh === "balicekOd" && !u.doplnenie);
-  const jeHodinaOff = (b: { hodin: number; nazov: string }) => b.hodin === 1 && kanalBalicka(b.nazov) === "off" && b.nazov !== NAZOV_UVODNEHO;
-  if (!balicky.some(jeHodinaOff)) return null;
-  const sablona = CENNIK.find((x) => x.nazov === "1h Balíček");
-  if (!sablona?.hodiny) return null;
+  const plati = (b: { den: string; doDna?: string }, d: string) => b.den <= d && (!b.doDna || b.doDna >= d);
   const treningy = os
     .filter((u): u is Extract<Udalost, { druh: "trening" }> => u.druh === "trening" && !u.uvodny && u.zdarma === undefined && u.den >= KOKPIT_OD)
     .sort((a, b) => a.den.localeCompare(b.den));
   for (const t of treningy) {
-    if (kanalTreningu(t) !== "off") continue;
-    if (balicky.some((b) => b.den === t.den && jeHodinaOff(b))) continue;
-    // Bežiace členstvo v ten deň: posledný balíček s viac hodinami.
-    const clenstvo = balicky
-      .filter((b) => b.hodin > 1 && b.den <= t.den && (!b.doDna || b.doDna >= t.den))
-      .sort((a, b) => b.den.localeCompare(a.den))[0];
-    if (!clenstvo || kanalBalicka(clenstvo.nazov) !== "on") continue;
+    const druh = kanalTreningu(t);
+    if (!druh) continue;
+    const jeHodina = (b: { hodin: number; nazov: string }) => b.hodin === 1 && kanalBalicka(b.nazov) === druh && b.nazov !== NAZOV_UVODNEHO;
+    if (balicky.some((b) => b.den === t.den && jeHodina(b))) continue;
+    const clenstva = balicky.filter((b) => b.hodin > 1 && plati(b, t.den) && !/^\s*(doplnenie|prenesen)/i.test(b.nazov));
+    // Platí aj členstvo toho druhu — tréning ide z neho.
+    if (clenstva.some((b) => kanalBalicka(b.nazov) === druh)) continue;
+    const clenstvo = clenstva.sort((a, b) => b.den.localeCompare(a.den))[0];
+    if (!clenstvo || !kanalBalicka(clenstvo.nazov)) continue;
+    const sablona = CENNIK.find((x) => x.nazov === (druh === "on" ? "1h Balíček online" : "1h Balíček"));
+    if (!sablona?.hodiny) continue;
     return {
       klient,
       odDna: t.den,
       nekrytych: 1,
       nazov: sablona.nazov,
       hodiny: sablona.hodiny,
-      cena: sablona.cena ?? 1450,
+      cena: sablona.cena ?? (druh === "on" ? 1390 : 1450),
       platnostDo: platnostDo(t.den, sablona.tyzdnov, sablona.mesiacov),
       predosly: { nazov: clenstvo.nazov, od: clenstvo.den, cena: null },
       navrat: false,
       pauzaDni: -1,
-      cenaPoznamka: "offline tréning popri online členstve — samostatná hodina",
+      cenaPoznamka: druh === "on" ? "online tréning popri offline členstve — samostatná hodina" : "offline tréning popri online členstve — samostatná hodina",
     };
   }
   return null;
