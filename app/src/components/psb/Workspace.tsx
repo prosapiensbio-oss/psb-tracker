@@ -291,6 +291,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const poZapise = useCallback(() => { void nacitaj(); oznam("klienti"); }, [nacitaj]);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
+  /**
+   * PLATBA PRIRADENÁ INDE MUSÍ ZMIZNÚŤ AJ TU (Jerry, 25. 10. 2026: „prečo,
+   * keď som Stokláskovej platbu zaradil, je stále medzi možnosťami?“).
+   * Zoznam nepriradených z banky sa načítal len pri otvorení; priradenie
+   * v profile alebo inej karte o sebe dá vedieť signálom „peniaze“, ale tu
+   * ho nikto nepočúval a platba z 24. 10. sa ďalej ponúkala Marcele.
+   */
+  useEffect(() => pocuvaj("peniaze", () => { void nacitaj(); }), [nacitaj]);
 
   /** Aktívni bez hodín — pýta sa exportu aj vlastnej evidencie naraz. */
   const bezBalicka = useMemo<BezBalicka[]>(

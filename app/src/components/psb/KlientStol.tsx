@@ -1492,7 +1492,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
             ))}
           </div>
@@ -1537,7 +1537,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             koruny, a jedna suma tam má dve hodnoty — vtedajšiu a dnešnú. */}
         {filter === "peniaze" && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
-            {([["platby", "platby"], ["bitcoin", "₿ bitcoin"]] as const).map(([id, l]) => (
+            {([["platby", "všetky platby"], ["bitcoin", "₿ bitcoin"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setPenazSub(id)} style={prepinac(penazSub === id)}>{l}</button>
             ))}
             {penazSub === "platby" && (
