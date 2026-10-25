@@ -106,7 +106,7 @@ import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
-import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
+import { chybajuceNaklady, dvojiteZapisy, nesediSPravidlom, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type NesediSPravidlom, type Pohyb, type PravidloNaKontrolu } from "../../lib/psb/kontrolaNakladov";
 import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 import { dnesPraha } from "../../lib/psb/cas";
 import { UDALOST_DO_EDITORA } from "../../lib/psb/doEditora";
@@ -1061,6 +1061,8 @@ export function PSBApp() {
   /** Výdavky na potvrdenie alebo bez kategórie, po mesiacoch (krok Fio). */
   const [bankaNaPotvrdenie, setBankaNaPotvrdenie] = useState<Record<string, number>>({});
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
+  /** Staršie pohyby, ktoré nesedia s neskôr naučeným pravidlom (nesediSPravidlom). */
+  const [pravidloNesedi, setPravidloNesedi] = useState<NesediSPravidlom[]>([]);
   /** Nákupy z BTC po mesiacoch — pre rozpis bunky aj pre kontrolu dvojitého zápisu. */
   const [btcNakupy, setBtcNakupy] = useState<Record<string, BtcNakup[]>>({});
   /** Výbery z BTC peňaženky, ku ktorým sa nenašla faktúra — náklad chýba v P&L. */
@@ -1524,7 +1526,7 @@ function skupinaFaktur(
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string; potvrdene?: boolean }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string; potvrdene?: boolean; vlozene?: string }[]; pravidla?: PravidloNaKontrolu[] }) => {
         // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
@@ -1864,6 +1866,15 @@ function skupinaFaktur(
         }
         setBankaNaPotvrdenie(naPotvrdenie);
         setBankaPohyby(pohybyPodla);
+        // Rozdelený pohyb (split) rozhoduje rozdelením, nie kategóriou — pravidlo
+        // sa ho netýka. Ostatné výdavky idú celé, aj potvrdené: hromadné
+        // potvrdenie „história" (7. 10. 2026) skrylo presne takýto pohyb.
+        setPravidloNesedi(nesediSPravidlom(
+          (j.pohyby || [])
+            .filter((p) => !(p.kluc && platnySplit(pohybSplits[p.kluc])))
+            .map((p) => ({ ...p, datum: String(p.datum).slice(0, 10), kluc: p.kluc || "" })),
+          j.pravidla || [],
+        ));
         setBankaPrijmy(prijmyBanka);
         // Rozpis má odteraz vlastnú verziu (nastavRozpis vyššie), takže sa
         // netreba spoliehať na tik „pre istotu".
@@ -1960,19 +1971,25 @@ function skupinaFaktur(
         key, category: "Anomália", tone: n.druh === "chyba" ? "red" : "orange",
         title: n.druh === "chyba"
           ? `${meno}: v ${monthLabel(n.mesiac)} nedorazil`
-          : `${meno}: v ${monthLabel(n.mesiac)} výrazne nižší`,
+          : n.druh === "vyskocil"
+            ? `${meno}: v ${monthLabel(n.mesiac)} výrazne vyšší`
+            : `${meno}: v ${monthLabel(n.mesiac)} výrazne nižší`,
         // Rozbalený register ukazuje detail, nie titulok — bez mena na jeho
         // začiatku sa z položky nedá zistiť, ČO vlastne chýba.
         detail: n.druh === "chyba"
           ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
-          : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
+          : n.druh === "vyskocil"
+            // August 2026: domáci nájom 23 000 sa pri importe zaradil do nájmu
+            // štúdia (52 750 namiesto 29 750) a nič sa neozvalo.
+            ? `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč, o ${Math.round(n.teraz - n.obvykle).toLocaleString("cs-CZ")} Kč viac. Buď sa sem zaradil pohyb, ktorý patrí inam (súkromný alebo spoločný výdavok, kaucia, dvojitý zápis), alebo sa naozaj platilo viac. Zisk za ten mesiac je zatiaľ o rozdiel nižší, ak je to chyba.`
+            : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
         // Peniaze má na starosti Jerry (31. 8. 2026).
         trener: "Jerry",
         ...stavPolozky(key, `naklad|${n.kategoria}`),
         // Cieľ nesie mesiac aj kategóriu: P&L sa otvorí, riadok rozbalí,
         // zvýrazní a odroluje sa k nemu. Predtým to bola správna obrazovka
         // so štyridsiatimi riadkami a hľadaním od začiatku.
-        priority: n.druh === "chyba" ? 3 : 7, client: `vzas|pnl|${n.mesiac}|${n.kategoria}`,
+        priority: n.druh === "chyba" ? 3 : n.druh === "vyskocil" ? 5 : 7, client: `vzas|pnl|${n.mesiac}|${n.kategoria}`,
       });
     }
 
@@ -1999,6 +2016,30 @@ function skupinaFaktur(
         // Peniaze má na starosti Jerry (31. 8. 2026).
         trener: "Jerry",
         ...stavPolozky(key, `dvojity|${d.kategoria}`), priority: 2, client: `vzas|pnl|${d.mesiac}|${d.kategoria}`,
+      });
+    }
+
+    // (1b2) Nové pravidlo nesedí so starším zaradením. Pravidlá sa spätne
+    // neaplikujú, takže pohyb zaradený zle pred vznikom pravidla zostal zle
+    // navždy — august 2026 (domáci nájom v nájme štúdia) pod pravidlom
+    // „najom pradlacka" zo 7. 10. Kokpit sa len pýta, nič nepreraďuje.
+    for (const n of pravidloNesedi) {
+      const key = n.kluc;
+      const ciel = nazovKategorie(n.kategoria);
+      const zamknute = n.pohyby.filter((p) => zamknuteMesiace.includes(p.mesiac));
+      const zoznam = n.pohyby.map((p) =>
+        `${fmtDMY(p.datum)} ${Math.round(Math.abs(p.suma)).toLocaleString("cs-CZ")} Kč v ${nazovKategorie(p.kategoria)}${zamknuteMesiace.includes(p.mesiac) ? " (uzavretý mesiac)" : ""}`).join(", ");
+      const prvy = n.pohyby[0];
+      out.push({
+        key, category: "Anomália", tone: "orange",
+        title: `Pravidlo „${n.vzor}“ → ${ciel}: ${n.pohyby.length === 1 ? "starší pohyb je" : `${n.pohyby.length} staršie pohyby sú`} zaradené inak`,
+        detail: `Od ${fmtDMY(n.pravidloOd.slice(0, 10))} platí pravidlo „${n.vzor}“ → ${ciel} (tak je zaradených ${n.zhoda} z ${n.spolu} pohybov s týmto textom). Pred ním sa zapísalo inak: ${zoznam}. Pravidlá sa spätne neaplikujú — ak patria do ${ciel}, preraď ich ručne; ak je iné zaradenie zámer, daj Vybavené.` +
+          (zamknute.length === n.pohyby.length
+            ? " Mesiac je uzavretý: oprava len s odomknutím (Uzávierka) a so záznamom v audite."
+            : zamknute.length ? ` ${zamknute.length} z nich je v uzavretom mesiaci — tie len s odomknutím.` : ""),
+        trener: "Jerry",
+        ...stavPolozky(key, undefined, n.platneOd),
+        priority: 6, client: `vzas|pnl|${prvy.mesiac}|${prvy.kategoria}`,
       });
     }
 
@@ -2114,7 +2155,7 @@ function skupinaFaktur(
     out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}));
 
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal, pravidloNesedi, zamknuteMesiace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};

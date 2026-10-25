@@ -1,4 +1,5 @@
 import { dnesPraha } from "./cas";
+import { MIN_VZOR } from "./fio";
 // Náklad, ktorý zmizol — a nezhoda s Excelom.
 //
 // Všetky doterajšie kontroly appky sa pozerajú na to, ČO V DÁTACH JE: klient,
@@ -23,7 +24,7 @@ export type NalezNakladu = {
   teraz: number;
   /** Z koľkých mesiacov sa pravidelnosť odvodila. */
   zMesiacov: number;
-  druh: "chyba" | "kleslo";
+  druh: "chyba" | "kleslo" | "vyskocil";
 };
 
 const median = (v: number[]): number => {
@@ -44,6 +45,22 @@ const median = (v: number[]): number => {
  * Prah 2 000 Kč zámerne: appka, ktorá hlási chýbajúce 200 Kč za doménu,
  * naučí človeka register preskakovať — a s ním aj chýbajúci nájom.
  */
+/**
+ * Náklad, ktorý VYSKOČIL — zrkadlo chýbajúceho.
+ *
+ * Chýbajúci nájom kontrola chytila, nájom navyše nie. Pri importe 5. 9. 2026
+ * sa domáci nájom „najom pradlacka" (23 000) zaradil podľa slova „najom" do
+ * nájmu štúdia; august mal 52 750 namiesto obvyklých 29 750, zisk bol o 23 000
+ * nižší a nič sa neozvalo, lebo kontrola hľadala len to, čo kleslo. Chyba
+ * v zaradení vie urobiť oboje: jednej kategórii ubudne, druhej pribudne —
+ * a keď tá prvá nie je sledovaná (spoločné výdavky), vidno len ten prírastok.
+ *
+ * Dva prahy naraz: o 30 % (inak drobné kolísanie) A aspoň o 3 000 Kč (inak
+ * by sa ozvalo každé predplatné, ktoré zdraželo o stovku).
+ */
+export const VYSKOCIL_PCT = 0.3;
+export const VYSKOCIL_KC = 3000;
+
 export function chybajuceNaklady(
   podlaMesiaca: BankovyMesiac,
   poslednyMesiac: string,
@@ -71,8 +88,108 @@ export function chybajuceNaklady(
     const teraz = podlaMesiaca[poslednyMesiac]?.[kat] ?? 0;
     if (teraz === 0) out.push({ kluc: `chyba|${kat}|${poslednyMesiac}`, kategoria: kat, mesiac: poslednyMesiac, obvykle, teraz, zMesiacov: kolkokrat, druh: "chyba" });
     else if (teraz < obvykle * 0.5) out.push({ kluc: `kleslo|${kat}|${poslednyMesiac}`, kategoria: kat, mesiac: poslednyMesiac, obvykle, teraz, zMesiacov: kolkokrat, druh: "kleslo" });
+    else if (teraz > obvykle * (1 + VYSKOCIL_PCT) && teraz - obvykle >= VYSKOCIL_KC) out.push({ kluc: `vyskocil|${kat}|${poslednyMesiac}`, kategoria: kat, mesiac: poslednyMesiac, obvykle, teraz, zMesiacov: kolkokrat, druh: "vyskocil" });
   }
   return out.sort((a, b) => b.obvykle - a.obvykle);
+}
+
+// ── nové pravidlo vs. staršie zaradenie ─────────────────────────────────────
+//
+// Pravidlá sa spätne neaplikujú — a je to správne, staré rozhodnutia sa ticho
+// nemajú prepisovať. Lenže pravidlo „najom pradlacka → Spoločné · Nájom" zo
+// 7. 10. 2026 je zároveň VÝPOVEĎ o starších pohyboch s tým istým textom: keď
+// ich je zaradených inak, buď sa pravidlo mýli, alebo sa mýlili ony. Augustový
+// pohyb (23 000 v nájme štúdia) presne takto ležal pod pravidlom, ktoré o ňom
+// vedelo — a hromadné potvrdenie „história" z toho istého dňa ho skrylo.
+//
+// Kontrola sa len PÝTA. Nepreraďuje (Jerry: Kokpit sa má pýtať), lebo časť
+// starých odchýlok je zámer — výber z bankomatu raz na potraviny, raz mimo.
+
+export type PohybNaKontrolu = {
+  kluc: string;
+  datum: string;
+  suma: number;
+  kategoria: string;
+  protistrana?: string;
+  poznamka?: string;
+  typ?: string;
+  /** Kedy sa pohyb zapísal do Kokpitu (fio_transactions.created_at). */
+  vlozene?: string;
+};
+
+/** Pravidlá v poradí priority — tak, ako ich číta `odhadniKategoriu`. */
+export type PravidloNaKontrolu = { vzor: string; kategoria: string; vytvorene?: string };
+
+export type NesediSPravidlom = {
+  kluc: string;
+  vzor: string;
+  /** Čo hovorí pravidlo. */
+  kategoria: string;
+  pravidloOd: string;
+  /** Koľko pohybov s týmto vzorom má kategóriu pravidla / spolu. */
+  zhoda: number;
+  spolu: number;
+  pohyby: (PohybNaKontrolu & { mesiac: string })[];
+  sumaSpolu: number;
+  /** Najneskôr vložený pohyb zo skupiny — od neho platí odpoveď v registri. */
+  platneOd: string;
+};
+
+const textPohybu = (p: PohybNaKontrolu) => `${p.protistrana || ""} ${p.poznamka || ""} ${p.typ || ""}`.toLowerCase();
+
+/** To isté poradie a tá istá podmienka ako `odhadniKategoriu` — vyhráva prvé. */
+function vitaznePravidlo(p: PohybNaKontrolu, pravidla: PravidloNaKontrolu[]): PravidloNaKontrolu | undefined {
+  const t = textPohybu(p);
+  return pravidla.find((r) => r.vzor && r.vzor.trim().length >= MIN_VZOR && r.kategoria && t.includes(r.vzor.toLowerCase()));
+}
+
+/**
+ * Výdavky zapísané PRED vznikom pravidla, ktoré im dnes zodpovedá a hovorí
+ * inú kategóriu. Zoskupené po pravidle — jedna otázka na jedno rozhodnutie.
+ *
+ * Dve brzdy proti šumu (zmerané na ostrých dátach 25. 10. 2026, bez nich
+ * 39 nálezov, väčšinou „APPLE.COM/BILL"):
+ * - Kategória pravidla musí PREVAŽOVAŤ medzi všetkými pohybmi s tým vzorom.
+ *   Apple účtuje appky aj súkromné nákupy; pravidlo nesie len posledné
+ *   rozhodnutie a stará kategória tam nie je chyba, ale iný nákup.
+ * - Suma aspoň `prahKc`. Wolt za 800 Kč v „Iné" nemení nič, čo by stálo za
+ *   otázku; nájom za 23 000 áno.
+ */
+export function nesediSPravidlom(
+  pohyby: PohybNaKontrolu[],
+  pravidla: PravidloNaKontrolu[],
+  prahKc = 1000,
+): NesediSPravidlom[] {
+  const vydavky = pohyby.filter((p) => p.suma < 0 && p.kategoria);
+  const podla = new Map<PravidloNaKontrolu, PohybNaKontrolu[]>();
+  for (const p of vydavky) {
+    const r = vitaznePravidlo(p, pravidla);
+    if (r) { const z = podla.get(r); if (z) z.push(p); else podla.set(r, [p]); }
+  }
+  const out: NesediSPravidlom[] = [];
+  for (const [r, vsetky] of podla) {
+    // Bez dátumu vzniku sa nedá povedať, čo je „staršie" — radšej mlčať.
+    if (!r.vytvorene) continue;
+    const zhoda = vsetky.filter((p) => p.kategoria === r.kategoria).length;
+    if (zhoda * 2 <= vsetky.length) continue;
+    const ine = vsetky.filter((p) =>
+      p.kategoria !== r.kategoria
+      && Math.abs(p.suma) >= prahKc
+      // Zapísaný po vzniku pravidla a predsa inak = človek to tak zvolil.
+      && (p.vlozene || p.datum) < r.vytvorene!,
+    );
+    if (!ine.length) continue;
+    const zoradene = [...ine].sort((a, b) => a.datum.localeCompare(b.datum));
+    out.push({
+      kluc: `pravidlo|${r.vzor.toLowerCase()}|${r.kategoria}`,
+      vzor: r.vzor, kategoria: r.kategoria, pravidloOd: r.vytvorene,
+      zhoda, spolu: vsetky.length,
+      pohyby: zoradene.map((p) => ({ ...p, mesiac: p.datum.slice(0, 7) })),
+      sumaSpolu: zoradene.reduce((a, p) => a + Math.abs(p.suma), 0),
+      platneOd: zoradene.reduce((m, p) => ((p.vlozene || p.datum) > m ? (p.vlozene || p.datum) : m), ""),
+    });
+  }
+  return out.sort((a, b) => b.sumaSpolu - a.sumaSpolu);
 }
 
 export type NezhodaSExcelom = {
