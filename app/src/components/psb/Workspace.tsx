@@ -116,8 +116,8 @@ const tyzdenOd = (s: string): string => {
  */
 function textSmsAnamnezy(url: string, uzBol: boolean): string {
   return bezDiakritiky(uzBol
-    ? `Dobry den, prosime Vas jeste o vyplneni kratkeho dotazniku k Vasemu treninku: ${url} Dekujeme, ProSapiens Biomechanic`
-    : `Dobry den, pred uvodni lekci Vas prosime o vyplneni kratkeho dotazniku: ${url} Dekujeme, ProSapiens Biomechanic`);
+    ? `Dobry den, prosime Vas jeste o kratky dotaznik k Vasemu treninku: ${url} Dekujeme, ProSapiens Biomechanic`
+    : `Dobry den, pred uvodni lekci Vas prosime o kratky dotaznik: ${url} Dekujeme, ProSapiens Biomechanic`);
 }
 
 export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
@@ -1000,6 +1000,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                                   vlozene
                                   druhAuditu="anamneza"
                                   predvolenyText={textSmsAnamnezy(smsAnamnezy.url, !!a.uzBol)}
+                                  nahladOdkazu={smsAnamnezy.url}
                                   onOdoslane={() => setSmsAnamnezy(null)}
                                 />
                               </div>

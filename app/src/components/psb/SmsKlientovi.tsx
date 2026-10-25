@@ -5,6 +5,9 @@ import { VyberMena } from "./VyberMena";
 
 import { dlzkaSpravy, textSms, cisloPreBranu, cisloNaUkazku } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
+import { navrhyCislaZDopytu, type DopytKontakt } from "../../lib/psb/cisloZDopytu";
+
+const fmtDen = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.`;
 
 /**
  * SMS KLIENTOVI Z NOTIFIKÁCIE.
@@ -46,10 +49,10 @@ const JINE_PRIJEMCA = "Jiné (nie je klient)";
 const kontakty = () =>
   fetch("/api/vydane-faktury", { credentials: "same-origin", cache: "no-store" })
     .then((r) => r.json())
-    .then((j) => (j?.udaje || []) as Kontakt[])
-    .catch(() => [] as Kontakt[]);
+    .then((j) => ({ udaje: (j?.udaje || []) as Kontakt[], dopyty: (j?.dopyty || []) as DopytKontakt[] }))
+    .catch(() => ({ udaje: [] as Kontakt[], dopyty: [] as DopytKontakt[] }));
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane, cisloNovehoCloveka, druhAuditu }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane, cisloNovehoCloveka, druhAuditu, nahladOdkazu }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -100,6 +103,11 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * zoznamu kroku 2 · SMS, ktorý stojí na stave hodín.
    */
   druhAuditu?: "ponuka" | "kalendar" | "fotky" | "anamneza";
+  /**
+   * Náhľad INEJ stránky než /v/ (anamnéza /a/<token>). Keď je, okno sa na
+   * odkaz /v/ nepýta a výber rozsahu balíčkov sa nekreslí.
+   */
+  nahladOdkazu?: string;
 }) {
   const [otvorene, setOtvorene] = useState(vlozene);
   const [telefon, setTelefon] = useState<string | null>(null);
@@ -112,6 +120,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    */
   const [komu, setKomu] = useState(meno);
   const [vsetkyKontakty, setVsetkyKontakty] = useState<Kontakt[]>([]);
+  /** Čísla z dopytov — návrh pri mene, ktoré v kontaktoch nemá číslo. */
+  const [dopyty, setDopyty] = useState<DopytKontakt[]>([]);
   /** Rozpísané číslo v úprave; `null` = neupravuje sa. */
   const [upravaCisla, setUpravaCisla] = useState<string | null>(null);
   const [ukladamCislo, setUkladamCislo] = useState(false);
@@ -161,15 +171,17 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     if (nacitane.current) return;
     nacitane.current = true;
     setTelefon(null);
-    void kontakty().then((u) => {
+    void kontakty().then(({ udaje: u, dopyty: d }) => {
       setVsetkyKontakty(u);
+      setDopyty(d);
       const svoje = String(u.find((x) => x.klient === meno)?.telefon || "");
       if (!svoje && cisloNovehoCloveka) { setKomu(JINE_PRIJEMCA); setTelefon(cisloNovehoCloveka); return; }
       setTelefon(svoje);
     });
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
     // keď dorazí — preto je v druhom effecte nižšie.
-    if (!predvolenyText) {
+    if (nahladOdkazu) setNahlad(`${nahladOdkazu}${nahladOdkazu.includes("?") ? "&" : "?"}nahlad=1`);
+    else if (!predvolenyText) {
       void fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "odkaz", klient: meno }),
@@ -180,7 +192,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         if (typeof j?.balickov === "number") setBalickov(j.balickov);
       }).catch(() => null);
     }
-  }, [otvorene, meno, predvolenyText, cisloNovehoCloveka]);
+  }, [otvorene, meno, predvolenyText, cisloNovehoCloveka, nahladOdkazu]);
 
   /**
    * Predvolený text sa skladá znova pri zmene rodu aj po príchode odkazu.
@@ -328,8 +340,9 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   useEffect(() => {
     if (!otvorene) return;
     return pocuvaj("klienti", () => {
-      void kontakty().then((u) => {
+      void kontakty().then(({ udaje: u, dopyty: d }) => {
         setVsetkyKontakty(u);
+        setDopyty(d);
         if (upravaCisla === null && komu !== JINE_PRIJEMCA) setTelefon(String(u.find((x) => x.klient === komu)?.telefon || ""));
       });
     });
@@ -466,6 +479,17 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       ) : !telefon ? (
         <div style={{ fontSize: 11.5, color: C.orange }}>
           {jeJine ? "Napíš číslo, na ktoré má správa odísť." : `${komu} nemá v Kokpite telefón — doplň ho vyššie, uloží sa aj do profilu.`}
+          {/* Meno v kalendári sa od dopytu líši („Jolona" × „Jolana") —
+              číslo sa NAVRHNE s menom z dopytu, potvrdí ho človek. */}
+          {!jeJine && upravaCisla === null && navrhyCislaZDopytu(komu, dopyty).map((d) => (
+            <div key={d.telefon} style={{ marginTop: 5, color: C.textMuted }}>
+              v dopyte „{d.meno}“ z {fmtDen(d.datum)} je {cisloNaUkazku(cisloPreBranu(d.telefon) || d.telefon)}{" "}
+              <button onClick={() => setUpravaCisla(d.telefon)}
+                style={{ background: "none", border: "none", color: C.accentLight, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                použiť toto číslo
+              </button>
+            </div>
+          ))}
         </div>
       ) : (
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -522,7 +546,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
             {/* Koľko histórie mu stránka ukáže. Pri klientovi, ktorému sa
                 mínus prenáša z balíčka do balíčka, jeden nestačí — z jedného
                 sa nedá vyčítať, kam sa hodiny podeli. */}
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7, alignItems: "center" }}>
+            {!nahladOdkazu && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7, alignItems: "center" }}>
               {[1, 2, 3, 0].map((n) => (
                 <button
                   key={n}
@@ -540,7 +564,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
                 </button>
               ))}
               {rozsahBezi && <span style={{ fontSize: 10.5, color: C.textDim }}>…</span>}
-            </div>
+            </div>}
             <NahladTelefonu key={verzia} src={verzia ? `${nahlad}&v=${verzia}` : nahlad} title={`Stránka klienta — ${meno}`} />
             <a
               href={nahlad} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, nahlad)}

@@ -14,7 +14,7 @@ import { DODAVATEL as DOD_FA, spayd } from "../../lib/psb/vydanaFaktura";
 import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, posunDen } from "../../lib/psb/cas";
 import { faktureUhradeneBalickom } from "../../lib/psb/fakturaUhradena";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 
@@ -243,11 +243,20 @@ export const Route = createFileRoute("/api/vydane-faktury")({
            */
           type Kontakt = { email: string; telefon: string; meno: string };
           const zDopytu = new Map<string, Kontakt>();
+          /**
+           * Čísla z dopytov za pol roka pre okno SMS — keď sa meno v kalendári
+           * od dopytu líši („Jolona" × „Jolana", „Prochazkova" bez krstného),
+           * okno ich ponúkne na potvrdenie (`navrhyCislaZDopytu`). Samo ich
+           * nepriradí nikomu.
+           */
+          const dopyty: { meno: string; telefon: string; datum: string }[] = [];
+          const odDopytov = posunDen(dnesPraha(), -183);
           for (const r of ((await DB.prepare(
-            "SELECT name, email, telefon FROM leads WHERE (email <> '' OR telefon <> '') ORDER BY date",
-          ).all().catch(() => ({ results: [] }))).results || []) as { name: string; email: string; telefon: string }[]) {
+            "SELECT name, email, telefon, date FROM leads WHERE (email <> '' OR telefon <> '') ORDER BY date",
+          ).all().catch(() => ({ results: [] }))).results || []) as { name: string; email: string; telefon: string; date: string }[]) {
             const meno = String(r.name || "").trim();
             if (!meno) continue;
+            if (r.telefon && String(r.date || "") >= odDopytov) dopyty.push({ meno, telefon: String(r.telefon), datum: String(r.date || "").slice(0, 10) });
             // Zoradené od najstaršieho, takže novší dopyt prepíše starší.
             zDopytu.set(meno.toLowerCase(), { email: String(r.email || ""), telefon: String(r.telefon || ""), meno });
           }
@@ -288,7 +297,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const d = polozky.get(String(r.id));
             return d ? { ...r, dalsie: d } : r;
           });
-          return Response.json({ ok: true, faktury, udaje, odberatelia, kontakty: k.results || [] },
+          return Response.json({ ok: true, faktury, udaje, odberatelia, kontakty: k.results || [], dopyty },
             { headers: { "cache-control": "no-store" } });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
