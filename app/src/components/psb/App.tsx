@@ -2027,8 +2027,10 @@ function skupinaFaktur(
       const key = n.kluc;
       const ciel = nazovKategorie(n.kategoria);
       const zamknute = n.pohyby.filter((p) => zamknuteMesiace.includes(p.mesiac));
+      // nazovKategorie pozná len riadky P&L; výplaty a kôš mimo pomenuje sama veta.
+      const nazov = (k: string) => k === "mimo" ? "mimo (súkromné)" : k === "vyplaty.jerry" ? "výplata Jerry" : k === "vyplaty.terezka" ? "výplata Terezka" : nazovKategorie(k);
       const zoznam = n.pohyby.map((p) =>
-        `${fmtDMY(p.datum)} ${Math.round(Math.abs(p.suma)).toLocaleString("cs-CZ")} Kč v ${nazovKategorie(p.kategoria)}${zamknuteMesiace.includes(p.mesiac) ? " (uzavretý mesiac)" : ""}`).join(", ");
+        `${fmtDMY(p.datum)} ${Math.round(Math.abs(p.suma)).toLocaleString("cs-CZ")} Kč ako ${nazov(p.kategoria)}${zamknuteMesiace.includes(p.mesiac) ? " (uzavretý mesiac)" : ""}`).join(", ");
       const prvy = n.pohyby[0];
       out.push({
         key, category: "Anomália", tone: "orange",
