@@ -3,6 +3,7 @@ import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { bezDiakritiky } from "../../lib/psb/sms";
 import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
@@ -106,6 +107,18 @@ const tyzdenOd = (s: string): string => {
   const d = new Date(`${String(s).slice(0, 10)}T12:00:00Z`);
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
+
+
+/**
+ * SMS s odkazom na anamnézu (Jerry, 25. 10. 2026: „prečo tu v anamnéze nemám
+ * možnosť rovno poslať odkaz"). Bez diakritiky ako úvodná SMS z Kalendára —
+ * jeden mäkčeň by zhodil limit zo 160 na 70 znakov.
+ */
+function textSmsAnamnezy(url: string, uzBol: boolean): string {
+  return bezDiakritiky(uzBol
+    ? `Dobry den, prosime Vas jeste o vyplneni kratkeho dotazniku k Vasemu treninku: ${url} Dekujeme, ProSapiens Biomechanic`
+    : `Dobry den, pred uvodni lekci Vas prosime o vyplneni kratkeho dotazniku: ${url} Dekujeme, ProSapiens Biomechanic`);
+}
 
 export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
   clients: Record<string, ClientAgg>;
@@ -228,6 +241,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [anamnezaPre, setAnamnezaPre] = useState<string | null>(null);
   /** Otvorená anamnéza v karte Anamnézy. Prázdne = zoznam. */
   const [anamnezaOtvorena, setAnamnezaOtvorena] = useState("");
+  /** Okno SMS s odkazom na anamnézu — klient a jeho odkaz (Jerry, 25. 10. 2026). */
+  const [smsAnamnezy, setSmsAnamnezy] = useState<{ klient: string; url: string } | null>(null);
   /** Archív anamnéz je zložený; otvorí sa klikom a dá sa v ňom hľadať. */
   /**
    * Čo appka ponúkne zapísať po priradení platby.
@@ -916,6 +931,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 {(() => {
                     /* Riadok sa kreslí raz a používa sa na karte aj v archíve.
                        Dve kópie by sa rozišli pri prvej zmene tlačidiel. */
+                    /** Odkaz klienta na anamnézu; keď ešte nie je, vyrobí ho. */
+                    const odkazAnamnezy = async (a: AnamnezaRiadok): Promise<string | null> => {
+                      if (a.odkaz) return a.odkaz;
+                      const r = await fetch("/api/anamneza", {
+                        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ akcia: "odkaz", klient: a.klient }),
+                      }).then((x) => x.json()).catch(() => null) as { ok?: boolean; odkaz?: string } | null;
+                      if (!r?.ok || !r.odkaz) { setChyba("Odkaz sa nepodarilo vyrobiť."); return null; }
+                      await nacitajAnamnezy();
+                      return r.odkaz;
+                    };
                     const riadokAnamnezy = (a: AnamnezaRiadok) => {
                         const den = (a.uvodny || "").slice(0, 10);
                         const kedy = den ? `${Number(den.slice(8))}. ${Number(den.slice(5, 7))}.` : "";
@@ -943,16 +969,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                               {!a.klientVyplnilAt && (
                                 <button
                                   onClick={() => void (async () => {
-                                    let url = a.odkaz;
-                                    if (!url) {
-                                      const r = await fetch("/api/anamneza", {
-                                        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-                                        body: JSON.stringify({ akcia: "odkaz", klient: a.klient }),
-                                      }).then((x) => x.json()).catch(() => null) as { ok?: boolean; odkaz?: string } | null;
-                                      if (!r?.ok || !r.odkaz) { setChyba("Odkaz sa nepodarilo vyrobiť."); return; }
-                                      url = r.odkaz;
-                                      await nacitajAnamnezy();
-                                    }
+                                    const url = await odkazAnamnezy(a);
+                                    if (!url) return;
                                     const ok = await doSchranky(url);
                                     setChyba(ok ? "" : "Skopíruj odkaz ručne — schránka odmietla.");
                                     if (ok) { setHlaska(`Odkaz pre ${a.klient} je v schránke.`); setTimeout(() => setHlaska(""), 2500); }
@@ -960,10 +978,32 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                                   style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green }}
                                 >{a.odkaz ? "Kopírovať odkaz" : "Vyrobiť odkaz"}</button>
                               )}
+                              {!a.klientVyplnilAt && (
+                                <button
+                                  onClick={() => void (async () => {
+                                    if (smsAnamnezy?.klient === a.klient) { setSmsAnamnezy(null); return; }
+                                    const url = await odkazAnamnezy(a);
+                                    if (url) setSmsAnamnezy({ klient: a.klient, url });
+                                  })()}
+                                  style={{ ...tlacidloKarty, borderColor: mix(C.accent, 45), color: C.accentLight }}
+                                >{smsAnamnezy?.klient === a.klient ? "Zavrieť SMS" : "Poslať SMS"}</button>
+                              )}
                               <button onClick={() => setAnamnezaOtvorena(a.klient)} style={tlacidloKarty}>
                                 {a.zapisAt ? "Otvoriť" : "Vyplniť"}
                               </button>
                             </div>
+                            {smsAnamnezy?.klient === a.klient && !a.klientVyplnilAt && (
+                              <div style={{ marginTop: 8 }}>
+                                <SmsKlientovi
+                                  meno={a.klient}
+                                  trener={a.trener || ""}
+                                  vlozene
+                                  druhAuditu="anamneza"
+                                  predvolenyText={textSmsAnamnezy(smsAnamnezy.url, !!a.uzBol)}
+                                  onOdoslane={() => setSmsAnamnezy(null)}
+                                />
+                              </div>
+                            )}
                           </div>
                         );
                     };
