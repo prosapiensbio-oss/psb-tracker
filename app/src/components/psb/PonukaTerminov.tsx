@@ -11,6 +11,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { useUzke } from "./useUzke";
 import { VyberMena } from "./VyberMena";
+import { cisloPreBranu } from "../../lib/psb/sms";
 
 /**
  * PONUKA TERMÍNOV — záložka Kalendár (Jerry, 7. 10. 2026: „A1 a B1";
@@ -325,12 +326,22 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
       {/* ── PANEL ── */}
       <div style={{ width: uzke ? "100%" : 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={stitok}>Komu</div>
-        <VyberMena hodnota={klient} mena={ponukaMena} onZmen={(v) => { setKlient(v); setHotovo(null); }} placeholder="klient alebo nový z dopytu…" />
+        <VyberMena hodnota={klient} mena={ponukaMena} onZmen={(v) => { setKlient(v); setHotovo(null); }} placeholder="klient, dopyt alebo hocikto — napíš meno…" />
+        {!klient.trim() && (
+          <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
+            Nie je v zozname? Napíš jeho meno a pod ním sa objaví políčko na telefón — odkaz mu príde SMS.
+          </div>
+        )}
         {klient.trim() && !jeKlient && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ fontSize: 11.5, color: C.textMuted }}>{dopyt ? "nový z dopytu" : "nový človek"} — dostane <b>úvodný tréning</b></div>
-            <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="telefón" inputMode="tel"
-              style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
+            <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="telefón, napr. 777 123 456" inputMode="tel"
+              style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${telefon.trim() && !cisloPreBranu(telefon) ? C.orange : C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
+            {/* Číslo sa overí hneď — bez neho by sa na zlé číslo prišlo až
+                pri odosielaní SMS (Jerry, 25. 10. 2026: „napísať tel. číslo
+                a poslať mu to"). */}
+            {telefon.trim() && !cisloPreBranu(telefon) && <div style={{ fontSize: 11.5, color: C.orange }}>Toto číslo nevyzerá ako telefón — skontroluj ho.</div>}
+            {!telefon.trim() && <div style={{ fontSize: 11.5, color: C.textDim }}>Bez čísla odkaz vznikne, ale poslať ho budeš musieť sám.</div>}
           </div>
         )}
         <div style={{ ...stitok, marginTop: 4 }}>Ponúkané termíny {zoradene.length ? `(${zoradene.length})` : ""}</div>
