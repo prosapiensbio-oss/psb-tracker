@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { bindings } from "../../lib/bindings.server";
+import { mesiacPraha } from "../../lib/psb/cas";
+import { loadData } from "../../lib/psb/db.server";
+import { mzdoveHodiny, narokJerryho } from "../../lib/psb/mzdoveHodiny";
 
 // Most pre Jerryho súkromnú appku Peniaze manažér (worker `peniaze`).
 //
-// GET ?od=YYYY-MM-DD → { ok, results: [{ id, date, suma, counterparty, note, typ, kat }] }
+// GET ?od=YYYY-MM-DD → { ok, results: [{ id, date, suma, counterparty, note, typ, kat }],
+//                        narok: [{ mesiac, hodiny, narok, beziaci }] }
 //
 // Vracia LEN Jerryho čerpanie z Fio: `vyplaty.jerry` (prevody na Air Bank aj
 // platby kartou z Fio) a `spolocne.*` (spoločné s Terezkou, jeho je polovica).
@@ -39,7 +43,10 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
             WHERE date >= ?1 AND (category = 'vyplaty.jerry' OR category LIKE 'spolocne.%')
             ORDER BY date LIMIT 5000`,
         ).bind(od).all();
-        return Response.json({ ok: true, results: rs.results || [] });
+        // Nárok z tých istých sedení a toho istého vzorca ako dlh trénera v Kokpite.
+        const data = await loadData(DB);
+        const narok = narokJerryho(mzdoveHodiny(data.sessions), od, mesiacPraha());
+        return Response.json({ ok: true, results: rs.results || [], narok });
       },
     },
   },

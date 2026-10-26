@@ -1,3 +1,4 @@
+import { mzdoveHodiny } from "../../lib/psb/mzdoveHodiny";
 import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import type { SporneKonanie } from "../../lib/psb/sporneKonanie";
@@ -887,15 +888,7 @@ export function PSBApp() {
   // Mzdové hodiny pre mesiace, ktoré Excel nemá — priamo z PTmindera, bez
   // úvodných tréningov (tie sa platia zvlášť a do mzdových hodín nepatria).
   useEffect(() => {
-    const podlaMesiaca: Record<string, { jerry: number; terezka: number }> = {};
-    for (const s of data.sessions) {
-      if (s.sessionType === "UVODNE") continue;
-      const mk = s.date.slice(0, 7);
-      const e = (podlaMesiaca[mk] ||= { jerry: 0, terezka: 0 });
-      if (s.sessionTrainer === "Jerry") e.jerry += s.duration / 60;
-      else if (s.sessionTrainer === "Terezka") e.terezka += s.duration / 60;
-    }
-    if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
+    if (nastavHodinyZTrackera(mzdoveHodiny(data.sessions))) setFioTik((x) => x + 1);
   }, [data.sessions]);
   // Matyášova mzda (záskok, DPP) pre mesiace mimo Excelu — zo sedení, CENTRÁLNE
   // z toho istého dôvodu ako hodiny vyššie (VZAS centrálne nalievanie).
