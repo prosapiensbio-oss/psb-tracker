@@ -3208,7 +3208,8 @@ export function deriveRegister(
         "Zápis",
         "blue",
         `Odlož do rezervy ${fmt(spolu)}`,
-        `${Math.round(REZERVA_PODIEL * 100)} % z platieb klientov ${fmtDMY(o.od)} – ${fmtDMY(o.do)}: ${teraz.pocet} platieb za ${fmt(teraz.prijate)} → ${fmt(teraz.suma)}.`
+        // Riadok registra kreslí DETAIL, nie titulok — suma preto patrí na začiatok.
+        `Odlož do rezervy ${fmt(spolu)}. ${Math.round(REZERVA_PODIEL * 100)} % z platieb klientov ${fmtDMY(o.od)} – ${fmtDMY(o.do)}: ${teraz.pocet} platieb za ${fmt(teraz.prijate)} → ${fmt(teraz.suma)}.`
           + (dlzne && dlzne.suma > 0 ? ` K tomu neodložené z obdobia ${fmtDMY(dlzne.od)} – ${fmtDMY(dlzne.do)}: ${fmt(dlzne.suma)}.` : "")
           + " Pošli to na rezervný účet PSB a daj Vybavené.",
         2,
