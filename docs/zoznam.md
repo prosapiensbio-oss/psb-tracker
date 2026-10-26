@@ -797,14 +797,14 @@ Dohodnuté (report: https://claude.ai/artifact/CHyFa8XsxXEgdvEj6fjJWa):
 - Výplata vždy **3. v mesiaci za predošlý uzavretý mesiac**; počas mesiaca len záloha (návrh do 20 000), 3. sa odpočíta.
 - **Minulé mesiace sa neprepočítavajú** — dlh ostáva, ako je (−162 985 k 30. 9.); pravidlo platí dopredu.
 - Rezerva firmy 5 % 3. a 18. — HOTOVÉ v Kokpite (`rezervaOdlozenie.ts`).
-- Osobne 15 % (začať 10 %) trvalým príkazom 3. do Budúcnosti — v Peniaze manažéri.
+- Osobne začína **10 %** (≈ 4 100 Kč) trvalým príkazom 3. do Budúcnosti (Jerry 26. 10.).
 
 Otvorené:
-1. [ ] Od ktorého mesiaca model A platí (návrh: október → prvá výplata 3. 11.).
-2. [ ] Terezka súhlasí a zapisuje hodiny navyše tiež; spoločný strop / čo v stratovom mesiaci.
-3. [ ] Čo je „hodina navyše" (práca pre PSB: Kokpit, strih, marketing, administratíva; nie box, plávanie, vlastné školenia).
+1. [x] Model A platí od októbra 2026 (Jerry 26. 10.). Prechod na výplatu 3. postupne: strop zálohy november 30 000, december 20 000, január 10 000, od februára len 3. (bez spoločných).
+2. [ ] **Terezka ešte nevie — nič sa nespúšťa naplno, kým nesúhlasí.** Stratový mesiac: Jerry zvažuje dlh firmy voči nim alebo odpustenie (návrh: zapísať ako dlh firmy, rozhodnúť v decembri).
+3. [x] Hodina navyše = len práca pre PSB, to, čo sa zapíše pri týždennej únave (Jerry 26. 10.).
 4. [ ] Kokpit: nárok s hodinami navyše od zvoleného mesiaca (salaryCalc + most do Peniaze manažéra + strážca výberov + Jarvis); oprava vety „Vybraté je o X viac“ pri kladnom dlhu Terezky (je opačne).
-5. [ ] Rezervný účet PSB založiť → číslo do Kokpitu, aby sa prevod 5 % páral sám.
+5. [ ] Rezervný účet PSB založiť → číslo do Kokpitu (Jerry: „urobím dodatočne“).
 6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
 
 ## Zavreté (aby sa neotvárali odznova)
