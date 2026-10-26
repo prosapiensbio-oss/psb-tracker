@@ -790,6 +790,23 @@ verzia 2 od 24. 10. 2026 (podrobnosti v README v jej repe).
 
 ---
 
+## 8 · Výplatný model A (Jerry, 26. 10. 2026)
+
+Dohodnuté (report: https://claude.ai/artifact/CHyFa8XsxXEgdvEj6fjJWa):
+- Nárok = 27 000 + (hodiny − 60) × 850 **+ hodiny navyše × 450 Kč, najviac 40 h mesačne** (z týždennej únavy, `<osoba>_hours`).
+- Výplata vždy **3. v mesiaci za predošlý uzavretý mesiac**; počas mesiaca len záloha (návrh do 20 000), 3. sa odpočíta.
+- **Minulé mesiace sa neprepočítavajú** — dlh ostáva, ako je (−162 985 k 30. 9.); pravidlo platí dopredu.
+- Rezerva firmy 5 % 3. a 18. — HOTOVÉ v Kokpite (`rezervaOdlozenie.ts`).
+- Osobne 15 % (začať 10 %) trvalým príkazom 3. do Budúcnosti — v Peniaze manažéri.
+
+Otvorené:
+1. [ ] Od ktorého mesiaca model A platí (návrh: október → prvá výplata 3. 11.).
+2. [ ] Terezka súhlasí a zapisuje hodiny navyše tiež; spoločný strop / čo v stratovom mesiaci.
+3. [ ] Čo je „hodina navyše" (práca pre PSB: Kokpit, strih, marketing, administratíva; nie box, plávanie, vlastné školenia).
+4. [ ] Kokpit: nárok s hodinami navyše od zvoleného mesiaca (salaryCalc + most do Peniaze manažéra + strážca výberov + Jarvis); oprava vety „Vybraté je o X viac“ pri kladnom dlhu Terezky (je opačne).
+5. [ ] Rezervný účet PSB založiť → číslo do Kokpitu, aby sa prevod 5 % páral sám.
+6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
+
 ## Zavreté (aby sa neotvárali odznova)
 
 - **Strižňa – body 10, 11, 13 z poradia 13. 10. hotové:** vyhľadávač tém na reakčné videá (obrazovka Reakcie),
