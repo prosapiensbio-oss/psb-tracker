@@ -371,10 +371,21 @@ export function AnamnezaPanel({ meno, mena = [] }: { meno: string; /** Klienti �
           </>
         ) : koniec ? (
           <>
-            <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
-              <div style={{ fontSize: 23, fontWeight: 700, letterSpacing: -0.3 }}>Prejdené. Skontroluj a ulož.</div>
-              <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 5 }}>
-                Klikni na ktorýkoľvek riadok, keď chceš niečo prepísať. Prázdne sa doplniť dá aj neskôr.
+            <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}`, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 260px" }}>
+                <div style={{ fontSize: 23, fontWeight: 700, letterSpacing: -0.3 }}>Prejdené. Skontroluj a ulož.</div>
+                <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 5 }}>
+                  Klikni na ktorýkoľvek riadok, keď chceš niečo prepísať. Prázdne sa doplniť dá aj neskôr.
+                </div>
+              </div>
+              {/* Uložiť NAVRCHU (Jerry, 26. 10. 2026) — prehľad je dlhý a tlačidlo
+                  pod ním sa muselo hľadať rolovaním. */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                <button onClick={() => void uloz(false)} disabled={bezi} style={{ ...velkeTlacidlo, background: mix(C.green, 16), borderColor: mix(C.green, 55), color: C.green }}>
+                  {bezi ? "Ukladám…" : "Uložiť zápis"}
+                </button>
+                {hlaska && <span style={{ fontSize: 12, color: C.green }}>{hlaska}</span>}
+                {chyba && <span style={{ fontSize: 12, color: C.red }}>{chyba}</span>}
               </div>
             </div>
             <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 12 }}>
@@ -478,11 +489,7 @@ export function AnamnezaPanel({ meno, mena = [] }: { meno: string; /** Klienti �
 
         {/* posun medzi sekciami — pri fotkách nie: tie sa ukladajú samé */}
         <div style={{ display: fotkyOtvorene ? "none" : "flex", alignItems: "center", gap: 12, paddingTop: 13, borderTop: `1px solid ${mix(C.border, 60)}`, flexWrap: "wrap" }}>
-          {koniec ? (
-            <button onClick={() => void uloz(false)} disabled={bezi} style={{ ...velkeTlacidlo, background: mix(C.green, 16), borderColor: mix(C.green, 55), color: C.green }}>
-              {bezi ? "Ukladám…" : "Uložiť zápis"}
-            </button>
-          ) : (
+          {koniec ? null : (
             <button onClick={() => chod((p) => p + 1)} style={velkeTlacidlo}>
               {i === sekcie.length - 1 ? "Na prehľad" : "Ďalšia sekcia"}
             </button>
