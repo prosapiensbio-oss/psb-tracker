@@ -29,6 +29,12 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const ciel = (e.notification.data && e.notification.data.url) || "/";
   e.waitUntil((async () => {
+    // Cieľ inej appky (Peniaze manažér) sa otvára v novom okne — prepnúť
+    // do neho otvorený Kokpit by Kokpit zavrelo.
+    if (new URL(ciel, self.location.origin).origin !== self.location.origin) {
+      await self.clients.openWindow(ciel);
+      return;
+    }
     const okna = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     // Keď je Kokpit už otvorený, len ho vytiahni dopredu a prepni — otvárať
     // druhé okno tej istej appky je na telefóne mätúce.

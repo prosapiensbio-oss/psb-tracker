@@ -137,6 +137,15 @@ const mailDopyty = (env: Env) =>
     }),
   );
 
+// Strážca výberov pre Peniaze manažér — po stiahnutí banky (4:10) a rannej dávke.
+const strazcaVyberu = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/strazca-vyberu", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+    }),
+  );
+
 const push = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/push-beh", {
@@ -298,6 +307,10 @@ export default {
     // patrí do vlastnej požiadavky (limit CPU, 29. 8. 2026).
     if (event.cron === "10 4 * * *") {  // 06:10 lokál v lete
       ctx.waitUntil(ohlas(env, "fio-banka", fioBanka(env)));
+      return;
+    }
+    if (event.cron === "45 4 * * *") {  // 06:45 lokál — po banke a rannej dávke
+      ctx.waitUntil(ohlas(env, "strazca-vyberu", strazcaVyberu(env)));
       return;
     }
     if (event.cron === "30 4 * * *") {  // 06:30 lokál — ranná dávka

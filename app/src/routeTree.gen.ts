@@ -37,6 +37,7 @@ import { Route as ApiTreningZdarmaRouteImport } from './routes/api/trening-zdarm
 import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
 import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
 import { Route as ApiTemaRouteImport } from './routes/api/tema'
+import { Route as ApiStrazcaVyberuRouteImport } from './routes/api/strazca-vyberu'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSmsRouteImport } from './routes/api/sms'
@@ -241,6 +242,11 @@ const ApiTitulkaNavrhRoute = ApiTitulkaNavrhRouteImport.update({
 const ApiTemaRoute = ApiTemaRouteImport.update({
   id: '/api/tema',
   path: '/api/tema',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStrazcaVyberuRoute = ApiStrazcaVyberuRouteImport.update({
+  id: '/api/strazca-vyberu',
+  path: '/api/strazca-vyberu',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSsoRoute = ApiSsoRouteImport.update({
@@ -638,6 +644,7 @@ export interface FileRoutesByFullPath {
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
@@ -733,6 +740,7 @@ export interface FileRoutesByTo {
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
@@ -829,6 +837,7 @@ export interface FileRoutesById {
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
@@ -926,6 +935,7 @@ export interface FileRouteTypes {
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/strazca-vyberu'
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
@@ -1021,6 +1031,7 @@ export interface FileRouteTypes {
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/strazca-vyberu'
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
@@ -1116,6 +1127,7 @@ export interface FileRouteTypes {
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/strazca-vyberu'
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
@@ -1212,6 +1224,7 @@ export interface RootRouteChildren {
   ApiSmsRoute: typeof ApiSmsRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
+  ApiStrazcaVyberuRoute: typeof ApiStrazcaVyberuRoute
   ApiTemaRoute: typeof ApiTemaRoute
   ApiTitulkaNavrhRoute: typeof ApiTitulkaNavrhRoute
   ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
@@ -1434,6 +1447,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tema'
       fullPath: '/api/tema'
       preLoaderRoute: typeof ApiTemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/strazca-vyberu': {
+      id: '/api/strazca-vyberu'
+      path: '/api/strazca-vyberu'
+      fullPath: '/api/strazca-vyberu'
+      preLoaderRoute: typeof ApiStrazcaVyberuRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sso': {
@@ -1974,6 +1994,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSmsRoute: ApiSmsRoute,
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
+  ApiStrazcaVyberuRoute: ApiStrazcaVyberuRoute,
   ApiTemaRoute: ApiTemaRoute,
   ApiTitulkaNavrhRoute: ApiTitulkaNavrhRoute,
   ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
