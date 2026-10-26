@@ -53,6 +53,7 @@ import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
 import { dnesPraha } from "./cas";
+import { obdobieRezervy, REZERVA_DNI, REZERVA_PODIEL, rezervaZaObdobie } from "./rezervaOdlozenie";
 import { trvanieText, zaciatokSpoluprace } from "./spolupraca";
 import { metrikyDozoru, suhrnDozoru } from "./reklamaDozor";
 
@@ -1116,6 +1117,21 @@ export function buildAiContext(
           stavZapisanyK: rezerva.datumStavu,
         }
       : null,
+    rezervaFirmy: (() => {
+      const o = obdobieRezervy(dnesPraha());
+      const r = rezervaZaObdobie(data.payments, o);
+      return {
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Rezerva firmy (Jerry, 26. 10. 2026): 3. a 18. v mesiaci odložiť 5 % z platieb klientov za uplynulé obdobie (3. = platby 18.–2., 18. = platby 3.–17.) na rezervný účet PSB. Pripomienka v registri má kľúč rezerva|<deň>; vybavená = odložené. Suma je hotová, nerátaj ju z platieb sám.",
+        podiel: REZERVA_PODIEL,
+        dni: [...REZERVA_DNI],
+        posledneSplatne: o.splatne,
+        obdobie: { od: o.od, do: o.do },
+        prijate: r.prijate,
+        pocetPlatieb: r.pocet,
+        odlozit: r.suma,
+        odlozene: !!data.anomalyAck?.[`rezerva|${o.splatne}`],
+      };
+    })(),
     dlhyVyplaty: (() => {
       // Dlh trénera voči firme (alebo firmy voči trénerovi) — to isté číslo,
       // aké ukazuje karta „Kam smeruje dlh" v Peniaze → J&T Výplaty. Ráta ho

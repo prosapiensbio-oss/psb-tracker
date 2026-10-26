@@ -16,6 +16,7 @@ import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import { polozkyFotiek } from "./fotkyOdkazy";
+import { obdobieRezervy, predosleObdobie, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
 import type {
   Lead,
   PackageRow,
@@ -3188,6 +3189,35 @@ export function deriveRegister(
       // vo všetkých rovnako.
       ...stavPolozkyRegistra(key, ack, rodina, undefined, kto?.platneOd),
     });
+
+  // REZERVA FIRMY 3. a 18. v mesiaci (Jerry, 26. 10. 2026): 5 % z platieb
+  // klientov za uplynulé obdobie, s presnou sumou. Neodložené predošlé
+  // obdobie sa pripočíta, aby jeden prehliadnutý termín rezervu neobral.
+  // Peniaze sú Jerryho, preto `trener: "Jerry"`.
+  {
+    const o = obdobieRezervy(dnesPraha());
+    const teraz = rezervaZaObdobie(data.payments, o);
+    const pred = predosleObdobie(o);
+    const predKluc = `rezerva|${pred.splatne}`;
+    const dlzne = !ack[predKluc] && pred.splatne >= REZERVA_START ? rezervaZaObdobie(data.payments, pred) : null;
+    const spolu = teraz.suma + (dlzne?.suma || 0);
+    if (spolu > 0 && o.splatne >= REZERVA_START) {
+      const fmt = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/,/g, " ")} Kč`;
+      add(
+        `rezerva|${o.splatne}`,
+        "Zápis",
+        "blue",
+        `Odlož do rezervy ${fmt(spolu)}`,
+        `${Math.round(REZERVA_PODIEL * 100)} % z platieb klientov ${fmtDMY(o.od)} – ${fmtDMY(o.do)}: ${teraz.pocet} platieb za ${fmt(teraz.prijate)} → ${fmt(teraz.suma)}.`
+          + (dlzne && dlzne.suma > 0 ? ` K tomu neodložené z obdobia ${fmtDMY(dlzne.od)} – ${fmtDMY(dlzne.do)}: ${fmt(dlzne.suma)}.` : "")
+          + " Pošli to na rezervný účet PSB a daj Vybavené.",
+        2,
+        "vzas|cashflow",
+        "rezerva",
+        { trener: "Jerry" },
+      );
+    }
+  }
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.
   //

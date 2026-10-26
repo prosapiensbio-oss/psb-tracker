@@ -3195,3 +3195,14 @@ předplatné od 21. 10.: „predplatné má pravidlo, že 2 h môžeš preniesť
   dávalo po konci prekrývajúceho sa balíčka nezmysel (Vaško by 26. 10. mal
   −7 namiesto −1; zistila nezávislá kontrola Fable). Overené: dnes 0 zmien
   u 80 klientov, 200 dní dopredu sa líši len tam, kde staré chybovalo.
+
+## Rezerva firmy: 5 % 3. a 18. v mesiaci (26. 10. 2026)
+
+Jerry: „pripomienka na odloženie 5 % 3. a 18. deň v mesiaci s výpočtom,
+koľko to je." `lib/psb/rezervaOdlozenie.ts` (obdobia: 3. = platby 18.–2.,
+18. = platby 3.–17., všetky platby klientov vrátane hotovosti a BTC) číta
+register (`rezerva|<deň>`, len Jerry, preklik Peniaze → Cashflow) aj Jarvis
+(`rezervaFirmy`). Neodložené predošlé obdobie sa pripočíta k ďalšiemu.
+Prevod robí človek; rezervný účet zatiaľ nie je v Kokpite, takže ho appka
+sama nespozná — keď bude, párovať podľa čísla účtu a zavrieť pripomienku.
+Prvý termín je 18. 10. 2026 (`REZERVA_START`), staršie sa nepýtajú.
