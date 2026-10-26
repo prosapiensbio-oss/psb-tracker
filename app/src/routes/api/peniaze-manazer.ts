@@ -4,11 +4,12 @@ import { bindings } from "../../lib/bindings.server";
 import { mesiacPraha } from "../../lib/psb/cas";
 import { loadData } from "../../lib/psb/db.server";
 import { mzdoveHodiny, narokJerryho } from "../../lib/psb/mzdoveHodiny";
+import { CURRENT_ERA } from "../../lib/psb/vzas";
 
 // Most pre Jerryho súkromnú appku Peniaze manažér (worker `peniaze`).
 //
 // GET ?od=YYYY-MM-DD → { ok, results: [{ id, date, suma, counterparty, note, typ, kat }],
-//                        narok: [{ mesiac, hodiny, narok, beziaci }] }
+//                        narok: [{ mesiac, hodiny, narok, beziaci }], model: { fix, prah, sadzba } }
 //
 // Vracia LEN Jerryho čerpanie z Fio: `vyplaty.jerry` (prevody na Air Bank aj
 // platby kartou z Fio) a `spolocne.*` (spoločné s Terezkou, jeho je polovica).
@@ -46,7 +47,8 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
         // Nárok z tých istých sedení a toho istého vzorca ako dlh trénera v Kokpite.
         const data = await loadData(DB);
         const narok = narokJerryho(mzdoveHodiny(data.sessions), od, mesiacPraha());
-        return Response.json({ ok: true, results: rs.results || [], narok });
+        const model = { fix: CURRENT_ERA.fix, prah: CURRENT_ERA.hoursThreshold, sadzba: CURRENT_ERA.hourlyRate };
+        return Response.json({ ok: true, results: rs.results || [], narok, model });
       },
     },
   },
