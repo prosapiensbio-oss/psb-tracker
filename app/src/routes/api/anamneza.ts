@@ -4,7 +4,8 @@ import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { FORMULAR } from "../../lib/psb/anamnezaFormular";
-import { podlaKlienta, predvyplnZapisu, ulozZapis, zalozAleboNajdi } from "../../lib/psb/anamneza.server";
+import { podlaKlienta, predvyplnZapisu, ulozZapis, zalozAleboNajdi, zdrojDoKokpitu } from "../../lib/psb/anamneza.server";
+import { setOverride } from "../../lib/psb/db.server";
 import { prevezmi, type StaryRiadok } from "../../lib/psb/anamnezaImport";
 import { zasifruj } from "../../lib/psb/sifra.server";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -234,7 +235,17 @@ export const Route = createFileRoute("/api/anamneza")({
           const ok = await ulozZapis(DB, klient, odpovede, ANAMNEZA_KLUC);
           if (!ok) return Response.json({ ok: false, error: "Zápis sa neuložil." }, { status: 500 });
           await audit(DB, { action: "anamneza-zapis", predmet: klient, actor: kto });
-          return Response.json({ ok: true });
+          // Zdroj a odporúčateľ idú aj ku klientovi — inak sa ho uzávierka
+          // a Dopyty pýtajú, odkiaľ prišiel, hoci odpoveď stojí v anamnéze.
+          const ov = await DB.prepare("SELECT zdroj, zdroj_kto FROM client_overrides WHERE name = ?1")
+            .bind(klient).first<{ zdroj: string | null; zdroj_kto: string | null }>();
+          const novyZdroj = zdrojDoKokpitu(odpovede.zdroj, ov?.zdroj);
+          if (novyZdroj) await setOverride(DB, klient, "zdroj", novyZdroj);
+          const kto2 = String(odpovede.zdroj_kto || "").replace(/\s+/g, " ").trim().slice(0, 120);
+          if (kto2 && (novyZdroj || ov?.zdroj) === "referencia" && kto2 !== (ov?.zdroj_kto || "")) {
+            await setOverride(DB, klient, "zdrojKto", kto2);
+          }
+          return Response.json({ ok: true, zdroj: novyZdroj ?? undefined });
         }
 
         return Response.json({ ok: false, error: "Neznáma akcia." }, { status: 400 });

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { sekcieZapisu, OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
+import { OTAZKY_KLIENTA, sekcieZapisu, OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
 import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
+import { VyberMena } from "./VyberMena";
 
 /**
  * ANAMNÉZA — JEDNA SEKCIA NA OKNO.
@@ -67,7 +68,7 @@ function akoText(o: Otazka, v: unknown): string {
 
 const maOdpoved = (o: Otazka, v: unknown): boolean => akoText(o, v).length > 0;
 
-export function AnamnezaPanel({ meno }: { meno: string }) {
+export function AnamnezaPanel({ meno, mena = [] }: { meno: string; /** Klienti — „Kdo ho poslal?" sa vyberá z nich. */ mena?: string[] }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [odp, setOdp] = useState<Odpovede>({});
   /** Index sekcie. `=== počet sekcií` znamená záverečný prehľad. */
@@ -457,7 +458,17 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
                     {o.pomoc && (
                       <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 7, lineHeight: 1.55, maxWidth: "58ch" }}>{o.pomoc}</div>
                     )}
-                    <Pole o={o} hodnota={odp[o.id]} prve={idx === 0} onZmen={(v) => zmen(o.id, v)} />
+                    {/* Kto ho poslal — meno KLIENTA zo zoznamu, nie voľný text
+                        (Jerry, 26. 10. 2026: napísal „Jakub Kaňovský" a zoznam
+                        klientov sa neukázal). Zapíše sa aj do zdroja klienta. */}
+                    {o.id === "zdroj_kto" && mena.length > 0 ? (
+                      <VyberMena hodnota={String(odp[o.id] ?? "")} mena={mena} onZmen={(v) => zmen(o.id, v)}
+                        placeholder="meno klienta, ktorý ho poslal…" style={{ maxWidth: 420 }}
+                        varovanie={!!String(odp[o.id] ?? "").trim() && !mena.includes(String(odp[o.id]).trim())} />
+                    ) : (
+                      <Pole o={o} hodnota={odp[o.id]} prve={idx === 0} onZmen={(v) => zmen(o.id, v)} />
+                    )}
+                    {OTAZKY_KLIENTA.has(o.id) && <PoznamkaTrenera hodnota={String(odp[`${o.id}_pozn`] ?? "")} onZmen={(v) => zmen(`${o.id}_pozn`, v)} />}
                   </div>
                 ))}
               </div>
@@ -525,6 +536,37 @@ const MAX_VYSKA = 150;
  * nevznikne — otázok s voľným textom je v sekcii pár, zvyšok sú pilulky.
  */
 const MIN_VYSKA = 54;
+
+/**
+ * POZNÁMKA TRÉNERA K ODPOVEDI KLIENTA (Jerry, 26. 10. 2026: „klient to len
+ * tak z ľahka vyplní a tu sa ho na to dopytujeme a nemáme to kde
+ * zapisovať"). Zavretá je to len jeden riadok odkazu, aby sekcia nevyzerala
+ * ako dvojnásobok práce; s textom ostáva otvorená. Ukladá sa do
+ * `<otázka>_pozn` vedľa odpovede.
+ */
+function PoznamkaTrenera({ hodnota, onZmen }: { hodnota: string; onZmen: (v: string) => void }) {
+  const [otvorena, setOtvorena] = useState(!!hodnota.trim());
+  if (!otvorena) {
+    return (
+      <button type="button" onClick={() => setOtvorena(true)}
+        style={{ marginTop: 6, padding: 0, border: "none", background: "none", color: C.textMuted, fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}>
+        + poznámka trénera
+      </button>
+    );
+  }
+  return (
+    <textarea
+      ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = `${Math.min(Math.max(el.scrollHeight, 40), 150)}px`; } }}
+      value={hodnota}
+      onChange={(e) => onZmen(e.target.value)}
+      rows={2}
+      autoFocus={!hodnota}
+      placeholder="čo k tomu povedal na úvodnom…"
+      style={{ display: "block", marginTop: 6, padding: "6px 10px", borderRadius: 8, fontSize: 13, fontFamily: "inherit", width: "100%", maxWidth: 420,
+        border: `1px dashed ${mix(C.accent, 60)}`, background: mix(C.accent, 5), color: C.text, boxSizing: "border-box", resize: "vertical", lineHeight: 1.45 }}
+    />
+  );
+}
 
 /** Ovládanie jednej otázky. Veľké natoľko, aby sa dalo trafiť bez pozerania. */
 function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve: boolean; onZmen: (v: unknown) => void }) {

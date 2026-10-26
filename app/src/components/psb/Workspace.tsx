@@ -875,7 +875,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     <b style={{ fontSize: 15 }}>{anamnezaOtvorena}</b>
                   </div>
                   <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto" }}>
-                    <AnamnezaPanel meno={anamnezaOtvorena} />
+                    <AnamnezaPanel meno={anamnezaOtvorena} mena={mena} />
                   </div>
                 </div>
               ) : novaAnamneza ? (

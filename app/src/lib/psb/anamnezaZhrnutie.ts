@@ -92,6 +92,12 @@ export function zhrnutieAnamnezy(
   const uspech = text(berTo("uspech"));
   if (uspech) out.push({ popis: "úspech po 6 mes.", hodnota: uspech });
 
+  // Čo tréner doplnil k odpovediam klienta (`<otázka>_pozn`, 26. 10. 2026).
+  const poznamky = Object.entries(zapis)
+    .filter(([k, v]) => k.endsWith("_pozn") && text(v))
+    .map(([, v]) => text(v));
+  if (poznamky.length) out.push({ popis: "doplnené na úvodnom", hodnota: poznamky.join(" · ") });
+
   return out;
 }
 

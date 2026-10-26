@@ -184,5 +184,20 @@ const ZDROJ_Z_KOKPITU: Record<string, string> = {
   ine: "Jiné",
 };
 
+/**
+ * Opačný smer: odpoveď z anamnézy → zdroj klienta v Kokpite (Jerry, 26. 10.
+ * 2026: „pri kto ho poslal som napísal Jakub Kaňovský … preto sa ma pýta
+ * stále, odkiaľ prišiel, pričom na to by malo byť už zodpovedané").
+ * „Jiné" nič neprepíše, keď klient už má zdroj, ktorý sa naň prekladá
+ * (web aj ine) — inak by z „web" spravilo „ine".
+ */
+export function zdrojDoKokpitu(odpoved: unknown, terajsi: string | null | undefined): string | null {
+  const o = String(odpoved || "").trim();
+  if (!o) return null;
+  if (o === "Jiné") return terajsi && ZDROJ_Z_KOKPITU[terajsi] === "Jiné" ? null : "ine";
+  const kluc = Object.entries(ZDROJ_Z_KOKPITU).find(([k, v]) => v === o && k !== "web")?.[0] ?? null;
+  return kluc && kluc !== terajsi ? kluc : null;
+}
+
 /** Oblasti z testu postury — vystavené kvôli kontrole v testoch. */
 export { OBLAST_Z_TESTU };

@@ -326,6 +326,13 @@ export function zTestuPostury(poznamka: string): { oblasti: string[]; odchylky: 
 }
 
 /**
+ * Otázky, na ktoré odpovedá klient sám pred úvodným. Pri nich si tréner
+ * píše poznámku (`<id>_pozn`) — Jerry, 26. 10. 2026: „klient to len tak
+ * z ľahka vyplní a tu sa ho na to dopytujeme a nemáme to kde zapisovať."
+ */
+export const OTAZKY_KLIENTA = new Set(FORMULAR.klient.flatMap((s) => s.otazky.map((o) => o.id)));
+
+/**
  * SEKCIE ZÁPISU TRÉNERA — prvá sú VŽDY otázky klienta.
  *
  * Jerry, 4. 10. 2026: „tie 3 otázky sa majú zobraziť v anamnéze za
@@ -404,7 +411,17 @@ export function sekcieZapisu(
   const zapis = formular.zapis.map((s) => ({
     s,
     // Test postury nie je otázka, je to výstup — patrí do stĺpca vedľa.
-    otazky: s.otazky.filter((o) => o.typ !== "len-citat" && zobrazit(o, odp) && !uz.has(o.id)),
+    otazky: s.otazky.filter((o) => o.typ !== "len-citat" && zobrazit(o, odp) && !uz.has(o.id)).flatMap((o) => {
+      /**
+       * „JINÉ" AJ V ČASTI TRÉNERA (Jerry, 26. 10. 2026: „Motivace a cíle —
+       * keď dám Jiné, neukáže sa mi ďalšie okno, kde by som mohol písať").
+       * Políčko na písanie dostávali len otázky klienta; cieľ a zdroj, ktoré
+       * „Jiné" v možnostiach majú, ho v zápise trénera nemali.
+       */
+      if (!((o.typ === "jedna" || o.typ === "viac") && o.moznosti?.includes(JINE))) return [o];
+      const jine: Otazka = { id: `${o.id}_jine`, text: "Jiné — čo presne?", typ: "text", vetva: { otazka: o.id, hodnoty: [JINE] } };
+      return zobrazit(jine, odp) && !uz.has(jine.id) ? [o, jine] : [o];
+    }),
   }));
   return [...klientske, ...zapis].filter((x) => x.otazky.length > 0);
 }

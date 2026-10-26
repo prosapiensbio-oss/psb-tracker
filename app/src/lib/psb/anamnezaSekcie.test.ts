@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-import { FORMULAR, JINE, sekcieZapisu } from "./anamnezaFormular";
+import { FORMULAR, JINE, OTAZKY_KLIENTA, sekcieZapisu } from "./anamnezaFormular";
 import { zhrnutieAnamnezy } from "./anamnezaZhrnutie";
-import { predvyplnZapisu } from "./anamneza.server";
+import { predvyplnZapisu, zdrojDoKokpitu } from "./anamneza.server";
 
 describe("otázky klienta sú v anamnéze vždy (Jerry, 4. 10. 2026)", () => {
   it("klient nevyplnil → prvá sekcia sú jeho otázky, prázdne, s pokynom vyplniť ich na úvodnom", () => {
@@ -57,5 +57,31 @@ describe("Jiné a hlavná obtiaž v zápise trénera", () => {
     const z = zhrnutieAnamnezy({}, { privadza: JINE, privadza_jine: "chce sa vrátiť k behu po pôrode", ciel: ["Zvýšit sílu nebo výdrž", JINE], ciel_jine: "zabehnúť polmaratón" });
     expect(z.find((r) => r.popis === "privádza ho")?.hodnota).toBe("chce sa vrátiť k behu po pôrode");
     expect(z.find((r) => r.popis === "cieľ")?.hodnota).toBe("Zvýšit sílu nebo výdrž, zabehnúť polmaratón");
+  });
+});
+
+describe("anamnéza z úvodného 26. 10. 2026", () => {
+  it("Motivace a cíle: pri Jiné sa otvorí políčko na písanie aj v časti trénera", () => {
+    const bez = sekcieZapisu(FORMULAR, { privadza: FORMULAR.klient[0].otazky[0].moznosti![0] }, null);
+    expect(bez.flatMap((x) => x.otazky.map((o) => o.id))).not.toContain("ciel_jine");
+    const s = sekcieZapisu(FORMULAR, { privadza: FORMULAR.klient[0].otazky[0].moznosti![0], ciel: [JINE] }, null);
+    const ciele = s.find((x) => x.s.id === "ciele")!.otazky.map((o) => o.id);
+    expect(ciele).toEqual(["ciel", "ciel_jine", "uspech"]);
+  });
+
+  it("zdroj z anamnézy ide ku klientovi; Jiné neprepíše web a rovnaký sa nezapisuje znova", () => {
+    expect(zdrojDoKokpitu("Doporučení", null)).toBe("referencia");
+    expect(zdrojDoKokpitu("Doporučení", "referencia")).toBeNull();
+    expect(zdrojDoKokpitu("Instagram", "referencia")).toBe("instagram");
+    expect(zdrojDoKokpitu("Jiné", "web")).toBeNull();
+    expect(zdrojDoKokpitu("Jiné", null)).toBe("ine");
+    expect(zdrojDoKokpitu("", null)).toBeNull();
+  });
+
+  it("poznámky trénera k otázkam klienta: len pri jeho otázkach a v súhrne", () => {
+    expect(OTAZKY_KLIENTA.has("privadza")).toBe(true);
+    expect(OTAZKY_KLIENTA.has("uspech")).toBe(false);
+    const r = zhrnutieAnamnezy({ privadza: "Něco mě bolí" }, { privadza_pozn: "bolí ho to len ráno", lieky_pozn: " " });
+    expect(r.find((x) => x.popis === "doplnené na úvodnom")?.hodnota).toBe("bolí ho to len ráno");
   });
 });
