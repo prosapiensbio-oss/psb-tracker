@@ -801,9 +801,9 @@ Dohodnuté (report: https://claude.ai/artifact/CHyFa8XsxXEgdvEj6fjJWa):
 
 Otvorené:
 1. [x] Model A platí od októbra 2026 (Jerry 26. 10.). Prechod na výplatu 3. postupne: strop zálohy november 30 000, december 20 000, január 10 000, od februára len 3. (bez spoločných).
-2. [ ] **Terezka ešte nevie — nič sa nespúšťa naplno, kým nesúhlasí.** Stratový mesiac: Jerry zvažuje dlh firmy voči nim alebo odpustenie (návrh: zapísať ako dlh firmy, rozhodnúť v decembri).
+2. [x] **Terezka súhlasila 26. 10. 2026** (návrh https://claude.ai/artifact/MWqnqj9ywpZ7cui3zNqvt6, plán https://claude.ai/artifact/1c6RhnigeXFG3ha2Kb4rBN). Stratový mesiac = hodiny navyše ako dlh firmy voči nim, vyplatené zo zisku neskôr, zvyšok v decembri; spoločný strop hodín navyše 25 000 Kč mesačne (oba body podľa návrhu — potvrdiť, ak Terezka odpovedala inak).
 3. [x] Hodina navyše = len práca pre PSB, to, čo sa zapíše pri týždennej únave (Jerry 26. 10.).
-4. [ ] Kokpit: nárok s hodinami navyše od zvoleného mesiaca (salaryCalc + most do Peniaze manažéra + strážca výberov + Jarvis); oprava vety „Vybraté je o X viac“ pri kladnom dlhu Terezky (je opačne).
+4. [ ] **Do 3. 11. 2026** Kokpit: nárok s hodinami navyše od októbra 2026, strop 40 h, spoločný strop 25 000 (salaryCalc + most do Peniaze manažéra + strážca výberov + Jarvis); oprava vety „Vybraté je o X viac“ pri kladnom dlhu Terezky (je opačne).
 5. [ ] Rezervný účet PSB založiť → číslo do Kokpitu (Jerry: „urobím dodatočne“).
 6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
 
