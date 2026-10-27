@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { aktivni, mieryKampane, odberateliaKtoriSuKlienti, prihlaseniaPoMesiacoch, type Odberatel } from "./mailer";
+import { aktivni, mieryKampane, prihlaseniaPoMesiacoch, zostavaZoznamu, type Odberatel } from "./mailer";
 
 const o = (prihlaseny: string, email = "a@b.cz", status = "active"): Odberatel =>
   ({ id: email + prihlaseny, email, prihlaseny, status, skupiny: "" });
@@ -51,26 +51,8 @@ describe("prihlásenia po mesiacoch", () => {
 });
 
 describe("odberatelia, ktorí sú klientmi", () => {
-  it("páruje sa na e-mail bez ohľadu na veľkosť písmen a medzery", () => {
-    const v = odberateliaKtoriSuKlienti(
-      [o("2026-01-01", " Jan@Novak.CZ "), o("2026-01-02", "nikto@nikde.sk")],
-      ["jan@novak.cz"],
-    );
-    expect(v).toMatchObject({ spolu: 2, klientov: 1 });
-    expect(Math.round(v.podiel!)).toBe(50);
-  });
 
-  it("bez e-mailov klientov vráti nulu, nie chybu", () => {
-    const v = odberateliaKtoriSuKlienti([o("2026-01-01")], []);
-    expect(v.klientov).toBe(0);
-    expect(v.podiel).toBe(0);
-  });
 
-  it("prázdny e-mail sa nespáruje s prázdnym", () => {
-    // Inak by každý odberateľ bez mailu vyzeral ako klient bez mailu.
-    const v = odberateliaKtoriSuKlienti([o("2026-01-01", "")], [""]);
-    expect(v.klientov).toBe(0);
-  });
 });
 
 describe("aktívni", () => {

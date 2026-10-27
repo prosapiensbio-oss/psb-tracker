@@ -539,7 +539,7 @@ gads_kampane / gads_dopyty / gads_ucty  — Google Ads: výkon vlastných kampan
 raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
 wishlist(id, nazov, cena, link, kupene, kupene_at, kategoria, poznamka, poradie)  — nákupný zoznam náradia a kurzov
 mkt_prispevky(id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, watch_time)  — instagramové príspevky z Metricool CSV, 1 100+ riadkov od jan 2025; druh: reel | post | story. \`hook\` je prvých 300 znakov textu — dá sa v ňom hľadať cez LIKE. \`watch_time\` je Ø čas sledovania reelu v MILISEKUNDÁCH a je to jediný retenčný údaj, aký appka má: uloženie hovorí, že sa príspevok páčil, watch time hovorí, ako dlho ho človek vydržal. Pri postoch a stories je 0.
-mail_odberatelia(id, email, meno, prihlaseny, status, skupiny)  — MailerLite; \`prihlaseny\` je deň prihlásenia, \`skupiny\` sú mená oddelené „ · “
+mail_odberatelia(id, email, meno, prihlaseny, status, skupiny, odhlaseny_at, dovod, telefon, firma, krajina, odoslanych, otvoreni, klikov, klient)  — MailerLite; \`prihlaseny\` je deň prihlásenia, \`skupiny\` sú mená oddelené „ · “; status je active / unsubscribed / bounced; \`klient\` je meno klienta z Kokpitu, keď sa mail spároval (160 z 561 aktívnych); \`otvoreni\` je počet otvorených mailov toho človeka — ODHLÁSENÝM (status unsubscribed) sa nepíše nikdy
 mail_kampane(id, nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia)  — odoslané kampane; otvorenia a prekliky sú UNIKÁTNE počty, nie celkové
 kanaly_mesiace(mesiac, kanal, metrika, hodnota, zmena)  — mesačné čísla všetkých kanálov (Facebook, TikTok, Meta Ads…) z mesačnej zostavy
 ga4_mesiace(mesiac, novi, organic_search, paid_social, organic_social, referral, direct, udalosti)  — web; udalosti = odoslané formuláre. organic_social = návštevy z Instagramu a spol. BEZ reklamy, paid_social = z platenej; rozlíšiť ich je jediný spôsob, ako povedať, či obsah privádza ľudí sám.
@@ -809,8 +809,15 @@ async function mailingKanal(): Promise<string> {
   if (!DB) return "";
   try {
     const [spolu, rad, skupiny, kampane] = await Promise.all([
-      DB.prepare("SELECT COUNT(*) n, SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) a, MAX(prihlaseny) posl FROM mail_odberatelia")
-        .first<{ n: number; a: number; posl: string }>(),
+      DB.prepare(
+        // Od 27. 10. 2026 aj spárovaní klienti, čitatelia a odhlásení — bez
+        // nich Jarvis o zozname tvrdil, že ani jeden kontakt nie je klient.
+        `SELECT COUNT(*) n, SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) a, MAX(prihlaseny) posl,
+           SUM(CASE WHEN klient IS NOT NULL THEN 1 ELSE 0 END) klientov,
+           SUM(CASE WHEN status='active' AND otvoreni > 0 THEN 1 ELSE 0 END) citaju,
+           SUM(CASE WHEN status='unsubscribed' THEN 1 ELSE 0 END) odhlaseni
+         FROM mail_odberatelia`,
+      ).first<{ n: number; a: number; posl: string; klientov: number; citaju: number; odhlaseni: number }>(),
       DB.prepare("SELECT substr(prihlaseny,1,7) m, COUNT(*) n FROM mail_odberatelia WHERE prihlaseny <> '' GROUP BY m ORDER BY m DESC LIMIT 14").all(),
       DB.prepare("SELECT skupiny, COUNT(*) n FROM mail_odberatelia WHERE skupiny <> '' GROUP BY skupiny ORDER BY n DESC LIMIT 15").all(),
       DB.prepare("SELECT nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia FROM mail_kampane ORDER BY odoslane DESC LIMIT 12").all(),
@@ -819,12 +826,15 @@ async function mailingKanal(): Promise<string> {
     const r = (rs: { results: unknown[] }) => rs.results as Record<string, string | number>[];
     return [
       "<mailing>",
-      `MailerLite: ${spolu.n} kontaktov, z toho ${spolu.a} aktívnych. Posledné prihlásenie: ${spolu.posl || "neznáme"}.`,
+      `MailerLite: ${spolu.n} kontaktov, z toho ${spolu.a} aktívnych, ${spolu.odhlaseni || 0} odhlásených. Posledné prihlásenie: ${spolu.posl || "neznáme"}.`,
+      `Spárovaných s klientmi Kokpitu: ${spolu.klientov || 0}. Aspoň raz otvorilo mail: ${spolu.citaju || 0} z aktívnych.`,
+      "ODHLÁSENÝM SA NEPÍŠE. Kto má status 'unsubscribed', je rozhodnutie človeka — dátum a dôvod sú v stĺpcoch odhlaseny_at a dovod. Do žiadneho zoznamu adresátov nepatrí, ani keď je klient.",
       "Prihlásení po mesiacoch (najnovšie hore): " + r(rad).map((x) => `${x.m}: ${x.n}`).join(" · "),
       "Skupiny: " + (r(skupiny).map((x) => `${x.skupiny} (${x.n})`).join(" · ") || "nestiahnuté"),
       "Kampane (komu | otvorilo | kliklo | odhlásilo):",
       ...r(kampane).map((x) => `- ${x.odoslane} ${x.nazov}: ${x.prijemcov} | ${x.otvorenia} | ${x.prekliky} | ${x.odhlasenia}`),
-      "Kontext, ktorý bez toho nedáva zmysel: tieto kontakty stáli ~4,60 Kč za kus (kampane Web_Clicks_Dokumenty, jar 2025) a ani jeden sa zatiaľ nestal klientom. Keď plánuješ, ber to ako najlacnejšie publikum, aké PSB má — a ako publikum, ktoré chladne.",
+      "Kontext, ktorý bez toho nedáva zmysel: tieto kontakty stáli ~4,60 Kč za kus (kampane Web_Clicks_Dokumenty, jar 2025). Keď plánuješ, ber to ako najlacnejšie publikum, aké PSB má — a ako publikum, ktoré chladne.",
+      "27. 10. 2026: MailerLite sa ruší (515 Kč/mes za zoznam, ktorému sa nepíše). CSV export je naliaty sem a je to POSLEDNÝ obraz zoznamu — cez API sa už neobnoví. Posielanie kampaní Kokpit nemá postavené; plán je v docs/zoznam.md.",
       "</mailing>",
     ].join("\n");
   } catch {

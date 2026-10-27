@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="cs"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Volné termíny pro vás — ProSapiens Biomechanic</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Raleway:wght@600;700&display=swap">
+<style>
+body{margin:0;background:#fff;color:#1A2E24;font-family:'Open Sans',Arial,sans-serif}
+.obal{max-width:460px;margin:0 auto;padding:26px 22px 40px}
+.logo{height:26px;display:block}
+h1{font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.15;margin:22px 0 8px}
+.veta{margin:0;font-size:15px;line-height:1.55;color:#5b6b63}
+.chyba{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:#fdecea;color:#8a2a1f;font-size:14px;line-height:1.5}
+.den{margin-top:22px}
+.den .d{font-family:'Raleway',sans-serif;font-weight:700;font-size:16px;margin-bottom:10px}
+.casy{display:flex;flex-wrap:wrap;gap:9px}
+.casy label{cursor:pointer}
+.casy input{position:absolute;opacity:0;pointer-events:none}
+.casy span{display:inline-block;padding:13px 18px;border-radius:32px;border:1.5px solid #e3e7e4;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.casy input:checked + span{background:#2D7D5A;border-color:#2D7D5A;color:#fff}
+.casy input:focus-visible + span{outline:3px solid #8FD3A8;outline-offset:2px}
+.spodok{position:sticky;bottom:0;margin-top:26px;padding:14px 0 6px;background:linear-gradient(rgba(255,255,255,0),#fff 28%)}
+button,.tlacidlo{display:block;width:100%;box-sizing:border-box;padding:16px;border:0;border-radius:32px;background:#2D7D5A;color:#fff;font:700 16px 'Open Sans',Arial,sans-serif;text-align:center;text-decoration:none;cursor:pointer}
+.tmave{background:#1A2E24}
+.nehodi{display:block;margin-top:12px;text-align:center;color:#2D7D5A;font-size:14px;font-weight:600;text-decoration:none}
+.kal-nadpis{margin-top:30px;font-family:'Raleway',sans-serif;font-weight:700;font-size:16px}
+.kal-veta{margin:4px 0 0;font-size:13px;line-height:1.5;color:#5b6b63}
+.ktyzden{margin-top:14px}
+.kmes{font-size:12px;font-weight:600;color:#5b6b63;margin-bottom:6px}
+.kmriezka{display:grid;grid-template-columns:24px repeat(7,1fr);gap:3px;border-radius:16px;background:#f4f6f5;padding:8px 6px 10px}
+.kh{height:30px;font-size:11px;color:#8a9890;text-align:center;line-height:1.1}
+.kh b{display:block;font-size:14px;color:#1A2E24;font-weight:700}
+.kst.ma .kh b{color:#2D7D5A}
+.khod span{position:absolute;right:3px;transform:translateY(-6px);font-size:10px;color:#8a9890;font-variant-numeric:tabular-nums}
+.kt{position:relative;border-radius:8px;background:#fff;background-image:repeating-linear-gradient(#fff 0 29px,#eceeed 29px 30px)}
+.okno{position:absolute;left:2px;right:2px;border-radius:7px;background:#d9ede2;border:1.5px solid #9fd0b5;box-sizing:border-box;display:flex;align-items:flex-start;justify-content:center;overflow:hidden}
+.okno span{font-size:10.5px;font-weight:700;color:#2D7D5A;padding-top:3px;font-variant-numeric:tabular-nums}
+.okno.klik{cursor:pointer}
+.vybrane{display:none;position:absolute;left:2px;right:2px;border-radius:7px;background:#2D7D5A;color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(45,125,90,.35);pointer-events:none}
+.hotovo{text-align:center;padding-top:30px}
+.fajka{width:76px;height:76px;margin:0 auto;border-radius:50%;background:#2D7D5A;color:#fff;font-size:40px;line-height:76px}
+.kedy{margin:22px 0;padding:18px;border-radius:22px;background:#e7f2ec;font-family:'Raleway',sans-serif;font-weight:700;font-size:20px;line-height:1.35}
+.kedy small{display:block;margin-top:6px;font-family:'Open Sans',Arial,sans-serif;font-weight:400;font-size:13px;color:#5b6b63}
+</style>
+</head><body><div class="obal">
+<img class="logo" src="https://kokpit.prosapiensbio.workers.dev/znacka-napis-tmava.svg" alt="ProSapiens Biomechanic">
+
+<h1>Volné termíny pro vás</h1>
+<p class="veta">Michale, vyberte si, kdy můžete začít — trénink trvá hodinu. Nabídka platí do neděle 8. 11. nebo do obsazení.</p>
+
+<form method="post" class="kal">
+
+<div class="den"><div class="d">Pondělí 2. 11.</div><div class="casy">
+<label><input type="radio" id="c0" name="cas" value="a|08:00" required><span>8:00</span></label>
+</div></div>
+<div class="den"><div class="d">Úterý 3. 11.</div><div class="casy">
+<label><input type="radio" id="c1" name="cas" value="b|15:00" required><span>15:00</span></label><label><input type="radio" id="c2" name="cas" value="b|15:30" required><span>15:30</span></label><label><input type="radio" id="c3" name="cas" value="b|16:00" required checked><span>16:00</span></label><label><input type="radio" id="c4" name="cas" value="b|16:30" required><span>16:30</span></label><label><input type="radio" id="c5" name="cas" value="b|17:00" required><span>17:00</span></label>
+</div></div>
+<div class="den"><div class="d">Čtvrtek 5. 11.</div><div class="casy">
+<label><input type="radio" id="c6" name="cas" value="d|07:00" required><span>7:00</span></label><label><input type="radio" id="c7" name="cas" value="e|17:00" required><span>17:00</span></label>
+</div></div>
+
+<div class="kal-nadpis">V kalendáři</div>
+<p class="kal-veta">Světle je, kdy můžete začít. Klepnutím na čas nahoře nebo na hodinové okno se váš výběr ukáže tmavě.</p>
+<div class="ktyzden"><div class="kmes">2. 11. – 8. 11.</div><div class="kmriezka"><div class="khod"><div class="kh"></div><div style="position:relative;height:390px"><span style="top:0px">6</span><span style="top:30px">7</span><span style="top:60px">8</span><span style="top:90px">9</span><span style="top:120px">10</span><span style="top:150px">11</span><span style="top:180px">12</span><span style="top:210px">13</span><span style="top:240px">14</span><span style="top:270px">15</span><span style="top:300px">16</span><span style="top:330px">17</span><span style="top:360px">18</span></div></div><div class="kst ma"><div class="kh">Po<b>2.</b></div><div class="kt" style="height:390px"><label class="okno klik" for="c0" style="top:60px;height:28px"><span>8:00</span></label><div class="vybrane v-c0" style="top:60px;height:28px">8:00</div></div></div><div class="kst ma"><div class="kh">Út<b>3.</b></div><div class="kt" style="height:390px"><div class="okno" style="top:270px;height:88px"><span>15–18</span></div><div class="vybrane v-c1" style="top:270px;height:28px">15:00</div><div class="vybrane v-c2" style="top:285px;height:28px">15:30</div><div class="vybrane v-c3" style="top:300px;height:28px">16:00</div><div class="vybrane v-c4" style="top:315px;height:28px">16:30</div><div class="vybrane v-c5" style="top:330px;height:28px">17:00</div></div></div><div class="kst"><div class="kh">St<b>4.</b></div><div class="kt" style="height:390px"></div></div><div class="kst ma"><div class="kh">Čt<b>5.</b></div><div class="kt" style="height:390px"><label class="okno klik" for="c6" style="top:30px;height:28px"><span>7:00</span></label><label class="okno klik" for="c7" style="top:330px;height:28px"><span>17:00</span></label><div class="vybrane v-c6" style="top:30px;height:28px">7:00</div><div class="vybrane v-c7" style="top:330px;height:28px">17:00</div></div></div><div class="kst"><div class="kh">Pá<b>6.</b></div><div class="kt" style="height:390px"></div></div><div class="kst"><div class="kh">So<b>7.</b></div><div class="kt" style="height:390px"></div></div><div class="kst"><div class="kh">Ne<b>8.</b></div><div class="kt" style="height:390px"></div></div></div></div>
+<style>.kal:has(#c0:checked) .v-c0{display:flex}.kal:has(#c1:checked) .v-c1{display:flex}.kal:has(#c2:checked) .v-c2{display:flex}.kal:has(#c3:checked) .v-c3{display:flex}.kal:has(#c4:checked) .v-c4{display:flex}.kal:has(#c5:checked) .v-c5{display:flex}.kal:has(#c6:checked) .v-c6{display:flex}.kal:has(#c7:checked) .v-c7{display:flex}</style>
+<div class="spodok">
+<button type="submit">Potvrdit termín</button>
+<a class="nehodi" href="sms:+420702090289?&amp;body=Dobr%C3%BD%20den%2C%20z%20poslan%C3%BDch%20term%C3%ADn%C5%AF%20se%20mi%20nehod%C3%AD%20%C5%BE%C3%A1dn%C3%BD.%20%C5%A0lo%20by%20to%20jindy%3F">Nehodí se mi ani jeden — napsat Filipovi</a>
+</div>
+</form>
+</div></body></html>

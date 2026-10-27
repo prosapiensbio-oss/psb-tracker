@@ -1268,7 +1268,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
         </>
       )}
 
-      {sub === "mail" && <Mail clients={clients} leads={leads} />}
+      {sub === "mail" && <Mail />}
       {sub === "nahrat" && <StriznaNahrat />}
 
       {/* Vyhľadávanie = kto ma hľadá a či klikne. Google Ads sem patrí:

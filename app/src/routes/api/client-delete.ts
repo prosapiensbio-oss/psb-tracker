@@ -116,6 +116,9 @@ export const Route = createFileRoute("/api/client-delete")({
           .bind(`%${name}%`).all<{ name: string; plati_za: string }>().catch(() => null);
         const platia = ((platiaR?.results) || []).filter((x) => menaPlatiZa(x.plati_za).includes(name));
 
+        // Mailový zoznam klienta neobsahuje — len odkaz naňho. Riadok
+        // odberateľa ostáva (je to jeho súhlas s odberom, nie náš záznam
+        // o klientovi), zruší sa iba spárovanie.
         const teraz = new Date().toISOString();
         const prikazy = [
           ...MAZAT.map(([t, c]) => DB.prepare(`DELETE FROM ${t} WHERE ${c} = ?1`).bind(name)),
@@ -124,6 +127,7 @@ export const Route = createFileRoute("/api/client-delete")({
             .bind(k.id, k.zoznam.filter((x) => x !== name).join(", "))),
           ...platia.map((p) => DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
             .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).filter((x) => x !== name)))),
+          DB.prepare("UPDATE mail_odberatelia SET klient = NULL WHERE klient = ?1").bind(name),
         ];
 
         /**

@@ -14,7 +14,18 @@
  * by v nich vyzeral ako päť ľudí a otvorenosť by presiahla sto percent.
  */
 
-export type Odberatel = { id: string; email: string; prihlaseny: string; status: string; skupiny: string };
+export type Odberatel = {
+  id: string; email: string; prihlaseny: string; status: string; skupiny: string;
+  /** Doplnené z CSV exportu pred zrušením MailerLite (27. 10. 2026). */
+  meno?: string;
+  odhlaseny_at?: string;
+  dovod?: string;
+  odoslanych?: number;
+  otvoreni?: number;
+  klikov?: number;
+  /** Meno klienta z Kokpitu, keď sa mail spároval. */
+  klient?: string | null;
+};
 export type MailKampan = {
   id: string; nazov: string; odoslane: string;
   prijemcov: number; otvorenia: number; prekliky: number; odhlasenia: number;
@@ -61,22 +72,30 @@ export function prihlaseniaPoMesiacoch(odberatelia: Odberatel[]): { m: string; v
   return von;
 }
 
-/**
- * Koľko z odberateľov sa stalo klientmi.
- *
- * Párovanie je na e-mail — meno v mailingu býva krstné alebo prezývka a
- * na mená sa spoliehať nedá. Klientske e-maily máme len tam, kde prišiel
- * dopyt cez web; pri starších klientoch chýbajú, takže výsledok je DOLNÁ
- * hranica, nie presné číslo. Obrazovka to musí povedať.
- */
-export function odberateliaKtoriSuKlienti(
-  odberatelia: Odberatel[],
-  mailyKlientov: string[],
-): { spolu: number; klientov: number; podiel: number | null } {
-  const set = new Set(mailyKlientov.map((e) => e.trim().toLowerCase()).filter(Boolean));
-  const klientov = odberatelia.filter((o) => set.has(o.email.trim().toLowerCase())).length;
-  return { spolu: odberatelia.length, klientov, podiel: pct(klientov, odberatelia.length) };
-}
-
 /** Aktívni, teda tí, komu sa ešte dá napísať. */
 export const aktivni = (o: Odberatel[]) => o.filter((x) => x.status === "active").length;
+
+
+/**
+ * ZOSTAVA ZOZNAMU PO EXPORTE — kto je kto a kto ho naozaj číta.
+ *
+ * Jerry, 27. 10. 2026, pred zrušením MailerLite. Sú to tie isté čísla pre
+ * obrazovku aj pre Jarvisa; druhá kópia by sa o mesiac rozišla.
+ */
+export function zostavaZoznamu(odb: Odberatel[]): {
+  spolu: number; aktivni: number; odhlaseni: number; nedorucitelni: number;
+  klientov: number; citaju: number; odhlaseniKlienti: number;
+} {
+  const poc = (s: string) => odb.filter((o) => o.status === s).length;
+  return {
+    spolu: odb.length,
+    aktivni: poc("active"),
+    odhlaseni: poc("unsubscribed"),
+    nedorucitelni: poc("bounced"),
+    klientov: odb.filter((o) => o.klient).length,
+    // „Číta" = aspoň raz otvoril ktorýkoľvek mail. Je to dolná hranica:
+    // otvorenie sa meria obrázkom, ktorý časť schránok nenačíta.
+    citaju: odb.filter((o) => o.status === "active" && (o.otvoreni || 0) > 0).length,
+    odhlaseniKlienti: odb.filter((o) => o.status === "unsubscribed" && o.klient).length,
+  };
+}

@@ -160,6 +160,51 @@ je kde pozrieť).
        2022–2024 aj posledný úplný export sú stiahnuté (19. 10.), takže po
        zrušení sa nestráca nič — ale skontrolovať to pred kliknutím.
 
+## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
+
+Jerry: „MailerLite — nedala by sa podobná aplikácia postaviť?" a „vedel by si
+to niekde do Kokpitu uložiť a pripraviť stavbu maileru niekedy v budúcnosti?"
+
+**Hotové 27. 10. 2026 (záloha):** CSV export z MailerLite je naliaty do
+`mail_odberatelia` (migrácia 0125) — 616 kontaktov, 561 aktívnych, 43
+odhlásených s dátumom a dôvodom, 12 nedoručiteľných; 160 aktívnych spárovaných
+s klientmi Kokpitu, 307 z nich aspoň raz otvorilo mail. Súbory ležia aj
+v `~/Downloads/MailerLite export 2026-10-27/`. Obrazovka: Marketing → Mailer,
+karta „Stav zoznamu". **Druhá tabuľka sa nezakladala** — odberatelia v Kokpite
+už boli od 13. 8. 2026, doplnili sa len chýbajúce stĺpce.
+
+**Čo zostáva postaviť, keď bude čo poslať.** Ľahká polovica (2–3 dni): výber
+adresátov, editor textu, naplánovanie, štatistika otvorení a klikov,
+odhlasovacia stránka. Kokpit na to má skoro všetko — MIME (`mime.ts`), SMTP,
+plánovač, audit, R2 na obrázky a hlavne segmenty, aké MailerLite nikdy mať
+nebude („dochodený balíček", „neprišiel po úvodnom", „nechodil 60 dní").
+
+**Ťažká polovica je doručiteľnosť a tá sa prácou nekúpi.** Z nej plynú
+rozhodnutia, ktoré treba spraviť SKÔR než prvý mail:
+
+1. **Neposielať cez websupportové SMTP.** Tou istou cestou chodia faktúry
+   a odpovede klientom; jedna kampaň označená ako spam zhodí doručovanie
+   dokladov. Navyše má schránka GEO ochranu, ktorá Workers odmieta podľa
+   dátového centra (pozri „Nesprávne heslo znamenalo nesprávnu KRAJINU").
+2. **Odosielať cez API:** Amazon SES (0,10 USD / 1 000 mailov) alebo Resend
+   (3 000 mailov mesačne zadarmo). Pri 561 adresátoch a štyroch mailoch
+   mesačne je to pár korún namiesto 515 Kč.
+3. **Vlastná poddoména** (`news.prosapiens.cz`) s vlastným SPF, DKIM a DMARC,
+   aby reputácia hlavnej domény zostala oddelená.
+4. **Odhlásenie je zákon, nie funkcia:** odkaz v päte, hlavička
+   `List-Unsubscribe` s jednoklikom (RFC 8058) a stránka, ktorá odhlásenie
+   zapíše do `mail_odberatelia.status`. Tých 43 odhlásených z exportu je
+   východzí stav — komu sa písať nesmie.
+5. **Bounce a sťažnosti sa musia spracovať**, inak reputácia klesne sama:
+   webhook od SES/Resend → `status = 'bounced'`, dve tvrdé zlyhania = koniec.
+6. **Rozbeh:** nová doména nesmie prvý deň poslať 561 mailov. Prvé kampane po
+   50–100 adresátoch, najprv tým, čo otvárajú.
+
+**Čo appka o tom zozname vie povedať už dnes:** číta ho 55 % aktívnych, 160
+z nich sú klienti a od septembra 2025 nepribudol ani jeden nový odberateľ —
+formuláre na webe do mailingu nič neposielajú. **Kým to platí, je stavba
+maileru druhá vec v poradí; prvá je formulár, ktorý zbiera.**
+
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
 
 Platby z banky si Jerry potvrdzuje sám. Moje kroky v tomto poradí — pri
@@ -356,464 +401,32 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 - **Odkaz s fotkami pre klienta — NAOSTRO od 12. 10. 2026.** `/f/<token>` (podoba A, olivová; `lib/psb/fotkyStranka.ts`, route `f.$token.tsx`, migrácia 0113). Profil → fotky → krúžkom označiť porovnania z editora → „Poslať klientovi" (správa, voliteľné čísla, „čo ďalej") → odkaz + SMS tlačidlom. Odpoveď klienta → register trénerovi (`fotkyOdkazy.ts`) + push bez obsahu + denník (odkial „fotky") + sekcia „Poslané klientovi". Krátky odkaz prosapiens.cz/f/ zapnutý 12. 10. (snippet 26 so súhlasom). Editor od 12. 10.: šípka, lupa, jemné zväčšenie, návrat k hotovému porovnaniu (✎ upraviť, migrácia 0114). **Otvorené:** (1) lupa a kreslenie overené len simulovaným dotykom, nie na iPade; (2) ~~„Na čem budeme pracovat dál"~~ rozhodnuté 13. 10.: pýta sa až tesne pred vytvorením odkazu (krok „Ďalej →", dá sa preskočiť); v ten deň pribudol aj nadpis „N týdnů práce" s rozsahom dní a „tvůj trenér · poslal"; (3) prvé ostré poslanie: Vaškovi poslané a otvorené 13. 10. Oslovenie „Ahoj Martin" bez 5. pádu Jerry 13. 10. schválil („úplne v pohode, netreba"). Editor 13. 10.: touchpad a dva prsty = plocha, veľkosť fotky len za rohy — na skutočnom iPade neoverené.
 
-- **Dozor reklám — NAOSTRO od 10. 10. 2026.** Notifikácia z dôvodu, s číslami a návrhom (`lib/psb/reklamaDozor.ts`, testy; `/api/meta` akcie `dozor`, `rozhodni-kampan`, `dozor-nastavenie`; plánovač 4:20 UTC; migrácia 0109). Tlačidlá Nechať · Vypnúť · Zmeniť rozpočet (potvrdenie so sumou na mesiac, strop 2 000 Kč/deň a 3×) · počet DM pri interakciách · Prompt pre Clauda; karta Marketing → Náklady → Dozor reklám. **Čaká na Jerryho:** (1) prvé tri vyhodnotenia (retargeting 1 099 Kč/dopyt, návštevy 1 961 Kč/dopyt, interakcie — zadať DM); (2) ~~cieľová cena za dopyt~~ — **odložená 15. 10. 2026** (Jerry: zatiaľ je dobrý akýkoľvek dopyt, reklamy sa ladia; vrátiť sa k tomu neskôr). Bez cieľa Kokpit vie povedať len „nechať/vypnúť", nie „pridať". 3 z 8 dopytov z reklamy od 20. 9. nemajú utm (označené ručne) — nedajú sa pripísať kampani.
-- **Reklamný agent — NAOSTRO od 10. 10. 2026.** Panel „Reklama · Jarvis" v Marketing → Čo to stálo vedľa dozoru: jedna stála debata (zameranie Kampaň, Opus), Jarvis číta Metu sám (`meta_citaj`) a zmeny navrhuje tlačidlami — rozpočet, vek/publiká sady, nová reklama s novým textom (médium z existujúcej), zapnúť/vypnúť reklamu. **19. 10. 2026:** zdrojom média môže byť aj BOOSTNUTÝ PRÍSPEVOK — dovtedy appka hlásila „Zdrojová reklama nemá stránku“, lebo médium hľadala len v `object_story_spec`; teraz ho vytiahne aj z polí kreatívy, z `effective_object_story_id` a prijme priamo ID videa alebo príspevku (`lib/psb/reklamaMedium.ts`, testy). Čítanie príspevkov stránky token nemá (`pages_read_engagement`), preto sa pri videopríspevku použije prípona jeho ID ako ID videa. **Zrovnané utm_campaign (19. 10. 2026):** nová reklama dostáva do adresy slug MENA KAMPANE (dovtedy prevzatý `uvodni-trenink-brno-2026-09`, rovnaký pre všetky tri kampane) a dopyt sa na kampaň páruje cez `klucKampane` (slug na oboch stranách, `lib/psb/utm.ts`) — karta Kampane aj reťazec od koruny preto prestali ukazovať 0 dopytov pri kampani, ktorá dopyty mala. **Sady v karte Kampane (19. 10. 2026):** `mkt_kampane.sady` (migrácia 0120) nesie ID sád kampane — napĺňa sa pri sťahovaní kampaní z toho istého volania, ktoré už sady ťahalo kvôli doručovaniu. Karta Kampane preto páruje dopyt najprv podľa `utm_term` (ID sady) a až potom podľa mena; dva staré dopyty (20. 9. retargeting, 12. 10. návštevy) sa tým pripísali správnym kampaniam, dovtedy mali obe nulu. `termZUtm` je spoločný s dozorom (`lib/psb/utm.ts`). Notifikácia dozoru má „Prebrať s Jarvisom →". Jerry ho používa (debata `reklama-agent` naposledy 13. 10. 2026 večer).
+- **Dozor reklám — NAOSTRO od 10. 10. 2026.** Notifikácia z dôvodu, s číslami a návrhom (`lib/psb/reklamaDozor.ts`, testy; `/api/meta` akcie `dozor`, `rozhodni-kampan`, `dozor-nastavenie`; plánovač 4:20 UTC; migrácia 0109). Tlačidlá Nechať · Vypnúť · Zmeniť rozpočet (potvrdenie so sumou na mesiac, strop 2 000 Kč/deň a 3×) · počet DM pri interakciách · Prompt pre Clauda; karta Marketing → Náklady → Dozor reklám. **Čaká na Jerryho (overené naživo 27. 10. o 8:20):**
+- [ ] **Dva staré administrátorské účty STÁLE SÚ** — Nika Pastorová
+  (pastorova@emglare.com) a Admin Systedo (admin@systedo.cz). Administrátori sú
+  stále traja.
+- [ ] **Zmazať Slider Revolution a WPBakery** — od 26. 10. vypnuté, ale
+  nainštalované, a Wordfence ich 27. 10. označil ako ZRANITEĽNÉ. Keďže na
+  hostingu nie je ani jeden FTP účet, je to najpravdepodobnejšia cesta, ktorou
+  sa 19. 10. dostal dnu backdoor.
+- [ ] **Dvojfázové overenie: 0 z 5.** Pribudol jeden prístupový kľúč (passkey),
+  čo je rovnocenná náhrada, ale len pre jeden účet.
 
-- ~~Septembrové faktúry z Alzy~~ — Jerry 13. 10. 2026: všetko hotové (krok Alza: 10 dokladov vybavených, každá platba bitcoinom má doklad). Neotvárať.
-- **Faktúry ako účtenka — návrh A, NAOSTRO od 10. 10. 2026.** `FakturyUctenka.tsx` + pravidlo `fakturaRiadky.ts` (testy). Krok Alza → „Faktúry za mesiac" ukazuje v bete len TOVAR; doprava a zľavy („Nehmotný produkt …", 23 z 42 septembrových riadkov za −338 Kč spolu) sa zbalia pod jeden riadok s ich súčtom a rozbalia klikom. × maže: šum hneď, tovar a zľavu k položke až po potvrdení (pri skupine povie, o koľko bude nákup drahší). Server: `/api/faktury` akcia `zmaz` (aj dávkou cez `ids`), zámok mesiaca platí, audit `faktura-polozka-zmazana` nesie názov aj sumu každého riadku. Pôvodný plochý zoznam je zmazaný — dve obrazovky na tú istú prácu sa rozídu. Ďalšie návrhy z 10. 10.: B priehradky (otočená os, vrecia hore, netriedené dole — moje odporúčanie), C triedička (jedna položka na obrazovku, klávesy 1–4). Spoločné k obom: dať parseru **variabilný symbol** = číslo objednávky, aby sa doklady z jednej objednávky párovali samy.
-- **Dve definície „bez faktúry" (11. 10. 2026).** Krok Alza hlásil „4 platby bitcoinom bez faktúry" a karta pod ním „každá platba má svoj doklad" — karta sa pýtala na záznam v `btc_parovanie` (ručný pár / „súkromné"), krok len na výsledok automatiky. Opravené: krok sa pýta to isté. **Otvorené:** ručný pár `308 → 4029506853, 4029506996` ukazuje na platbu, ktorá v BTC knihe UŽ NIE JE (zmazaná alebo prečíslovaná) — náklad sa nestráca (doklady ostávajú voľné pre automat), ale záznam je mŕtvy a mal by sa zmazať.
-- **Stránka platby podľa spätnej väzby klienta (11. 10. 2026).** Petr Gažo po zaplatení: (1) **CTA hore** — suma bola až pod osou času, teraz je nad ňou kotva `#platba` so sumou a „přejít na platbu"; (2) **„ProSapiens" nakreslené V OBRÁZKU QR** — názov súboru nestačí, na iPhone sa ukladá podržaním prsta a meno sa zahodí; kreslí canvas v prehliadači pod kód, pri zlyhaní zostane pôvodný QR; (3) **koruna je pevná, bitcoin sa dopočítava** — peňaženka prepočíta sats vlastným kurzom a ukáže o pár korún inak, takže veľká je teraz čiastka v Kč a sats sú pod ňou. Test „nič nestojí na JavaScripte" už nehovorí „žiadny `<script>`", ale stráži, že bez skriptu je na stránke skutočný QR aj funkčné tlačidlo.
-- **QR Gažovi na dvojnásobok (11. 10. 2026, OPRAVENÉ).** SMS s odkazom na platbu znela na 41 243 Kč namiesto 20 093. Jeden balíček z 9. 10. je zapísaný v oboch systémoch za inú sumu — PTminder 21 150 (cenník), Kokpit 20 093 (5 % zľava za bitcoin) — a `bezZdvojenych` ich spájalo len pri rovnakej cene. Teraz balíček smie byť lacnejší najviac o tretinu. **Zo štyroch dvojíc poplatok+balíček bol Gažo jediný zasiahnutý.** Zároveň `zaplateneVPtminderi` uzná aj 2–3 splátky (Gažo zaplatil júlové členstvo 8 000 + 12 081). Overené naživo na `/v/`: 20 093 Kč.
-- **Zdravie Kokpitu — kontrola APPKY (11. 10. 2026).** Jerry: „kontrolu si predstavujem ako kontrolu appky celkovo… tá, o ktorej sa bavíme, mi príde nadbytočná." Karta je navrchu kroku Mesačné kontroly (`ZdravieKokpitu.tsx`, pravidlá v `zdravieKokpitu.ts` s testami, dáta z `/api/automat-beh`). Tri otázky: **bežia automaty** (tabuľka `automaty`, migrácia 0110; zapisuje PLÁNOVAČ, nie jednotlivé endpointy — pozná aj prípad, keď endpoint vôbec neodpovie; posudzuje sa POSLEDNÝ ÚSPECH, strop 48 h), **spadlo niečo v prehliadači** (`vzas_audit` action `chyba-prehliadaca`, 7 dní), **sedia dva zdroje** (balíčky, dochádzka, tržby — číta porovnania, ktoré appka už počíta). Automat, o ktorom appka nevie, je „neviem", nie zelená. **Pred týmto si stav zapisovali 2 z 10 automatov.** ZOSTÁVA: rozhodnúť, či štyri staré mesačné kontroly (kontrola DÁT) zrušiť — Jerry ich považuje za nadbytočné, ale sú podmienkou zámku mesiaca, takže ich odstránenie treba spraviť naraz so zmenou zámku.
-- **Mesačné kontroly ZRUŠENÉ (11. 10. 2026).** Jerry: „mesačná kontrola ako zoznam úloh nemá existovať vôbec." Štyri pripomienky v registri aj ich odklepávanie sú preč; prácu robí Workspace priebežne (krok 1 „bol tam?", krok 3 priradenie príjmov) a kontrola bola tretie miesto na to isté — 10. 10. bola odklepnutá v mesiaci, kde čakalo 7 nepriradených príjmov za 54 810 Kč. **Zámok mesiaca** visí odteraz na kroku „Otázky z mesiaca" (sporné konanie + príjmy bez klienta za ten mesiac), nie na štyroch fajkách. Zostali **prompty pre Clauda** na karte Zdravie Kokpitu (`promptSKontextom` — nesie mesiac a nálezy appky). `kontrolyMesiaca()` ostáva kvôli starým kľúčom `zapis|kontrola-*`. **Zámok smie brániť len tomu, čo sa po ňom nedá opraviť** (Jerry: „dlžoby sa môžu preniesť do ďalšieho mesiaca"): stráži IMPORTY (`db.server.ts`) a POLOŽKY FAKTÚR (`api/faktury.ts`); priradenie platby, odpoveď „bol tam?" ani register zámok nekontrolujú, takže mesiac nedržia — riadok „Zostáva z mesiaca" je informácia. Stráži to `zamokMesiaca.test.ts`.
-- **Mesačné kontroly ukazujú výsledok, nie zadanie (10. 10. 2026).** Jerry: „sú skutočne urobené?" — z databázy sa to zistiť nedalo, appka zaznamenávala klik, nie prácu. `lib/psb/kontrolaVysledky.ts` (testy): Kokpit si sám overí vek importov PTmindera a Metricoolu (strop 14 dní), dátum stavu účtu a hotovosti (31 dní) a počet otvorených upozornení mesiaca; chýbajúci zdroj je „neviem", nie „v poriadku". Zvyšok (je upozornenie pravdivé, nevymýšľa si Jarvis nad prázdnou tabuľkou) zostáva človeku a stojí pod tým oddelene. „Otvoriť" si zapamätá kontrolu (`psb-kontrola-otvorena`) a po návrate je riadok zvýraznený s otvoreným políčkom. Odškrtnutie nesie NÁLEZ — prázdne políčko = „sedelo"; dovtedy tam bola fráza „skontrolované z Workspace". **Stav 10. 10.: september má 3 zo 4 (Jarvis & dáta chýba, posledná je z augusta).**
-- **Potvrdenie dokladu (10. 10. 2026, migrácia 0108 `potvrdene_at`/`potvrdil`).** Jerry: „chcem mať potvrdenie a tým, že to potvrdím, sa to zapíše a schová, aby som mal uzávierku pekne čistú — podobne ako zápisy z účtu.“ Každý doklad má „Potvrdiť“, nad zoznamom je **„Potvrdiť všetkých N dokladov“** (dávka = jeden UPDATE + jeden riadok auditu). Potvrdený zmizne a zbalí sa do riadku „vybavené · N dokladov · suma“ s „vrátiť“ / „vrátiť všetky“. Potvrdenie NEPODMIEŇUJE kategórie — vedľa tlačidla len stojí, koľko vecí ich nemá. Krok uzávierky je hotový až keď sú všetky doklady vybavené (`fakturyNepotvrdene` v App — musí byť aj v deps memo). Kategórie sa naďalej zapisujú hneď pri kliku a obrazovka to hovorí, lebo tlačidlo „Uložiť“ tam nie je.
-- **Naučené pravidlá v zápisoch z účtu sú zbalené** (Jerry, 10. 10. 2026) — počet zostáva v nadpise.
-- **Šesť skratiek pri položke — NAOSTRO od 10. 10. 2026.** `Jerry · Terezka · Ahsoka · domácnosť · doplnky · náradie` (`kategorieRychle.ts` `rychleVolby()` — jeden zoznam pre náhľad po nahratí aj pre zoznam mesiaca). **Náradie** je `variabilne.prevadzka2.pomocky` — jediná zo šiestich, ktorá je náklad PSB; ostatné sú peniaze trénerov alebo domácnosti. **Výplata sú dve tlačidlá s menami, nie prepínač** — prvá verzia mala jedno tlačidlo „výplata" a prepínač nad zoznamom, Jerry: „tá výplata je nešťastné riešenie." Prepínač je stav, ktorý si treba pamätať, a tlačidlo, ktoré podľa neho zapíše raz sem a raz tam. Test stráži, že každá skratka do `spolocne.*` ukazuje na kategóriu, ktorá vo VZAS existuje.
-- **Náhľad nahratých faktúr:** prázdna karta sa nekreslí, tlačidlo „Zahodiť" (s potvrdením) zahodí nepotvrdený rozpis a doklad, ktorý sa medzitým zapísal, z čakárne sám zmizne. Rozpis prežíva zavretú kartu v `localStorage` (`psb-alza-caka`).
-
-- ~~Mobilné ovládanie~~ — **C NAOSTRO od 9. 10. 2026** (Jerry po skúške A/C v bete: „vyhráva C"): na každom telefóne (≤ 640 px) tenký riadok hore (≡ Viac · ‹ · názov · hľadanie) a lišta dole Dnes · Workspace · + · Kalendár · Jarvis; Firma, Marketing, Prechod, Upload, Bitcoin a odhlásenie vo Viac. Workspace bez bočných šípok, podzáložky v jednom posuvnom rade, bez plávajúceho Jarvisa. Počítač a iPad bez zmeny. Kód `MobilNavigacia.tsx`, `useMobilRozlozenie.ts`.
-
-
-- ~~Tri veci z 9. 10. 2026~~ — **HOTOVÉ 9. 10.**: (1) mesačné kontroly sú krok uzávierky a podmienka zámku (karta Mesačné kontroly zrušená, `kontrolyMesiaca(mk)`, kľúče `zapis|kontrola-*-RRRR-MM` ostali); (2) hodiny: Tréningy „Posledný mesiac" boli posledných 31 dní → teraz „Minulý mesiac" = celý kalendárny mesiac, karta sa volá Mzdové hodiny (bez úvodných), report má riadok Mzdové hodiny; (3) platby bitcoinom bez dokladu majú tlačidlo „Súkromné — nie je náklad PSB" (ručný pár `sukromne` v `btc_parovanie`). (4) **krok uzávierky „Alza a nákupy bitcoinom"** (Jerry: „samostatná súčasť mesačnej uzávierky, kde nahrám faktúry z Alzy, Kokpit ich spáruje s BTC platbami a ja rozdelím položky — náklad, výplata, Ahsoka"): nahratie PDF, faktúry mesiaca s kategóriou meniteľnou aj po zápise (`/api/faktury` akcia `kategoria`, zamknutý mesiac nie), platby bitcoinom mesiaca bez faktúry so „Súkromné"; hotový pri 0/0. Čaká na Jerryho: september — 8 platieb bitcoinom bez faktúry, faktúry za september v Kokpite nie sú; „Oprava zostatku Muun na 0" 23 527 Kč označiť ako súkromné.
-
-
-- **Metriky z výskumu kníh — postavené 8.–9. 10. 2026** (Jerry: „postav to, strop Jerry 120 Terezka 120"; 9. 10. „pokračuj s reportom"): obnova balíčkov, retencia 6 mes., prežitie 100 dní, hodnota klienta, koncentrácia, vyťaženie voči stropu, rezerva, predplatené hodiny, dlhy, Profit First, odporúčatelia. 9. 10. doplnené: **lievik z `krokyZa`** (noví klienti = jeKlient ako v Marketingu; rozpis „z úvodného / rovno na balíček" — úvodný je produkt, nie každý prvý tréning, viď test v MarketingLievik), **konverzia dopytov** zDopytu/dopyty (september 1 zo 7 = 14 %, predtým chybne 57 %), **noví klienti podľa zdroja + cena za klienta** (len pri reklame; september 0 z reklamy, 2 bez zapísaného zdroja — Dominika Križová, Lukáš Kríž), **štvrtá otázka kvartálu** „Splnili sme, čo report navrhol?" (`report_akcie`, snímka pri zamknutí mesiaca, áno/čiastočne/nie; staršie mesiace dopočítané).
-
-- ~~Heinrich 24. 9.: 2 400 Kč Terezkina výplata~~ — **zapísané 9. 10. 2026** (Jerry: „áno 2400"): hotovosť 24. 9. −2 400, kategória výplata Terezka; september 46 329 → 48 729 Kč. Tržba je v septembri z PTmindera (7 790), takže príjem sa nezapisoval. Krátke odkazy /t/ a /k/ cez prosapiens.cz naostro od 9. 10. (snippet 26).
-
-- **Mesačný a kvartálny report — NAOSTRO 8. 10. 2026** (Jerry vybral „C s kartami z A"): Uzávierka → pod zámkom „📄 Report za <mesiac>" (pred zamknutím „Náhľad"), za mar/jún/sep/dec aj „📊 Kvartálny report". `lib/psb/mesacnyReport.ts` + `ReportMesiaca.tsx`, vstup `vstupReportu` v App. Tlač/PDF hotová 8. 10., štvrtá otázka v kvartálnom 9. 10. (do tlače/PDF zatiaľ nejde).
-
-- ~~Odpočet hodín — tri návrhy~~ — **Jerry 8. 10. 2026 vybral A** (rad pod sebou, teda to, čo beží). Návrhy B (pás hodín) a C (dve kôpky) zostávajú v `navrhy-kokpitu/odpocet-hodin.html`, keby sa k tomu raz vrátil.
-- ~~Faktúra 20261001 (Vaško, 7 790 Kč)~~ — **stornovaná 8. 10. 2026**, nahradená faktúrou **20261006 na 6 990 Kč** (splatná 22. 10.). Jerry 9. 10.: posielať netreba. Príčina (klik na popis prepisoval sumu) je opravená.
-
-- **Späť/dopredu v Kokpite — HOTOVÉ 8. 10. 2026, overené naostro 8. 10.** (Workspace → Kalendár → Firma, ‹ ‹ › a Alt+← vrátia presne poradie). Tlačidlá ‹ › pred záložkami, Alt+šípky, Cmd+[ a Cmd+]. Stopa si pamätá aj kartu Workspace a klienta na stole, takže návrat zo stola klienta vráti zoznam a dopredu zasa stôl. Vyskúšaj, či to v prstoch sedí: za prihlasovaciu bránu sa nedostanem, overené je len testami a typmi.
-
-- **Úvodný tréning ako vlastný balíček — HOTOVÉ 8. 10. 2026, ale len dopredu.** Appka si úvodný balíček (1 h / 1 100 Kč) založí sama prvým tréningom a nezaplatený ide do mínusu. Pri otvorení Kokpitu vzniknú dva: **Petr Baťa** 5. 10. → dlh 1 100 Kč (presne ako Jerry chcel) a **Lenka Divinova** 28. 8. → zaplatené, dlh 0. Druh tréningu sa dá prepnúť oboma smermi v karte klienta (tabuľka `trening_druh`, prebije kalendár aj export).
-  **Doplnené 8. 10. 2026** (Jerry: „áno doplň tie staršie úvodné"): sedem úvodných z augusta a septembra má vlastný balíček — Pavlik, Hrdinova, Spoligova, Pehalova, Malinova, Dvořak, Matl. Nikomu z nich nevznikol dlh (všetci zaplatili) a nikomu sa nezmenili hodiny okrem troch, ktorí dovtedy nemali žiadny záznam.
-  **Čo sa doplniť NEDÁ:** zvyšných 59 úvodných späť do januára 2025. Nasucho to vymyslelo dlh 1 100 Kč štrnástim ľuďom, ktorí zaplatili (ich platby z 2025 sa k balíčku nespárujú), dvom iným naopak dlh 6 990 Kč zmazalo a piatim stlačilo hodiny do mínusu. Keby to raz malo zmysel, musí sa k tomu prilepiť párovanie starých platieb — nie samotné balíčky.
-- ~~Nadpis stránky klienta vs. os~~ — **vyriešené samo** (overené 9. 10. 2026 kontrolórom profilov nad ostrou DB: nadpis odkazu = karta u všetkých, os = karta okrem Milana Bařinu, kde os vidí dokúpených 8 h z 21. 6. 2025). Hanus: os aj karta rovnako.
-
-- **Vyskúšať na vlastnom telefóne (Jerry, 7. 10. 2026 — „daj to na zoznam"; 9. 10.: „vyskúšam najskôr"):**
-  1. **Kalendár v mobile** (8. 10.: zatiaľ nikto nemá odkaz, `klient_kalendar` je prázdna) — poslať si odkaz z profilu klienta, pridať na iPhone: zostanú zapnuté upozornenia (iOS „Odstranit upozornění")? Ako rýchlo sa prejaví presun? To isté na Androide / Google Kalendári.
-  2. **Ponuka termínov** — zápis z /t/ do Google FUNGUJE (overené 8. 10. v dátach): ponuka pre Mateja Prochadzku vytvorená 7. 10. o 9:47, termín vybraný o 31 s neskôr, udalosť 14. 10. 10:00 je v Google aj v Kokpite. **Jerry 9. 10. 2026: nebola to skúška** — termín 14. 10. platí. Prvý ostrý výber teda prešiel. Push trénerovi neoverený.
-  3. **Gestá v Kalendári** — švih prstom (telefón/iPad) a dva prsty na touchpade medzi týždňami; overené len simuláciou.
-     **Duplikovať (13. 10. 2026, Jerry: „udalosť mi zmizne"):** po kópii sa panel zavrel a pod ním boli polia dňa/času PÔVODNÉHO tréningu — „Uložiť" ho presunulo (Papiež 26. 10. → 28. 10.). Opravené: panel kópie ostáva otvorený, ďalšia kópia o týždeň po poslednej, polia originálu a „Uložiť" sú počas kopírovania skryté, presun má tlačidlo „Presunúť na …".
-- ~~September: chýbalo 10 výdavkov z banky (−17 641 Kč)~~ — HOTOVÉ 7. 10. 2026: Jerry stiahol mesiac z Fio (september má 132 pohybov); krok Fio odvtedy hlási hotovo až pri 0 nepotvrdených a 0 nezaradených výdavkoch.
-- ~~Pravidlo Terezkinho účtu → Služby~~ — HOTOVÉ 7. 10. 2026: výplata 29. 9. prehodená na Výplata Terezka, pravidlo účtu teraz → výplata Terezka; SmsManager ostáva Apps AI (Jerry).
-- ~~5 príjmov s kategóriou „AI aplikácie" + pravidlo „pro"~~ — HOTOVÉ 7. 10. 2026 s Jerryho súhlasom: nálepky vymazané, pravidlo zmazané.
-- ~~Kratšie odkazy v SMS pre /t/ a /k/~~ — HOTOVÉ 9. 10. 2026: snippet 26 presmerúva aj /t/ a /k/ (overené curl 302 → worker → 200), `verejnyOdkaz` ich posiela cez prosapiens.cz.
-
-- **Editor fotiek + editor videa (6. 10. 2026)** — Jerry: fotky ako v appke Layout (štvorec na polovicu, výrez, mriežka, prekrytie, čiary a uhly), z 5 rozložení vybral **1 · panel vpravo**; potom „editor videa musí byť samostatný". Náčrty: `navrhy-kokpitu/editor-fotiek.html` a `navrhy-kokpitu/editor-videa.html` (video: krok o snímku, rýchlosť bodkou 0,07–2×, strih bodkami na osi + I/O, čiary viazané na snímku, 📷 snímka, stiahnutie videa so strihom a spomalením — MP4 v Chrome). Snímky idú do spoločného zásobníka (`skladacka-sklad.js`, IndexedDB) a editor fotiek ich ponúka v „Snímky z videa". Spoločné časti vkladá `python3 zostav-skladacku.py`. **V Kokpite od 6. 10. 2026: Workspace → karta Editor → Foto / Video** (zdroj `app/editor/`, `python3 editor/zostav.py`). **Napojené na kartotéku klienta 6. 10. 2026** (porovnanie, video, snímky; klient sa vyberá nad editorom). Otvorené (**Jerry 9. 10. 2026: „editor videa necháme na potom"** — odložené): veľké videá nahrávať po kusoch (limit veľkosti požiadavky Workera), HEVC z iPhonu. Pozor: súhlas v anamnéze hovorí „nikde se nezveřejňují" — export na sociálne siete chce samostatný súhlas.
-
-| Vec | Odkedy | Otázka |
-|---|---|---|
-| ~~PSI kľúč~~ — HOTOVÉ 6. 10. 2026: nový kľúč (projekt Kokpit kalendar, obmedzený na PageSpeed Insights API) v Údajoch; 3 merania cez appku prešli (07:09 UTC), priamy test u Google 200. Pozn.: „41 znakov" bola dĺžka s úvodzovkami JSON v `vzas_settings`, nie chyba kľúča. | 1. 10. | — |
-
-## 2 · Prijaté, nezačaté
-
-- **Jarvis: Sonnet vs Opus — vyhodnotiť 22. 10. 2026 (Jerry, 15. 10.:
-  „nechaj to týždeň merať a potom mi povedz, koľko otázok išlo na Opus
-  a za koľko“).** Meranie: `vzas_audit` action `jarvis-spotreba`
-  (old_value = model, new_value = tokeny + `vyber` sam/rucne/zakladny +
-  kategória; `vyber` až od druhého nasadenia 15. 10.). Vyhodnotiť počet
-  a cenu podľa modelu a kto ho vybral; potom rozhodnúť o eskalácii
-  „Sonnet začne, Opus len keď sám uzná“ a o prepínači, ktorý si pamätá
-  voľbu (`psb-ai-deep` v localStorage). Cache opravený 15. 10.
-
-- **Strižňa 1.0 – hranica, aby sa nestavalo donekonečna (13. 10. 2026,
-  Jerry: „musíme to nejako zadefinovať“):** Strižňa je hotová, keď Terezka
-  na svojom Macu prejde celý kruh BEZ Clauda: nahrá deň → priradí klipy
-  ku kartám → zostrihá reel → schváli text → naplánuje cez Metricool →
-  výsledky sa vrátia na kartu v Kokpite. Do 1.0 patrí už len to, čo tento
-  kruh blokuje: (1) jeden ostrý reel od Terezky od nahratia po
-  naplánovanie, (2) opraviť, čo pri ňom padne, (3) upload do Higgsfieldu
-  (SSL chyba pri PUT – zatiaľ len raz). Všetko ostatné (memy, analyzátor,
-  vyhľadávač, profily) je samostatná vec s vlastným rozhodnutím Jerryho.
-
-- **Memy (13. 10. 2026, Jerry: „páči sa mi, ale aby sme nestavali všetko
-  naraz, daj to na zoznam“):** sekcia v Strižni – šablóna (obrázok/klip +
-  text hore/dole), texty navrhne Claude z témy karty, sadzba v značke.
-  Čaká, kým bude Strižňa 1.0.
-
-- **Analyzátor IG videa (13. 10. 2026, filozofická debata):** vložiť
-  odkaz/súbor → Claude rozoberie háčik (prvé 3 s), strihy (detekcia scén),
-  titulky a text, popis (hashtagy, jazyk, tón, vulgarizmy, téma) a povie,
-  čo z toho prevziať. Pozor: Instagram z Workera nestiahneš (429) – video
-  musí prísť ako súbor (stiahnuté z telefónu / nahrávka obrazovky).
-  Celý profil: Metricool vie LEN účty pridané ako konkurenti (overené
-  13. 10.: na PSB je jediný holystic.training; dáva popis, lajky,
-  komentáre, engagement, odkaz – NIE videá ani zhliadnutia). Rozbor
-  popisov celého profilu sa teda dá z Metricoolu, rozbor videí nie.
-
-- **Vyhľadávač „normalizovaných zranení“ (13. 10. 2026, Jerry spresnil):**
-  NEJDE o celebrity. Téma je moment, keď ľudia (hocikto – dvaja chalani pri
-  zhybových, podcast, celebrita) hovoria o tom, koľko zranení už mali, a berú
-  to ako súčasť tréningu („makám veľa, ale stále som zranený, to k tomu
-  patrí“). FP to ukazuje bez kritiky človeka: toto je výsledok, keď tak
-  trénujete. Jerry také videá nepozerá, takže nástroj musí nájsť aj kanály.
-  Postup: YouTube Data API (bezplatný kľúč) hľadá podľa fráz a tém (podcasty,
-  gym talk, vlogy, rozhovory so športovcami), Claude prečíta titulky a
-  vytiahne úseky, kde niekto vymenúva zranenia ako normálne – s časom
-  a vetou; kanály s najviac zásahmi ponúkne Jerrymu na sledovanie.
-  FP pravidlá: zákaz FP techník, loga, hovoriť za FP; formát robí aj hlavný
-  FP profil, takže podľa Jerryho môže ísť aj na MIP – potvrdiť otázkou 3
-  v `docs/fp-otazka.md`. Krátky úsek + zdroj (citačná licencia).
-
-- **Formát reakčného videa (13. 10. 2026):** šablóna v Strižni – úsek
-  cudzieho videa hore, Jerry dole (alebo greenscreen), titulky oboch.
-  Nadväzuje na vyhľadávač; samostatne nemá z čoho žiť.
-
-- **Osobné profily — samostatný projekt (odložené 13. 10. 2026, Jerry: „osobné profily
-  nechame na neskôr“, neskôr v ten deň: „toto by som staval samostatne“):** prepínač profilov PSB / Jerry / Terezka, vzhľad,
-  šablóny a textár podľa profilu, karty a výsledky v Kokpite s profilom,
-  nahrávanie vlastných štatistík (snímky z Instagramu alebo CSV z Meta
-  Business Suite), keď profil nie je v Metricoole. Otvorené otázky pre Jerryho:
-  (1) majú osobné profily ísť cez Metricool (Terezkin profil tam nie je,
-  môže to chcieť vyšší plán), alebo stačí nahrávanie štatistík?
-  (2) aké štatistiky presne nahrávať – ku konkrétnemu reelu, mesačný prehľad
-  účtu, aj mimo Instagramu (TikTok, YouTube)? Návrh je v konverzácii 13. 10.
-  a v pamäti `striznja-appka.md`.
-
-- **Prezentácia z mesačného reportu — POSTAVENÁ 12. 10. 2026** (Jerry: „chcel
-  by som aby mi to rovno vygenerovalo nejakú prezentáciu… niečo ako
-  powerpointovú, prepínam medzi slajdami, postupne sa mi tam zobrazujú
-  jednotlivé data", potom nad náhľadom „postav to, ľúbi sa mi to"): v okne
-  reportu tlačidlo **▶ Prezentácia** → slajdy na celú obrazovku. Príbeh mesiaca:
-  titulka → semafor šiestich otázok → otázka po otázke (veľké číslo, stĺpce,
-  tabuľka, „Urob") → Čo to znamená → Čo urobíme. Šípky, medzerník, F = celá
-  obrazovka, Esc zatvára prezentáciu (nie report pod ňou). Čísla sa NEPOČÍTAJÚ
-  znova — `prezentacia.ts` len prestavuje hotový `Report`. Otvorené: (1) na
-  telefóne je slajd zmenšený na šírku displeja a text je malý — prezentuje sa
-  z notebooku, pre mobil by chcelo vlastné rozloženie; (2) prezentácia sa zatiaľ
-  nedá vytlačiť ani poslať ďalej (report áno, `reportHtml.ts`) — `Platno` je
-  z komponentu vyčlenené práve na to.
-
-- **Termíny klienta v kalendári mobilu — NAOSTRO 7. 10. 2026 (A1 profil + B1 stránka /k/). Otvorené: overiť na skutočnom iPhone upozornenia a obnovu; Android/Google obnova. Pôvodne — náčrty 7. 10.: `navrhy-kokpitu/kalendar-do-mobilu.html` (A1 profil / A2 záložka „V mobile" / A3 hromadne; B1–B3 stránka /k/; C náhľad v telefóne), čaká sa na výber:** každý klient tajný odkaz (iCal odber) na svoje tréningy z Google kalendára; telefón ich pripomenie sám, presuny sa prejavia samy, zadarmo. Pozor: iPhone obnovuje po hodinách, Android/Google aj pol dňa–deň; iOS pri odberoch často vypína upozornenia — OVERIŤ na skutočnom iPhone pred spustením (návod klientovi „zapni Upozornění"). V udalosti len „Trénink ProSapiens · tréner" + adresa, nič citlivé. Ide až po ponuke termínov.
-- **Ponuka termínov klientovi — NAOSTRO 7. 10. 2026 (A1 + B1):** záložka Kalendár → Ponuka termínov (pôvodne Workspace, presunuté na Jerryho želanie), bez ±15 min, stránka /t/. Otvorené: prvý ostrý výber sledovať (zápis do Google netestovaný naostro); kratší odkaz cez prosapiens.cz chce /t/ v WP snippete id 26. Pôvodné zadanie: v Kokpite týždeň z Google kalendára, ťukaním ponúknuť voľné časy (60 min, upraviť po 15 min hore/dole), vybrať klienta (alebo nový z dopytu), „Vytvoriť odkaz" → SMS. Klient na stránke (čeština) klepne na jeden → udalosť v kalendári trénera + push. Platí do konca týždňa alebo kým sa termín nezaplní (vybraný termín zmizne aj z iných ponúk). Každý tréner ponúka zo svojho kalendára, filter Jerryho / Terezkine / oboje. Náčrty: `navrhy-kokpitu/ponuka-terminov.html`.
-
-- **Anonymný dotazník — POSTAVENÝ 9. 10. 2026** (varianta B): stránka `/d/<token>` (7 otázok v češtine, bez JS, odkaz použiteľný raz), odpovede v `dotaznik_odpovede` bez tokenu/klienta/času (len deň), výsledky až od 5 odpovedí (Výsledky → Dotazník). Posiela sa vo Workspace → 2 · SMS → Hromadná správa → „+ odkaz na anonymný dotazník" (`{dotaznik}`, audit `sms-dotaznik`); pripomienka cez filter „Neodpovedali na dotazník". **Hlasovanie o funkciách Jerry 6. 10. ZAMIETOL** („ľudia volia to, čo znie dobre" / „hlasovanie je sľub") — nestavať. Otvorené: (1) bývalí klienti — zatiaľ len aktívni; (2) krátky odkaz `/d/` cez prosapiens.cz — HOTOVÉ 9. 10. (snippet 26, Jerry súhlasil); náhľad stránky v hromadnej správe pred odoslaním (`/d/NAHLADDOTAZNIK`, nič neukladá).
-
-- ~~Dizajn stiahnutého JPEG z editora~~ — **POSTAVENÉ 9. 10. 2026** (Jerry: „postav D a nechaj tam aj E na Instagram"): „Stiahnuť JPEG" aj ukladanie do kartotéky = návrh D (biele štítky PŘEDTÍM/POTOM s dátumom, postavička ako vodoznak, Agrandir); tlačidlo „Instagram 4 : 5" = návrh E (nadpis „N týdnů práce" z dátumov, štvorec v zaoblenom okne, nápis + prosapiens.cz). Popisky v editore sú odteraz po česky. Zverejnenie chce samostatný súhlas klienta. Náčrty ostávajú v `navrhy-kokpitu/jpeg-z-editora.html`.
-
-- ~~**Dávkové potvrdzovanie bankových platieb**~~ — HOTOVÉ (akcia
-  `priradz-davka`, použité 28. 9.; pravidlá od 5. 10. len z priezviska).
-  Pôvodne (Jerry, 25. 9.): Z 238 príjmov
-  od 1/2026 je priradených 113. Pri poslednom meraní malo 74 nepriradených
-  jednoznačný návrh — zoznam s odškrtávaním a jedným potvrdením z toho robí
-  prácu na večer, nie na mesiac. Dnes sa potvrdzuje po jednom.
-
-- ~~**Anamnéza klienta v Kokpite**~~ — HOTOVÉ 30. 9. (sekcia 0c), kartotéka
-  fotiek 5. 10. Pôvodne (Jerry, 26. 9.): Argument je jeho: „ak už
-  máme citlivé dáta o meraniach klientov, spravme v Kokpite aj anamnézu a tým
-  pádom tu bude všetko." Tabuľka `klient_merania` už dnes drží telesné
-  merania, takže sa tým nezvyšuje kategória údajov — len prestane byť pravda
-  o klientovi roztrhaná medzi appku a papier. Rozsah dohodnúť; pri zdravotných
-  údajoch platí „len to, čo sa naozaj používa pri tréningu".
-
-- ~~**Fakturácia v Kokpite**~~ — HOTOVÉ (vydané faktúry s QR a mailom od
-  26. 9., spoločná faktúra za viacerých 4. 10.). Pôvodne (Jerry, 26. 9.): Rozhovor je v konverzácii z 26. 9.,
-  fakty: 84 faktúr od 2023, z toho 37 za rok 2026 (347 079 Kč), číselná rada
-  `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
-  balíčku, niesť QR platbu a odísť mailom.
-
-- **PENIAZE Z KOKPITU OD 10/2026 — ZAPNUTÉ 13. 10. 2026** (Jerry: „áno, priraď a prepni na Kokpit"). Priradených 6 októbrových príjmov (Nová, Šašinková, Malinová, Rupová, Lozias, Doležalová — 43 665 Kč, každý jediný návrh s menom v texte), október Kokpit 70 427 / PTminder 70 435 Kč. Tržby a P&L od októbra berú vlastnú evidenciu.
-- ~~**6. 10. 2026 — PREPÍNAČ PEŇAZÍ POSTAVENÝ**~~ (`peniazeZKokpitu.ts`): tržby,
-  grafy aj P&L berú platby pred zvoleným mesiacom z PTmindera, od neho
-  z vlastnej evidencie; prepína sa v Prechode → Platby a server pustí len
-  mesiac, ktorý sedí (200 Kč / 1 %) a nečaká v ňom nepriradený príjem.
-  Tréningy od 1. 10. už idú z kalendára, takže staré názvy v kalendári mapovať
-  netreba (pred 1. 10. platí PTminder). **Čaká na Jerryho:** priradiť
-  októbrové príjmy z banky (4, 33 580 Kč), zapisovať hotovosť a bitcoin do
-  Kokpitu (zošit nie je v Kokpite od 28. 8.), potom tlačidlo „Prepnúť peniaze
-  na Kokpit od 10/2026" (Jerry 9. 10.: „to ešte počká"). Stav 6. 10.: október Kokpit 0 / PTminder 17 190.
-  **Bitcoin sa berie sám z BTC knihy** (6. 10., Jerry: „prečo sa BTC platby
-  nečítajú?") — od začiatku súbežného chodu, nespoznané mená ukáže karta.
-  V knihe zatiaľ žiadna októbrová platba (posledná 17. 9.).
-  ~~Miřejovský 752~~ — vybavené 11. 10. (pohyb označený „nie je platba klienta"); Jerry 13. 10.: neotvárať.
-  Pôvodný text: **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Meradlo
-  beží v Prechode („Vlastné dáta proti exportu", dvojitý výpočet za posledné
-  tri mesiace). Stav k 26. 9. — august, jediný uzavretý mesiac:
-  tréningy 186/183, hodiny 186/183, klienti 54/54 sedia; **peniaze
-  199 036 / 83 940 nie**. Chýbajú DVE veci, obe známe:
-  (a) staré názvy v kalendári nie sú namapované (júl −21 tréningov pri 32
-  nezaradených), (b) z bankových príjmov je priradená polovica — august 32
-  príjmov za 180 817 Kč, priradených 16. Banka teda peniaze má, len nevie,
-  komu patria. Cieľ:
-  dochádzka a tréningy z Google kalendára, peniaze z Fia a vlastných platieb;
-  export z PTmindera beží súbežne a porovnáva sa. Prvý krok hotový —
-  doplnenie histórie z iCalu a mesačné porovnanie v Prechode. Merané 26. 9.:
-  august sedí (183 / 186), staršie mesiace chýbajú takmer presne toľko, koľko
-  je v nich NEZARADENÝCH udalostí (marec −72 pri 72 nezaradených). Ďalší krok
-  je teda hromadné mapovanie starých názvov, nie ďalšie sťahovanie. Potom to
-  isté pre peniaze a až nakoniec prepnutie grafov.
-
-- **Export rokov pred 2025 z PTmindera** (Jerry, 26. 9.). Kokpit má dáta od
-  3. 1. 2025; PTminder drží aj 2022–2024 (používa sa 4,5 roka). Dohoda:
-  NEMIGROVAŤ do živých tabuliek — staré čísla by vstúpili do priemerov, LTV
-  a kohort a Jerry by musel riešiť nezrovnalosti, ktoré ho nezaujímajú.
-  Namiesto toho ARCHÍV: surové riadky tak, ako prídu, bez opráv, a z nich sa
-  nič nepočíta; na karte klienta len riadok „pred 2025: N tréningov, X Kč".
-  Čaká na Jerryho: stiahnuť z PTmindera kompletný export za celé obdobie.
-  Urobiť to treba TAK ČI TAK, kým PTminder beží — po vypnutí sú dáta preč.
-
-- [x] **6. 10. 2026 vyriešené:** Jerry — „Veronika chodí online a občas ide na
-  offline, ale to si platí ako samostatný tréning." Kúpená 1 h iného druhu
-  (ON/OFF z NÁZVU balíčka) počas platného členstva pokryje svoj tréning
-  a členstvo beží ďalej (`samostatne` v `priebehBalickov`); Marcela Hrůzová
-  24. 9. a 1. 10. má odvtedy 3 a 2 namiesto prázdneho riadku. Prísne „online
-  len z online" ZÁMERNE nie: Lucia Podolová má „ON - 6h" a tréningy vedené
-  ako offline — balíček by sa jej nemínal. Pôvodný text:
-  **Tréningy pod balíčkom ignorujú DRUH sedenia.** Jerry, 28. 9. 2026:
-  „prečo má Veronika 2 tréningy na 1 hodinu?" Rozbalenie balíčka berie
-  všetko, čo padne do jeho platnosti — Veronika Stoklasková má „OFF -
-  1 hodina offline" (2. 9. – 29. 9.) a v tom okne dve sedenia: OFFLINE 2. 9.
-  (to je tá hodina) a **ONLINE 16. 9.**, ktoré z offline balíčka čerpať
-  nemôže. Rovnaká slepota je v odpočte hodín. Treba rozhodnúť, čo z čoho
-  čerpá: `session_type` (OFFLINE/ONLINE/UVODNE) verzus názov balíčka
-  („OFF - …" / „ON - …"), a či sa online hodiny platia zvlášť.
-  Súvisí s tým aj to, že balíček na 1 h mal v tom okne dve sedenia — keď
-  ONLINE vypadne, sedí to.
-
-## 2b · Myšlienková mapa — čo z rešerše zostalo nepostavené
-
-Traja agenti (tester, kontrolór, kritik) prešli mapu 25. 9. 2026 a porovnali
-ju s MindMeisterom, MindMupom, Coggle, Freeplane, XMindom a Mirom. Chyby sú
-opravené; toto sú mechaniky, ktoré tie nástroje majú a my vedome zatiaľ nie,
-zoradené podľa toho, koľko práce Jerrymu ušetria:
-
-1. **↑/↓ skok na súrodenca a ⌘↑/⌘↓ preradenie** — dnes sa klávesnicou dá ísť
-   len dopredu; späť na štvrtý nápad len myšou. Preradenie je jediný spôsob,
-   ako z výsypu spraviť poradie bez prepisovania. `poradie` v databáze už je.
-2. **Osnova ako druhý POHĽAD na tie isté riadky** (XMind Outliner) — dnes
-   vieme len jednosmerný text. Písanie dvadsiatich viet je v zozname
-   rýchlejšie a celý mesiac sa dá prečítať naraz.
-3. **Viacnásobný výber v „Vysyp a usporiadaj"** — priradiť fázu dvadsiatim
-   nápadom je dnes dvadsať mierení na malé tlačidlo.
-4. **Hľadanie (⌘F)** — odkedy je máp viac, „napísal som to už?" nemá odpoveď.
-
-Vedome NEROBIŤ (z tej istej rešerše): ukladané pozície a voľné ťahanie,
-prepojenia medzi vetvami, ikony a priority, prezentačný režim, zdieľanie,
-AI dopĺňanie mapy, šablóny. Každá z nich je rozhodnutie urobené namiesto
-napísania ďalšieho nápadu — a pri jednom človeku s jedným cieľom nič nerieši.
-
-**Všetky štyri postavené 5. 10. 2026** (Jerry: „pokračuj s myšlienkovou
-mapou"), aj s tromi menšími: Enter vkladá hneď za (server prečísluje rad,
-`vlozenieZa`), server overuje `rodic` a vetva/viditeľnosť sa počítajú raz
-za prekreslenie (`vetvyVsetkych`, `viditelneVsetky`). Pri overovaní sa
-našla strata textu pri rýchlom písaní — viď CLAUDE.md „Koncept sa ukladá
-bez čakania".
-
-~~**Vlastné vetvy.**~~ Hotové 25. 9. 2026 (migrácia 0078): zoznam vetiev
-žije v `mkt_mapy.vetvy`, nová sa píše v ponuke pri kmeni, na obvode vetvy sa
-dá premenovať, prefarbiť, prehodiť na druhú stranu a zmazať. Zmazanie nápady
-nemaže — padnú do odkladiska.
-
-## 2c · Balíčky: história z PTmindera a jedno pravidlo „zaplatený"
-
-Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
-
-- [x] Matl, Luky Križ, Hanus, Podolova — v `balicky` už sú (naliate 3. 10.).
-- [x] **Nezaplatený balíček je nula, zostatok má znamienko** — nasadené
-  3. 10. večer (`zostatokKokpitu`, `priebehBalickov`, `osKlientaZoServera`).
-  Hanus −1 h a 6 990 Kč, Šašinková −3, Vaško −3. Viď CLAUDE.md.
-- [x] **História balíčkov z PTmindera** — 4. 10. 2026 (Jerry: „neriaď sa
-  podľa názvu"). Tabuľka `ptminder_historia`, 1 232 riadkov; os času z nej
-  berie skutočné hodiny a koniec členstiev. Upload ju odteraz plní sám.
-  Doplnenia z nej zámerne nie (viď CLAUDE.md).
-- [x] **Karta ≠ zoznam — overené v PTminderi 5. 10. 2026**:
-  Stoklasková sedí (1). Broskva a Krčmar opravené v kóde (nový balíček
-  preberá nekryté tréningy pred sebou — PTminder ich tam má). Obrovská:
-  karta 2 správne (doplnenie 5 h). Přinosilová: májové členstvo malo 17 h,
-  nie 18 — opravené v DB, karta 7 = PTminder. Holubová: hodiny prepadli,
-  karta 0 správne. Gerich: karta 6 správne, 15 580 = členstvo + kredit vopred.
-- [x] **Šnirychová** (5. 10. 2026) — Janke zrušený duplicitný ručný „SPECIAL 3"
-  z 22. 9. (Jerry odklepol); karta aj zoznam 2 h = PTminder (doplnenie 3 h).
-- [x] **6. 10. 2026 prepočítané nad kópiou ostrej DB:** prenos mínusu zo
-  skončeného členstva NESEDÍ s PTminderom (Kouřil, Vopalenský, Kadličková,
-  Khamaziuk — 4 z 4 overiteľných dávajú o 1–3 h menej než PTminder aj karta;
-  Tsiolis by si stiahol 20 tréningov až z 11/2025). „Mínusy" v histórii sú
-  väčšinou artefakt delenia osi podľa dňa kúpy (Kadličková mala v členstve
-  6/30–8/24 presne 6 tréningov). Pre históriu teda ostáva vypnutý.
-  **6. 10. doplnené (Jerry):** po konci platnosti sa zvyšok hodín nečerpá,
-  kým nepadne rozhodnutie; balíček vzniká hneď a ide do mínusu. Rušenie
-  a nové založenie automatického balíčka po doplnení Jerry odmietol
-  („minulosť by som nemenil") — odstránené.
-  - [x] **Doplnenie a prepadnutie na osi (6. 10. 2026, Jerry):** zvyšok 2 h
-    po konci platnosti → doplnenie: tréningy „2 h, 1 h · doplnenie", potom
-    nový balíček od 6 h (pri neskorom rozhodnutí sa automatický balíček zruší
-    a hneď založí za doplnením). Prepadnutie: v deň konca platnosti značka
-    „2 h, 1 h · prepadlo" bez tréningu (z odpovede v `anomaly_ack`). Značka
-    je v profile, klientovi na stránke/v maili sa nekreslí. Resnerová
-  nemala čo presúvať — PTminder: 8 h, 8 tréningov 11. 8. – 1. 10.
-  Dopredu (členstvo skončené v Kokpite) platí Jerryho logika: tréning po
-  konci platnosti a bez hodín je prvá hodina nového členstva, nezaplatené =
-  „6 h −1", balíček vznikne sám (Resnerová 6. 10. — predtým ticho).
-  Pôvodný text: **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
-  proti vymysleným deficitom). Jerryho pravidlo z 28. 9. hovorí, že nový
-  balíček mínus preberá — 13 klientov má skutočne pretrénované skončené
-  členstvo (napr. Vaňková −1 tesne pred súčasným). Zapnúť späť sa dá, až
-  keď aj karta počíta prenos, inak sa karta a zoznam rozídu znova.
-- [x] ~~ROZHODNUTIE (Jerry): naliať históriu balíčkov z PTmindera.~~ Hotové vyššie.
-  Pôvodný text: **naliať históriu balíčkov z PTmindera.** Kokpit
-  má z reportu „Packages & Memberships" len stav *Active* (124 riadkov).
-  Pod *Finished* je 553 balíčkov a 634 členstiev s obdobiami až do 2022
-  (Cancelled/Paused/Expired sú prázdne). Súbory: `~/Downloads/ptminder-2026-10-03/`.
-  Bežný import ich NESMIE dostať — `packages` import je po klientoch výmena
-  a Active by zmizlo; treba vlastnú cestu do `balicky` (parsePackages ich
-  číta, dedup klient|názov|platnosť_od). Dopad: hodiny sa pohnú u veľkej
-  časti klientov — preto najprv simulácia, potom Jerry.
-- [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
-- [x] **Deň z UTC** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
-- [x] **SMS rozhoduje o QR z iného čísla než stránka** (`SmsKlientovi.tsx:142`
-  vs `v.$token.tsx`): overiť po nasadení, či po zjednotení `packageRemaining`
-  ešte môžu nesúhlasiť; ak áno, SMS má stav nečítať vôbec (pamäť „Jedna SMS").
-- [x] `KlientStol`/`Dashboard`/`Kalendar` odčítavajú `mimoExportu` od čísla,
-  ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
-- [x] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
-  5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
-- [x] **Jarek Heinrich (6. 10. 2026, Jerry: „zaplatil 7 790 za 6 h od 27. 7.")**
-  — overené v PTminderi: platba 21. 9. bez členstva, tréningy 27. 7., 31. 8.,
-  14. 9. za 0 Kč na doplneniach. Nahodený „6h Balíček" 27. 7. – 15. 11.
-  (koniec ako členstvo kúpené 21. 9.), 7 790 Kč; os 6/5/4/3, karta 2 h, dlh 0.
-- [x] **Monikine hodiny na Danovi (6. 10. 2026, Jerry: „áno, oprav to")** —
-  sedenia 6., 13. a 20. 3. o 8:30 s Terezkou preradené z Dana Kouřila na
-  Moniku Schonwalderovú (sessions + dedup_key, audit `sedenie-preradene`).
-  Marec je zamknutý, import ich späť neprepíše. V PTminderi ostali na Danovi
-  — Kokpit je od 1. 10. pravda, netreba.
-- [x] **Staré obdobia vynulované (6. 10. 2026, Jerry: „neber to ako mínus ani
-  ako plus, dôležité je, aby to sedelo teraz")** — v uzavretom členstve spred
-  1. 10. je tréning nad rámec „—" (`vyrovnane`), nie −N. 39 mínusov a 124
-  prázdnych riadkov; karty, koniec osi ani návrhy sa nezmenili. Rozdiely
-  nižšie sú tým vybavené, netreba ich opravovať v PTminderi.
-- [x] ~~Pre Jerryho — rozdiely kalendár ↔ PTminder (6. 10. 2026)~~, príčina
-  mínusov pri prenose; súčasné balíčky sedia, ide len o históriu:
-  - Kadličková: kalendár 17. 6. 16:00, v PTminderi nie je.
-  - Kouřil: kalendár 24. 5. (ne 10:00) a 14. 6. (ne 9:00), v PTminderi nie sú;
-    6., 13. a 20. 3. má v PTminderi DVA tréningy, v kalendári je v ten deň
-    Monika 8:30 a Dan inokedy → áno, Monikine; preradené 6. 10.
-  - Khamaziuk: v PTminderi druhá rezervácia o 11:00 (11. 3., 29. 4., 13. 5.,
-    20. 5., 10. 6.; a 6. 5. 11:00), kalendár má len 9:00 → duplicity?
-    A 22. 2. (ne 11:00) v kalendári, v PTminderi nie.
-  - Vopalenský: zdroje sedia; skutočne nekrytý je len 14. 4. — deň po konci
-    členstva 17. 2. – 13. 4., ďalšie začalo 7. 6.
-- [x] ~~Pre Jerryho: Jarek Heinrich~~ (vyriešené vyššie) trénuje od 27. 7. bez platného členstva
-  (posledné 27. 4. – 21. 6., potom len doplnenia bez počtu hodín 23. 6.,
-  5. 9., 20. 9.). Tréningy 27. 7., 31. 8., 14. 9., 5. 10. sú na osi bez čísla
-  a automatický balíček zámerne nevznikne (história z PTmindera). Platba
-  7 790 z 24. 9. — za čo? Ak je to 6 h od 27. 7., stačí ho nahodiť ručne.
-- [x] **Jerry 6. 10. 2026 vysvetlil:** Kalva/Martinek/Vaško 8/8/7 h = presun
-  nevychodených hodín do ďalšieho mesiaca (PTminder má pravdu); Čechová 5 h =
-  odpočítaný nevychodený tréning po letnej pauze (správne); Gerich = nový
-  balík začína nové členstvo, má predplatené dva balíčky; Gažo platí len
-  v PTminderi (bez zásahu).
-
-## 3 · Blokované niečím mimo Kokpitu
-
-- **NDA pri fotkách pred/po** (od 8. 9.) — kým nie sú skontrolované súhlasy
-  klientov, ktorých fotky sa už niekde použili, nemá zmysel stavať úložisko.
-  Je to jediná zostávajúca cesta, ako dokázať výsledok obrazom (meranie
-  bolesti Jerry 24. 9. zrušil natrvalo — pozri „Zavreté").
-- ~~**Google Ads „Basic"**~~ — PRIDELENÉ (overené 6. 10. 2026 v API Center
-  aj naživo: `akcia: "skus-planovac"`, „osobní trenér praha" 260/mes.).
-  Objem hľadania sa teda dá ťahať — zatiaľ nie je postavená obrazovka.
-## 4 · Odložené do vypnutia PTmindera
-
-- Na karte klienta nahradiť „zaplatil podľa PTmindera" **dvoma číslami vedľa
-  seba** — Kokpit a export. Podrobne aj s dôvodom v `CLAUDE.md`, sekcia
-  „Súbežný chod potrebuje meradlo".
-
-- ~~**Vytiahnuť z PTmindera maily a telefóny**~~ — overené 13. 10. 2026: `klient_fakturacia` má 120 telefónov a 120 mailov zo 124 klientov. Pôvodne: a pripojiť ich k profilom
-  klientov (Jerry, 26. 9.). Bez nich sa faktúra ani pripomienka nedá poslať
-  z Kokpitu — dnes je v appke 9 mailov (a tie sú z dopytov, nie od klientov)
-  a v iDokladi 8 z 35 kontaktov. Odísť z PTmindera bez tohto kroku by
-  znamenalo stratiť jediné miesto, kde tie kontakty sú.
-
-## 5 · Fronty, ktoré appka meria a nikto ich neznižuje
-
-Toto nie sú úlohy pre Kokpit, je to práca, na ktorú Kokpit ukazuje. Čísla
-k 25. 9. 2026:
-
-| | koľko |
-|---|---|
-| bankové príjmy bez priradenia | ~125 z 238 (priradených 113) |
-| dopyty bez dôvodu, prečo sa z nich nestal klient | 46 → 0: od 6. 10. 2026 sa pýta len pri nových (`DOVOD_DOPYTU_OD`) |
-| dopyty bez času prvej odpovede | 46 |
-| nevysvetlené zmeny v kalendári | 36 |
-| závery po termíne overenia | 13 z 18 otvorených |
-| šesť konkrétnych dôvodov odchodu — Andrea Čonkova, Vojta Bartoň, Viera Adamkova, Josef Žiška, Jiri Kubik, Denisa Chmelarova | 6, všetky prázdne od 15. 9. |
-
-## 6 · Nový web (téma psb-spready — ŽIVÁ, od 1. 10. 2026 overené)
-
-Téma je na webe AKTÍVNA (admin hlási „Theme: ProSapiens Spready 1.0"),
-nie nahratá bokom — nadpis tu tvrdil opak. Zmena v nej sa preto robí na
-DVOCH miestach: v repe (`navrhy-webu/tema/psb-spready/`) aj cez Editor
-šablón vo WordPresse, inak ju prvé nahratie témy prepíše.
-
-**5. 10. 2026 — premerané a opravené** (`tools/kontrola_tema.py` meria
-odvtedy aj zaplnenie obrazovky a zeleň; `--tablet`, alebo rozmery `820x1180`):
-- tablet na šírku: pretekanie ani prekryv už nie sú (opravilo kolo 19. 9.);
-- zelené zvýraznenia: všade najviac 4 a do 5 slov (2 obrazovky na telefóne
-  so 6 sú ceny — zámer);
-- tablet na výšku: riedke obrazovky 86 → 18 (820×1180), 62 → 16 (768×1024);
-  telefóny tiež o trochu menej, počítač bez zmeny. Tri opravy v prototype:
-  T-1 koniec článku sa centroval na skrytú pätičku `.folio` a padal ku
-  spodku; T-2 vyvažovanie aj medzi susednými kusmi „Text N" článku; T-3
-  `growScale` — riedka obrazovka na tablete sa celá zväčší (najviac 1,35×).
-- viditeľný text overený zhodný so starou verziou; menia sa len `style.css`
-  a `js/app.js`. Náhľad: https://psb-tema.prosapiensbio.workers.dev
-- **Nahraté 5. 10. 2026** cez Editor šablón (Jerry výslovne povolil; bez
-  toho automatický režim zápis zamieta ako „Production Deploy“). Overené:
-  návštevník dostáva nové `?ver=`, na 820×1180 sa Cena a Otázky na Úvodnom
-  tréningu zväčšia 1,345×, nič nepreteká, konzola bez chýb.
-
-Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10. — všetko
-vyriešené opravami 5. 10. vyššie, ponechané ako história):
-
-- tablet na šírku 1024×768 — pretekanie pod spodnú lištu na viacerých
-  stránkach (Domov, Úvodný tréning, Vzdelávanie, Služby, Online, Test),
-- tablet na výšku 820×1180 — 22 obrazoviek vyplnených pod 55 %,
-- „Kariéra → Koho hledáme" pri výške 600 px — druhá obrazovka na 33 %,
-- v článkoch je zeleného zvýraznenia priveľa (74 zvýraznení dlhších než osem
-  slov na 15 článkoch; pravidlo boli 2–4 krátke spojenia).
-
----
-
-### Web — stav k 27. 10. 2026
-
-**Hotové 27. 10.:**
-- **og:image** — nastavený záložný „Obrázek webu" v Yoast → Nastavení → Základy
-  webu (DSC09343). Platí pre každú stránku, ktorá nemá vlastný obrázok; overené
-  na deviatich. Yoastova sekcia u typov obsahu má tlačidlá vypnuté, funguje len
-  toto jedno miesto.
-- **`/blog/` má meta popis** (stránka 639, Yoast metabox).
-- **Mŕtvy DOI na `/ploche-nohy/`** — správne je `10.1038/s41598-025-89364-8`.
-  Overené cez Crossref: názov, časopis, rok, autori aj číslo článku 5077 sedia,
-  chybné bolo len číslo DOI. Opravené cez **Texty webu** (live) aj v repe
-  (prototyp, part, `inc/zdroj`).
-- **Mŕtvy odkaz na BiohackPlanet** v `/biomechanika-evolucia_treningu/` —
-  obchod zanikol, odkaz je preč, názov v texte zostal. Rovnako na oboch miestach.
-- **Oba zipy témy prebalené** (`tema/psb-spready.zip` 20 MB,
-  `tema/instalace/psb-spready-bez-fotiek.zip` 1,2 MB) už s opravami.
-- **Cache vyprázdnená** po tých zmenách.
-- **Wordfence dobehol celý** (27. 10. 8:07): 33 422 súborov, 40 tém a pluginov,
-  5 používateľov, 15 689 adries. **Žiadny malvér, žiadny zmenený ani neznámy
-  súbor, žiadny cudzí používateľ.** Všetkých 33 nálezov sú zastarané pluginy
-  (Yoast 25.7 → 28.7, WooCommerce 10.1.4 → 11.2.1, Jetpack, Forminator…),
-  dva opustené (Health Check, Exclude Pages From Menu) a dva označené ako
-  zraniteľné: **Slider Revolution a WPBakery** — tie sú od 26. 10. vypnuté,
-  ale súbory na disku zostávajú. Zmazať ich je rozhodnutie pre Jerryho.
-
-**Čaká na Jerryho:**
-- [ ] **Dva staré administrátorské účty** — Nika Pastorová (pastorova@emglare.com,
-  naposledy 15. 7. 2024) a Admin Systedo (admin@systedo.cz, 26. 11. 2023).
-  Buď zmazať, alebo zraziť na Návštevníka.
-- [ ] **Dvojfázové overenie** nemá ani jeden z piatich používateľov.
-- [ ] **Heslo k FTP** (heslo do WordPressu zmenené 19. 10., FTP nie).
-- [ ] **OPcache vypnutý na hostingu** — nekešovaná stránka ~1,4 s. Vec na
-  Websupport, nie na nás.
-- [ ] **Odpovedať Radke Kovaříkovej** — písala, že formulár nerobí medzery;
-  opravené 19. 10., odpoveď nikdy neodišla.
+**Odpadlo, nerobiť:**
+- ~~Zmeniť heslo k FTP~~ — **žiadny FTP účet neexistuje** (Websupport, FTP účty:
+  0 z 0). Je tam len dočasné webFTP. Zároveň to vylučuje FTP ako cestu dnu.
+- ~~Odpovedať Radke Kovaříkovej~~ — **Jerry odpovedal 19. 10. o 16:23**
+  („Re: uvodni trenink", v odoslanej pošte info@).
+- ~~Zapnúť OPcache~~ — **už je zapnutý.** Overené 27. 10. priamo v nastavení
+  webu (Websupport → Pokročilá konfigurácia → Web → „…" → Nastavenia PHP):
+  **Opcache (PHP 5.4+): Povolené (Predvolené)**. Hlásenie „Cache opkódů:
+  Deaktivováno" v Zdraví webu je nesprávna detekcia WordPressu pri PHP-FPM,
+  nie skutočný stav. **Moje tvrdenie, že preto je nekešovaná stránka pomalá,
+  bolo nesprávne** — príčina tých ~1,4 s je inde a zatiaľ nie je zistená
+  (WordPress s 35 aktívnymi pluginmi toľko bežne trvá).
+  Pri tej istej kontrole vidno, že `display_errors` je na hostingu **Povolené**;
+  vypína to až snippet 29 vo WordPresse (viď [[chyby-php-do-stranky]]) — keby
+  ten niekto vypol, chyby PHP sa začnú vypisovať do stránok.
 
 **Poznámka k postupu:** skriptované volania na prosapiens.cz znova narazili na
 firewall webu (Access Forbidden). Návštevníkov sa to netýka, ale overovať sa
@@ -852,8 +465,8 @@ Otvorené:
 1. [x] Model A platí od októbra 2026 (Jerry 26. 10.). Prechod na výplatu 3. postupne: strop zálohy november 30 000, december 20 000, január 10 000, od februára len 3. (bez spoločných).
 2. [x] **Terezka súhlasila 26. 10. 2026** (návrh https://claude.ai/artifact/MWqnqj9ywpZ7cui3zNqvt6, plán https://claude.ai/artifact/1c6RhnigeXFG3ha2Kb4rBN). Stratový mesiac = hodiny navyše ako dlh firmy voči nim, vyplatené zo zisku neskôr, zvyšok v decembri; spoločný strop hodín navyše 25 000 Kč mesačne (oba body podľa návrhu — potvrdiť, ak Terezka odpovedala inak).
 3. [x] Hodina navyše = len práca pre PSB, to, čo sa zapíše pri týždennej únave (Jerry 26. 10.).
-4. [ ] **Do 3. 11. 2026** Kokpit: nárok s hodinami navyše od októbra 2026, strop 40 h, spoločný strop 25 000 (salaryCalc + most do Peniaze manažéra + strážca výberov + Jarvis); oprava vety „Vybraté je o X viac“ pri kladnom dlhu Terezky (je opačne).
-5. [ ] Rezervný účet PSB založiť → číslo do Kokpitu (Jerry: „urobím dodatočne“).
+4. [x] Kokpit: nárok s hodinami navyše od októbra 2026 (strop 40 h, spolu 25 000), strážca stráži zálohy od 11/2026, veta pri kladnom dlhu opravená — nasadené 27. 10. 2026 (commit 7429164).
+5. [x] Rezervný účet PSB = Fio 2503222384/2010 (Jerry 27. 10.); prevody naň Kokpit spozná sám, zatvoria pripomienku 5 % a počítajú sa do rezervy firmy.
 6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
 
 ## Zavreté (aby sa neotvárali odznova)

@@ -88,7 +88,11 @@ export const Route = createFileRoute("/api/mailer")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const [odb, kam, tok] = await Promise.all([
-            DB.prepare("SELECT id, email, meno, prihlaseny, status, skupiny FROM mail_odberatelia ORDER BY prihlaseny DESC").all(),
+            DB.prepare(
+              // Stĺpce z CSV exportu (27. 10. 2026) idú von tiež — obrazovka
+              // podľa nich povie, kto zoznam naozaj číta a kto sa odhlásil.
+              "SELECT id, email, meno, prihlaseny, status, skupiny, odhlaseny_at, dovod, odoslanych, otvoreni, klikov, klient FROM mail_odberatelia ORDER BY prihlaseny DESC",
+            ).all(),
             DB.prepare("SELECT id, nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia FROM mail_kampane ORDER BY odoslane DESC").all(),
             DB.prepare("SELECT value FROM vzas_settings WHERE key = 'mailer_token'").first(),
           ]);

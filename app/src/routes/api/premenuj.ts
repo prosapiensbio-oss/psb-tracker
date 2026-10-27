@@ -105,6 +105,8 @@ const TABULKY: Tabulka[] = [
   { tab: "ptminder_historia", stlpec: "klient", kluc: "historia" },
   { tab: "ptminder_klienti", stlpec: "meno", unik: [] },
   { tab: "editor_navrhy", stlpec: "klient" },
+  // Mailový zoznam: `klient` je spárované meno z Kokpitu (27. 10. 2026).
+  { tab: "mail_odberatelia", stlpec: "klient" },
 ];
 
 /**
