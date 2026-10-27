@@ -15,6 +15,7 @@ import { barterovePredaje } from "./barter";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
+import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { obdobieRezervy, odlozeneOd, predosleObdobie, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
 import type {
@@ -2903,6 +2904,8 @@ export type RegisterItem = {
   platneOd?: string;
   /** Tlačidlo „Poslať SMS" priamo v notifikácii (notifikaciaHodin.ts). */
   sms?: { meno: string; trener: string; zostatok: number };
+  /** SMS po úvodnom: najbližší tréning z kalendára (`YYYY-MM-DDTHH:MM`), predvyplní okno. */
+  dalsiTrening?: string;
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
   tone: "red" | "orange" | "blue";
   title: string;
@@ -4567,7 +4570,8 @@ export function pripomienkySlubov(
       category: "Rozhodnutie",
       tone: "blue",
       title: `SMS po úvodnom — ${meno}`,
-      detail: `${meno} — úvodný tréning ${fmtDMY(d)}. Po ňom posielame SMS; klikni na „Poslané", keď je odoslaná.`,
+      detail: `${meno} — úvodný tréning ${fmtDMY(d)}. Po ňom posielame SMS s odkazom — „Poslať SMS po úvodnom".`,
+      dalsiTrening: dalsiTreningPoUvodnom(udalosti.filter((x) => !jeZrusena(x)).map((x) => ({ zaciatok: x.zaciatok, klient: klientUdalosti(x), typ: x.typ })), meno, u.zaciatok) || undefined,
       priority: 12,
       client: meno,
       trener: u.trener || undefined,

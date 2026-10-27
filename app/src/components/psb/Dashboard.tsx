@@ -1,5 +1,6 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
+import { SmsPoUvodnom } from "./SmsPoUvodnom";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -2710,7 +2711,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           )}
           {jeSms && !item.acked && (
             <button onClick={() => setUvOtvoreny((o) => !o)} style={{ ...linkBtn, color: uvOtvoreny ? C.accentLight : C.green }}>
-              {uvOtvoreny ? "Zavrieť" : "Pripraviť SMS"}
+              {uvOtvoreny ? "Zavrieť" : "Poslať SMS po úvodnom"}
             </button>
           )}
           {jeSms && !item.acked && (
@@ -2961,7 +2962,14 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
         </div>
       )}
 
-      {uvOtvoreny && (
+      {/* SMS po úvodnom má jedno okno pre notifikáciu aj profil (28. 10. 2026). */}
+      {uvOtvoreny && jePoUvodnom && item.oKom && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
+          <SmsPoUvodnom meno={item.oKom} trener={item.trener} dalsiTrening={item.dalsiTrening} klucNotifikacie={item.key}
+            onOdoslane={(p) => { setUvOtvoreny(false); vybav(p); }} />
+        </div>
+      )}
+      {uvOtvoreny && !jePoUvodnom && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, color: C.textMuted }}>{uvDruh === "po" ? "Ďalší tréning:" : "Termín:"}</span>

@@ -32,6 +32,8 @@ import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
 import { KalendarVMobile } from "./KalendarVMobile";
+import { SmsPoUvodnom } from "./SmsPoUvodnom";
+import { dalsiTreningPoUvodnom, poslednyUvodny } from "../../lib/psb/smsPoUvodnom";
 import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
@@ -1417,6 +1419,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
         {/* Kalendár v mobile (7. 10. 2026) — klient odoberá LEN svoje tréningy. */}
         <KalendarVMobile meno={meno} trener={c?.primaryTrainer || ""} />
+
+        {/* SMS po úvodnom aj z profilu (Jerry, 28. 10. 2026: „včera bola na
+            úvodnom Linda Muth — na profile potrebujem možnosť poslať SMS po
+            úvodnom tréningu"). To isté okno ako v notifikácii; po odoslaní sa
+            zavrie aj ona. */}
+        <SmsPoUvodnomDlazdica meno={meno} kalUdalosti={kalUdalosti || []} acks={data.anomalyAck || {}} />
 
         <button onClick={() => setDetaily(!detaily)} style={{ ...navrhTlacidlo, textAlign: "left" }}>
           {detaily ? "Skryť detaily ▴" : `Ďalších ${dalsichUdajov} údajov ▾`}
@@ -3535,6 +3543,40 @@ export function RozdelitPlatbu({ id, platitel, suma, mena, zaKoho, onHotovo }: {
       </div>
       {(chyba || problem) && (
         <div role="alert" style={{ fontSize: 11.5, color: chyba ? C.red : C.textMuted, marginTop: 6 }}>{chyba || problem}</div>
+      )}
+    </div>
+  );
+}
+
+/** Dlaždica „SMS po úvodnom" v profile — len keď mal klient úvodný za posledných 30 dní. */
+function SmsPoUvodnomDlazdica({ meno, kalUdalosti, acks }: {
+  meno: string;
+  kalUdalosti: { trener?: string; zaciatok: string; klient: string | null; typ: string | null }[];
+  acks: Record<string, { note?: string; ackedAt?: string } | undefined>;
+}) {
+  const [otvorene, setOtvorene] = useState(false);
+  const uv = poslednyUvodny(kalUdalosti, meno, dnesPraha());
+  if (!uv) return null;
+  const den = uv.zaciatok.slice(0, 10);
+  const kluc = `sms|${den}|${uv.klient}`;
+  const odoslane = acks[kluc];
+  const dalsi = dalsiTreningPoUvodnom(kalUdalosti, meno, uv.zaciatok);
+  return (
+    <div style={{ padding: "9px 11px", borderRadius: 10, border: `1px solid ${odoslane ? mix(C.border, 80) : mix(C.green, 45)}`, background: odoslane ? "transparent" : mix(C.green, 6) }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>📨 SMS po úvodnom</span>
+        <span style={{ fontSize: 11.5, color: C.textDim }}>
+          úvodný {Number(den.slice(8, 10))}. {Number(den.slice(5, 7))}.{odoslane ? ` · ${odoslane.note || "odoslaná"}` : ""}
+        </span>
+        <button type="button" onClick={() => setOtvorene((o) => !o)}
+          style={{ marginLeft: "auto", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: otvorene ? C.textMuted : C.green }}>
+          {otvorene ? "Zavrieť" : odoslane ? "Poslať znova" : "Poslať SMS po úvodnom"}
+        </button>
+      </div>
+      {otvorene && (
+        <div style={{ marginTop: 9 }}>
+          <SmsPoUvodnom meno={meno} trener={uv.trener} dalsiTrening={dalsi} klucNotifikacie={kluc} />
+        </div>
       )}
     </div>
   );
