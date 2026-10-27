@@ -48,7 +48,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
     (updateScheduledPost s novou titulkou je neoverený) a prvá kópia strihu na iný účet.
 9l. [x] Prepínač profilov naostro: (Jerry 20. 10.: hotovo) prvé stiahnutie výsledkov @philipjerry / @filip_stranavsky / @ahsoka (Metricool, nikdy
     neoverené) a prvý mem/infografika plánovaná do inej značky.
-9k. [ ] Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
+9k. [x] (jazyk Ahsoky sk + textár profilov 25. 10.; Filip má paletu) Skontrolovať u Jerryho: tón a farby profilov (Filip nemá v skilloch paletu – má farby štúdia bez loga; jazyk Ahsoky nenastavený).
 9g. [x] ✦ AI záber: (Jerry 20. 10.: hotovo) prvé skutočné generovanie (Higgsfield, 2 / 6,25 kreditu) – zatiaľ overený len prompt; klik je Jerryho.
 9h. [x] Presúvať video ťahaním medzi stopami Video 3 / Video 4 – hotové 19. 10. (strizna daf12d9, BRoll.stopa; overené 20. 10. v kóde).
 9i. [x] Nestabilné testy pod záťažou – vyhľadávač opravený 19. 10. (a38ac82), synchronizácia 20. 10. (ea2a68f); dve sady naraz prešli.
@@ -56,8 +56,10 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9l. [x] Kľúčové snímky polohy aj pre B-roll / kameru B – na osi sú ◆ pri kamere B aj vrstvách (overené 20. 10. v kóde).
 9m. [x] Kalendár: presun príspevku ťahaním na iný deň – hotové 19. 10. (kalendarPresun.ts; overené 20. 10. v kóde).
 9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
-9o. [ ] Strih cvičebných videí je mdlý (Jerry 22. 10.): diagnóza (strih vs. natočenie), výskum techník (strih v pohybe medzi uhlami, rytmus, zrýchlenie/spomalenie, detail) a štýl „Cvičenie v pohybe“ v Strižni; skúšobné zábery v ~/Downloads/filip_stranavsky fp insta.
-9p. [ ] Strižňa – Vložky (Jerry 23. 10.): filmové reakcie (obraz, hlas ide ďalej) aj hlášky so zvukom, CZ/SK klasiky aj Hollywood; banka vložiek, hľadanie scén na YouTube cez titulky, návrhy z prepisu. Vzor: @nadacia_zastavmekorupciu (vložka každé 3–4 s, Poirot ako vizuálny vtip).
+9o. [x] (hotové 22.–23. 10.: Cvičenie v pohybe, podpisové prvky, 10 prechodov) Strih cvičebných videí je mdlý (Jerry 22. 10.): diagnóza (strih vs. natočenie), výskum techník (strih v pohybe medzi uhlami, rytmus, zrýchlenie/spomalenie, detail) a štýl „Cvičenie v pohybe“ v Strižni; skúšobné zábery v ~/Downloads/filip_stranavsky fp insta.
+9p. [x] (hotové 23. 10.; YouTube sťahuje cez ~/bin/yt-dlp) Strižňa – Vložky (Jerry 23. 10.): filmové reakcie (obraz, hlas ide ďalej) aj hlášky so zvukom, CZ/SK klasiky aj Hollywood; banka vložiek, hľadanie scén na YouTube cez titulky, návrhy z prepisu. Vzor: @nadacia_zastavmekorupciu (vložka každé 3–4 s, Poirot ako vizuálny vtip).
+9q. [ ] Prvé ostré skúšky (26. 10.): hotové video #24 Ahsoky → titulka + naplánovať v Metricoole; AI titulka Ahsoky (Higgsfield, kredity); prvý presun ťahaním v Kalendári po oprave twitterData; Príbeh z klipov na ďalšom priečinku (#22, #28–32).
+9r. [ ] Push na GitHub, aby Terezka dostala všetko od 23. 10. (textár profilov, repost autor+text, hotové videá, príbeh z klipov, vložky…) – čaká na Jerryho „pushni“.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
