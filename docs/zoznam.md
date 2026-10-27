@@ -14,6 +14,12 @@ vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
 Stav k **27. 10. 2026** (overené v D1: ponuku termínov si klienti vybrali už 3× — Prochádzka, Kaňovský, Pavlík; pocitovka 0 odpovedí; anonymný dotazník 0 kôl).
 
+**Veci s dátumom** (sem patrí všetko, čo sa nedá urobiť skôr, aby to
+nezapadlo medzi úlohami bez termínu):
+
+- **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
+  merania webu — 27. 10. 2026" nižšie).
+
 ---
 
 ## PORADIE OD 13. 10. 2026 (Jerry: „napíš celý zoznam a poradie“)
@@ -431,6 +437,43 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 **Poznámka k postupu:** skriptované volania na prosapiens.cz znova narazili na
 firewall webu (Access Forbidden). Návštevníkov sa to netýka, ale overovať sa
 odteraz má prehliadačom, nie dávkou `curl`.
+
+**Cache sa maže uložením stránky, nie tlačidlom.** 27. 10. 2026 ohlásilo
+tlačidlo „Vymazat všechny cache" vo WP Fastest Cache úspech DVAKRÁT a súbor
+sa nezmenil — web ďalej servíroval starý titulok a popis. Zabralo až uloženie
+tej jednej stránky vo WordPresse. Pozná sa to podľa komentára na konci každej
+stránky (`WP Fastest Cache file was created … on <dátum>`): keď sa ten čas po
+premazaní nezmení, cache stojí, nech plugin tvrdí čokoľvek.
+
+---
+
+### Kontrola merania webu — 27. 10. 2026
+
+**Merania chodia.** Za 28 dní (29. 9. – 26. 10.) je `obrazovka` najčastejšia
+udalosť na webe: 1 550 udalostí od 183 z 399 používateľov. Idú aj
+`cta_formular` (15), `formular_start` (10), `formular_zlyhal` (15 od 3 ľudí),
+`formular_odoslany` (7), `formular_oprava` (1), `video_start` (9),
+`test_krok` (4), `odchod` (2), `klik_telefon` (1). `klik_mail` ani raz.
+
+**Most na formuláre je v poriadku** — overené naživo na /kontakt/: `formulare.js`
+sa načíta, `gtag` beží, formulár má `data-form` a `focusin` naozaj vyvolá
+`formular_start`. Varovanie nočnej kontroly („0 začatých formulárov za 7 dní")
+je teda pravdivé, ale nie je to porucha: za sedem dní prišli 4 kliky na odkaz
+pri 139 návštevách a nikto do formulára nenapísal.
+
+**Diera, ktorá sa tým našla:** udalosť `obrazovka` nesie `cislo`, `celkom`
+a `nazov`, ale ani jeden nebol zaregistrovaný ako vlastný rozmer. Meranie od
+11. 10. teda vedelo povedať len „koľkí aspoň raz listovali", nie „kam
+dolistovali" — čiže práve to, kvôli čomu vzniklo. Doplnené 27. 10.
+(Hlbka obrazovky / Nazov obrazovky / Obrazoviek celkom). **GA4 nedopočítava
+spätne**, takže odpoveď bude až z dát od 27. 10.
+
+- [ ] **10. 11. 2026 — pozrieť sa na hĺbku listovania** (zapísané 27. 10. 2026
+  na Jerryho pokyn „nech na to nezabudneme"). GA4, vlastnosť 355422977:
+  Interakcia → Udalosti → `obrazovka`, rozpad podľa **Hlbka obrazovky**
+  a **Nazov obrazovky**. Rozmery pribudli 27. 10. a GA4 nedopočítava spätne,
+  takže dva týždne dát sú najskorší možný termín. To je odpoveď na debatu
+  „je na webe veľa textu" — dovtedy ju nerozhodovať dojmom.
 
 ---
 
