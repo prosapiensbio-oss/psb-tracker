@@ -1,3 +1,4 @@
+import { jeUcetRezervy, REZERVA_PROTISTRANA } from "./rezervaOdlozenie";
 // Import bankového výpisu.
 //
 // Zámerne tolerantný parser a zámerne s NÁHĽADOM pred zápisom. Fio dáva výpis
@@ -371,11 +372,12 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
     // Zpráva a Poznámka bývajú identické — zdvojený text nič nepridá.
     const popis = [sprava, pozn === sprava ? "" : pozn, iVs >= 0 ? c[iVs] : ""].filter(Boolean).join(" · ");
     const typ = (iTyp >= 0 ? c[iTyp] : "") || "";
-    const protistrana = protistranaZPopisu(popis) || (iProti >= 0 ? c[iProti] : "") || "";
+    const rezerva = iProti >= 0 && jeUcetRezervy(c[iProti]);
+    const protistrana = rezerva ? REZERVA_PROTISTRANA : protistranaZPopisu(popis) || (iProti >= 0 ? c[iProti] : "") || "";
     out.push({
       id: iId >= 0 ? (c[iId] || "").trim() : "",
       datum, suma, protistrana, poznamka: popis.slice(0, 200), typ,
-      kategoria: suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
+      kategoria: rezerva ? PRESUN : suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
     });
   }
 

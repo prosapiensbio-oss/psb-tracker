@@ -19,6 +19,7 @@
 // tržby aj náklady sa nahrali, ale VZAS o tom mesiaci nevedel. Rovnaká chyba
 // by sa opakovala každý mesiac. Excel končí júnom 2026 — všetko po ňom plnia
 // importy (PTminder, Fio), takže stačí, aby mesiac existoval.
+import { platbaNavyse, type HodinyNavyse } from "./hodinyNavyse";
 import { ltvSpoluprace } from "./compute";
 import { dnesPraha } from "./cas";
 const POSLEDNY_Z_EXCELU = "2026-06";
@@ -241,6 +242,11 @@ export type SalaryPerson = {
   hourlyRate: number;
   hours: Vals;
   personal: Record<string, Vals>;
+  /**
+   * Hodiny navyše v korunách po mesiacoch (model A od 10/2026, `hodinyNavyse.ts`).
+   * Plní ich `nastavHodinyNavyse` zo zápisov týždennej únavy.
+   */
+  navyse?: Vals;
 };
 
 // HOURS — the rule, confirmed by Jerry (2026-07-31), so nobody "fixes" it later:
@@ -554,6 +560,30 @@ export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; te
       if (Math.abs(rad[i] - v) > 0.05) { rad[i] = v; zmena = true; }
     }
   }
+  if (zmena) oznacZmenu();
+  return zmena;
+}
+
+/**
+ * HODINY NAVYŠE do nároku (model A, Jerry a Terezka 26. 10. 2026).
+ *
+ * Vstup nesie CELÝ obraz zápisov týždennej únavy, preto sa mesiac bez zápisu
+ * od začiatku modelu vynuluje (pravidlo importných setterov). Mesiace pred
+ * `NAVYSE.od` ostávajú nulové — minulosť sa neprepočítava.
+ */
+export function nastavHodinyNavyse(hodiny: HodinyNavyse): boolean {
+  let zmena = false;
+  for (const k of ["jerry", "terezka"] as const) {
+    const rad = (SALARY[k].navyse ||= []);
+    dorovnaj(rad);
+  }
+  VZAS_MONTHS.forEach((mk, i) => {
+    const p = platbaNavyse(mk, hodiny[mk]);
+    for (const k of ["jerry", "terezka"] as const) {
+      const rad = SALARY[k].navyse!;
+      if (Math.abs((rad[i] || 0) - p[k]) > 0.5) { rad[i] = p[k]; zmena = true; }
+    }
+  });
   if (zmena) oznacZmenu();
   return zmena;
 }
@@ -1021,6 +1051,8 @@ export const spolocneHalf = (): Vals => spolocneTotal().map((v) => v / 2);
 
 export type SalaryCalc = {
   variabil: Vals;
+  /** Hodiny navyše × 450 Kč (model A od 10/2026); pred ním nuly. */
+  navyse: Vals;
   narok: Vals;          // era 70/30: the payout itself (there was no entitlement)
   hasModel: boolean[];  // false where "nárok" is not a modelled number
   personalTotal: Vals;
@@ -1061,6 +1093,7 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
   const poslane = vAdd(personalTotal, half);
 
   const variabil: Vals = [];
+  const navyse: Vals = [];
   const narok: Vals = [];
   const hasModel: boolean[] = [];
   const rozdiel: Vals = [];
@@ -1082,7 +1115,9 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
     hasModel.push(modelled);
     const v = modelled ? (s.hours[i] - era.hoursThreshold) * era.hourlyRate : 0;
     variabil.push(v);
-    narok.push(modelled ? era.fix + v : poslane[i]);
+    const n = modelled ? (s.navyse?.[i] || 0) : 0;
+    navyse.push(n);
+    narok.push(modelled ? era.fix + v + n : poslane[i]);
     // Mesiac, ktorý ešte nenastal (alebo doňho nič nepribudlo), dlh nehýbe.
     // Inak by nárok bez odrobených hodín a bez výplaty pripísal firme dlh
     // za mesiac, ktorý sa nestal.
@@ -1090,7 +1125,7 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
     rozdiel.push(prazdny ? 0 : modelled ? narok[i] - poslane[i] : rec.splatka[i] - rec.pozicka[i]);
     cumDebt.push((i === 0 ? DEBT_START : cumDebt[i - 1]) + rozdiel[i]);
   }
-  return { variabil, narok, hasModel, personalTotal, spolocneHalf: half, poslane, rozdiel, cumDebt };
+  return { variabil, navyse, narok, hasModel, personalTotal, spolocneHalf: half, poslane, rozdiel, cumDebt };
 }
 
 // Stav Jarek(N) = Stav(N−1) + Splátky(N) − Vklady(N).

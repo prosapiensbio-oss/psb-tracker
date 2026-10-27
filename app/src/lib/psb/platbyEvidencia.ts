@@ -26,6 +26,7 @@
  * nezbadá, lebo súčet v banke sedí.
  */
 
+import { jePrevodRezervy } from "./rezervaOdlozenie";
 import { normName } from "./format";
 
 /** Y a I sú v českých priezviskách to isté písmeno („snyrich"/„šnirych"). */
@@ -646,6 +647,8 @@ export function nepriradene(
     // Vlastný vklad hotovosti nie je príjem od klienta — tie isté peniaze
     // sú už v zošite a v banke by sa započítali druhýkrát.
     if (/vklad do bankomatu|vklad hotovosti/i.test(text)) continue;
+    // Peniaze vrátené z rezervného účtu PSB nie sú platba klienta.
+    if (jePrevodRezervy(r.counterparty)) continue;
     /**
      * Naučené pravidlo platí, len keď ukazuje na JEDNÉHO človeka. Pred
      * 21. 10. 2026 sa vedelo naučiť aj zo zoznamu z fakturačného kontaktu

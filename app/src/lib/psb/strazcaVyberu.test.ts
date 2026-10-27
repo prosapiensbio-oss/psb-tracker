@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { cerpanieMesiaca, narokPodlaTempa, rozhodni } from "./strazcaVyberu";
+import { cerpanieMesiaca, narokPodlaTempa, rozhodni, rozhodniZalohu, stropZalohy, zalohyMesiaca } from "./strazcaVyberu";
 
 const model = { fix: 27000, prah: 60, sadzba: 850 };
 
@@ -42,5 +42,29 @@ describe("rozhodni", () => {
   });
   test("nový mesiac začína odznova", () => {
     expect(rozhodni("2026-11", 46000, n, { mesiac: "2026-10", prah: 3 }).poslat).toBe(true);
+  });
+});
+
+describe("zálohy po prechode na výplatu 3. (model A)", () => {
+  test("strop klesá: nov 30k, dec 20k, jan 10k, potom 0; pred novembrom neplatí", () => {
+    expect(stropZalohy("2026-10")).toBeNull();
+    expect(stropZalohy("2026-11")).toBe(30000);
+    expect(stropZalohy("2026-12")).toBe(20000);
+    expect(stropZalohy("2027-01")).toBe(10000);
+    expect(stropZalohy("2027-02")).toBe(0);
+  });
+  test("výplata 1.–5. a spoločné sa do zálohy nerátajú", () => {
+    const p = [
+      { date: "2026-11-03", suma: -30000, kat: "vyplaty.jerry" },
+      { date: "2026-11-12", suma: -10000, kat: "vyplaty.jerry" },
+      { date: "2026-11-20", suma: -8000, kat: "spolocne.potraviny" },
+    ];
+    expect(zalohyMesiaca(p, "2026-11")).toBe(10000);
+  });
+  test("ozve sa až nad strop a potom po 5 000 Kč", () => {
+    expect(rozhodniZalohu("2026-11", 29000, 30000, null).poslat).toBe(false);
+    const r = rozhodniZalohu("2026-11", 31000, 30000, null);
+    expect(r.poslat).toBe(true);
+    expect(rozhodniZalohu("2026-11", 33000, 30000, { mesiac: "2026-11", prah: 1 }).poslat).toBe(false);
   });
 });

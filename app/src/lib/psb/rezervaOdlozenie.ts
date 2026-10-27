@@ -70,3 +70,46 @@ export function rezervaZaObdobie(
   }
   return { ...o, prijate: Math.round(prijate), pocet, suma: Math.max(0, Math.round(prijate * podiel)) };
 }
+
+/**
+ * REZERVNÝ ÚČET PSB (Jerry, 27. 10. 2026): Fio 2503222384/2010, bez karty.
+ * Peniaze naň idú z hlavného účtu, ktorý Kokpit každú noc sťahuje — preto sa
+ * prevod spozná podľa ČÍSLA protiúčtu (meno je na oboch účtoch to isté
+ * „Stráňavský, Filip“ ako pri výplatách, podľa mena sa rozlíšiť nedá).
+ * Stav rezervného účtu = súčet prevodov naň mínus prevody späť; vlastný
+ * token na ten účet netreba, kým naň nechodí nič iné.
+ */
+export const REZERVA_CISLO = "2503222384";
+export const REZERVA_KOD = "2010";
+export const REZERVA_PROTISTRANA = `Rezerva PSB · ${REZERVA_CISLO}/${REZERVA_KOD}`;
+
+/** Je toto číslo protiúčtu rezervný účet? Berie „2503222384/2010“ aj rozdelené. */
+export function jeUcetRezervy(ucet: string | null | undefined, kod?: string | null): boolean {
+  const t = String(ucet || "").replace(/\s/g, "");
+  if (!t) return false;
+  const [cislo, k] = t.includes("/") ? t.split("/") : [t, String(kod || "")];
+  return cislo.replace(/^0+/, "") === REZERVA_CISLO && (!k || k === REZERVA_KOD);
+}
+
+/** Pohyb z hlavného účtu, ktorý ide na rezervu alebo z nej. */
+export function jePrevodRezervy(protistrana: string | null | undefined): boolean {
+  return String(protistrana || "").includes(REZERVA_CISLO);
+}
+
+export type PrevodRezervy = { date: string; amount: number };
+
+/** Koľko je na rezervnom účte: odchádzajúce prevody (−) naň pribúdajú. */
+export function stavRezervnehoUctu(prevody: PrevodRezervy[]): number {
+  return Math.round(prevody.reduce((s, p) => s - (Number(p.amount) || 0), 0));
+}
+
+/** Koľko sa odložilo od daného dňa (vrátane) do dňa pred `doExcl`. */
+export function odlozeneOd(prevody: PrevodRezervy[], od: string, doExcl?: string): number {
+  let s = 0;
+  for (const p of prevody) {
+    const d = String(p.date || "").slice(0, 10);
+    if (d < od || (doExcl && d >= doExcl)) continue;
+    s -= Number(p.amount) || 0;
+  }
+  return Math.round(s);
+}

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { CIEL_MESIACOV, breakEvenPriemer, chybaDoCiela, poslednyUzavretyIdx, spocitajRezervu } from "../../lib/psb/rezerva";
+import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -121,8 +122,8 @@ export function PeniazePrehlad({ data, onNavigate }: {
   }, [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rezerva = useMemo(
-    () => spocitajRezervu({ btcCzk, ucet, hotovost, bePriem: breakEvenPriemer().bePriem }),
-    [btcCzk, ucet, hotovost, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => spocitajRezervu({ btcCzk, ucet, hotovost, rezervnyUcet: stavRezervnehoUctu(data.rezervaPrevody || []), bePriem: breakEvenPriemer().bePriem }),
+    [btcCzk, ucet, hotovost, data.rezervaPrevody, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Jedno pravidlo „zaplatený" (`data.dlhy`): poplatky z PTmindera aj

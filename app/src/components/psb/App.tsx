@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
-import { breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyNavyse, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prveTreningy, retencia6 } from "../../lib/psb/metrikyKlientov";
@@ -60,6 +60,7 @@ import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNo
 import { polozkaGuillermo } from "../../lib/psb/guillermo";
 import { polozkyHodin } from "../../lib/psb/notifikaciaHodin";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
+import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { BetaPruh } from "./BetaPruh";
 import { Workspace } from "./Workspace";
 import type { FakturaPredvolba } from "./VydaneFaktury";
@@ -891,6 +892,11 @@ export function PSBApp() {
   useEffect(() => {
     if (nastavHodinyZTrackera(mzdoveHodiny(data.sessions))) setFioTik((x) => x + 1);
   }, [data.sessions]);
+  // Hodiny navyše (model A od 10/2026) do nároku — CENTRÁLNE, z toho istého
+  // dôvodu ako hodiny vyššie; zdroj sú zápisy týždennej únavy z loadData.
+  useEffect(() => {
+    if (nastavHodinyNavyse(data.hodinyNavyse || {})) setFioTik((x) => x + 1);
+  }, [data.hodinyNavyse]);
   // Matyášova mzda (záskok, DPP) pre mesiace mimo Excelu — zo sedení, CENTRÁLNE
   // z toho istého dôvodu ako hodiny vyššie (VZAS centrálne nalievanie).
   useEffect(() => {
@@ -2767,7 +2773,7 @@ function skupinaFaktur(
           // Koncentrácia z tržieb obdobia — tie isté platby, z ktorých má P&L tržby.
           const k = koncentracia((data.payments || []).map((x) => ({ klient: x.client, datum: x.date.slice(0, 10), suma: x.amount })), obdobie);
           const odDna = new Date(Date.UTC(y, m - 12, 1)).toISOString().slice(0, 10);
-          const rez = spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem });
+          const rez = spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, rezervnyUcet: stavRezervnehoUctu(data.rezervaPrevody || []), bePriem: breakEvenPriemer().bePriem });
           return {
             obnova: { skoncilo: obnovy.reduce((a, o) => a + o.skoncilo, 0), obnovene: obnovy.reduce((a, o) => a + o.obnovene, 0) },
             bezObnovy: obnovy.flatMap((o) => o.bezObnovy),
@@ -2931,7 +2937,7 @@ function skupinaFaktur(
       // Rezerva sa počíta v lib/psb/rezerva.ts — tým istým výpočtom ako
       // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
       // stav appky a tá horšia znela istejšie.
-      spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem }),
+      spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, rezervnyUcet: stavRezervnehoUctu(data.rezervaPrevody || []), bePriem: breakEvenPriemer().bePriem }),
       // Bitcoin po klientoch — ten istý výpočet, aký kŕmi kartu klienta.
       {
         kurzCzkZaBtc: btcKurz.kurz, kurzKedy: btcKurz.kedy,

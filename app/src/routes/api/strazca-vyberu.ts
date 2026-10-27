@@ -6,7 +6,8 @@ import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { loadData } from "../../lib/psb/db.server";
 import { mzdoveHodiny } from "../../lib/psb/mzdoveHodiny";
 import { posli, type Odber } from "../../lib/psb/push.server";
-import { cerpanieMesiaca, narokPodlaTempa, rozhodni, type PohybFio, type StavStrazcu } from "../../lib/psb/strazcaVyberu";
+import { cerpanieMesiaca, narokPodlaTempa, rozhodni, rozhodniZalohu, stropZalohy, zalohyMesiaca, type PohybFio, type StavStrazcu } from "../../lib/psb/strazcaVyberu";
+import { platbaNavyse } from "../../lib/psb/hodinyNavyse";
 import { CURRENT_ERA } from "../../lib/psb/vzas";
 
 // Strážca výberov pre Peniaze manažér — beh plánovača po stiahnutí banky.
@@ -50,13 +51,25 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
         // hodiny len po dnešok — kalendár nesie aj budúce termíny
         const hodiny = mzdoveHodiny(data.sessions.filter((s) => s.date.slice(0, 10) <= dnes));
         const model = { fix: CURRENT_ERA.fix, prah: CURRENT_ERA.hoursThreshold, sadzba: CURRENT_ERA.hourlyRate };
-        const minulyNarok = hodiny[minuly] ? model.fix + (hodiny[minuly].jerry - model.prah) * model.sadzba : null;
-        const narok = narokPodlaTempa(model, hodiny[mesiac]?.jerry || 0, den, dniVMesiaci, minulyNarok);
-        const cerpanie = cerpanieMesiaca(fioRs.results as unknown as PohybFio[], mesiac);
+        // Hodiny navyše (model A od 10/2026): minulý mesiac celé, bežiaci podľa tempa.
+        const nav = data.hodinyNavyse || {};
+        const navTeraz = nav[mesiac] ? { jerry: (nav[mesiac].jerry / Math.max(1, den)) * dniVMesiaci, terezka: (nav[mesiac].terezka / Math.max(1, den)) * dniVMesiaci } : undefined;
+        const minulyNarok = hodiny[minuly] ? model.fix + (hodiny[minuly].jerry - model.prah) * model.sadzba + platbaNavyse(minuly, nav[minuly]).jerry : null;
+        const tempo = narokPodlaTempa(model, hodiny[mesiac]?.jerry || 0, den, dniVMesiaci, minulyNarok);
+        const narok = tempo.podlaTempa ? { ...tempo, narok: tempo.narok + platbaNavyse(mesiac, navTeraz).jerry } : tempo;
+        const pohyby = fioRs.results as unknown as PohybFio[];
+        const cerpanie = cerpanieMesiaca(pohyby, mesiac);
         let posledny: StavStrazcu = null;
         try { posledny = stavRs?.value ? JSON.parse(stavRs.value) : null; } catch { /* starý zápis */ }
-        const r = rozhodni(mesiac, cerpanie, narok, posledny);
-        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0 };
+        /**
+         * Od novembra 2026 (výplata 3. za predošlý mesiac) sa stráži ZÁLOHA
+         * počas mesiaca proti dohodnutému stropu — výplata 3. by inak sama
+         * vyzerala ako výber nad nárok bežiaceho mesiaca.
+         */
+        const strop = stropZalohy(mesiac);
+        const zalohy = zalohyMesiaca(pohyby, mesiac);
+        const r = strop === null ? rozhodni(mesiac, cerpanie, narok, posledny) : rozhodniZalohu(mesiac, zalohy, strop, posledny);
+        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0, zalohy, stropZalohy: strop };
 
         if (!r.poslat || skuska) return Response.json({ ok: true, ...suhrn, poslat: r.poslat, text: r.poslat ? r.text : undefined, skuska });
 

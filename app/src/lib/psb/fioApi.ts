@@ -22,7 +22,8 @@
  * v databáze ani v odpovedi API. Preto sa v tomto súbore ani raz nelogu je.
  */
 
-import { odhadniKategoriu, protistranaZPopisu, type FioRiadok } from "./fio";
+import { odhadniKategoriu, PRESUN, protistranaZPopisu, type FioRiadok } from "./fio";
+import { jeUcetRezervy, REZERVA_PROTISTRANA } from "./rezervaOdlozenie";
 
 const ZAKLAD = "https://fioapi.fio.cz/v1/rest";
 
@@ -70,6 +71,8 @@ export function datumPohybu(s: Stlpec): string {
  * sa tvar líšil, naučené pravidlá by na pohyby z API nesadli.
  */
 export function protistranaPohybu(p: Pohyb): string {
+  // Rezervný účet má na sebe to isté meno ako výplaty — rozhoduje číslo.
+  if (jeUcetRezervy(text(p.column2), text(p.column3))) return REZERVA_PROTISTRANA;
   const nazov = text(p.column10);
   if (nazov) return nazov;
   /**
@@ -131,7 +134,9 @@ export function pohybyZOdpovede(
       // Príjem sa nezaraďuje — to robí Jerry sám (platba klienta, vrátenie…).
       // Rovnako ako import zo súboru; bez tejto podmienky dostal Gerich
       // kategóriu „AI aplikácie" z pravidla naučeného na Perplexity.
-      kategoria: suma < 0 ? odhadniKategoriu(`${protistrana} ${poznamka} ${typ}`, pravidla) : "",
+      // Prevod na rezervu a späť nie je náklad ani príjem — je to presun.
+      kategoria: protistrana === REZERVA_PROTISTRANA ? PRESUN
+        : suma < 0 ? odhadniKategoriu(`${protistrana} ${poznamka} ${typ}`, pravidla) : "",
     });
   }
   // Od najstaršieho — ten istý poriadok, v akom chodia riadky z výpisu.

@@ -1,4 +1,6 @@
 // Server-only D1 access for the PSB Tracker. All reads/writes hit env.DB.
+import { hodinyNavysePoMesiacoch } from "./hodinyNavyse";
+import { REZERVA_CISLO } from "./rezervaOdlozenie";
 import { zjednotOverrides } from "./zjednotOverrides";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -433,6 +435,22 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       // Odvodený pohľad na ten istý zoznam (párovanie platieb vo Workspace).
       data.nezaplateneKokpit = polozky.filter((d) => d.zdroj === "kokpit")
         .map((d) => ({ klient: d.klient, den: d.den, cena: d.cena, nazov: d.nazov, doplatit: d.doplatit }));
+    }
+    /**
+     * VÝPLATNÝ MODEL A (26. 10. 2026): hodiny navyše zo zápisov týždennej
+     * únavy a prevody na rezervný účet PSB. Číta ich salaryCalc (cez App),
+     * strážca výberov, most do Peniaze manažéra aj register — jedno miesto.
+     */
+    {
+      const tyzdne: Record<string, Record<string, unknown>> = {};
+      for (const r of ((await DB.prepare("SELECT week, data FROM vzas_week_notes").all()).results || []) as { week: string; data: string | null }[]) {
+        try { tyzdne[r.week] = r.data ? JSON.parse(r.data) : {}; } catch { /* poškodený zápis týždňa — preskočí sa */ }
+      }
+      data.hodinyNavyse = hodinyNavysePoMesiacoch(tyzdne);
+      data.rezervaPrevody = (((await DB.prepare(
+        "SELECT date, amount_czk FROM fio_transactions WHERE counterparty LIKE ?1 ORDER BY date",
+      ).bind(`%${REZERVA_CISLO}%`).all()).results || []) as { date: string; amount_czk: number }[])
+        .map((r) => ({ date: String(r.date).slice(0, 10), amount: Number(r.amount_czk) || 0 }));
     }
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
       klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,

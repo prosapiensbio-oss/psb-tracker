@@ -3206,3 +3206,30 @@ register (`rezerva|<deň>`, len Jerry, preklik Peniaze → Cashflow) aj Jarvis
 Prevod robí človek; rezervný účet zatiaľ nie je v Kokpite, takže ho appka
 sama nespozná — keď bude, párovať podľa čísla účtu a zavrieť pripomienku.
 Prvý termín je 18. 10. 2026 (`REZERVA_START`), staršie sa nepýtajú.
+
+## Výplatný model A: hodiny navyše, výplata 3., rezervný účet (27. 10. 2026)
+
+Jerry a Terezka 26. 10. 2026 (plán: https://claude.ai/artifact/1c6RhnigeXFG3ha2Kb4rBN).
+Za apríl – september si Jerry vybral +29 % nad nárok; s hodinami navyše za
+450 Kč by to bolo −0,3 % — dlh rástol z neplatenej práce, nie z míňania.
+
+- **Nárok od októbra 2026** = 27 000 + (hodiny − 60) × 850 + hodiny navyše
+  × 450 (`lib/psb/hodinyNavyse.ts`): zdroj sú zápisy týždennej únavy
+  (`<osoba>_hours`), týždeň sa delí do mesiacov po dňoch, najviac 40 h na
+  osobu, obaja spolu najviac 25 000 Kč (nad tým pomerné krátenie).
+  **Minulé mesiace sa neprepočítavajú** (`NAVYSE.od`). `loadData` →
+  `data.hodinyNavyse` → App volá `nastavHodinyNavyse` CENTRÁLNE (pravidlo
+  nalievania VZAS); `salaryCalc` má riadok `navyse`. Ten istý nárok čítajú
+  most Peniaze manažéra (`narokJerryho`) aj strážca výberov.
+- **Výplata 3. za predošlý mesiac.** Od novembra strážca nestráži výber proti
+  nároku, ale ZÁLOHU počas mesiaca proti stropu (nov 30 000 · dec 20 000 ·
+  jan 10 000 · potom 0; `stropZalohy`). Výplata 1.–5. deň a spoločné sa do
+  zálohy nerátajú. VZAS priraďuje výplatu podľa dňa prevodu — mesačný
+  rozdiel sa tým posunie o mesiac, kumulovaný dlh sedí.
+- **Rezervný účet PSB = Fio 2503222384/2010** (`REZERVA_CISLO`). Spozná sa
+  podľa ČÍSLA protiúčtu (meno je to isté ako pri výplatách): kategória
+  `presun` (nie náklad), nie je kandidát na platbu klienta, `data.rezervaPrevody`
+  zatvorí pripomienku 5 % sama a `stavRezervnehoUctu` sa pripočíta do rezervy
+  firmy — inak by každé odloženie rezervu znížilo.
+- **Stratový mesiac:** nárok sa nemení; čo firma nevyplatí, je kladný dlh
+  firmy voči trénerovi. O ňom aj o starom dlhu sa rozhodne v decembri.

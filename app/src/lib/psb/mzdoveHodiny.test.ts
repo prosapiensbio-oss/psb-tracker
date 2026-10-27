@@ -25,9 +25,17 @@ describe("narokJerryho", () => {
   test("27 000 + (hodiny − 60) × 850, od zadaného mesiaca po bežiaci", () => {
     const n = narokJerryho(hodiny, "2026-05-01", "2026-10");
     expect(n).toEqual([
-      { mesiac: "2026-05", hodiny: 100, narok: 61000, beziaci: false },
-      { mesiac: "2026-10", hodiny: 30, narok: 1500, beziaci: true },
+      { mesiac: "2026-05", hodiny: 100, narok: 61000, beziaci: false, navyse: 0 },
+      { mesiac: "2026-10", hodiny: 30, narok: 1500, beziaci: true, navyse: 0 },
     ]);
+  });
+
+  test("model A: hodiny navyše × 450 od októbra 2026, september nie", () => {
+    const n = narokJerryho({ ...hodiny, "2026-09": { jerry: 100, terezka: 0 } }, "2026-09-01", "2026-10", {
+      "2026-09": { jerry: 40, terezka: 0 }, "2026-10": { jerry: 52, terezka: 0 },
+    });
+    expect(n.find((x) => x.mesiac === "2026-09")).toMatchObject({ narok: 61000, navyse: 0 });
+    expect(n.find((x) => x.mesiac === "2026-10")).toMatchObject({ narok: 1500 + 18000, navyse: 18000 });
   });
 
   test("mesiac pred dnešným modelom nárok nemá", () => {

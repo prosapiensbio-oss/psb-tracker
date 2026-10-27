@@ -268,6 +268,10 @@ export type PSBData = {
   paymentsPtminder?: PaymentRow[];
   /** Mesiac RRRR-MM, od ktorého sú peniaze z Kokpitu. Prázdne = všetko z PTmindera. */
   peniazeOd?: string;
+  /** Hodiny navyše po mesiacoch zo zápisov týždennej únavy (`hodinyNavyse.ts`). */
+  hodinyNavyse?: import("./hodinyNavyse").HodinyNavyse;
+  /** Pohyby hlavného účtu na rezervný účet PSB a späť (− = odložené). */
+  rezervaPrevody?: { date: string; amount: number }[];
   /**
    * Balíčky zapísané v Kokpite (vrátane naliatych z PTmindera). Od 1. 10.
    * 2026 sa z nich počíta zostatok na karte klienta (`zostatokKokpitu`).

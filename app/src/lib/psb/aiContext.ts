@@ -53,7 +53,7 @@ import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
 import { dnesPraha } from "./cas";
-import { obdobieRezervy, REZERVA_DNI, REZERVA_PODIEL, rezervaZaObdobie } from "./rezervaOdlozenie";
+import { obdobieRezervy, odlozeneOd, REZERVA_CISLO, REZERVA_DNI, REZERVA_PODIEL, rezervaZaObdobie, stavRezervnehoUctu } from "./rezervaOdlozenie";
 import { trvanieText, zaciatokSpoluprace } from "./spolupraca";
 import { metrikyDozoru, suhrnDozoru } from "./reklamaDozor";
 
@@ -1121,7 +1121,7 @@ export function buildAiContext(
       const o = obdobieRezervy(dnesPraha());
       const r = rezervaZaObdobie(data.payments, o);
       return {
-        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Rezerva firmy (Jerry, 26. 10. 2026): 3. a 18. v mesiaci odložiť 5 % z platieb klientov za uplynulé obdobie (3. = platby 18.–2., 18. = platby 3.–17.) na rezervný účet PSB. Pripomienka v registri má kľúč rezerva|<deň>; vybavená = odložené. Suma je hotová, nerátaj ju z platieb sám.",
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Rezerva firmy (Jerry, 26. 10. 2026): 3. a 18. v mesiaci odložiť 5 % z platieb klientov za uplynulé obdobie (3. = platby 18.–2., 18. = platby 3.–17.) na rezervný účet PSB (stavRezervnehoUctu = súčet prevodov naň, je aj v rezerve firmy). Pripomienka v registri má kľúč rezerva|<deň> a zmizne sama, keď prevod príde vo výpise (odlozenePrevodom). Suma je hotová, nerátaj ju z platieb sám.",
         podiel: REZERVA_PODIEL,
         dni: [...REZERVA_DNI],
         posledneSplatne: o.splatne,
@@ -1129,7 +1129,10 @@ export function buildAiContext(
         prijate: r.prijate,
         pocetPlatieb: r.pocet,
         odlozit: r.suma,
-        odlozene: !!data.anomalyAck?.[`rezerva|${o.splatne}`],
+        odlozenePrevodom: odlozeneOd(data.rezervaPrevody || [], o.splatne),
+        odlozeneVybavene: !!data.anomalyAck?.[`rezerva|${o.splatne}`],
+        rezervnyUcet: `${REZERVA_CISLO}/2010`,
+        stavRezervnehoUctu: stavRezervnehoUctu(data.rezervaPrevody || []),
       };
     })(),
     dlhyVyplaty: (() => {
@@ -1171,7 +1174,7 @@ export function buildAiContext(
           };
         };
         return {
-          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO (tempoCzkMesacne) je priemerný mesačný pohyb dlhu a platí nad oknom v „tempoOkno“ — je to to isté okno aj ten istý výpočet, aký má karta v predvolenom stave. Tempo bez okna je nezmysel: nad rokom 2026 vyjde iné číslo než nad celou érou modelu. VŽDY povedz aj okno. Keď má Jerry v prepínači iné obdobie, karta ukáže iné číslo — vtedy sa spýtaj, nad čím ho chce. Vlastné tempo z nároku a poslaného NEPOČÍTAJ.",
+          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850, od októbra 2026 navyše hodiny navyše zo zápisov týždennej únavy × 450 Kč, najviac 40 h na osobu a obaja spolu najviac 25 000 Kč — výplatný model A, dohodnutý 26. 10. 2026; minulé mesiace sa neprepočítavajú; výplata chodí 3. za predošlý mesiac, počas mesiaca len záloha; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO (tempoCzkMesacne) je priemerný mesačný pohyb dlhu a platí nad oknom v „tempoOkno“ — je to to isté okno aj ten istý výpočet, aký má karta v predvolenom stave. Tempo bez okna je nezmysel: nad rokom 2026 vyjde iné číslo než nad celou érou modelu. VŽDY povedz aj okno. Keď má Jerry v prepínači iné obdobie, karta ukáže iné číslo — vtedy sa spýtaj, nad čím ho chce. Vlastné tempo z nároku a poslaného NEPOČÍTAJ.",
           kMesiacu: (VZAS_MONTHS[posl] as string) || null,
           jerry: osoba("jerry"),
           terezka: osoba("terezka"),

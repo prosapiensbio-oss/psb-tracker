@@ -68,6 +68,12 @@ export type RezervaVstup = {
   ucet: { suma: number; datum: string } | null;
   /** Hotovosť — jediné číslo, ktoré sa naozaj musí zapisovať ručne. */
   hotovost: { suma: number; datum: string } | null;
+  /**
+   * Rezervný účet PSB (od 27. 10. 2026) — súčet prevodov z hlavného účtu
+   * (`stavRezervnehoUctu`). Bez neho by každé odloženie 5 % rezervu ZNÍŽILO:
+   * peniaze odídu z hlavného účtu a nikde by nepribudli.
+   */
+  rezervnyUcet?: number;
   bePriem: number | null;
 };
 
@@ -88,7 +94,7 @@ export type Rezerva = {
 export function spocitajRezervu(v: RezervaVstup): Rezerva {
   const btc = v.btcCzk;
   const maNieco = v.ucet !== null || v.hotovost !== null;
-  const majetok = maNieco ? (btc ?? 0) + (v.ucet?.suma ?? 0) + (v.hotovost?.suma ?? 0) : btc;
+  const majetok = maNieco ? (btc ?? 0) + (v.ucet?.suma ?? 0) + (v.hotovost?.suma ?? 0) + (v.rezervnyUcet ?? 0) : btc;
   const mesiace = majetok !== null && v.bePriem !== null && v.bePriem > 0 ? majetok / v.bePriem : null;
   // Najstarší z dátumov — rezerva je len taká čerstvá ako jej najstarší vstup.
   const datumy = [v.ucet?.datum, v.hotovost?.datum].filter((x): x is string => !!x).sort();

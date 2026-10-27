@@ -38,6 +38,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { fetchBtcReserve, fetchVzasSettings, ozvalSomSa, saveLead } from "../../lib/psb/client";
 import { SOURCES } from "./Klienti";
 import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
+import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
   centerBody, GrafyKniznica, HLAVNE, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
@@ -1014,7 +1015,7 @@ export function Dashboard({
     // o dvoch rôznych obdobiach a nedalo sa z nich nič usúdiť. Celá téma má
     // teraz vlastnú kartu „Platby v bitcoine" v sekcii Peniaze, kde je každé
     // číslo pri svojom období.
-    const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, ucet: ucetStav, hotovost: hotovostStav, bePriem: zisk?.bePriem ?? null });
+    const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, ucet: ucetStav, hotovost: hotovostStav, rezervnyUcet: stavRezervnehoUctu(data.rezervaPrevody || []), bePriem: zisk?.bePriem ?? null });
     const majetok = r.majetok;
     const mesRez = r.mesiace;
     const chyba = chybaDoCiela(r);

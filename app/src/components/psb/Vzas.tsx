@@ -1,3 +1,4 @@
+import { NAVYSE } from "../../lib/psb/hodinyNavyse";
 import { PeniazePrehlad } from "./PeniazePrehlad";
 import { DotaznikVysledky } from "./DotaznikVysledky";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
@@ -1054,11 +1055,19 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
                     {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{c.hasModel[i] ? money(c.variabil[i]) : "—"}</td>)}
                     <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.filter((i) => c.hasModel[i]).map((i) => c.variabil[i])))}</td>
                   </tr>
+                  {/* Model A od 10/2026: hodiny navyše zo zápisov týždennej únavy, 450 Kč, max 40 h. */}
+                  {idx.some((i) => c.navyse[i]) && (
+                    <tr>
+                      <td style={{ ...lbl, paddingLeft: 24, fontSize: 11 }}>Hodiny navyše (× {NAVYSE.sadzba})</td>
+                      {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{c.navyse[i] ? money(c.navyse[i]) : "—"}</td>)}
+                      <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.filter((i) => c.navyse[i]).map((i) => c.navyse[i])))}</td>
+                    </tr>
+                  )}
                 </>
               )}
               <tr style={{ borderTop: `1px solid ${C.border}` }}>
                 <td style={{ ...lbl, fontWeight: 600, color: C.text }}>
-                  <Info text="Od sep 2025: Fix + (hodiny − 60) × 850. Pred tým nárok neexistoval — pri modeli 70/30 bolo nárokom presne to, čo klient zaplatil, preto sú tie mesiace zobrazené šedo a rovnajú sa Poslanému." label="Nárok" />
+                  <Info text="Od sep 2025: Fix + (hodiny − 60) × 850; od okt 2026 aj hodiny navyše × 450 (max 40 h, spolu s druhým trénerom najviac 25 000 Kč). Pred tým nárok neexistoval — pri modeli 70/30 bolo nárokom presne to, čo klient zaplatil, preto sú tie mesiace zobrazené šedo a rovnajú sa Poslanému." label="Nárok" />
                 </td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: c.hasModel[i] ? C.green : C.textDim, fontWeight: c.hasModel[i] ? 600 : 400, fontStyle: c.hasModel[i] ? "normal" : "italic" }}>{money(c.narok[i])}</td>)}
                 <td style={{ ...cell, color: C.green, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(c.narok)))}</td>
@@ -1245,8 +1254,8 @@ function DebtBox({ p }: { p: DebtPerson }) {
             „koľko hodín" tu nedáva zmysel — dlh je na druhej strane. */}
         {!dlzi && p.dlh !== 0 && (
           <div style={{ marginTop: 9, marginLeft: 14, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 60)}`, fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-            Vybraté je o {fmtCZK(Math.abs(p.dlh))} viac, než bol nárok — dlh je na opačnej strane, firma nedlží nič.
-            Pri {p.hodinyTeraz.toFixed(0)} h / mes. ({naTyzden(p.hodinyTeraz).toFixed(1)} h/týž.) sa to samo vyrovnáva.
+            Vybraté je o {fmtCZK(Math.abs(p.dlh))} menej, než bol nárok — dlh je na opačnej strane: firma dlží trénerovi.
+            Doplatí sa pri niektorej ďalšej výplate (3. v mesiaci) alebo pri uzávierke roka.
           </div>
         )}
       </div>
