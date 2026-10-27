@@ -294,7 +294,7 @@ ${cennikHtml()}
 <span style="flex-grow:1;min-width:0;font-size:16px;line-height:1.55;color:#3C4C42">Chceme Vás také upozornit, že tady máme psa.</span>
 </div>`
     : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
-<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Děkuji za účast a jsem rád, že jsme domluvili pokračování.</p>
+<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : "Děkuji za účast a jsem rád, že jsme domluvili pokračování."}</p>
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`

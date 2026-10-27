@@ -123,6 +123,7 @@ describe("bez termínu stránka neklame", () => {
     expect(h).toContain("Domluvit další trénink");
     expect(h).not.toContain(">Potvrdit termín<");
     expect(h).not.toContain("Termín Vám potvrdíme zprávou.");
+    expect(h).not.toContain("domluvili pokračování");
   });
 });
 
