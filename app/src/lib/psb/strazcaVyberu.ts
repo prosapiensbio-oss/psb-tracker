@@ -25,7 +25,8 @@ export function cerpanieMesiaca(pohyby: PohybFio[], mesiac: string): number {
   for (const p of pohyby) {
     if (!p.date.startsWith(mesiac)) continue;
     if (p.kat === "vyplaty.jerry") s += -p.suma;
-    else if (p.kat.startsWith("spolocne.")) s += -p.suma / 2;
+    // spoločné a výplaty bez mena/delené: Jerryho je polovica (ako v dlhu trénera)
+    else if (p.kat.startsWith("spolocne.") || p.kat === "vyplaty" || p.kat === "vyplaty.delene") s += -p.suma / 2;
   }
   return Math.round(s);
 }

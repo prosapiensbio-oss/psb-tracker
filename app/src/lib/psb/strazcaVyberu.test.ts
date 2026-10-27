@@ -12,8 +12,10 @@ describe("cerpanieMesiaca", () => {
       { date: "2026-10-04", suma: 2000, kat: "vyplaty.jerry" },
       { date: "2026-09-30", suma: -5000, kat: "vyplaty.jerry" },
       { date: "2026-10-05", suma: -900, kat: "fixne.apps" },
+      { date: "2026-10-06", suma: -1000, kat: "vyplaty" },
+      { date: "2026-10-07", suma: 3000, kat: "vyplaty.jerry" },
     ], "2026-10");
-    expect(c).toBe(11500 + 8000);
+    expect(c).toBe(11500 + 8000 + 500 - 3000);
   });
 });
 

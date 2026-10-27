@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
           loadData(DB),
           DB.prepare(
             `SELECT date, amount_czk AS suma, category AS kat FROM fio_transactions
-              WHERE date >= ?1 AND (category = 'vyplaty.jerry' OR category LIKE 'spolocne.%')`,
+              WHERE date >= ?1 AND (category IN ('vyplaty.jerry', 'vyplaty', 'vyplaty.delene') OR category LIKE 'spolocne.%')`,
           ).bind(`${mesiac}-01`).all(),
           DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(KLUC).first<{ value: string }>(),
         ]);

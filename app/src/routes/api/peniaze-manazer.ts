@@ -13,7 +13,8 @@ import { CURRENT_ERA } from "../../lib/psb/vzas";
 //                        narok: [{ mesiac, hodiny, narok, beziaci }], model: { fix, prah, sadzba } }
 //
 // Vracia LEN Jerryho čerpanie z Fio: `vyplaty.jerry` (prevody na Air Bank aj
-// platby kartou z Fio) a `spolocne.*` (spoločné s Terezkou, jeho je polovica).
+// platby kartou), `spolocne.*` (spoločné s Terezkou) a výplaty bez mena
+// a delené (`vyplaty`, `vyplaty.delene`) — pri posledných troch je jeho polovica.
 // Nič iné z Kokpitu (klienti, Terezkine výplaty, tržby) sem nejde.
 //
 // Prístup je len tokenom `PENIAZE_TOKEN` v hlavičke, nie prihlásením do Kokpitu:
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
         const rs = await DB.prepare(
           `SELECT id, date, amount_czk AS suma, counterparty, note, typ, category AS kat
              FROM fio_transactions
-            WHERE date >= ?1 AND (category = 'vyplaty.jerry' OR category LIKE 'spolocne.%')
+            WHERE date >= ?1 AND (category IN ('vyplaty.jerry', 'vyplaty', 'vyplaty.delene') OR category LIKE 'spolocne.%')
             ORDER BY date LIMIT 5000`,
         ).bind(od).all();
         // Nárok z tých istých sedení a toho istého vzorca ako dlh trénera v Kokpite.
