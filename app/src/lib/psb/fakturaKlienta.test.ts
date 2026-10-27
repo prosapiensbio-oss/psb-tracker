@@ -58,12 +58,12 @@ describe("blok na stránke po úvodnom", () => {
   it("bez údajov sa pýta a formulár je zavretý", () => {
     const h = blokFakturyHtml({ klient: "Jan Novák", udaje: null });
     expect(h).toContain("Chcete platit fakturou?");
-    expect(h).toContain("Vyplnit fakturační údaje");
-    expect(h).not.toContain("<details open");
+    expect(h).toContain('<summary class="fa-tlacidlo">Chcete platit fakturou?</summary>');
+    expect(h).not.toContain('<details id="faktura" open');
   });
   it("s chybou je formulár otvorený, s hláškou a s tým, čo klient napísal", () => {
     const h = blokFakturyHtml({ klient: "Jan Novák", udaje: null, chyba: "ico", vstup: { komu: "firma", ico: "1234", email: "x@y.cz" } });
-    expect(h).toContain("<details open");
+    expect(h).toContain('<details id="faktura" open');
     expect(h).toContain("IČO nesedí");
     expect(h).toContain('value="1234"');
     expect(h).toContain('value="x@y.cz"');
@@ -76,6 +76,7 @@ describe("blok na stránke po úvodnom", () => {
     expect(h).toContain("Firma s.r.o.");
     expect(h).toContain("IČO 27074358");
     expect(h).toContain("Změnit údaje");
+    expect(h).toContain('<details id="faktura" open');
     expect(h).not.toContain("Chcete platit fakturou?");
   });
   it("samotný e-mail ešte nie sú fakturačné údaje", () => {
@@ -85,11 +86,11 @@ describe("blok na stránke po úvodnom", () => {
     const h = blokFakturyHtml({ klient: "Jan", udaje: null, chyba: "email", vstup: { email: '"><script>' } });
     expect(h).not.toContain("<script>");
   });
-  it("je len na stránke po úvodnom, pred „Souhrn z dnešní lekce“", () => {
+  it("je tretie tlačidlo pod „Potvrdit termín“ a „Zavolat“, len po úvodnom", () => {
     const zaklad = { trener: "Jerry", kedy: null, logoUrl: "/l.svg" } as const;
     const po = uvodnaStrankaHtml({ ...zaklad, druh: "po", faktura: { klient: "Jan", udaje: null } });
-    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(0);
-    expect(po.indexOf("Chcete platit fakturou?")).toBeLessThan(po.indexOf("Souhrn z dnešní lekce"));
+    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Jerrymu"));
+    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Souhrn z dnešní lekce"));
     expect(uvodnaStrankaHtml({ ...zaklad, druh: "po" })).not.toContain("Chcete platit fakturou?");
   });
 });

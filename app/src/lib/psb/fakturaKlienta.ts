@@ -163,15 +163,25 @@ export const CSS_FAKTURY = `
 .fa-volba input:focus-visible+span{outline:2px solid #1A2E24;outline-offset:2px}
 .fa:has(#fa-osoba:checked) .jen-firma{display:none}
 .fa:has(#fa-firma:checked) .jen-osoba{display:none}
-.fa-tlacidlo{display:block;margin-top:14px;text-align:center;background:#2D7D5A;color:#FFFFFF;font-size:16px;font-weight:600;padding:15px 22px;border-radius:32px;cursor:pointer}
+.fa-tlacidlo{display:block;text-align:center;border:2px solid #2D7D5A;color:#2D7D5A;background:#FFFFFF;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px;cursor:pointer}
+.fa-tlacidlo:hover{background:#F3F9F5}
 details[open]>.fa-tlacidlo{display:none}
 `;
 
 /**
- * Blok na stránke po úvodnom. Tri podoby:
- *  - údaje ešte nemáme → otázka + tlačidlo, ktoré rozbalí formulár na mieste;
- *  - údaje máme → čo na faktúre bude, a „Změnit";
- *  - práve uložené → poďakovanie + to isté zhrnutie.
+ * TRETIE TLAČIDLO pod „Potvrdit termín" a „Zavolat" (Jerry, 28. 10. 2026:
+ * „chcete platit fakturou pridaj ako 3. CTA a keď naň človek klikne, rozbalí
+ * sa to"). Zavreté je to len tlačidlo; po kliknutí sa namiesto neho rozbalí
+ * karta s formulárom — rovno vyplniteľným, bez druhého klikania.
+ *
+ * Tri podoby karty:
+ *  - údaje ešte nemáme → otázka, vysvetlenie a formulár;
+ *  - údaje máme → čo na faktúre bude, a „Změnit údaje";
+ *  - práve uložené alebo chyba → karta je rozbalená hneď, aby klient videl výsledok.
+ *
+ * Zavrieť ju ide krížikom — `summary` je pri otvorenej karte skrytý.
+ * Pri chybe sa stránka vráti bez kotvy v adrese (údaje nejdú cez presmerovanie),
+ * preto ju na kartu posunie riadok skriptu — inak by hláška ostala pod koncom stránky.
  */
 export function blokFakturyHtml(b: BlokFaktury): string {
   const u = b.udaje;
@@ -218,6 +228,14 @@ ${pole("E-mail pro fakturu", "email", hod("email"), { ph: "jmeno@firma.cz", typ:
 <div style="margin-top:10px;font-size:12.5px;color:#5B6B60;text-align:center;line-height:1.55">Údaje uvidí jen Váš trenér a použijí se jen na faktury od ProSapiens Biomechanic.</div>
 </form>`;
 
+  const zavriet = `<button type="button" aria-label="Zavřít" onclick="this.closest('details').open=false" style="flex-shrink:0;width:32px;height:32px;border:0;border-radius:16px;background:rgba(26,46,36,0.07);color:#1A2E24;font-size:16px;line-height:1;cursor:pointer;font-family:inherit">✕</button>`;
+  const rozbalit = otvorene || !!b.ulozene;
+  const obal = (tlacidlo: string, karta: string) => `<details id="faktura"${rozbalit ? " open" : ""}>
+<summary class="fa-tlacidlo">${tlacidlo}</summary>
+${karta}
+</details>${otvorene ? `
+<script>document.getElementById("faktura").scrollIntoView({block:"start"})</script>` : ""}`;
+
   if (hotove && u) {
     const riadky = [
       u.firma || b.klient,
@@ -226,27 +244,27 @@ ${pole("E-mail pro fakturu", "email", hod("email"), { ph: "jmeno@firma.cz", typ:
       [u.ico ? `IČO ${u.ico}` : "", u.dic ? `DIČ ${u.dic}` : ""].filter(Boolean).join(" · "),
       u.email,
     ].filter(Boolean);
-    return `<div id="faktura" style="margin-top:28px;border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px;background:#F6F8F6">
-<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:17px;color:#1A2E24">${b.ulozene ? "Děkujeme, fakturační údaje máme ✓" : "Fakturační údaje máme ✓"}</div>
+    return obal("Fakturační údaje ✓", `<div style="border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px;background:#F6F8F6">
+<div style="display:flex;gap:12px;align-items:flex-start">
+<div style="flex-grow:1;min-width:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:17px;line-height:1.35;color:#1A2E24">${b.ulozene ? "Děkujeme, fakturační údaje máme ✓" : "Fakturační údaje máme ✓"}</div>
+${zavriet}</div>
 <div style="margin-top:8px;font-size:14.5px;line-height:1.6;color:#3C4C42">Fakturu vystavíme na:<br>${riadky.map(esc).join("<br>")}</div>
 <details${otvorene ? " open" : ""} style="margin-top:6px">
 <summary style="font-size:14px;color:#2D7D5A;font-weight:600;cursor:pointer;margin-top:6px">Změnit údaje</summary>
 ${formular}
 </details>
-</div>`;
+</div>`);
   }
 
-  return `<div id="faktura" style="margin-top:28px;border:2px solid #2D7D5A;border-radius:18px;padding:18px 18px 16px;background:#F3F9F5">
+  return obal("Chcete platit fakturou?", `<div style="border:2px solid #2D7D5A;border-radius:18px;padding:18px 18px 16px;background:#F3F9F5">
 <div style="display:flex;gap:12px;align-items:flex-start">
 <span style="font-size:24px;line-height:1" role="img" aria-label="faktura">🧾</span>
 <div style="flex-grow:1;min-width:0">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:19px;line-height:1.3;color:#1A2E24">Chcete platit fakturou?</div>
 <div style="margin-top:6px;font-size:15px;line-height:1.6;color:#3C4C42">Vyplňte fakturační údaje — fakturu Vám pak vystavíme na firmu nebo na jméno a pošleme e-mailem. Zabere to minutu.</div>
-</div></div>
-<details${otvorene ? " open" : ""}>
-<summary class="fa-tlacidlo">Vyplnit fakturační údaje</summary>
+</div>
+${zavriet}</div>
 ${formular}
-</details>
 <div style="margin-top:9px;font-size:12.5px;color:#5B6B60;text-align:center">Platíte převodem na účet nebo hotově? Nic vyplňovat nemusíte.</div>
-</div>`;
+</div>`);
 }

@@ -311,8 +311,6 @@ ${v.odpovedPoslana
 <div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(tr.krstne)}, nikam jinam.</div>
 </form>`}
 
-${v.faktura ? blokFakturyHtml(v.faktura) : ""}
-
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Souhrn z dnešní lekce</h2>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes říkal, je sepsané tady.</p>
 ${riadokOdkazu(ODKAZY.poUvodnej, "Informace po úvodní lekci", "souhrn z dnešního tréninku")}
@@ -374,6 +372,7 @@ ${telo}
 <div style="margin-top:34px;display:flex;flex-direction:column;gap:11px">
 <a href="${esc(smsHref)}" style="display:block;text-align:center;text-decoration:none;background:#2D7D5A;color:#FFFFFF;font-size:17px;font-weight:600;padding:19px 24px;border-radius:32px">${bezTerminuPo ? "Domluvit další trénink" : "Potvrdit termín"}</a>
 <a href="tel:${esc(tel)}" style="display:block;text-align:center;text-decoration:none;border:2px solid #1A2E24;color:#1A2E24;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px">Zavolat ${esc(tr.krstne === "Filip" ? "Jerrymu" : tr.krstne)}</a>
+${v.faktura ? blokFakturyHtml(v.faktura) : ""}
 </div>
 
 <div style="margin-top:36px;padding-top:26px;border-top:1px solid #DCE3DD">
