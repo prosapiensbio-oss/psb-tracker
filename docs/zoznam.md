@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **15. 10. 2026**.
+Stav k **27. 10. 2026** (overené v D1: ponuku termínov si klienti vybrali už 3× — Prochádzka, Kaňovský, Pavlík; pocitovka 0 odpovedí; anonymný dotazník 0 kôl).
 
 ---
 
@@ -83,7 +83,7 @@ Tento týždeň je posledný týždeň zápisu do PTmindera; účet sa ruší a�
 uzávierke októbra (prvý mesiac s peniazmi z Kokpitu — keby niečo nesedelo,
 je kde pozrieť).
 
-1. [ ] **Do ne 18. 10.** — posledný týždeň zápisu do PTmindera.
+1. [x] **Do ne 18. 10.** — posledný týždeň zápisu do PTmindera.
        [x] 9 otvorených poplatkov z PTmindera prejdených 15. 10.: 7 má balíček
        v Kokpite, Dominika a Gerich nie sú dlhom (zaplatené / kredit vopred),
        Monika Schonwalderová stojí len na poplatku z PTmindera (7 790, 9. 10.)
@@ -93,7 +93,7 @@ je kde pozrieť).
        ostáva 411 Kč = rozdiel kurzu BTC, rozhodne Jerry).
 2. [x] **Po 19. 10.** — Jerry: posledný úplný export (všetky reporty ako doteraz) — stiahnuté 19. 10., v archíve; do Kokpitu ešte nenaliate (Packages/Sessions/Payments za október treba nahrať cez Upload, ak má október sedieť)
        + archív rokov 2022–2024 (zo starých rokov sa nič nepočíta, len uložiť).
-3. [ ] **Týždeň od 19. 10.** — Claude:
+3. [x] **Týždeň od 19. 10.** — Claude:
        - [x] 6M z balíčkov v Kokpite (předplatné) — hotové 15. 10. (tá istá
          množina 12+ klientov ako zo snímky; `sixMClientSet`);
        - [x] vypnúť porovnania s PTminderom — **naostro 20. 10. 2026**: preč
@@ -114,7 +114,7 @@ je kde pozrieť).
        - [x] **21. 10. 2026 — peniaze**: poistka PTmindera len pre balíčky spred
          1. 10.; poplatky PTmindera od 1. 10. dlh nerobia; rozpory → notifikácia
          `ptrozpor|` (Veronika, Natália, Iva, Monika); barter Sofie nie je dlh.
-       - [ ] **Audit 21. 10. 2026 — čo ešte stojí na PTminderi** (Jerry: „sú ešte
+       - [x] **Audit 21. 10. 2026 — čo ešte stojí na PTminderi** (Jerry: „sú ešte
          nejaké veci, ktoré by mali byť, ale nie sú?"). **Body 1–5 hotové
          21. 10. 2026** (os bez predajov PTmindera od 1. 10.; mená do párovania
          aj z kalendára a balíčkov; barter z balíčkov Kokpitu; report bez
