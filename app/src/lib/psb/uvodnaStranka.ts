@@ -1,5 +1,6 @@
 import { CENNIK } from "./cennik";
 import { TRENERI } from "./mailFaktury";
+import { blokFakturyHtml, CSS_FAKTURY, type BlokFaktury } from "./fakturaKlienta";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — pred úvodným tréningom a po ňom.
@@ -137,6 +138,11 @@ export type VolbyStranky = {
   anamnezaUrl?: string | null;
   /** `true` = klient práve odoslal odpoveď; namiesto poľa sa poďakuje. */
   odpovedPoslana?: boolean;
+  /**
+   * „Chcete platit fakturou?" — len po úvodnom (Jerry, 28. 10. 2026).
+   * Bez hodnoty sa blok nekreslí. Viď `fakturaKlienta.ts`.
+   */
+  faktura?: BlokFaktury | null;
 };
 
 /**
@@ -305,6 +311,8 @@ ${v.odpovedPoslana
 <div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(tr.krstne)}, nikam jinam.</div>
 </form>`}
 
+${v.faktura ? blokFakturyHtml(v.faktura) : ""}
+
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Souhrn z dnešní lekce</h2>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes říkal, je sepsané tady.</p>
 ${riadokOdkazu(ODKAZY.poUvodnej, "Informace po úvodní lekci", "souhrn z dnešního tréninku")}
@@ -335,6 +343,7 @@ summary{list-style:none}
 summary::-webkit-details-marker{display:none}
 .rozbal{display:flex;transform:rotate(90deg);transition:transform .15s ease}
 details[open] .rozbal{transform:rotate(-90deg)}
+${v.faktura ? CSS_FAKTURY : ""}
 </style>
 </head>
 <body>
