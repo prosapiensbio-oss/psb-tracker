@@ -55,6 +55,7 @@ import { Route as ApiPlatbyRouteImport } from './routes/api/platby'
 import { Route as ApiPlanyRouteImport } from './routes/api/plany'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPeniazeManazerRouteImport } from './routes/api/peniaze-manazer'
+import { Route as ApiPeniazeBlocekRouteImport } from './routes/api/peniaze-blocek'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
@@ -332,6 +333,11 @@ const ApiPeriodsRoute = ApiPeriodsRouteImport.update({
 const ApiPeniazeManazerRoute = ApiPeniazeManazerRouteImport.update({
   id: '/api/peniaze-manazer',
   path: '/api/peniaze-manazer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPeniazeBlocekRoute = ApiPeniazeBlocekRouteImport.update({
+  id: '/api/peniaze-blocek',
+  path: '/api/peniaze-blocek',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPdfImportRoute = ApiPdfImportRouteImport.update({
@@ -627,6 +633,7 @@ export interface FileRoutesByFullPath {
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
+  '/api/peniaze-blocek': typeof ApiPeniazeBlocekRoute
   '/api/peniaze-manazer': typeof ApiPeniazeManazerRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
@@ -723,6 +730,7 @@ export interface FileRoutesByTo {
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
+  '/api/peniaze-blocek': typeof ApiPeniazeBlocekRoute
   '/api/peniaze-manazer': typeof ApiPeniazeManazerRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
@@ -820,6 +828,7 @@ export interface FileRoutesById {
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
+  '/api/peniaze-blocek': typeof ApiPeniazeBlocekRoute
   '/api/peniaze-manazer': typeof ApiPeniazeManazerRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
@@ -918,6 +927,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
+    | '/api/peniaze-blocek'
     | '/api/peniaze-manazer'
     | '/api/periods'
     | '/api/plany'
@@ -1014,6 +1024,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
+    | '/api/peniaze-blocek'
     | '/api/peniaze-manazer'
     | '/api/periods'
     | '/api/plany'
@@ -1110,6 +1121,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
+    | '/api/peniaze-blocek'
     | '/api/peniaze-manazer'
     | '/api/periods'
     | '/api/plany'
@@ -1207,6 +1219,7 @@ export interface RootRouteChildren {
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPagespeedRoute: typeof ApiPagespeedRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
+  ApiPeniazeBlocekRoute: typeof ApiPeniazeBlocekRoute
   ApiPeniazeManazerRoute: typeof ApiPeniazeManazerRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiPlanyRoute: typeof ApiPlanyRoute
@@ -1573,6 +1586,13 @@ declare module '@tanstack/react-router' {
       path: '/api/peniaze-manazer'
       fullPath: '/api/peniaze-manazer'
       preLoaderRoute: typeof ApiPeniazeManazerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/peniaze-blocek': {
+      id: '/api/peniaze-blocek'
+      path: '/api/peniaze-blocek'
+      fullPath: '/api/peniaze-blocek'
+      preLoaderRoute: typeof ApiPeniazeBlocekRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/pdf-import': {
@@ -1977,6 +1997,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPagespeedRoute: ApiPagespeedRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
+  ApiPeniazeBlocekRoute: ApiPeniazeBlocekRoute,
   ApiPeniazeManazerRoute: ApiPeniazeManazerRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiPlanyRoute: ApiPlanyRoute,
