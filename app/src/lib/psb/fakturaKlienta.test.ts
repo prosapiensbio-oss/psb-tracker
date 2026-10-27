@@ -84,7 +84,8 @@ describe("blok na stránke po úvodnom", () => {
   });
   it("text klienta sa escapuje", () => {
     const h = blokFakturyHtml({ klient: "Jan", udaje: null, chyba: "email", vstup: { email: '"><script>' } });
-    expect(h).not.toContain("<script>");
+    expect(h).toContain('value="&quot;&gt;&lt;script&gt;"');
+    expect(h).not.toContain('"><script>');
   });
   it("je tretie tlačidlo pod „Potvrdit termín“ a „Zavolat“, len po úvodnom", () => {
     const zaklad = { trener: "Jerry", kedy: null, logoUrl: "/l.svg" } as const;
