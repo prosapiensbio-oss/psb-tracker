@@ -176,6 +176,18 @@ export function ReklamaRozhodnutie({ item, onHotovo, onNavigate }: { item: Regis
           ))}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             {r.kampanId && <a href={adsManagerOdkaz(r.kampanId)} target="_blank" rel="noreferrer" style={{ ...linkBtn, color: C.textMuted }}>Ads Manager ↗</a>}
+            {/* Aj pri „bez dopytu" a strope (Jerry, 27. 10. 2026) — o reklame
+                sa rozhoduje s reklamným Jarvisom: vidí do Mety a zásah spraví
+                tlačidlom. Prompt pre Clauda ostáva na zmeny kódu Kokpitu. */}
+            {onNavigate && (
+              <button
+                onClick={() => { posliAgentovi(`${r.prompt}\n\nPozri sa do Mety (meta_citaj) na všetky bežiace kampane — kto klikal (vek, pohlavie), koľko ľudí dorazilo na stránku a čo hovoria texty reklám — a povedz mi, ktorú nechať, ktorú vypnúť a čo zmeniť. Ak navrhneš zmenu, daj ju ako tlačidlo.`, r.druh === "bezdopytu" ? "Preberme reklamy bez dopytu" : `Preberme: ${item.title}`); onNavigate("marketing", "dozor"); }}
+                style={{ ...linkBtn, color: C.accentLight }}
+                title="Otvorí reklamného Jarvisa v Dozore reklám s touto otázkou"
+              >
+                Prebrať s Jarvisom →
+              </button>
+            )}
             <PromptPreClauda text={r.prompt} />
           </div>
         </div>

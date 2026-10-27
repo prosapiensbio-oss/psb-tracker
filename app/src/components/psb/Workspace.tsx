@@ -26,6 +26,7 @@ import { Uzavierky } from "./Uzavierky";
 import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
+import { NaCeluObrazovku } from "./NaCeluObrazovku";
 import { jeKontrolaPenazi, jeReklamaDozoru } from "../../lib/psb/kontrolaPenazi";
 import type { Actions } from "./App";
 import type { AssistantChat } from "./Assistant";
@@ -856,17 +857,21 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
               {k.druh === "editor" && <EditorKarta mena={mena} />}
               {/* DOZOR REKLÁM — tá istá obrazovka ako bola v Marketingu (19. 10. 2026). */}
-              {/* Rozhodnutia o reklamách — na Dnes je len súhrn „Skontrolovať
-                  reklamy", tlačidlá sú tu (Jerry, 27. 10. 2026). */}
-              {k.druh === "reklamy" && actions && onNavigate && (register || []).some((r) => jeReklamaDozoru(r.key) && !r.acked) && (
-                <div style={{ marginBottom: 12 }}>
-                  <NadpisSekcie pocet={(register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length}>Čaká na rozhodnutie</NadpisSekcie>
-                  {(register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).map((r) => (
-                    <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />
-                  ))}
-                </div>
+              {k.druh === "reklamy" && (
+                <NaCeluObrazovku nazov="Dozor reklám">
+                  {/* Rozhodnutia o reklamách — na Dnes je len súhrn „Skontrolovať
+                      reklamy", tlačidlá sú tu (Jerry, 27. 10. 2026). */}
+                  {actions && onNavigate && (register || []).some((r) => jeReklamaDozoru(r.key) && !r.acked) && (
+                    <div style={{ marginBottom: 12 }}>
+                      <NadpisSekcie pocet={(register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length}>Čaká na rozhodnutie</NadpisSekcie>
+                      {(register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).map((r) => (
+                        <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />
+                      ))}
+                    </div>
+                  )}
+                  <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate as never} />
+                </NaCeluObrazovku>
               )}
-              {k.druh === "reklamy" && <ReklamaPracovisko data={data} chat={chatReklama} onNavigate={onNavigate as never} />}
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}
