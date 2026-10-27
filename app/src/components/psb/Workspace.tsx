@@ -26,6 +26,7 @@ import { Uzavierky } from "./Uzavierky";
 import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
+import { jeKontrolaPenazi } from "../../lib/psb/kontrolaPenazi";
 import type { Actions } from "./App";
 import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
@@ -836,6 +837,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     );
   }
 
+  /** Kontrola peňazí — položky registra, ktoré sa na Dnes neukazujú (27. 10. 2026). */
+  // Bez useMemo: stojí pod skorším returnom (hooky pod returnom zhasnú appku).
+  const kontrolaPenazi = (register || []).filter((r) => jeKontrolaPenazi(r.key) && !r.acked);
   const zostava = (x: Karta) => (x.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).filter((p) => !hotove.has(klucPolozky(x.druh, p))).length;
   // Presvitajúce karty idú tiež dokola — na poslednej je za ňou prvá.
   const dalsie = zive.length > 1
@@ -1709,6 +1713,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       const d = new Date();
       return new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1)).toISOString().slice(0, 7);
     })();
+    if (k.krok === "kontroly") {
+      const polozky = kontrolaPenazi;
+      return actions && onNavigate ? (
+        <>
+          {polozky.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />)}
+          {!polozky.length && <VsetkoVybavene text="Všetko vybavené — náklady sedia a staré zaradenia sú vysvetlené." />}
+        </>
+      ) : null;
+    }
     if (k.krok === "dopyty") {
       const zdroje = (krokyUzavierky?.(mesiacUzavierky) || []).find((x) => x.id === "zdroje");
       const mena = ((zdroje?.focus as { skupina?: { mena?: string[] } } | undefined)?.skupina?.mena) || [];
@@ -1888,7 +1901,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           polozky={zive.map((x) => ({
             kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
             nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? x.sekcie.reduce((a, y) => a + zostava(y), 0) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
+            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
           }))}
           aktivna={Math.min(i, zive.length - 1)}
           onVyber={(j, smer) => prepni(smer, j)}

@@ -105,6 +105,7 @@ import { pocetCakajucich, ZapisButton } from "./Zapis";
 import { MobilNavigacia } from "./MobilNavigacia";
 import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
+import { jeKontrolaPenazi } from "../../lib/psb/kontrolaPenazi";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nesediSPravidlom, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type NesediSPravidlom, type Pohyb, type PravidloNaKontrolu } from "../../lib/psb/kontrolaNakladov";
@@ -2370,6 +2371,10 @@ function skupinaFaktur(
     ).sort((a, b) => a.priority - b.priority);
   }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, hodinyPolozky, temaDna, data.anomalyAck]);
 
+  // Notifikácie na Dnes BEZ kontroly peňazí — tá má kartu vo Workspace
+  // (Jerry, 27. 10. 2026). Jarvis a uzávierka berú `registerAll` celý.
+  const registerNaDnes = useMemo(() => registerAll.filter((r) => !jeKontrolaPenazi(r.key)), [registerAll]);
+
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.
   // `vzasVerzia()` je v závislostiach zámerne: P&L sa napĺňa importom z banky
@@ -3365,7 +3370,7 @@ function skupinaFaktur(
           </div>
         )}
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} onVypisKlientovi={(m) => { setVypisPredvolba(m); setActive("workspace"); }} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerNaDnes} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} onVypisKlientovi={(m) => { setVypisPredvolba(m); setActive("workspace"); }} />
         )}
 
         {/* Bitcoinová evidencia vnútri Kokpitu (Jerry, 6. 9. 2026 — jedno okno).

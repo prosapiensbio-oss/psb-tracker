@@ -156,7 +156,11 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
       krok("uzavierka", "Uzávierka mesiaca", volby.ja === "Terezka"
         ? "prehľad mesiaca a tvoje odpovede — odkiaľ prišli noví a otázky mesiaca"
         : "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
+      // Kontrola peňazí (Jerry, 27. 10. 2026: „z týchto platobných notifikácií
+      // mi sprav kartu") — náklady, čo vyskočili, staré pohyby proti novým
+      // pravidlám, dvojité zápisy. Na Dnes sa už neukazujú (`jeKontrolaPenazi`).
       ...(pre("Jerry") ? [
+        krok("kontroly", "Kontrola peňazí", "náklady, ktoré nesedia, a staré zaradenia proti novým pravidlám", []),
       ] : []),
     ] : []),
     ...daj("faktury"),
