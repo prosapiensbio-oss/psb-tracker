@@ -226,9 +226,16 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
 
   // Potvrdenie otvorí SPRÁVU s vyplneným číslom aj textom. Odoslať ju musí
   // človek — to je zámer, inak by chodili potvrdenia od omylom klepnutých.
+  /**
+   * PO ÚVODNOM BEZ DOHODNUTÉHO TERMÍNU (Jerry, 28. 10. 2026: „Terezka nie je
+   * s Lindou dohodnutá na žiadnom termíne — musíme mať možnosť poslať SMS po
+   * úvodnom aj bez termínu"). Vtedy nie je čo potvrdzovať: tlačidlo otvorí
+   * správu „chcem si domluvit další trénink".
+   */
+  const bezTerminuPo = !kedy && !predUvodnym;
   const textPotvrdenia = kedy
     ? `Potvrzuji termín ${predUvodnym ? "úvodního tréninku" : "tréninku"} ${kedy.datum} v ${kedy.cas}.`
-    : "Potvrzuji termín.";
+    : bezTerminuPo ? "Dobrý den, rád/a bych si domluvil/a další trénink. Hodí se mi: " : "Potvrzuji termín.";
   const smsHref = `sms:${tel}?&body=${encodeURIComponent(textPotvrdenia)}`;
 
   const hlavicka = kedy
@@ -236,7 +243,7 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
 <div style="margin-top:8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:40px;line-height:1.05">${esc(kedy.den)}<br>${esc(kedy.datum)}</div>
 <div style="margin-top:10px;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;color:#8FD3A8">${esc(kedy.cas)}</div>`
     : `<div style="margin-top:26px;font-family:'Raleway',sans-serif;font-weight:700;font-size:34px;line-height:1.15">${predUvodnym ? "Váš úvodní trénink" : "Po úvodní lekci"}</div>
-<div style="margin-top:10px;font-size:15px;color:#C9D8CE">Termín Vám potvrdíme zprávou.</div>`;
+<div style="margin-top:10px;font-size:15px;color:#C9D8CE">${bezTerminuPo ? "Až budete chtít pokračovat, napište nám a domluvíme další trénink." : "Termín Vám potvrdíme zprávou."}</div>`;
 
   // Zľava sa NEZAMLČÍ: keď je cena nižšia než bežná, pôvodná zostane
   // prečiarknutá vedľa nej. Klient tak vidí, že dostal zľavu, a nie len
@@ -356,7 +363,7 @@ ${v.figuraUrl ? `<img src="${esc(v.figuraUrl)}" alt="" aria-hidden="true" width=
 ${telo}
 
 <div style="margin-top:34px;display:flex;flex-direction:column;gap:11px">
-<a href="${esc(smsHref)}" style="display:block;text-align:center;text-decoration:none;background:#2D7D5A;color:#FFFFFF;font-size:17px;font-weight:600;padding:19px 24px;border-radius:32px">Potvrdit termín</a>
+<a href="${esc(smsHref)}" style="display:block;text-align:center;text-decoration:none;background:#2D7D5A;color:#FFFFFF;font-size:17px;font-weight:600;padding:19px 24px;border-radius:32px">${bezTerminuPo ? "Domluvit další trénink" : "Potvrdit termín"}</a>
 <a href="tel:${esc(tel)}" style="display:block;text-align:center;text-decoration:none;border:2px solid #1A2E24;color:#1A2E24;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px">Zavolat ${esc(tr.krstne === "Filip" ? "Jerrymu" : tr.krstne)}</a>
 </div>
 

@@ -118,6 +118,12 @@ describe("bez termínu stránka neklame", () => {
     expect(h).toContain("Termín Vám potvrdíme zprávou.");
     expect(h).toContain(encodeURIComponent("Potvrzuji termín."));
   });
+  it("po úvodnom bez termínu nepotvrdzuje nič — ponúkne domluvit další trénink (Linda Muth, 28. 10. 2026)", () => {
+    const h = uvodnaStrankaHtml({ druh: "po", trener: "Terezka", kedy: null, logoUrl: "/l.svg" });
+    expect(h).toContain("Domluvit další trénink");
+    expect(h).not.toContain(">Potvrdit termín<");
+    expect(h).not.toContain("Termín Vám potvrdíme zprávou.");
+  });
 });
 
 describe("figúra v hlavičke", () => {
