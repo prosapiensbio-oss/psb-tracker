@@ -154,6 +154,11 @@ je kde pozrieť).
          „1h Balíček 1 450" na 27. 10., po založení offline tréning kryje 1h
          a online balíček sa nemíňa.
 4. [ ] **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
+       **Jerry 27. 10. 2026: „PTminder zrušíme budúci týždeň.“** Čiže v týždni
+       2.–8. 11., po uzávierke októbra. Posledná platba 2 287 Kč odišla 2. 10.;
+       ďalšia by prišla 2. 11., takže zrušiť ideálne PRED druhým. Archív rokov
+       2022–2024 aj posledný úplný export sú stiahnuté (19. 10.), takže po
+       zrušení sa nestráca nič — ale skontrolovať to pred kliknutím.
 
 ## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
 
@@ -771,6 +776,48 @@ vyriešené opravami 5. 10. vyššie, ponechané ako história):
 - „Kariéra → Koho hledáme" pri výške 600 px — druhá obrazovka na 33 %,
 - v článkoch je zeleného zvýraznenia priveľa (74 zvýraznení dlhších než osem
   slov na 15 článkoch; pravidlo boli 2–4 krátke spojenia).
+
+---
+
+### Web — stav k 27. 10. 2026
+
+**Hotové 27. 10.:**
+- **og:image** — nastavený záložný „Obrázek webu" v Yoast → Nastavení → Základy
+  webu (DSC09343). Platí pre každú stránku, ktorá nemá vlastný obrázok; overené
+  na deviatich. Yoastova sekcia u typov obsahu má tlačidlá vypnuté, funguje len
+  toto jedno miesto.
+- **`/blog/` má meta popis** (stránka 639, Yoast metabox).
+- **Mŕtvy DOI na `/ploche-nohy/`** — správne je `10.1038/s41598-025-89364-8`.
+  Overené cez Crossref: názov, časopis, rok, autori aj číslo článku 5077 sedia,
+  chybné bolo len číslo DOI. Opravené cez **Texty webu** (live) aj v repe
+  (prototyp, part, `inc/zdroj`).
+- **Mŕtvy odkaz na BiohackPlanet** v `/biomechanika-evolucia_treningu/` —
+  obchod zanikol, odkaz je preč, názov v texte zostal. Rovnako na oboch miestach.
+- **Oba zipy témy prebalené** (`tema/psb-spready.zip` 20 MB,
+  `tema/instalace/psb-spready-bez-fotiek.zip` 1,2 MB) už s opravami.
+- **Cache vyprázdnená** po tých zmenách.
+- **Wordfence dobehol celý** (27. 10. 8:07): 33 422 súborov, 40 tém a pluginov,
+  5 používateľov, 15 689 adries. **Žiadny malvér, žiadny zmenený ani neznámy
+  súbor, žiadny cudzí používateľ.** Všetkých 33 nálezov sú zastarané pluginy
+  (Yoast 25.7 → 28.7, WooCommerce 10.1.4 → 11.2.1, Jetpack, Forminator…),
+  dva opustené (Health Check, Exclude Pages From Menu) a dva označené ako
+  zraniteľné: **Slider Revolution a WPBakery** — tie sú od 26. 10. vypnuté,
+  ale súbory na disku zostávajú. Zmazať ich je rozhodnutie pre Jerryho.
+
+**Čaká na Jerryho:**
+- [ ] **Dva staré administrátorské účty** — Nika Pastorová (pastorova@emglare.com,
+  naposledy 15. 7. 2024) a Admin Systedo (admin@systedo.cz, 26. 11. 2023).
+  Buď zmazať, alebo zraziť na Návštevníka.
+- [ ] **Dvojfázové overenie** nemá ani jeden z piatich používateľov.
+- [ ] **Heslo k FTP** (heslo do WordPressu zmenené 19. 10., FTP nie).
+- [ ] **OPcache vypnutý na hostingu** — nekešovaná stránka ~1,4 s. Vec na
+  Websupport, nie na nás.
+- [ ] **Odpovedať Radke Kovaříkovej** — písala, že formulár nerobí medzery;
+  opravené 19. 10., odpoveď nikdy neodišla.
+
+**Poznámka k postupu:** skriptované volania na prosapiens.cz znova narazili na
+firewall webu (Access Forbidden). Návštevníkov sa to netýka, ale overovať sa
+odteraz má prehliadačom, nie dávkou `curl`.
 
 ---
 
