@@ -105,7 +105,7 @@ import { pocetCakajucich, ZapisButton } from "./Zapis";
 import { MobilNavigacia } from "./MobilNavigacia";
 import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { mimoWorkspace, ritualy as spocitajRitualy, stavHotovostiHotovy } from "../../lib/psb/rituals";
-import { jeKontrolaPenazi } from "../../lib/psb/kontrolaPenazi";
+import { jeKontrolaPenazi, jeReklamaDozoru, klucSuhrnuReklam } from "../../lib/psb/kontrolaPenazi";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nesediSPravidlom, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type NesediSPravidlom, type Pohyb, type PravidloNaKontrolu } from "../../lib/psb/kontrolaNakladov";
@@ -2373,7 +2373,21 @@ function skupinaFaktur(
 
   // Notifikácie na Dnes BEZ kontroly peňazí — tá má kartu vo Workspace
   // (Jerry, 27. 10. 2026). Jarvis a uzávierka berú `registerAll` celý.
-  const registerNaDnes = useMemo(() => registerAll.filter((r) => !jeKontrolaPenazi(r.key)), [registerAll]);
+  const registerNaDnes = useMemo(() => {
+    const ostatne = registerAll.filter((r) => !jeKontrolaPenazi(r.key) && !jeReklamaDozoru(r.key));
+    // Reklamy: jedna notifikácia, ktorá preklikne do Dozoru reklám (27. 10. 2026).
+    const reklamy = registerAll.filter((r) => jeReklamaDozoru(r.key) && !r.acked);
+    if (!reklamy.length) return ostatne;
+    const key = klucSuhrnuReklam(reklamy.map((r) => r.key));
+    const suhrn = {
+      key, category: "Rozhodnutie" as const, tone: (reklamy.some((r) => r.tone === "red") ? "red" : "orange") as "red" | "orange",
+      title: `Skontrolovať reklamy (${reklamy.length})`,
+      detail: `Skontrolovať reklamy — ${reklamy.length === 1 ? "jedna vec čaká" : `${reklamy.length} veci čakajú`} v Dozore reklám: ${reklamy.map((r) => r.title).join(" · ")}`,
+      priority: Math.min(...reklamy.map((r) => r.priority)), client: "marketing|dozor", trener: "Jerry",
+      ...stavPolozky(key),
+    };
+    return [...ostatne, suhrn].sort((a, b) => (a.acked === b.acked ? a.priority - b.priority : a.acked ? 1 : -1));
+  }, [registerAll, stavPolozky]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.

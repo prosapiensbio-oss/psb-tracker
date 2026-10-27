@@ -13,3 +13,14 @@
 const PREDPONY = ["naklad|", "dvojity|", "pravidlo|", "prijmy|", "nezhody|"];
 
 export const jeKontrolaPenazi = (kluc: string): boolean => PREDPONY.some((p) => kluc.startsWith(p));
+
+/**
+ * REKLAMY: NA DNES JEDNA NOTIFIKÁCIA, ROZHODNUTIA V DOZORE (Jerry, 27. 10. 2026:
+ * „to isté sprav s reklamami — daj mi len 1 notifikáciu skontrolovať reklamy
+ * a nech ma to preklikne do dozoru reklám"). Položky dozoru (`reklama|…`)
+ * sa kreslia s tlačidlami v karte Dozor reklám vo Workspace.
+ */
+export const jeReklamaDozoru = (kluc: string): boolean => kluc.startsWith("reklama|");
+
+/** Kľúč súhrnu: mení sa s každou novou položkou, takže „Vybavené" platí len na to, čo bolo. */
+export const klucSuhrnuReklam = (kluce: string[]): string => `reklamy-suhrn|${[...kluce].sort().join(",")}`;
