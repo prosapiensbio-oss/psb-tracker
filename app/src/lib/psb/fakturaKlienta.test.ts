@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { blokFakturyHtml, platneIco, udajeHotove, udajeZAres, vstupZFormulara } from "./fakturaKlienta";
+import { blokFakturyHtml, notifikacieFaktur, platneIco, udajeHotove, udajeZAres, vstupZFormulara } from "./fakturaKlienta";
 import { uvodnaStrankaHtml } from "./uvodnaStranka";
 
 describe("IČO s kontrolnou číslicou", () => {
@@ -93,5 +93,25 @@ describe("blok na stránke po úvodnom", () => {
     expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Jerrymu"));
     expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Souhrn z dnešní lekce"));
     expect(uvodnaStrankaHtml({ ...zaklad, druh: "po" })).not.toContain("Chcete platit fakturou?");
+  });
+});
+
+describe("notifikácia: klient vyplnil fakturačné údaje", () => {
+  const riadok = { klient: "Branislav Široký", at: "2026-10-28T09:15:00.000Z", firma: "Asseco Central Europe, a.s.", ico: "27074358", dic: "CZ27074358", ulica: "Budějovická 778/3a", psc: "140 00", mesto: "Praha 4", email: "b@firma.cz" };
+  it("kľúč nesie čas zápisu — nová zmena = nová notifikácia", () => {
+    const [n] = notifikacieFaktur([riadok], "2026-10-28");
+    expect(n.key).toBe("faktura-od-klienta|Branislav Široký|2026-10-28T09:15:00.000Z");
+    expect(n.title).toBe("Branislav Široký vyplnil(a) fakturačné údaje");
+    expect(n.detail).toContain("Asseco Central Europe, a.s., IČO 27074358, DIČ CZ27074358");
+    expect(n.detail).toContain("Budějovická 778/3a, 140 00 Praha 4");
+    expect(n.detail).toContain("b@firma.cz");
+  });
+  it("na meno bez firmy: meno klienta, bez IČO", () => {
+    const [n] = notifikacieFaktur([{ ...riadok, firma: "", ico: "", dic: "" }], "2026-10-28");
+    expect(n.detail).toContain("Faktúra na: Branislav Široký · Budějovická");
+    expect(n.detail).not.toContain("IČO");
+  });
+  it("staršie ako 30 dní už nečaká", () => {
+    expect(notifikacieFaktur([{ ...riadok, at: "2026-09-20T10:00:00.000Z" }], "2026-10-28")).toEqual([]);
   });
 });

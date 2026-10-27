@@ -230,6 +230,8 @@ export type PSBData = {
   reklamaDozor?: import("./reklamaDozor").DozorData;
   /** Odpovede a súhlasy klientov z odkazu s fotkami `/f/` (posledných 60 dní). */
   fotkyKlientov?: import("./fotkyOdkazy").FotkyKlientov;
+  /** Fakturačné údaje, ktoré klient vyplnil sám cez odkaz po úvodnom (posledných 30 dní). */
+  fakturyOdKlientov?: import("./fakturaKlienta").FakturaOdKlienta[];
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;

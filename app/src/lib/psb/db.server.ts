@@ -34,6 +34,7 @@ import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
 import { nacitajDozor } from "./reklamaDozor.server";
 import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
+import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
 
 const uid = () => crypto.randomUUID();
 
@@ -466,6 +467,18 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
   data.reklamaDozor = await nacitajDozor(DB);
   // Odpovede klientov na odkaz s fotkami → notifikácia trénerovi (fotkyOdkazy.ts).
   data.fotkyKlientov = await nacitajFotkyKlientov(DB);
+  // Fakturačné údaje vyplnené klientom na odkaze po úvodnom → notifikácia (fakturaKlienta.ts).
+  const odHranice = new Date(Date.now() - FAKTURA_OKNO_DNI * 86400_000).toISOString();
+  data.fakturyOdKlientov = ((await DB.prepare(
+    `SELECT a.payment_id AS klient, MAX(a.at) AS at, f.firma, f.ico, f.dic, f.ulica, f.psc, f.mesto, f.email
+       FROM vzas_audit a JOIN klient_fakturacia f ON f.klient = a.payment_id
+      WHERE a.action = 'fakturacne-udaje' AND a.actor LIKE 'klient%' AND a.at >= ?1
+      GROUP BY a.payment_id`,
+  ).bind(odHranice).all().catch(() => ({ results: [] }))).results as any[]).map((r) => ({
+    klient: String(r.klient || ""), at: String(r.at || ""),
+    firma: String(r.firma || ""), ico: String(r.ico || ""), dic: String(r.dic || ""),
+    ulica: String(r.ulica || ""), psc: String(r.psc || ""), mesto: String(r.mesto || ""), email: String(r.email || ""),
+  }));
 
   return data;
 }

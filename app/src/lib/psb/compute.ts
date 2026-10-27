@@ -17,6 +17,7 @@ import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
 import { odpovedeKlientov } from "./odpovedeKlientov";
+import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { obdobieRezervy, odlozeneOd, predosleObdobie, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
 import type {
@@ -3560,6 +3561,15 @@ export function deriveRegister(
     const c = clients[o.klient] || Object.values(clients).find((x) => normName(x.name) === normName(o.klient));
     add(o.key, "Zápis", "blue", o.title, o.detail, 8, o.klient, "odpoved-klienta",
       { trener: c?.primaryTrainer || undefined, oKom: o.klient });
+  }
+
+  /**
+   * Klient vyplnil fakturačné údaje na odkaze po úvodnom (28. 10. 2026).
+   * Faktúry vystavuje Jerry — preto jemu, nie trénerovi klienta.
+   */
+  for (const n of notifikacieFaktur(data.fakturyOdKlientov || [], dnesPraha())) {
+    add(n.key, "Zápis", "blue", n.title, n.detail, 8, n.klient, "faktura-od-klienta",
+      { trener: "Jerry", oKom: n.klient });
   }
 
   return items.sort((a, b) => {

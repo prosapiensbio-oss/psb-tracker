@@ -268,3 +268,38 @@ ${formular}
 <div style="margin-top:9px;font-size:12.5px;color:#5B6B60;text-align:center">Platíte převodem na účet nebo hotově? Nic vyplňovat nemusíte.</div>
 </div>`);
 }
+
+/**
+ * NOTIFIKÁCIA: KLIENT VYPLNIL FAKTURAČNÉ ÚDAJE (Jerry, 28. 10. 2026: „áno,
+ * pridaj notifikáciu"). Údaje z odkazu sa uložia ticho ku klientovi — bez
+ * notifikácie by sa o nich Jerry dozvedel až pri vystavovaní faktúry, ak by
+ * si naň vôbec spomenul.
+ *
+ * Zdroj je audit (`fakturacne-udaje` s autorom „klient…"), nie nový stĺpec:
+ * čas zápisu tam už je a kľúč ho nesie, takže keď klient údaje zmení znova,
+ * príde nová notifikácia namiesto zabudnutej starej. Okno 30 dní — staršia
+ * už na faktúru nečaká.
+ */
+export const FAKTURA_OKNO_DNI = 30;
+
+export type FakturaOdKlienta = UlozeneUdaje & { klient: string; at: string };
+
+export type NotifikaciaFaktury = { key: string; klient: string; title: string; detail: string };
+
+export function notifikacieFaktur(rows: FakturaOdKlienta[], dnes: string): NotifikaciaFaktury[] {
+  const hranica = new Date(Date.parse(`${dnes}T12:00:00Z`) - FAKTURA_OKNO_DNI * 86400_000).toISOString();
+  return rows
+    .filter((r) => r.klient && r.at && r.at >= hranica)
+    .map((r) => {
+      const komu = r.ico ? `${r.firma || r.klient}, IČO ${r.ico}${r.dic ? `, DIČ ${r.dic}` : ""}` : (r.firma || r.klient);
+      const adresa = [r.ulica, [r.psc, r.mesto].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+      const [, mm, dd] = r.at.slice(0, 10).split("-").map(Number);
+      return {
+        key: `faktura-od-klienta|${r.klient}|${r.at}`,
+        klient: r.klient,
+        title: `${r.klient} vyplnil(a) fakturačné údaje`,
+        detail: `${dd}. ${mm}. cez odkaz po úvodnom. Faktúra na: ${[komu, adresa, r.email].filter(Boolean).join(" · ")}. Údaje sú uložené pri klientovi — pri vystavení faktúry sa predvyplnia.`,
+      };
+    })
+    .sort((a, b) => b.key.localeCompare(a.key));
+}
