@@ -16,6 +16,7 @@ import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
+import { odpovedeKlientov } from "./odpovedeKlientov";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { obdobieRezervy, odlozeneOd, predosleObdobie, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
 import type {
@@ -3549,6 +3550,16 @@ export function deriveRegister(
   for (const p of polozkyFotiek(data.fotkyKlientov)) {
     add(p.key, "Zápis", p.tone, p.title, p.detail, p.tone === "orange" ? 3 : 8, p.klient, "fotky",
       { trener: p.trener || undefined, oKom: p.klient });
+  }
+
+  /**
+   * Klient napísal, ako sa cíti (27. 10. 2026) — stránka po úvodnom aj
+   * pocitovka. Trénerovi klienta; preklik do profilu, kde je blok „Ako sa cíti".
+   */
+  for (const o of odpovedeKlientov(data.merania || [], dnesPraha())) {
+    const c = clients[o.klient] || Object.values(clients).find((x) => normName(x.name) === normName(o.klient));
+    add(o.key, "Zápis", "blue", o.title, o.detail, 8, o.klient, "odpoved-klienta",
+      { trener: c?.primaryTrainer || undefined, oKom: o.klient });
   }
 
   return items.sort((a, b) => {
