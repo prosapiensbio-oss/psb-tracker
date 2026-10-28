@@ -56,6 +56,22 @@ async function firmaZAres(ico: string): Promise<UdajeFirmy | null | "nedostupne"
 
 type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string | null; cena_czk: number | null; fotky_json?: string | null };
 
+/**
+ * Riadok odkazu. Stĺpec `fotky_json` pribudol migráciou 0127 — keď ešte nie
+ * je v databáze, dopyt s ním spadne a stránka by klientovi vrátila 500
+ * (28. 10. 2026 sa to na pár minút stalo: kód bol nasadený skôr než migrácia).
+ * Preto druhý pokus bez neho: odkaz funguje vždy, fotky len keď stĺpec je.
+ */
+async function riadokOdkazu(DB: D1Database, token: string): Promise<RiadokOdkazu | null> {
+  try {
+    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1")
+      .bind(token).first<RiadokOdkazu>();
+  } catch {
+    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk FROM uvodne_odkazy WHERE token = ?1")
+      .bind(token).first<RiadokOdkazu>();
+  }
+}
+
 /** Id fotiek pred a po, ktoré k odkazu pripol tréner (`/api/uvodny`). */
 function fotkyOdkazu(r: RiadokOdkazu): string[] {
   if (r.druh !== "po" || !r.fotky_json) return [];
@@ -134,8 +150,7 @@ async function ulozFakturu(DB: D1Database | null, request: Request, token: strin
   const ukazka = jeUkazka(token);
   const r: RiadokOdkazu | null = ukazka
     ? { klient: "Jan Ukázka", druh: "po", trener: "Jerry", kedy: "2026-10-16T09:00", cena_czk: null }
-    : DB ? await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1")
-        .bind(token).first<RiadokOdkazu>().catch(() => null) : null;
+    : DB ? await riadokOdkazu(DB, token).catch(() => null) : null;
   if (!r) return new Response(null, { status: 303, headers: { location: `/u/${encodeURIComponent(token)}`, "cache-control": "no-store" } });
 
   const sChybou = async (chyba: string, udaje: UlozeneUdaje | null = null) => {
@@ -238,9 +253,7 @@ export const Route = createFileRoute("/u/$token")({
 
         if (!DB) return prec("Tento odkaz neplatí.", 404);
 
-        const r = await DB.prepare(
-          "SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1",
-        ).bind(token).first<RiadokOdkazu>();
+        const r = await riadokOdkazu(DB, token);
         if (!r) return prec("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.", 404);
 
         const q = new URL(request.url).searchParams;

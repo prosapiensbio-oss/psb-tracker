@@ -93,7 +93,20 @@ export const Route = createFileRoute("/api/uvodny")({
                kedy       = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
                cena_czk   = excluded.cena_czk,
                fotky_json = CASE WHEN ?9 = 1 THEN excluded.fotky_json ELSE uvodne_odkazy.fotky_json END`,
-          ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString(), fotkyJson ?? null, fotkyJson === undefined ? 0 : 1).run();
+          ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString(), fotkyJson ?? null, fotkyJson === undefined ? 0 : 1).run()
+            // Bez migrácie 0127 stĺpec fotky_json nie je — odkaz bez fotiek
+            // musí vzniknúť aj tak (SMS po úvodnom nesmie stáť na fotkách).
+            .catch(async (e) => {
+              if (fotkyJson !== undefined || !/fotky_json/.test(String(e))) throw e;
+              await DB.prepare(
+                `INSERT INTO uvodne_odkazy (token, klient, druh, trener, kedy, cena_czk, vytvorene)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT (klient, druh) DO UPDATE SET
+                   trener   = excluded.trener,
+                   kedy     = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
+                   cena_czk = excluded.cena_czk`,
+              ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString()).run();
+            });
 
           const r = await DB.prepare(
             "SELECT token FROM uvodne_odkazy WHERE klient = ?1 AND druh = ?2",
