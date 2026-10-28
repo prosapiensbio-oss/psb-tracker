@@ -65,7 +65,8 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9o. [x] (hotové 22.–23. 10.: Cvičenie v pohybe, podpisové prvky, 10 prechodov) Strih cvičebných videí je mdlý (Jerry 22. 10.): diagnóza (strih vs. natočenie), výskum techník (strih v pohybe medzi uhlami, rytmus, zrýchlenie/spomalenie, detail) a štýl „Cvičenie v pohybe“ v Strižni; skúšobné zábery v ~/Downloads/filip_stranavsky fp insta.
 9p. [x] (hotové 23. 10.; YouTube sťahuje cez ~/bin/yt-dlp) Strižňa – Vložky (Jerry 23. 10.): filmové reakcie (obraz, hlas ide ďalej) aj hlášky so zvukom, CZ/SK klasiky aj Hollywood; banka vložiek, hľadanie scén na YouTube cez titulky, návrhy z prepisu. Vzor: @nadacia_zastavmekorupciu (vložka každé 3–4 s, Poirot ako vizuálny vtip).
 9q. [ ] Prvé ostré skúšky (26. 10.): hotové video #24 Ahsoky → titulka + naplánovať v Metricoole; AI titulka Ahsoky (Higgsfield, kredity); prvý presun ťahaním v Kalendári po oprave twitterData; Príbeh z klipov na ďalšom priečinku (#22, #28–32).
-9r. [ ] Push na GitHub: chýba len Príbeh z klipov (6 commitov, zvyšok už na GitHube je) – čaká na Jerryho „pushni“.
+9r. [x] Push na GitHub (28. 10.): Príbeh z klipov, palety profilov, fotky/videá v infografikách a 4 psie štýly Ahsoky (Vodítko, Mapa, Štartové číslo, Pamlsky) – main a1cbbe6.
+9s. [ ] Naostro overiť: karusel s fotkou/videom do Metricoolu, grafika od Clauda/Higgsfieldu v štýloch Ahsoky.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
