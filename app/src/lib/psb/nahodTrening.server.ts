@@ -56,6 +56,27 @@ export async function znamiKlienti(DB: D1Database, odDni?: number): Promise<stri
 }
 
 /**
+ * KANONICKÝ TVAR MENA ZNÁMEHO KLIENTA — z celého zoznamu, nie z PTmindera.
+ *
+ * Do 28. 10. 2026 sa tvar mena hľadal v `sessions` (export PTmindera): pri
+ * faktúre, override aj importe anamnéz. Klient, ktorý začal po poslednom
+ * exporte, tam nebol — a s odchodom od PTmindera by tam nebol nikto nový.
+ * `znamiKlienti` berie aj kalendár, balíčky a pravidlá mien. Presná zhoda
+ * (bez ohľadu na veľkosť písmen) vyhráva, potom celé meno bez diakritiky;
+ * keď sa nenájde nič, ostane, čo prišlo.
+ */
+export async function kanonickyTvarKlienta(DB: D1Database, meno: string, znami?: string[]): Promise<string> {
+  const m = String(meno || "").trim();
+  if (!m) return m;
+  const zoznam = znami ?? await znamiKlienti(DB);
+  const presne = zoznam.find((x) => x.toLowerCase() === m.toLowerCase());
+  if (presne) return presne;
+  const n = normName(m);
+  const zhody = zoznam.filter((x) => normName(x) === n);
+  return zhody.length === 1 ? zhody[0] : m;
+}
+
+/**
  * ZÁPIS TRÉNINGU DO KALENDÁRA TRÉNERA — jedno miesto pre Kokpit aj pre
  * klienta, ktorý si vyberie termín z ponuky (`/t/<token>`, 7. 10. 2026).
  *

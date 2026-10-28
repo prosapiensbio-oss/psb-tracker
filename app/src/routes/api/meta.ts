@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { znamiKlienti } from "../../lib/psb/nahodTrening.server";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -321,12 +322,8 @@ export const Route = createFileRoute("/api/meta")({
           const mk = await DB.prepare(
             "SELECT datum, hook, dosah FROM mkt_prispevky WHERE druh IN ('reel','post') AND datum <> ''",
           ).all();
-          // POZOR: v D1 sa stĺpec volá `client_name`. V TypeScripte je to `client`,
-          // lebo import ho premenúva — a práve na tom sa to 12. 8. zlomilo:
-          // `SELECT DISTINCT client` hodilo „no such column", výnimka zhodila
-          // celú odpoveď a sťahovanie Instagramu tíško padalo na 500.
-          const klienti = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
-          const mena = krstneMenaKlientov(((klienti.results as { client_name: string }[]) || []).map((r) => r.client_name));
+          // Známi klienti (kalendár, balíčky, PTminder), nie len export — 28. 10. 2026.
+          const mena = krstneMenaKlientov(await znamiKlienti(DB));
 
           type R = { datum: string; kategoria?: string; hook?: string; dosah?: number };
           const von = new Map<string, { datum: string; kategoria: string; hook: string; dosah: number; zdroj: string }>();
@@ -529,8 +526,7 @@ export const Route = createFileRoute("/api/meta")({
         }
 
         if (akcia === "prepocitaj-kategorie") {
-          const klientiPre = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
-          const mena = krstneMenaKlientov(((klientiPre.results as { client_name: string }[]) || []).map((r) => r.client_name));
+          const mena = krstneMenaKlientov(await znamiKlienti(DB));
           const rs = await DB.prepare("SELECT id, hook, text, kategoria FROM ig_prispevky").all<{ id: string; hook: string; text: string; kategoria: string }>();
           let zmenene = 0;
           const zmeny: Record<string, number> = {};
@@ -1746,12 +1742,8 @@ export const Route = createFileRoute("/api/meta")({
           // Krstné mená klientov — bez nich sa klientsky príbeh nedá spoznať,
           // lebo „Michal" je inak obyčajné slovo. Berú sa zo sedení: tabuľka
           // klientov neexistuje, klient je odvodený z toho, kto trénoval.
-          // POZOR: v D1 sa stĺpec volá `client_name`. V TypeScripte je to `client`,
-          // lebo import ho premenúva — a práve na tom sa to 12. 8. zlomilo:
-          // `SELECT DISTINCT client` hodilo „no such column", výnimka zhodila
-          // celú odpoveď a sťahovanie Instagramu tíško padalo na 500.
-          const klienti = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
-          const mena = krstneMenaKlientov(((klienti.results as { client_name: string }[]) || []).map((r) => r.client_name));
+          // Známi klienti (kalendár, balíčky, PTminder), nie len export — 28. 10. 2026.
+          const mena = krstneMenaKlientov(await znamiKlienti(DB));
 
           const stmts = vsetky.map((m) => {
             const datum = String(m.timestamp || "").slice(0, 10);

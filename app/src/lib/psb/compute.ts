@@ -2239,8 +2239,14 @@ export function deriveAnomalies(
    * 6 990 a Kokpit „Prenesené hodiny" za 0 Kč. Od 1. 10. je pravda Kokpit,
    * takže dlh počíta z neho — ale ktorá verzia je SPRÁVNA, vie len tréner.
    * PTminder sa od 19. 10. nepíše, zoznam teda už nepribúda.
+   *
+   * VYPNUTÉ 28. 10. 2026. Jerry 23. 10. prípad po prípade rozhodol „nechajme
+   * to podľa Kokpitu" a pri odchode z PTmindera (krok 1) sa notifikácia,
+   * ktorá sa pýta na PTminder, už nemá čo pýtať. Rozpory ostávajú v dátach
+   * (`rozporyPtminder`) — len sa nehlásia.
    */
-  for (const r of data.rozporyPtminder || []) {
+  const ROZPORY_HLASIT = false;
+  for (const r of ROZPORY_HLASIT ? data.rozporyPtminder || [] : []) {
     const kokpit = r.kokpit.length
       ? r.kokpit.map((b) => `„${nazovProduktu(b.nazov)}" za ${b.cena.toLocaleString("sk-SK")} Kč (${fmtDMY(b.den)})`).join(" a ")
       : "";
@@ -3240,11 +3246,14 @@ export function deriveRegister(
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.
   //
-  // Keď sa týždeň nenahrá export z PTmindera, appka nič nehlási: dochádzka
+  // Keď sa dochádzka prestane dopĺňať, appka nič nehlási: dochádzka
   // každému klesne (okno 18 týždňov sa posúva, ale nové tréningy nepribúdajú),
   // lievik bežiaceho mesiaca ukáže nula nových klientov a vyzerá to ako zlý
   // mesiac namiesto prázdnej tabuľky. Preto to appka povie nahlas, kým je
   // rozdiel medzi „nič sa nedialo" a „nič sme nenahrali" ešte zistiteľný.
+  //
+  // Od 1. 10. 2026 sú tréningy z Google kalendára (28. 10. 2026 prepísané
+  // z „Dáta z PTmindera končia"): staré dáta = kalendár sa nestiahol.
   const posledneData = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
   if (posledneData) {
     const dniStare = Math.floor(daysBetween(posledneData.slice(0, 10), dnesPraha()));
@@ -3253,12 +3262,11 @@ export function deriveRegister(
         `data|${posledneData.slice(0, 10)}`,
         "Zápis",
         dniStare >= PRAH_ZASTARANIA ? "red" : "orange",
-        `Dáta z PTmindera končia ${fmtDMY(posledneData)}`,
-        `Posledné nahraté sedenie je z ${fmtDMY(posledneData)}, teda spred ${dniStare} dní. Kým nenahráš nový export, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné — nula nových klientov nemusí znamenať, že nikto neprišiel.`,
+        `Dochádzka končí ${fmtDMY(posledneData)}`,
+        `Posledný tréning v dátach je z ${fmtDMY(posledneData)}, teda spred ${dniStare} dní. Tréningy chodia z Google kalendára — ak sa medzitým trénovalo, kalendár sa nestiahol. Obnov ho v Kalendári; kým sa to nestane, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné.`,
         1,
         // Kategória Zápis nesie cieľ prekliku v poli client ako „tab|sub“.
-        // Bez neho by „Otvoriť“ viedlo na Klientov, teda nie tam, kde sa to rieši.
-        "udaje|",
+        "workspace|kalendar",
       );
     }
   }
@@ -3363,15 +3371,16 @@ export function deriveRegister(
     );
   }
 
-  // Človek po úvodnom, ktorého appka ešte nepozná. Profil vzniká z kalendára,
-  // potvrdenie príde z exportu — a vtedy položka zmizne sama.
+  // Človek po úvodnom, ktorého appka ešte nepozná. Profil vzniká z kalendára;
+  // od odchodu z PTmindera (28. 10. 2026) ho nepotvrdí export, ale priradenie
+  // udalosti klientovi v Kalendári — vtedy položka zmizne sama.
   for (const c of cakajuci) {
     add(
       `novy|${c.uvodny}|${c.meno}`,
       "Zápis",
       "blue",
       `${c.meno} — nový klient po úvodnom ${fmtDMY(c.uvodny)}`,
-      `${c.meno}: úvodný ${fmtDMY(c.uvodny)}, v PTminderi ešte nie je. Potvrdí ho najbližší export — dovtedy nemá zostatok hodín ani dochádzku.${c.zNazvu ? " Meno je z názvu udalosti; preklep oprav v Kalendári." : ""}`,
+      `${c.meno}: úvodný ${fmtDMY(c.uvodny)} je v kalendári, ale Kokpit ho ešte nevedie ako klienta. ${c.zNazvu ? "Meno je len z názvu udalosti — v Kalendári priraď udalosť klientovi (a oprav prípadný preklep)" : "Over v Kalendári, či je udalosť priradená správnemu klientovi"}; dovtedy nemá zostatok hodín ani dochádzku.`,
       8,
       // Karta klienta ešte neexistuje — klik vedie na Klientov, kde stojí
       // v rámčeku „Čakajú na potvrdenie".

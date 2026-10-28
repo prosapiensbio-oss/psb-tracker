@@ -974,7 +974,7 @@ export function buildAiContext(
         poslednyDenSDatami: kotva.den,
         poslednyPlnyMesiac: kotva.plny,
         beziaciMesiac: kotva.ciastocny ? kotva.mesiac : null,
-        poznamka: "Dáta z PTmindera končia dňom poslednyDenSDatami — nie dneškom. Mesiac označený príznakom rozrobeny je napočítaný len po tento deň; NIKDY ho neporovnávaj s plnými mesiacmi, nedávaj ho do priemerov a nenazývaj ho „minulý mesiac“. Otázky typu „koľko sme zarobili minulý mesiac“ sa týkajú poslednyPlnyMesiac.",
+        poznamka: "Dáta (tréningy od 1. 10. 2026 z kalendára, staršie z archívu PTmindera) končia dňom poslednyDenSDatami — nie dneškom. Mesiac označený príznakom rozrobeny je napočítaný len po tento deň; NIKDY ho neporovnávaj s plnými mesiacmi, nedávaj ho do priemerov a nenazývaj ho „minulý mesiac“. Otázky typu „koľko sme zarobili minulý mesiac“ sa týkajú poslednyPlnyMesiac.",
       },
     },
     beziaciMesiac: beziaci

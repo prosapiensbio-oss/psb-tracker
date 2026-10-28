@@ -34,6 +34,7 @@ import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
 import { nacitajDozor } from "./reklamaDozor.server";
 import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
+import { znamiKlienti } from "./nahodTrening.server";
 import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
 
 const uid = () => crypto.randomUUID();
@@ -97,7 +98,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
           AND u.zaciatok >= ?1`,
     ).bind(KOKPIT_OD).all(),
     // Balíčky v Kokpite — z nich cena tréningu z kalendára.
-    DB.prepare("SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
+    DB.prepare("SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, hodiny_spolu, cena_czk, zrusene_at, poznamka FROM balicky")
       .all(),
     /**
      * Pocitovka — tri otázky 1–10, ktoré si klepne klient sám na svojej
@@ -326,6 +327,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       (balickyK.results as any[]).map((r) => ({
         klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""),
         platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null,
+        hodinySpoluUlozene: r.hodiny_spolu ?? null,
       })),
       data.packages.map((p) => ({ client: p.client, package: p.package, total: p.total, naObdobie: p.naObdobie })),
       hodinZNazvuBalicka,
@@ -745,7 +747,8 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     // nesedí celé, skúsi sa priezvisko — a riadok, ktorý sa nespáruje, sa
     // zaráta ako preskočený, nie ako úspech.
     const riadky = parseAnamneza(text);
-    const menaDb = (await DB.prepare("SELECT DISTINCT client_name FROM sessions").all()).results.map((r: any) => String(r.client_name));
+    // Známi klienti, nie len export PTmindera — nový klient by sa nespároval (28. 10. 2026).
+    const menaDb = await znamiKlienti(DB);
     const podlaNorm = new Map<string, string>();
     const podlaPriezviska = new Map<string, string[]>();
     for (const m of menaDb) {

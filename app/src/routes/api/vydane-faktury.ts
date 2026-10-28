@@ -18,6 +18,7 @@ import { dnesPraha, posunDen } from "../../lib/psb/cas";
 import { faktureUhradeneBalickom } from "../../lib/psb/fakturaUhradena";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { odlozOdberatela } from "../../lib/psb/odberatelOdlozenie.server";
+import { kanonickyTvarKlienta } from "../../lib/psb/nahodTrening.server";
 
 /**
  * VYDANÉ FAKTÚRY.
@@ -52,16 +53,8 @@ const denISO = (s: unknown) => {
  * iným tvarom mena sa „uloží" a nikde sa neobjaví, lebo čítanie hľadá
  * kanonický tvar z exportu.
  */
-async function kanonickeMeno(DB: D1Database, meno: string): Promise<string> {
-  const presne = await DB.prepare(
-    "SELECT client_name FROM sessions WHERE client_name = ?1 COLLATE NOCASE LIMIT 1",
-  ).bind(meno).first<{ client_name: string }>();
-  if (presne?.client_name) return presne.client_name;
-  const kandidati = await DB.prepare("SELECT DISTINCT client_name FROM sessions").all<{ client_name: string }>();
-  const hladane = normName(meno);
-  const zhody = (kandidati.results || []).filter((r) => normName(r.client_name) === hladane);
-  return zhody.length === 1 ? zhody[0].client_name : meno;
-}
+// Zoznam známych klientov, nie export PTmindera (28. 10. 2026) — viď kanonickyTvarKlienta.
+const kanonickeMeno = (DB: D1Database, meno: string): Promise<string> => kanonickyTvarKlienta(DB, meno);
 
 /**
  * Prístup do schránky. Tie isté údaje, aké Kokpit používa na čítanie dopytov

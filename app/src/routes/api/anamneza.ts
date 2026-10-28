@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { kanonickyTvarKlienta, znamiKlienti } from "../../lib/psb/nahodTrening.server";
 
 import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
@@ -186,14 +187,15 @@ export const Route = createFileRoute("/api/anamneza")({
           if (!riadky.length) return Response.json({ ok: false, error: "Prázdna dávka." }, { status: 400 });
 
           const vysledky: { klient: string; stav: string }[] = [];
+          const znami = await znamiKlienti(DB);
           for (const r of riadky) {
-            const klientR = kus(r.klient, 120);
-            if (!klientR) { vysledky.push({ klient: "?", stav: "bez mena" }); continue; }
+            const zadany = kus(r.klient, 120);
+            if (!zadany) { vysledky.push({ klient: "?", stav: "bez mena" }); continue; }
 
-            const jeKlient = await DB.prepare(
-              "SELECT 1 x FROM sessions WHERE client_name = ?1 LIMIT 1",
-            ).bind(klientR).first<{ x: number }>();
-            if (!jeKlient) { vysledky.push({ klient: klientR, stav: "klient v Kokpite nie je" }); continue; }
+            // Klient zo zoznamu známych (kalendár, balíčky, PTminder) — nie len
+            // z exportu PTmindera, kde nový klient nie je (28. 10. 2026).
+            const klientR = await kanonickyTvarKlienta(DB, zadany, znami);
+            if (!znami.includes(klientR)) { vysledky.push({ klient: zadany, stav: "klient v Kokpite nie je" }); continue; }
 
             const uz = await DB.prepare("SELECT zapis_at FROM anamnezy WHERE klient = ?1").bind(klientR).first<{ zapis_at: string | null }>();
             if (uz?.zapis_at) { vysledky.push({ klient: klientR, stav: "preskočené — zápis už má" }); continue; }

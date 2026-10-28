@@ -57,7 +57,7 @@ stiahni acks       "SELECT * FROM anomaly_ack"
 stiahni leads      "SELECT * FROM leads"
 stiahni kal        "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zmizla_at IS NULL"
 # Vlastná evidencia balíčkov — od 28. 9. 2026 stojí na osi a mení odpočet.
-stiahni balicky    "SELECT id,klient,nazov,hodiny,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj,poznamka FROM balicky"
+stiahni balicky    "SELECT id,klient,nazov,hodiny,hodiny_spolu,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj,poznamka FROM balicky"
 # Tie isté vstupy osi ako v loadData — bez nich kontrolór počíta inak než appka.
 stiahni historia   "SELECT klient,nazov,druh,stav,hodiny,zostatok,od,do,pridane,platba FROM ptminder_historia"
 stiahni doplnenia  "SELECT klient,den,hodiny FROM doplnenia_hodiny"

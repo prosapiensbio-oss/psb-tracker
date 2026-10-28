@@ -99,7 +99,7 @@ const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
 {
   const terazPraha = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
   const bal = doplnHodinySpolu(
-    balicky.map((r: any) => ({ klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""), platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null })),
+    balicky.map((r: any) => ({ klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""), platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null, hodinySpoluUlozene: r.hodiny_spolu ?? null })),
     packages.map((p: any) => ({ client: p.client, package: p.package, total: p.total, naObdobie: p.naObdobie })),
     hodinZNazvuBalicka,
   );

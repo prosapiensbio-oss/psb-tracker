@@ -121,6 +121,13 @@ describe("doplnHodinySpolu", () => {
     const [b] = doplnHodinySpolu([{ klient: "A", nazov: "Balíček 6 h", zdroj: "rucne", platnost_od: "2026-10-01", platnost_do: null, hodiny: 6, cena_czk: 7790 }], [], zNazvu);
     expect(b.hodinySpolu).toBe(6);
   });
+  it("uložený celok (hodiny_spolu) platí aj bez exportu PTmindera — 28. 10. 2026", () => {
+    const [b] = doplnHodinySpolu(
+      [{ klient: "B", nazov: "ONE YEAR", zdroj: "ptminder", platnost_od: "2026-09-20", platnost_do: null, hodiny: 50, cena_czk: 54522, hodinySpoluUlozene: 78 }],
+      [], zNazvu,
+    );
+    expect(b.hodinySpolu).toBe(78);
+  });
 });
 
 describe("online tréning ide z online balíčka (Marcela Hrůzová)", () => {

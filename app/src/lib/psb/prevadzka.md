@@ -229,45 +229,50 @@ Preto je signál „Je toto duch?" formulovaný ako otázka s tlačidlami
 
 ## 11. Peniaze: kde je zdroj pravdy
 
-**PTminder je zdroj pravdy o príjmoch.** Nie banka. Cez bankový účet totiž
-neprejde bitcoin, hotovosť ani barter — banka teda nikdy neuvidí všetky tržby a
-**nesmie sa použiť ako zdroj pravdy o hotovosti**.
+**OD 1. 10. 2026 JE ZDROJOM PRAVDY KOKPIT, NIE PTMINDER.** (Prepísané 28. 10.
+2026 pri odchode z PTmindera; dovtedy tu stálo opačné pravidlo.) Do PTmindera
+sa od 19. 10. 2026 nič nezapisuje a po októbrovej uzávierke sa ruší.
 
-**Fio slúži hlavne na VÝDAVKY.** Príchodzie platby sa v ňom sledujú nanajvýš ako
-kontrola, nie ako zdroj. Pri importe z toho plynie:
-- výdavky z Fio → kategórie P&L (toto je hlavný úžitok importu),
-- príjmy z Fio → len krížová kontrola proti PTminderu,
-- rozdiel medzi bankou a PTminderom **nie je chyba** — je to BTC + hotovosť +
-  barter. Má sa vyčísliť, nie odstraňovať.
+- **Tréningy** od 1. 10. 2026 sú z Google kalendára; staršie z exportu
+  PTmindera (archív, `sessions`).
+- **Platby** od 10/2026 sú vlastná kniha Kokpitu (`platby`): banka z výpisu
+  Fio, hotovosť zo zošita, bitcoin z BTC appky. Staršie mesiace sú v archíve
+  z PTmindera (`payments`).
+- **Balíčky** sú vlastná evidencia Kokpitu (`balicky`). Balíčky kúpené pred
+  1. 10. 2026 sú do nej prenesené z PTmindera (`zdroj = ptminder`).
+
+Banka stále nevidí bitcoin, hotovosť ani barter — preto tržby nie sú „to, čo
+prišlo na účet", ale súčet knihy platieb. **Fio slúži aj na VÝDAVKY** →
+kategórie P&L.
 
 **Jedna platba môže byť rozdelená medzi bitcoin a inú cestu.** Lukáš Kríž
-zaplatil na dvakrát a v bitcoine bola len časť. Keď je teda v PTminderi vyššia
+zaplatil na dvakrát a v bitcoine bola len časť. Keď je teda v knihe platieb vyššia
 suma než v BTC appke, nie je to nezrovnalosť — zvyšok prišiel inak. Vážny je len
 opačný smer: v bitcoine prišlo viac, než je zapísané.
 
 **Bitcoinové platby majú vlastnú evidenciu.** Každá platba klienta v BTC je
 zapísaná v appke prosapiens-btc ako `income` s menom klienta, sumou v satoshi a
-CZK hodnotou v čase platby. To je jediná úplná evidencia BTC príjmov a dá sa
-použiť na krížovú kontrolu proti PTminderu.
+CZK hodnotou v čase platby. To je jediná úplná evidencia BTC príjmov.
 
-## 11b. Nezaplatené poplatky — čo to je a odkiaľ to je
+## 11b. Nezaplatené — čo to je a odkiaľ to je
 
-V kontexte je pole `nezaplatene` (počet, suma, položky). Je to **doslovný
-obsah exportu PTminder → Finances → Transactions**, druhá sekcia súboru.
-
-**Ako sa to číta:** v PTminderi sa poplatok po zaplatení **zmaže**. Čo teda
-v zozname stojí, to je otvorené — netreba a nedá sa to párovať s platbami
-v `payments`. Neexistuje „poplatok, ktorý už je uhradený, ale ešte tam visí".
+V kontexte je pole `nezaplatene` (počet, suma, položky). **Skladá ho appka
+jedným pravidlom** (`dlhyKlientov`): balíček z Kokpitu, na ktorý platby
+nestačili, je nezaplatený; poistka z PTmindera platí už len pre balíčky
+začaté pred 1. 10. 2026. Neprepočítavaj ho zo surových tabuliek — surový
+dopyt do `poplatky` vráti iné číslo než obrazovka (poplatky z PTmindera po
+1. 10. sú len stopa po starom exporte, nie dlh).
 
 **Kde to Jerry vidí:** obrazovka Dnes → dole pod „Končí platnosť členstva", nadpis
 „Nezaplatené (N) · suma". Zoznam sa filtruje prepínačom trénera, celková
 suma tiež — takže Jerryho číslo a číslo v kontexte (všetci tréneri) sa
 legitímne líšia.
 
-**Čerstvosť je jediná pasca.** Zoznam je zrkadlo POSLEDNÉHO importu
-Transactions, nie živý stav. Keď niekto zaplatí dnes, zmizne až po ďalšom
-nahratí súboru. Preto sa nikdy netvrdí „X dlhuje" ako o dnešku — správne je
-„v poslednom exporte z <dátum> stálo otvorených N poplatkov".
+**Čerstvosť je jediná pasca.** Platba z banky sa do Kokpitu dostane až
+nočným stiahnutím z Fio a priradením ku klientovi, hotovosť až zápisom zo
+zošita. Keď niekto zaplatil dnes, zmizne zo zoznamu až potom. Preto sa netvrdí
+„X dlhuje" ako o istote — správne je „podľa Kokpitu má X otvorený balíček
+z <dátum>, platba k nemu zatiaľ nie je".
 
 **Balíček bez platby nie je nezrovnalosť** — viď oddiel 12c.
 
@@ -297,19 +302,20 @@ mesiac dozadu a jeden dopredu** — z dvanástich zaplatených hodín na osobu b
 polovica už odchodená a dopredu zostalo šesť.
 
 **Dôsledok pre každý výpočet:** koľko hodín klientovi zostáva, sa dá zistiť LEN
-zo zostatku v exporte balíčkov, nikdy z výšky platby. Výška platby hovorí, koľko
+zo zostatku balíčkov (karta klienta), nikdy z výšky platby. Výška platby hovorí, koľko
 zaplatil, nie koľko má pred sebou.
 
 ## 12c. Platba a balíček sa nemusia stretnúť — ani jeden smer NIE JE chyba
 
 Klient občas zaplatí hneď po poslednom tréningu zo starého balíčka, ale nové
-členstvo sa mu v PTminderi **ešte nezaloží**. Dôvod je vecný: členstvo má
+členstvo mu **ešte nevznikne** (v Kokpite vzniká samo prvým tréningom, kedysi
+sa zakladalo v PTminderi). Dôvod je vecný: členstvo má
 platiť **od prvého tréningu nového cyklu** a ten ešte nie je dohodnutý.
 Zakladať ho skôr by znamenalo, že platnosť začne bežať naprázdno a klientovi
 budú prepadávať hodiny, kým sa dohodne termín (viď oddiel 3).
 
-**Ako to vyzerá v dátach:** platba v `payments` je, v `packages` má klient
-starý riadok s nulou alebo jednotkou, prípadne v novom exporte vôbec nie je.
+**Ako to vyzerá v dátach:** platba v `platby` je (pred 10/2026 v `payments`),
+v `balicky` má klient len starý balíček s nulou alebo jednotkou.
 
 **Príklad, na ktorom sa to potvrdilo:** Panagiotis Tsiolis zaplatil 26. 8.
 2026 dvadsaťjedentisíc stopäťdesiat korún, naposledy trénoval 20. 8. a
@@ -324,7 +330,7 @@ platby ubehnú týždne a stále nie je dohodnutý termín, to už nie je účto
 stav, ale nedohodnutý klient — a to je otázka pre Jerryho, nie pre appku.
 
 **A platí to aj naopak: balíček bez platby tiež NIE JE chyba.** Nový balíček
-sa v PTminderi nahodí hneď, klient z neho začne čerpať a platba príde neskôr —
+vznikne hneď prvým tréningom, klient z neho začne čerpať a platba príde neskôr —
 preto je ten istý človek v Kokpite naraz v „Balíček dojde…" aj
 v „Nezaplatené". Jerry, 31. 8. 2026: *„my im v ptminder nahodíme nový balík,
 ale ešte nezaplatili, čerpajú z neho, je nezaplatený."*
@@ -338,29 +344,26 @@ Sú to teda dva legitímne stavy, nie protiklady:
 
 **Ani jeden sa nehlási.** Hodný pozornosti je len čas: pri prvom to je dlho
 nedohodnutý termín, pri druhom dlho neuhradený poplatok — a na ten druhý je
-priamo karta „Nezaplatené" (oddiel o poplatkoch, zdroj PTminder Transactions).
+priamo karta „Dlhujú peniaze" (pravidlo v oddiele 11b).
 
 ## 13. Mesačná uzávierka — kedy sú dáta úplné
 
-Tréningy a platby sa do PTmindera nedopĺňajú v reálnom čase. **Uzávierka mesiaca
-je prvý víkend nasledujúceho mesiaca**; ak 1. deň padne na piatok alebo víkend,
-uzávierka je až ten ďalší víkend.
+**Uzávierka mesiaca je prvý víkend nasledujúceho mesiaca**; ak 1. deň padne na
+piatok alebo víkend, uzávierka je až ten ďalší víkend. Tréningy z kalendára sú
+v Kokpite hneď, ale banka sa sťahuje v noci a hotovosť zo zošita sa dopisuje
+neskôr.
 
 Dôsledok pri čítaní čísel: **posledný týždeň a hlavne prvé dni mesiaca sú vždy
-neúplné.** Keď v dátach niečo chýba tesne pred uzávierkou, prvá hypotéza nie je
-„klient neplatil" ani „chyba", ale „ešte to nie je zapísané". Nikdy z posledných
-dní nerob závery o poklese tržieb ani o odchode klienta.
-
-Príklad z 2. 8. 2026: v BTC appke boli Krčmárove platby za 75 425 Kč z 23.–24. 7.,
-v PTminderi po nich nebola stopa. Nebola to nezrovnalosť — len ešte nebola
-uzávierka.
+neúplné v peniazoch.** Keď niečo chýba tesne pred uzávierkou, prvá hypotéza nie
+je „klient neplatil" ani „chyba", ale „ešte to nie je zapísané". Nikdy
+z posledných dní nerob závery o poklese tržieb ani o odchode klienta.
 
 ## 14. Kontrolné zdroje verzus zdroj pravdy
 
-Pri prijatých platbách je zdrojom pravdy **PTminder**. Bankový účet aj BTC appka
-slúžia iba na **kontrolu** — overia, že to, čo je v PTminderi, sa naozaj stalo,
-a ukážu prípady, kde niečo chýba alebo nesedí kurzom. Nikdy z nich nepočítaj
-tržby.
+Od 10/2026 je zdrojom pravdy o prijatých platbách **kniha platieb Kokpitu**.
+Výpis z banky a BTC appka sú jej vstupy, nie druhý súčet vedľa nej. Pre mesiace
+pred 10/2026 platí archív z PTmindera. Nikdy nesčítavaj archív PTmindera
+a knihu Kokpitu za ten istý mesiac — tá istá platba je v oboch.
 
 ---
 

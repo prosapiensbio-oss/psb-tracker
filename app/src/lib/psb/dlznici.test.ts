@@ -192,7 +192,7 @@ describe("hodiny čítajú to isté pravidlo", () => {
   it("loadData berie id balíčka a karta dostane dni bez hodín", async () => {
     const zdroj = require("fs").readFileSync(require("path").join(__dirname, "db.server.ts"), "utf8") as string;
     // Bez `id` v SELECTe by otázka „suma nesedí" nevznikla nikdy (nález 5. 10. 2026).
-    expect(zdroj).toMatch(/SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky/);
+    expect(zdroj).toMatch(/SELECT id, klient, nazov, zdroj, platnost_od, platnost_do, hodiny, hodiny_spolu, cena_czk, zrusene_at, poznamka FROM balicky/);
     expect(zdroj).toContain("data.bezHodin = bezHodinZDlhov(polozky, dvojcata);");
   });
 });

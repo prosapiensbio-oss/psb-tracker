@@ -1,0 +1,13 @@
+-- CELKOVÝ POČET HODÍN BALÍČKA NALIATEHO Z PTMINDERA — VO VLASTNEJ TABUĽKE.
+--
+-- Jerry, 28. 10. 2026: „poďme vymazať PTminder z Kokpitu, ale predtým
+-- skontroluj, či vymazanie nič nerozbije." Cena tréningu z kalendára sa delí
+-- celkovým počtom hodín balíčka. Pri balíčku naliatom z PTmindera nesie
+-- `hodiny` zostatok v deň naliatia, takže celok sa doteraz hľadal pri každom
+-- načítaní v tabuľke `packages` (export PTmindera) — po 1. 10. 2026 jediné
+-- miesto, kde cena hodiny ešte závisela od PTmindera.
+--
+-- Stĺpec sa naplní raz, z toho istého výpočtu, aký beží v appke
+-- (`doplnHodinySpolu`), takže sa žiadne číslo nezmení. Prázdne = balíček
+-- z Kokpitu (celok je v `hodiny`) alebo naliaty bez zhody v exporte.
+ALTER TABLE balicky ADD COLUMN hodiny_spolu INTEGER;

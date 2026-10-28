@@ -210,16 +210,22 @@ export function spojDochadzku(
  * Doplní balíčkom z Kokpitu celkový počet hodín, ktorým sa delí cena.
  *
  * Balíček zapísaný v Kokpite ho má v `hodiny`. Naliaty z PTmindera nesie
- * v `hodiny` zostatok v deň naliatia, takže celok sa hľadá v exporte:
+ * v `hodiny` zostatok v deň naliatia, takže celok sa hľadal v exporte:
  * „78 left from 78" → 78, členstvo „8 per month" → 8, inak číslo z názvu.
+ *
+ * OD 28. 10. 2026 JE CELOK ULOŽENÝ V BALÍČKU (`balicky.hodiny_spolu`,
+ * migrácia 0126) — naplnený raz týmto istým výpočtom. Cena tréningu tak
+ * prestala závisieť od tabuľky `packages`, ktorá odíde s PTminderom.
+ * Hľadanie v exporte zostáva len pre balíček, ktorý uloženú hodnotu nemá.
  */
 export function doplnHodinySpolu(
-  balicky: (BalicekKokpitu & { nazov: string; zdroj?: string | null })[],
+  balicky: (BalicekKokpitu & { nazov: string; zdroj?: string | null; hodinySpoluUlozene?: number | null })[],
   export_: { client: string; package: string; total: number; naObdobie?: number }[],
   hodinZNazvu: (nazov: string) => number,
 ): BalicekKokpitu[] {
   return balicky.map((b) => {
     if (b.zdroj !== "ptminder") return { ...b, hodinySpolu: b.hodiny };
+    if ((b.hodinySpoluUlozene || 0) > 0) return { ...b, hodinySpolu: b.hodinySpoluUlozene! };
     const p = export_.find((x) => x.client === b.klient && x.package === b.nazov);
     const spolu = (p?.total || 0) > 0 ? p!.total : (p?.naObdobie || 0) > 0 ? p!.naObdobie! : hodinZNazvu(b.nazov) || b.hodiny;
     return { ...b, hodinySpolu: spolu };

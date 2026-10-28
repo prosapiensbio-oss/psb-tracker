@@ -1,4 +1,3 @@
-import { normName } from "../../lib/psb/format";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
@@ -7,6 +6,7 @@ import { bindings } from "../../lib/bindings.server";
 import { setOverride } from "../../lib/psb/db.server";
 import type { ClientOverride } from "../../lib/psb/types";
 import { dnesPraha } from "../../lib/psb/cas";
+import { kanonickyTvarKlienta } from "../../lib/psb/nahodTrening.server";
 
 const ALLOWED = new Set<keyof ClientOverride>([
   "status",
@@ -60,18 +60,11 @@ export const Route = createFileRoute("/api/override")({
          * (zjednotOverrides), ale kým sa zapisuje krivé meno, vyrábajú sa
          * ďalšie riadky, ktoré treba zlučovať.
          */
-        const zhoda = await DB.prepare(
-          "SELECT client_name FROM sessions WHERE client_name = ?1 COLLATE NOCASE LIMIT 1",
-        ).bind(name).first<{ client_name: string }>();
-        if (!zhoda) {
-          const kandidati = await DB.prepare("SELECT DISTINCT client_name FROM sessions").all<{ client_name: string }>();
-          const hladane = normName(name);
-          const presne = (kandidati.results || []).filter((r) => normName(r.client_name) === hladane);
-          // Len keď je zhoda JEDNA. Dvaja ľudia s rovnakým menom po odstránení
-          // diakritiky sú zriedkavosť, ale zápis pod nesprávneho z nich by
-          // bol horší než zápis pod nové meno.
-          if (presne.length === 1) name = presne[0].client_name;
-        }
+        // Tvar zo zoznamu známych klientov (kalendár, balíčky, PTminder), nie
+        // len z exportu — nový klient by sa inak zapísal pod krivé meno
+        // (28. 10. 2026). Len pri JEDNEJ zhode: zápis pod nesprávneho
+        // z dvoch rovnakých mien by bol horší než zápis pod nové meno.
+        name = await kanonickyTvarKlienta(DB, name);
         // Stála poznámka sa prepisuje — ale poznámky v čase sú príbeh klienta,
         // nie smetisko. Pred prepisom sa stará verzia odloží do denníka
         // (client_notes), takže sa nedá nič stratiť ani nechtiac.
