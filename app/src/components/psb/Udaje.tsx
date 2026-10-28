@@ -623,7 +623,7 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
             <br /><span style={{ color: C.textDim }}>
               iDoklad → Fakturace › Vydané faktury › Export do CSV. Číslo dokladu je variabilný symbol,
               ktorý stojí v texte bankového prevodu — bez neho appka pri takej platbe nevie, komu patrí.
-              Meno na faktúre býva firma, tú spáruješ s klientom v Prechode.
+              Meno na faktúre býva firma, tú spáruješ s klientom v Evidencii.
             </span>
           </span>
         </div>

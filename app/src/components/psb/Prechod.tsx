@@ -2,8 +2,6 @@ import { BalickyEvidencia } from "./BalickyEvidencia";
 import { DavkovePlatby } from "./DavkovePlatby";
 import { ParovacKontaktov } from "./ParovacKontaktov";
 import { PlatbyEvidencia } from "./PlatbyEvidencia";
-import { C, mix } from "../../lib/psb/theme";
-import { Card, H3 } from "./ui";
 
 /**
  * Prechod — dočasná záložka na odchod od PTmindera.
@@ -37,28 +35,14 @@ export function Prechod({ mena, onFaktura, onVypis, onKlient }: {
 }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <Card>
-        <H3>Odchod od PTmindera</H3>
-        <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6, marginTop: 4 }}>
-          Do PTmindera sa od 19. 10. 2026 nezapisuje — dochádzka, hodiny aj peniaze sú v Kokpite.
-          Porovnania s PTminderom sú preto vypnuté: merali by už len to, že PTminder stojí.
-          Starý export zostáva ako história.
-        </div>
-        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-          Táto záložka je dočasná. Keď sa PTminder vypne, zmizne aj ona.
-        </div>
-      </Card>
+      {/* Úvodná karta „Odchod od PTmindera" je od 28. 10. 2026 preč — záložka
+          sa volá Evidencia a nesie prácu, ktorá sa robí v Kokpite. */}
 
       <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} onVypis={onVypis} onKlient={onKlient} /></div>
       <div id="prechod-kontakty"><ParovacKontaktov mena={mena} /></div>
       <div id="prechod-davka"><DavkovePlatby mena={mena} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
 
-      <Card style={{ background: mix(C.border, 25) }}>
-        <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>
-          Po uzávierke októbra, keď bude všetko sedieť, PTminder sa zruší a táto záložka zmizne.
-        </div>
-      </Card>
     </div>
   );
 }

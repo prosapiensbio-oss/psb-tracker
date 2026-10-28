@@ -40,6 +40,7 @@ import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { dniDoNarodenin, trvanieText, zaciatokSpoluprace } from "../../lib/psb/spolupraca";
 import { fakturaZBalicka } from "../../lib/psb/fakturaZBalicka";
+import { historiaBalickov, historiaPlatieb } from "../../lib/psb/profilHistoria";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -375,6 +376,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     () => vlastnePlatby.filter((x) => normName(x.klient) === normName(meno) && !x.zrusene_at).sort((a, b) => b.datum.localeCompare(a.datum)),
     [vlastnePlatby, meno],
   );
+  /**
+   * Pod evidenciou len to, čo v nej nie je (Jerry, 28. 10. 2026: „prečo to
+   * tam musí byť 2×?"). Len zobrazenie — os ani čísla sa nemenia.
+   */
+  const historiaB = useMemo(() => historiaBalickov(os, mojeBalicky), [os, mojeBalicky]);
+  const historiaP = useMemo(() => historiaPlatieb(os, mojePlatby), [os, mojePlatby]);
 
   /**
    * Príjmy z výpisu, ktoré appka navrhuje práve tomuto klientovi.
@@ -1174,17 +1181,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {dlh.dlzi > 0
               ? `${dlh.pocet === 1 ? "balíček" : `${dlh.pocet} balíčky`} za ${fmtCZK(dlh.zaBalicky)}${dlh.zaplatene ? `, zaplatené ${fmtCZK(dlh.zaplatene)}` : ", zatiaľ bez platby"}`
               : dlzi > 0
-                ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "položka" : poplatkyKlienta.length < 5 ? "položky" : "položiek"} z PTmindera`
-                : `zaplatil ${fmtCZK(zaplatene)} podľa PTmindera`}
-            {dlh.dlzi > 0 && dlzi > 0 ? ` · a ${fmtCZK(dlzi)} z PTmindera` : ""}
+                ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "starý poplatok" : poplatkyKlienta.length < 5 ? "staré poplatky" : "starých poplatkov"}`
+                : `zaplatil spolu ${fmtCZK(zaplatene)}`}
+            {dlh.dlzi > 0 && dlzi > 0 ? ` · a ${fmtCZK(dlzi)} starý poplatok` : ""}
           </div>
-          {/* Keď má klient platby aj v Kokpite, povedz to — inak človek číta
-              číslo z jedného zdroja ako celok. */}
-          {!!mojePlatby.length && (
-            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
-              + {fmtCZK(mojePlatby.reduce((a, x) => a + x.suma_czk, 0))} zapísané v Kokpite
-            </div>
-          )}
+          {/* „+ X zapísané v Kokpite" je od 28. 10. 2026 preč: `zaplatene` je už
+              CELÁ kniha (do 9/2026 archív PTmindera, od 10/2026 Kokpit —
+              `spojPlatby`), takže riadok pripočítaval platby Kokpitu druhýkrát. */}
           {/* SMS rovno odtiaľto (Jerry, 1. 10. 2026: „strašne mi chýba
               možnosť poslať SMS priamo v profile"). Doteraz sa to dalo len
               z dlaždice na dashboarde — teda z inej obrazovky, než na ktorej
@@ -1275,8 +1278,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )}
             {mimoExportu > 0 && (
               <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
-                {c.packageOdkial?.startsWith("Kokpit") ? "Kokpit hovorí" : "PTminder hovorí"} {c.packageRemaining} h k poslednému exportu;
-                {" "}{mimoExportu} {mimoExportu === 1 ? "hodina sa odtrénovala" : mimoExportu < 5 ? "hodiny sa odtrénovali" : "hodín sa odtrénovalo"} po ňom a vie o nich zatiaľ len kalendár.
+                Zostatok {c.packageRemaining} h ešte nezahŕňa {mimoExportu} {mimoExportu === 1 ? "tréning" : mimoExportu < 5 ? "tréningy" : "tréningov"} z kalendára, ktoré sa práve odtrénovali.
               </div>
             )}
             {/* SMS O HODINÁCH — aj odtiaľto, nielen z Kalendára.
@@ -1834,7 +1836,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 </div>
                 );
               })}
-              <div style={hlavicka}>Z PTMINDERA</div>
+              {!!historiaB.length && <div style={hlavicka}>STARŠIA HISTÓRIA</div>}
             </div>
           )}
 
@@ -1941,7 +1943,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   )}
                 </div>
               ))}
-              <div style={hlavicka}>Z PTMINDERA</div>
+              {!!historiaP.length && <div style={hlavicka}>STARŠIA HISTÓRIA</div>}
             </div>
           )}
 
@@ -1999,10 +2001,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )
           )}
 
-          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && os
-            .filter((x) => filter === "vsetko"
-              || (filter === "peniaze" && x.druh === "platba")
-              || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
+          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? os : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
             .map((x, i) => (
               <RiadokOsi
                 key={i}

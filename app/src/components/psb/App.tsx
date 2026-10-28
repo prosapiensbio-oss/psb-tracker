@@ -250,7 +250,10 @@ const TABS = [
   // súbežného chodu najprv viseli v Kalendári — Jerry v ten istý deň: „keď
   // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
   // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
-  { id: "prechod", label: "Prechod", icon: "prechod" },
+  // Nápis „Evidencia" od 28. 10. 2026 (Jerry: zmienky o PTminderi preč, karty
+  // ostávajú — zápis balíčkov, kniha platieb, dávky, firmy klientov). `id`
+  // ostáva „prechod", visia naň adresy a odkazy.
+  { id: "prechod", label: "Evidencia", icon: "prechod" },
   // Upload = nahrať exporty a zavrieť mesiac. `id` zostáva „udaje", lebo naň
   // visia adresy (#udaje), ciele rituálov aj Jarvisove odkazy — nápis je vec
   // pre človeka, id je vec pre kód.
