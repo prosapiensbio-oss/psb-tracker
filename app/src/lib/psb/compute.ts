@@ -10,7 +10,6 @@ import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnost
 import { menoZNazvuUvodneho } from "./kalendar";
 import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
-import { sedeniaMimoKalendara } from "./mimoKalendara";
 import { barterovePredaje } from "./barter";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
@@ -3318,58 +3317,10 @@ export function deriveRegister(
   const cakajuci = cakajuciKlienti(clients, kal?.udalosti, kal?.zmeny);
 
   /**
-   * OPAČNÝ SMER — a od 1. 10. 2026 ten dôležitejší.
-   *
-   * „V kalendári áno, v PTminderi nie" znamená, že kontrola ešte nedobehla.
-   * „V PTminderi áno, v kalendári nie" znamená, že sa tréning konal a ZDROJ
-   * PRAVDY o ňom nevie — po odchode z PTmindera by zmizol aj s hodinou,
-   * ktorú klient zaplatil. Jerry, 1. 10. 2026: „všetko by malo byť v Google
-   * kalendári."
-   *
-   * Appka to vedela už dávno, ale len v karte „Vydrží kalendár sám?"
-   * v Kalendári — a tam sa nikto nechodí pozerať.
-   *
-   * Okno si funkcia berie z poľa udalostí, nie z konštanty; prečo, stojí
-   * v `mimoKalendara.ts` aj s tým, čo to stálo.
+   * „V PTminderi áno, v kalendári nie" (`mimokal|`) je od 28. 10. 2026 preč
+   * (Jerry: „odstrániť porovnávania"). Od 1. 10. sú tréningy z kalendára,
+   * takže v okne 21 dní už nemala s čím porovnávať — mlčala, len bežala.
    */
-  /**
-   * ZLÚČENÉ PO ČLOVEKU. Tri chýbajúce tréningy jedného klienta sú jedna
-   * robota — otvoriť jeho kartu a dopísať ich — nie tri otázky. Kontrola
-   * ostrých dát to zachytila hneď („tá istá otázka dvakrát") a je to to isté
-   * pravidlo ako pri týždenných rituáloch: po osobách v registri, zlúčené
-   * v zozname.
-   *
-   * Kľúč nesie NAJNOVŠÍ chýbajúci deň: keď pribudne ďalší, zmení sa a položka
-   * sa ozve znova. Odklepnutie tak umlčí to, čo človek videl, nie aj to, čo
-   * príde po ňom.
-   */
-  const mimoKal = new Map<string, { datumy: string[]; trener: string | null }>();
-  for (const m of sedeniaMimoKalendara(
-    (data.sessions || []).map((x) => ({ client: x.client, date: x.date, sessionTrainer: x.sessionTrainer })),
-    kal?.udalosti,
-  )) {
-    const z = mimoKal.get(m.klient) || { datumy: [], trener: m.trener };
-    z.datumy.push(m.datum);
-    mimoKal.set(m.klient, z);
-  }
-  for (const [klient, z] of mimoKal) {
-    const dni = z.datumy.slice().sort();
-    const najnovsi = dni[dni.length - 1];
-    const vypis = dni.map((d) => fmtDMY(d)).join(", ");
-    add(
-      `mimokal|${klient}|${najnovsi}`,
-      "Zápis",
-      "orange",
-      dni.length === 1
-        ? `${klient} — tréning ${fmtDMY(najnovsi)} nie je v Google kalendári`
-        : `${klient} — ${dni.length} tréningy nie sú v Google kalendári`,
-      `${klient}: ${vypis} ${dni.length === 1 ? "je tréning" : "sú tréningy"} v PTminderi, ale v kalendári nie. Od 1. 10. je dochádzka z kalendára, takže takto zapísaný tréning sa po odchode z PTmindera stratí. Dopíš ho do kalendára — na karte klienta je „Nahodiť tréning do kalendára".`,
-      6,
-      klient,
-      "mimokal",
-      { trener: z.trener, oKom: klient },
-    );
-  }
 
   // Človek po úvodnom, ktorého appka ešte nepozná. Profil vzniká z kalendára;
   // od odchodu z PTmindera (28. 10. 2026) ho nepotvrdí export, ale priradenie

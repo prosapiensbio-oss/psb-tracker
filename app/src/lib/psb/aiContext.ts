@@ -48,7 +48,6 @@ import type { BezBalicka } from "./bezBalicka";
 import type { Dlznik } from "./dlznici";
 import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
-import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
@@ -121,7 +120,7 @@ export function buildAiContext(
   btc?: BtcPreAi,
   guillermo?: { zaznamy: GuillermoZaznam[]; udalosti: GuillermoUdalost[] },
   /** Hotové meradlo súbežného chodu zo servera — sem sa neprepočítava. */
-  porovnanie?: PorovnanieDochadzky | null,
+  porovnanie?: unknown,
   /** To isté pre balíčky (`/api/balicky`). */
   balicky?: { spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null,
   /** A to isté pre platby (`/api/platby`). */

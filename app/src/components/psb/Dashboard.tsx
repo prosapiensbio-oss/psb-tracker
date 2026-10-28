@@ -2729,7 +2729,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           {jeNepotvrdeny && !item.acked && (
             <>
               <button onClick={odpovedzNetrenoval} style={{ ...linkBtn, color: C.red }}>Netrénoval</button>
-              <button onClick={() => vybav("trénoval — chýba v PTminderi, treba doplniť")} style={{ ...linkBtn, color: C.green }}>Trénoval</button>
+              <button onClick={() => vybav("trénoval")} style={{ ...linkBtn, color: C.green }}>Trénoval</button>
             </>
           )}
           {jeBezDopytu && !item.acked && (

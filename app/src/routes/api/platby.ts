@@ -12,7 +12,7 @@ import {
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { dnesPraha } from "../../lib/psb/cas";
-import { btcNaPlatby, mozePrepnut, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
 import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
 import { najdiKlienta } from "../../lib/psb/compute";
 
@@ -473,7 +473,6 @@ async function stavPlatieb(DB: D1Database) {
      * z obchodu prepnutiu nebráni.
      */
     peniazeOd: String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, ""),
-    prepnutie: { od: odMesiaca, ...mozePrepnut(odMesiaca, porovnanie.mesiace, vsetkyNepriradene.filter((x) => x.klientsky)) },
     /** BTC platby, ktorých klienta import nespoznal — treba ich zapísať ručne. */
     btcNesparovane: (() => {
       try { return JSON.parse(String((btcNes as { value?: string } | null)?.value || "[]")) as { meno: string; datum: string; suma: number }[]; } catch { return []; }
@@ -1003,20 +1002,14 @@ export const Route = createFileRoute("/api/platby")({
          * keď brána (`mozePrepnut`) pustí: rozhoduje server, nie tlačidlo —
          * obrazovka mohla byť načítaná pred hodinou. Späť sa dá vždy.
          */
+        /**
+         * PREPÍNAČ „PENIAZE Z PTMINDERA / Z KOKPITU" JE PREČ (Jerry, 28. 10.
+         * 2026: „odstráň ho"). Peniaze sú z Kokpitu od 10/2026 natrvalo
+         * (`vzas_settings.peniaze_kokpit_od`); návrat na PTminder by od
+         * októbra vrátil tržby z exportu, do ktorého sa už nezapisuje.
+         */
         if (akcia === "peniaze-od") {
-          const m = String(b.mesiac || "").slice(0, 7);
-          if (!m) {
-            await DB.prepare("DELETE FROM vzas_settings WHERE key = ?1").bind(PENIAZE_KLUC).run();
-            await audit(DB, { action: "peniaze-z-ptmindera", predmet: "", actor: kto });
-            return Response.json({ ok: true });
-          }
-          const stav = await stavPlatieb(DB);
-          if (m !== stav.prepnutie.od) return Response.json({ ok: false, error: `Prepnúť sa dá od ${stav.prepnutie.od} — od toho mesiaca sa súbežný chod porovnáva.` }, { status: 400 });
-          if (!stav.prepnutie.ok) return Response.json({ ok: false, error: `Ešte nesedí: ${stav.prepnutie.dovody.join(" · ")}` }, { status: 409 });
-          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-            .bind(PENIAZE_KLUC, JSON.stringify(m)).run();
-          await audit(DB, { action: "peniaze-z-kokpitu", predmet: m, actor: kto });
-          return Response.json({ ok: true });
+          return Response.json({ ok: false, error: "Peniaze sú z Kokpitu od 10/2026 natrvalo — prepínač je zrušený." }, { status: 410 });
         }
 
         /** Odkedy sa súbežný chod súdi. Staršie mesiace zostávajú v evidencii. */

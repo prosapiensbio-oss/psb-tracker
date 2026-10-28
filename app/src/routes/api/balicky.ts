@@ -6,7 +6,7 @@ import { smieVzniknutAutomaticky } from "../../lib/psb/workspaceKroky";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { porovnajBalicky, type Balicek, type PtBalicek } from "../../lib/psb/balickyEvidencia";
+import { type Balicek } from "../../lib/psb/balickyEvidencia";
 import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac, normName } from "../../lib/psb/format";
 import { jePlatenyBalicek, podobnyBalicek, type ExistujuciBalicek } from "../../lib/psb/duplicitaBalicka";

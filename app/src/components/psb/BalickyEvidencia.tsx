@@ -110,22 +110,20 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
         />
       </H3>
 
+      {/* „Naliať / Doplniť nové z PTmindera" je od 28. 10. 2026 preč —
+          PTminder sa ruší a balíčky vznikajú v Kokpite (samy prvým tréningom
+          alebo zápisom). Akcia `nalej` na serveri ostáva pre prípadný
+          posledný export, tlačidlo nie. */}
       {prazdne ? (
         <>
           <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55, margin: "4px 0 10px" }}>
-            Zoznam je zatiaľ prázdny. Nalej doň aktuálny stav z PTmindera — päťdesiat živých členstiev
-            sa prepisovať ručne nebude. Odvtedy sa do Kokpitu zapisujú už len nové predaje a appka
-            porovná, či jej zostatky sedia s PTminderom.
+            Zoznam je zatiaľ prázdny. Balíček vznikne sám prvým tréningom klienta, alebo ho zapíš ručne.
           </div>
           <button
-            onClick={() => void akcia({ akcia: "nalej" }, "nalej")}
-            disabled={pracujem === "nalej"}
-            style={{
-              padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
-              border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 12), color: C.green,
-            }}
+            onClick={() => setPisem(!pisem)}
+            style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accentLight, 45)}`, background: "transparent", color: C.accentLight }}
           >
-            {pracujem === "nalej" ? "nalievam…" : "Naliať z PTmindera"}
+            {pisem ? "Zavrieť" : "Zapísať nový balíček"}
           </button>
         </>
       ) : (
@@ -143,13 +141,6 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
               style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accentLight, 45)}`, background: "transparent", color: C.accentLight }}
             >
               {pisem ? "Zavrieť" : "Zapísať nový balíček"}
-            </button>
-            <button
-              onClick={() => void akcia({ akcia: "nalej" }, "nalej")}
-              disabled={pracujem === "nalej"}
-              style={{ padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
-            >
-              {pracujem === "nalej" ? "…" : "Doplniť nové z PTmindera"}
             </button>
           </div>
         </>

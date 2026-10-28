@@ -8,7 +8,6 @@ import { SmsKlientovi } from "./SmsKlientovi";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { navrhniKlientaKandidati, vyzeraNaMeno, type ClientAgg } from "../../lib/psb/compute";
-import type { TyzdenPorovnania } from "../../lib/psb/porovnanieDochadzky";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
@@ -43,8 +42,7 @@ type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string
 /** Meno z kalendára, ktoré sedí na viacerých klientov (napr. dve Markety). */
 type Nejednoznacne = { nazov: string; kandidati: string[]; casy: string[] };
 type Guillermo = { id: string; datum: string; druh: string; hodiny: number; suma_czk: number | null; poznamka: string | null };
-export type Porovnanie = { tyzdne: TyzdenPorovnania[]; od: string; do: string; sedeni: number; lenPtminder: number; lenKalendar: number; bezKalendara: { trener: string; sedeni: number }[] };
-type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; zmenyHistoria: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[]; porovnanie: Porovnanie | null };
+type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; zmenyHistoria: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[] };
 
 const TYPY = [
   { value: "trening", label: "Tréning klienta" },
@@ -183,7 +181,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
     const j = (await r.json()) as { ok: boolean } & Stav;
-    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, zmenyHistoria: j.zmenyHistoria || [], mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [], nejednoznacne: j.nejednoznacne || [], porovnanie: j.porovnanie || null });
+    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, zmenyHistoria: j.zmenyHistoria || [], mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [], nejednoznacne: j.nejednoznacne || [] });
   }, []);
 
   useEffect(() => { void nacitaj(); }, [nacitaj]);

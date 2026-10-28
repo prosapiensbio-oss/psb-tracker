@@ -17,7 +17,6 @@ import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
-import { REPORTS, UploadCard } from "./Udaje";
 import { BankaUlozene } from "./BankaUlozene";
 import { BankovyImport } from "./Banka";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
@@ -1769,12 +1768,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           reportVstup={reportUzavierky}
           obsahKroku={(() => {
             const mk = mesiacUzavierky;
-            const nahravanie = (co: string, zameranie: "ptminder" | "metricool") => actions ? (
-              <>
-                <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>{co}</div>
-                <UploadCard bezBanky zameranie={zameranie} mesiacKroku={mk} data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
-              </>
-            ) : null;
             const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
             return {
               // Mesačné kontroly uzatváraného mesiaca — krok uzávierky, nie
@@ -1788,7 +1781,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                * Zostalo hlásenie: beží appke všetko? Nič sa v ňom neodklepáva.
                */
               kontroly: <ZdravieKokpitu rozpory={rozpory || []} mesiac={mk} />,
-              ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,
               // 8. 10. 2026) — okno na CSV Jerry v ten istý deň zrušil.
               // Pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026). Sťahuje sa

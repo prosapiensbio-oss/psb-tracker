@@ -35,17 +35,10 @@ import { Konta, KontaNadpis } from "./Konta";
 // budíku rýchlosti. Uzávierky sem prišli z VZAS z rovnakého dôvodu: nie sú to
 // peniaze, je to obsluha dát.
 
-// Zdroj `banka` nie je v PSBData — bankové pohyby žijú vo vlastnej tabuľke a
-// načítavajú sa až na obrazovke, kde treba. V zozname je preto zvlášť: nie je
-// z PTmindera, ale je to piaty súbor, bez ktorého appka nevie, kam idú peniaze.
-export const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
-  { key: "sessions", label: "Payroll by Session", path: "PTminder → Payroll Reports › By Session" },
-  { key: "services", label: "Payroll by Service", path: "PTminder → Payroll Reports › By Service" },
-  { key: "payments", label: "Payments Recorded", path: "PTminder → Financial Reports › Payments Recorded" },
-  { key: "packages", label: "Packages & Memberships", path: "PTminder → General Reports › Packages & Memberships (všetky 4 pohľady)" },
-  { key: "poplatky", label: "Transactions", path: "PTminder → Finances › Transactions (Export). Nezaplatené poplatky — po zaplatení sa v PTminderi mažú, takže export je vždy úplný zoznam otvorených." },
-];
-
+// Exporty z PTmindera sa tu od 28. 10. 2026 neponúkajú (Jerry: „odstrániť
+// import, tlačidlá, porovnávania a krok uzávierky — import spravím cez teba").
+// Nahrávanie ich stále PREČÍTA (`detectCSVType`), keby ešte prišiel posledný
+// októbrový export; len sa po ňom nikto nepýta a zoznam ich nevypisuje.
 const BANKA_ZDROJ = {
   label: "Fio banka — pohyby",
   path: "Fio → Výpisy a reporty › Výpis z účtu (CSV) — ten má ID operácií aj kontrolné súčty, na rozdiel od „Vyhledané pohyby“",
@@ -78,7 +71,6 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
 ];
 
 export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc, pohybSplits, nastavPohybSplit }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void }; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
-  const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
       {/* Uzávierka, pohyby z banky a zošit sa od 5. 10. 2026 robia vo
@@ -92,7 +84,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
           ? <button onClick={() => onNavigate("workspace", "uzavierka")} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, cursor: "pointer", fontFamily: "inherit", fontSize: 12, textDecoration: "underline" }}>Workspace → Uzávierka mesiaca</button>
           : "Workspace → Uzávierka mesiaca"}.
       </div>
-      <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
+      <UploadCard data={data} actions={actions} chat={chat} />
 
       {btc && <BtcParovanie platby={btc.platby} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />}
 
@@ -191,14 +183,14 @@ function Verzia() {
   );
 }
 
-export function UploadCard({ data, missing, actions, chat, bezBanky = false, zameranie, mesiacKroku }: {
-  data: PSBData; missing: typeof REPORTS; actions: Actions; chat?: AssistantChat;
+export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, mesiacKroku }: {
+  data: PSBData; actions: Actions; chat?: AssistantChat;
   /**
    * Len jeden zdroj — krok uzávierky vo Workspace (Jerry, 5. 10. 2026:
    * „toto všetko nám nemusí byť napísané"). Namiesto celého zoznamu zdrojov
    * ukáže len reporty toho kroku, každý s dátumom nahratia.
    */
-  zameranie?: "ptminder" | "metricool";
+  zameranie?: "metricool";
   /** Mesiac uzávierky — report, ktorý ho nepokrýva, nemá fajku. */
   mesiacKroku?: string;
   /**
@@ -210,8 +202,8 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Collapsed by default — CSV can also be uploaded via the AI assistant. Auto-open when reports are missing.
-  const [open, setOpen] = useState(missing.length > 0);
+  // Zavreté — súbory sa dajú nahrať aj cez Jarvisa.
+  const [open, setOpen] = useState(false);
   // Bankový výpis sa nedá nahrať naslepo: každý výdavok potrebuje kategóriu a na
   // účte sú aj súkromné veci. Preto JEDNO miesto na nahrávanie, ale dve
   // správania — výpis z PTmindera sa zapíše hneď, výpis z banky otvorí náhľad
@@ -412,7 +404,7 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
           návod a zoznam potrebných CSV. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <div style={{ ...S.h3, marginBottom: 0 }}>Upload CSV</div>
-        {missing.length > 0 && <span style={{ ...badge("orange"), fontSize: 10 }}>{missing.length} chýba</span>}
+
       </div>
       <div>
       <div
@@ -429,8 +421,8 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
         <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
           {zameranie
             ? "Typ rozpozná sám; duplicity preskočí, históriu zachová."
-            : <>PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
-              Bankový výpis sa najprv ukáže na kontrolu.</>}
+            : <>Bankový výpis z Fio, faktúry, marketing aj ďalšie zdroje. Typ rozpozná sám; duplicity preskočí,
+              históriu zachová. Bankový výpis sa najprv ukáže na kontrolu.</>}
         </div>
       </div>
       {pdfStav && (
@@ -597,29 +589,6 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
       {open && (
       <div style={{ marginTop: 10, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
         <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV (kde ich nájdeš · aktuálnosť):</div>
-        {REPORTS.map((r) => {
-          const arr = (data[r.key] as { date?: string }[]) || [];
-          const present = arr.length > 0;
-          let info = "";
-          if (r.key === "packages") {
-            const up = data.uploadLog?.find((l) => l.type === "packages");
-            info = up ? `nahrané ${fmtDMY(up.date)}` : "";
-          } else if (present) {
-            let mx = "";
-            for (const x of arr) if (x.date && x.date > mx) mx = x.date;
-            info = mx ? `dáta do ${fmtDMY(mx)}` : "";
-          }
-          return (
-            <div key={r.label} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
-              <span style={{ color: present ? C.green : C.orange, flexShrink: 0 }}>{present ? "✓" : "✗"}</span>
-              <span>
-                <strong style={{ color: C.text }}>{r.label}</strong>
-                {info && <span style={{ color: present ? C.accentLight : C.textDim, fontWeight: 500 }}> · {info}</span>}
-                <br /><span style={{ color: C.textDim }}>{r.path}</span>
-              </span>
-            </div>
-          );
-        })}
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
           <span style={{ color: bankaNahrata ? C.green : C.orange, flexShrink: 0 }}>{bankaNahrata ? "✓" : "✗"}</span>
           <span>
@@ -658,18 +627,6 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
             </span>
           </span>
         </div>
-        {/* Zoznam klientov — jediný úplný zdroj mailov a telefónov. Bez neho
-            má kontakt 27 zo 125 klientov a faktúra nemá kam odísť. */}
-        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
-          <span style={{ color: C.textDim, flexShrink: 0 }}>·</span>
-          <span>
-            <strong style={{ color: C.text }}>Zoznam klientov</strong>
-            <br /><span style={{ color: C.textDim }}>
-              PTminder → Clients › Export. Doplní maily, telefóny a narodeniny do profilov — čo už v appke je,
-              neprepíše, len na rozdiel upozorní. Stiahni si ten DLHŠÍ export (s trénerom a narodeninami).
-            </span>
-          </span>
-        </div>
         <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing a web:</div>
         {MARKETING_ZDROJE.map((m) => {
           const st = surove.find((x) => x.druh === m.druh);
@@ -693,11 +650,6 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false, zam
           to, čo sa natočilo a naplánovalo v decembri 2025, sa dovtedy minie. Nový content treba mať natočený,
           nastrihaný a naplánovaný skôr.
         </div>
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-          Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,
-          členstvá klientov) — nahraj všetky, každý nesie niečo iné a ten posledný má aj platnosť členstva.
-          Rovnaký súbor nič nezduplikuje.
-        </div>
       </div>
       )}
       </>)}
@@ -712,11 +664,10 @@ const denMes = (iso: string) => { const d = String(iso || "").slice(0, 10); retu
 /**
  * REPORTY JEDNÉHO KROKU UZÁVIERKY, každý s dátumom nahratia.
  *
- * Jerry, 5. 10. 2026: pri PTminderi len jeho reporty a „dátum nahratia by mal
- * ostať"; pri Metricoole „stačí, aby tam ostal iba Metricool, a môžeš tam
+ * Jerry, 5. 10. 2026: pri Metricoole „stačí, aby tam ostal iba Metricool, a môžeš tam
  * vypísať zoznam jednotlivých reportov pod seba".
  */
-function ZoznamZdrojaKroku({ zameranie, data, obnova, mesiac }: { zameranie: "ptminder" | "metricool"; data: PSBData; obnova: unknown; mesiac?: string }) {
+function ZoznamZdrojaKroku({ zameranie, data, obnova, mesiac }: { zameranie: "metricool"; data: PSBData; obnova: unknown; mesiac?: string }) {
   const [subory, setSubory] = useState<{ filename: string; uploaded_at: string }[] | null>(null);
   const [pdfZaznam, setPdfZaznam] = useState<{ filename: string; date: string } | null>(null);
   useEffect(() => {
@@ -739,21 +690,6 @@ function ZoznamZdrojaKroku({ zameranie, data, obnova, mesiac }: { zameranie: "pt
       </span>
     </div>
   );
-  if (zameranie === "ptminder") {
-    const typLogu: Record<string, string> = { sessions: "sessions", services: "services", payments: "payments", packages: "packages", poplatky: "transakcie" };
-    return (
-      <div style={{ marginTop: 12 }}>
-        {REPORTS.map((r) => {
-          const arr = (data[r.key] as { date?: string }[]) || [];
-          let mx = "";
-          if (r.key !== "packages") for (const x of arr) if (x.date && x.date > mx) mx = x.date;
-          const nahrate = naposledy(typLogu[r.key as string] || "");
-          const info = [mx ? `dáta do ${fmtDMY(mx)}` : "", nahrate ? `nahraté ${denMes(nahrate)}` : ""].filter(Boolean).join(" · ");
-          return riadok(arr.length > 0, r.label, info, r.path.split(". ")[0]);
-        })}
-      </div>
-    );
-  }
   // Metricool: posledný súbor každého druhu, jeho obdobie z názvu a deň nahratia.
   const druhy = [
     { vzor: "instagram-posts", nazov: "Instagram — príspevky (CSV)" },

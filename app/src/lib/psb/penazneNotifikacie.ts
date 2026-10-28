@@ -48,7 +48,7 @@ export function polozkaZastaranaBanka(poslednyPohyb: string, ack: Ack, dnes = ne
   };
 }
 
-/** „Bitcoin nesedí s PTminderom — X." */
+/** „Bitcoin nesedí s knihou platieb — X." */
 export function polozkyBtcNesedi(
   payments: PaymentRow[],
   btcPlatby: BtcKnihaPlatba[],
@@ -61,8 +61,8 @@ export function polozkyBtcNesedi(
   // problém, ktorý neexistuje.
   return porovnajBtcPlatby(payments, btcPlatby).nesedi.map((n) => ({
     key: n.kluc, category: "Anomália" as const, tone: "orange" as const,
-    title: `Bitcoin nesedí s PTminderom — ${n.klient}`,
-    detail: `${n.text}. Oprav to v PTminderi pri zdroji; kontrola je v Peniaze → Tržby.`,
+    title: `Bitcoin nesedí s knihou platieb — ${n.klient}`,
+    detail: `${n.text}. Chýbajúcu platbu zapíš v Kokpite (Prechod → Platby); kontrola je v Peniaze → Tržby.`,
     priority: 8, client: "vzas|trzby", trener: "Jerry", oKom: n.klient,
     ...stavPolozkyRegistra(n.kluc, ack, "btc", dnes),
   }));

@@ -2208,8 +2208,6 @@ function skupinaFaktur(
     const min = new Date(dnes.getFullYear(), dnes.getMonth() - 1, 1);
     const mk = `${min.getFullYear()}-${String(min.getMonth() + 1).padStart(2, "0")}`;
     const chybaju: string[] = [];
-    const k = kotvaDat(data);
-    if (!k.plny || k.plny < mk) chybaju.push("PTminder (sedenia a platby)");
     if (!bankaSumy[mk]) chybaju.push("výpis z Fio");
     if (!MKT_MESACNE.some((r) => r.m === mk) && !kanalyMesiace.includes(mk)) chybaju.push("Metricool");
     // Bez zošita chýba hotovosť — a s ňou časť nákladov aj výplat. Mesiac,
@@ -2424,7 +2422,6 @@ function skupinaFaktur(
   }, []);
 
   const krokyZamku = useCallback((mk: string): KrokUzavierky[] => {
-    const k = kotvaDat(data);
     const z = zapisy.mesiace?.[mk];
     /**
      * OTÁZKY MESIACA SÚ ZODPOVEDANÉ, AŽ KEĎ ODPOVEDALI OBAJA.
@@ -2477,16 +2474,9 @@ function skupinaFaktur(
       return chyba.sort((a, b) => a.localeCompare(b, "sk"));
     })();
     return [
-      // PTminder sa od 19. 10. 2026 nepíše — export patrí len k uzávierke
-      // októbra (posledný, kým sa účet nezruší). Novšia uzávierka ho nechce.
-      ...(mk <= "2026-10" ? [{
-        id: "ptminder",
-        label: "PTminder",
-        hotovo: !!k.plny && k.plny >= mk,
-        detail: k.den ? `nahratý po ${fmtDMY(k.den)}` : "nič nie je nahraté",
-        tab: "workspace",
-        sub: "uzavierka",
-      }] : []),
+      // Krok „PTminder" je od 28. 10. 2026 preč (Jerry: „odstrániť import,
+      // tlačidlá, porovnávania a krok uzávierky — môžeš už teraz, import spravím
+      // cez teba"). Posledný export za október nahrá Claude, nie uzávierka.
       {
         id: "fio",
         label: "Výpis z Fio",

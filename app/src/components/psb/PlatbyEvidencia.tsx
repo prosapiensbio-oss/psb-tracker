@@ -57,7 +57,6 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ klient: "", datum: dnesPraha(), suma: "", poznamka: "", sposob: "hotovost" });
   const [peniazeOd, setPeniazeOd] = useState("");
-  const [prepnutie, setPrepnutie] = useState<{ od: string; ok: boolean; dovody: string[] } | null>(null);
   const [btcNes, setBtcNes] = useState<{ meno: string; datum: string; suma: number }[]>([]);
 
   const nacitaj = useCallback(async () => {
@@ -66,7 +65,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
     if (j.ok) {
       setPlatby(j.platby || []); setNepriradene(j.nepriradene || []); setP(j.porovnanie || null);
       setPoExport(j.poExport || ""); setOdMesiaca(j.odMesiaca || ""); setCelkom(j.celkomNepriradenych ?? (j.nepriradene || []).length);
-      setPeniazeOd(j.peniazeOd || ""); setPrepnutie(j.prepnutie || null); setBtcNes(j.btcNesparovane || []);
+      setPeniazeOd(j.peniazeOd || ""); setBtcNes(j.btcNesparovane || []);
     }
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -94,35 +93,14 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
         />
       </H3>
 
-      {/* ODKIAĽ BERÚ PENIAZE GRAFY (peniazeZKokpitu.ts). Tlačidlo sa ukáže,
-          až keď mesiac sedí — a aj tak rozhoduje server. Dovtedy karta
-          povie, čo chýba, číslom; „nesedí" bez čísla sa nedá opraviť. */}
-      <div style={{ fontSize: 12.5, lineHeight: 1.55, margin: "2px 0 12px", padding: "8px 10px", borderRadius: 8, background: mix(peniazeOd ? C.green : C.border, 14) }}>
+      {/* ODKIAĽ BERÚ PENIAZE GRAFY (peniazeZKokpitu.ts). Prepínač „vrátiť na
+          PTminder" je od 28. 10. 2026 preč (Jerry: „odstráň ho") — peniaze sú
+          z Kokpitu natrvalo; staršie mesiace ostávajú v archíve PTmindera. */}
+      <div style={{ fontSize: 12.5, lineHeight: 1.55, margin: "2px 0 12px", padding: "8px 10px", borderRadius: 8, background: mix(peniazeOd ? C.green : C.orange, 14) }}>
         {peniazeOd ? (
-          <>
-            <b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b>{" "}
-            Staršie mesiace z PTmindera (história).{" "}
-            <button disabled={!!pracujem} onClick={() => void akcia({ akcia: "peniaze-od", mesiac: "" }, "peniaze")}
-              style={{ marginLeft: 6, fontSize: 11.5, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 8px", color: C.textMuted, cursor: "pointer" }}>
-              vrátiť na PTminder
-            </button>
-          </>
-        ) : prepnutie?.ok ? (
-          <>
-            <b>{mesiacKratko(prepnutie.od)} sedí s PTminderom.</b> Tržby a grafy môžu odteraz brať platby z Kokpitu.{" "}
-            <button disabled={!!pracujem} onClick={() => void akcia({ akcia: "peniaze-od", mesiac: prepnutie.od }, "peniaze")}
-              style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, background: C.green, color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
-              {pracujem === "peniaze" ? "…" : `Prepnúť peniaze na Kokpit od ${mesiacKratko(prepnutie.od)}`}
-            </button>
-          </>
+          <><b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b> Staršie mesiace sú z archívu PTmindera.</>
         ) : (
-          <>
-            <b>Tržby a grafy berú zatiaľ platby z PTmindera.</b> Na Kokpit sa prepnú od {prepnutie ? mesiacKratko(prepnutie.od) : "zvoleného mesiaca"}, keď bude sedieť:
-            {(prepnutie?.dovody || []).map((d) => <div key={d} style={{ color: C.textMuted, marginLeft: 10 }}>• {d}</div>)}
-            <div style={{ color: C.textDim, marginTop: 4 }}>
-              Čo chýba býva hotovosť zo zošita (formulár nižšie) a príjmy z banky na priradenie. Bitcoin sa berie sám z BTC knihy — ručne len klient, ktorého meno v knihe Kokpit nespoznal.
-            </div>
-          </>
+          <b style={{ color: C.orange }}>Chýba nastavenie, od ktorého mesiaca sú peniaze z Kokpitu — tržby teraz berú archív PTmindera. Napíš to Claudovi.</b>
         )}
       </div>
 
