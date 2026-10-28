@@ -65,3 +65,17 @@ describe("istá zhoda celého mena (6. 10. 2026)", () => {
     expect(klientPodlaCelehoMena("Veronika-online", k)).toBeNull();
   });
 });
+
+import { tvarZnamehoKlienta } from "./kalendarMena";
+
+describe("klient z pravidla dostane tvar známeho klienta (28. 10. 2026)", () => {
+  const znami = ["Branislav Široký", "Marketa Nová"];
+  it("„Široky\" z pravidla je „Široký\" s balíčkom", () => {
+    expect(tvarZnamehoKlienta("Branislav Široky", znami)).toBe("Branislav Široký");
+  });
+  it("neznámy, krstné meno a prázdno ostanú", () => {
+    expect(tvarZnamehoKlienta("Jan Novák", znami)).toBe("Jan Novák");
+    expect(tvarZnamehoKlienta("Marketa", znami)).toBe("Marketa");
+    expect(tvarZnamehoKlienta(null, znami)).toBeNull();
+  });
+});

@@ -6,7 +6,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
-import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
+import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, tvarZnamehoKlienta, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
 import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
 import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from "../../lib/psb/nahodTrening.server";
@@ -138,7 +138,9 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // Klienta JEDNEJ udalosti, ktorého určil človek, pravidlo mena neprepíše
     // (21. 10. 2026 — „Albert Matl“ ↔ Richard Matl).
     const s = podlaUid.get(u.uid);
-    const klient = s?.klient_rucne ? s.klient : (m?.klient ?? presne);
+    // Klient z pravidla v tvare známeho klienta — „Široky" z pravidla je
+    // „Široký" s balíčkom (28. 10. 2026, `tvarZnamehoKlienta`).
+    const klient = s?.klient_rucne ? s.klient : tvarZnamehoKlienta(m?.klient ?? presne, menaKlientov);
     // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
     // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie

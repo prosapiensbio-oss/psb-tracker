@@ -95,3 +95,20 @@ export function klientPodlaCelehoMena(nazov: string, menaKlientov: string[]): st
   const zhody = [...new Set(menaKlientov.filter((m) => normName(m) === n))];
   return zhody.length === 1 ? zhody[0] : null;
 }
+
+/**
+ * TVAR MENA ZNÁMEHO KLIENTA (Jerry, 28. 10. 2026: „prečo je Branislav Široký
+ * 2 profily?"). Pravidlo mena „Branislav Široky" (bez dĺžňa) ukazovalo na
+ * klienta „Branislav Široky" — pre appku iného človeka než „Branislav Široký"
+ * s balíčkom, platbami a fakturačnými údajmi. Klient, ktorého dá pravidlo,
+ * sa preto prepíše na tvar známeho klienta s tým istým celým menom.
+ *
+ * `menaKlientov` musí byť zlúčený zoznam (`znamiKlienti`) — v ňom má každé
+ * meno jeden tvar a prednosť majú sedenia, PTminder a balíčky pred pravidlami.
+ * Krstné meno alebo prezývka sa neprepisuje (`klientPodlaCelehoMena` chce
+ * aspoň dve slová).
+ */
+export function tvarZnamehoKlienta(klient: string | null, menaKlientov: string[]): string | null {
+  if (!klient) return klient;
+  return klientPodlaCelehoMena(klient, menaKlientov) ?? klient;
+}
