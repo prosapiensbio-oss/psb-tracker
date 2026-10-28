@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { bindings } from "../../lib/bindings.server";
-import { mesiacPraha } from "../../lib/psb/cas";
+import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { loadData } from "../../lib/psb/db.server";
 import { mzdoveHodiny, narokJerryho } from "../../lib/psb/mzdoveHodiny";
 import { NAVYSE } from "../../lib/psb/hodinyNavyse";
@@ -48,7 +48,9 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
         ).bind(od).all();
         // Nárok z tých istých sedení a toho istého vzorca ako dlh trénera v Kokpite.
         const data = await loadData(DB);
-        const narok = narokJerryho(mzdoveHodiny(data.sessions), od, mesiacPraha(), data.hodinyNavyse || {});
+        // Hodiny len po dnešok — kalendár nesie aj budúce termíny (ako strážca výberov).
+        const dnes = dnesPraha();
+        const narok = narokJerryho(mzdoveHodiny(data.sessions.filter((s) => s.date.slice(0, 10) <= dnes)), od, mesiacPraha(), data.hodinyNavyse || {});
         const model = {
           fix: CURRENT_ERA.fix, prah: CURRENT_ERA.hoursThreshold, sadzba: CURRENT_ERA.hourlyRate,
           // Model A (26. 10. 2026): hodiny navyše × 450, max 40 h — už sú v `narok`.
