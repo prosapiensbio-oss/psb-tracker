@@ -166,6 +166,26 @@ je kde pozrieť).
        ďalšia by prišla 2. 11., takže zrušiť ideálne PRED druhým. Archív rokov
        2022–2024 aj posledný úplný export sú stiahnuté (19. 10.), takže po
        zrušení sa nestráca nič — ale skontrolovať to pred kliknutím.
+5. [x] **Inventúra „vymazať PTminder" (Jerry 28. 10. 2026)** — kde všade je,
+       čo by sa rozbilo. Záver: nástroj (import, porovnania, texty) sa odstrániť
+       dá; DÁTA NIE — sú to jediné záznamy pred 1. 10. (P&L júl–sep, mzdové
+       hodiny júl–sep, história klientov, LTV, kohorty; tabuľky čítané bez
+       poistky → ich zmazanie zhodí celý Kokpit).
+       **Krok 1 hotový 28. 10. (fc2611f):** cena tréningu z `balicky.hodiny_spolu`
+       (0126), mená cez `znamiKlienti` (anamnézy, faktúry, override, IG),
+       notifikácia `ptrozpor|` vypnutá, `data|` a `novy|` prepísané, Jarvisova
+       príručka + SCHEMA_DB: od 1. 10. pravda Kokpit, PTminder = archív.
+6. [ ] **Po zrušení PTmindera (krok 3)**: odstrániť import PTminder súborov
+       (Údaje, plocha vo Workspace, „Naliať/Doplniť z PTmindera" — `detectCSVType`
+       a `ingest` zdieľajú aj iDoklad/Metricool/GA4/GSC/anamnézy, tie ostanú),
+       krok uzávierky „PTminder", prepínač „vrátiť peniaze na PTminder",
+       `mimokal|`, BTC „sedí s PTminderom", texty „podľa PTmindera" (~30 miest),
+       mŕtvy kód (`KalendarHistoria`, `dvojmo`, `porovnaj-mesiace`,
+       `sessionsPtminder`, `paymentsPtminder`), P&L náklad „PTminder" (fixný
+       → ukončiť). V appke pomenovať tabuľky ako „archív do 30. 9. 2026".
+7. [ ] **Dáta PTmindera NEMAZAŤ** (krok 4). Ak ich raz preč, najprv preniesť do
+       vlastných tabuliek (P&L júl–sep, mzdové hodiny, história sedení, prvý
+       tréning, história členstiev) — samostatná väčšia práca.
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
