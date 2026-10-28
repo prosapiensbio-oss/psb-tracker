@@ -8,6 +8,8 @@ import { OpravitText } from "./OpravitText";
 import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { denZFotky } from "../../lib/psb/exifDatum";
+import { PLATNO } from "../../lib/psb/porovnaniePredPo";
+import { poskladajPredPo } from "./poskladajPredPo";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -32,7 +34,12 @@ type Odpoved = {
   fotky?: Fotka[]; poznamky?: Record<string, string>;
   odkazy?: OdkazFotiek[]; odpovede?: OdpovedFotky[];
   suhlas?: boolean; ulozisko?: boolean; sifra?: boolean;
+  /** Id porovnaní, ktoré ukazuje stránka po úvodnom (/u/). */
+  uvodny?: string[];
 };
+
+/** Strana porovnania pred a po: náhľad v okne a súbor, z ktorého sa skladá. */
+type StranaUvodneho = { nahlad: string; subor: Blob };
 
 const denCz = (d: string) => {
   const [r, m, dd] = d.split("-");
@@ -69,6 +76,20 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   const [pohlad, setPohlad] = useState<string>("bok");
   const [osobne, setOsobne] = useState(false);
   const [nahravam, setNahravam] = useState<string | null>(null);
+  /**
+   * ÚVODNÝ TRÉNING — FOTKY PRED A PO (Jerry, 28. 10. 2026: „pri prvom fotení
+   * daj možnosť fotenie úvodný tréning; keď to zaškrtnem, vložím fotky,
+   * uložím — a na stránke po úvodnom sa to ukáže"). Fotka z diagnostiky
+   * a fotka po narovnaní sa poskladajú vedľa seba, uložia ako porovnanie
+   * a pripnú k stránke po úvodnom (`/api/uvodny` akcia `fotky`).
+   */
+  const [uvodny, setUvodny] = useState(false);
+  const [uvPred, setUvPred] = useState<StranaUvodneho | null>(null);
+  const [uvPo, setUvPo] = useState<StranaUvodneho | null>(null);
+  const [uvUkladam, setUvUkladam] = useState(false);
+  useEffect(() => () => { if (uvPred) URL.revokeObjectURL(uvPred.nahlad); }, [uvPred]);
+  useEffect(() => () => { if (uvPo) URL.revokeObjectURL(uvPo.nahlad); }, [uvPo]);
+  useEffect(() => { setUvodny(false); setUvPred(null); setUvPo(null); }, [meno]);
   const [zvacsena, setZvacsena] = useState<Fotka | null>(null);
   /** Rozpísaný popis zväčšenej fotky — zapíše sa pri odchode z políčka. */
   const [popisKoncept, setPopisKoncept] = useState<string | null>(null);
@@ -227,6 +248,49 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
     }
   };
 
+  /** Pripne porovnanie k stránke po úvodnom (alebo ho z nej odoberie pri prázdnom zozname). */
+  const naStrankuPoUvodnom = async (ids: string[]): Promise<boolean> => {
+    const j = await fetch("/api/uvodny", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "fotky", klient: meno, fotky: ids, trener }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" })) as { ok?: boolean; error?: string };
+    if (!j.ok) { setChyba(j.error || "Fotky sa k stránke po úvodnom nepripojili."); return false; }
+    return true;
+  };
+
+  const ulozUvodny = async () => {
+    if (!uvPred || !uvPo || uvUkladam) return;
+    setUvUkladam(true);
+    setChyba("");
+    setHlaska("");
+    try {
+      const subor = await poskladajPredPo(uvPred.subor, uvPo.subor);
+      const fd = new FormData();
+      fd.append("klient", meno);
+      fd.append("den", den);
+      fd.append("pohlad", "porovnanie");
+      fd.append("popis", "Úvodní lekce — před a po");
+      fd.append("sirka", String(PLATNO.sirka));
+      fd.append("vyska", String(PLATNO.vyska));
+      if (osobne) fd.append("suhlasOsobne", "1");
+      fd.append("subor", subor, "pred-a-po.jpg");
+      const j = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd })
+        .then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" })) as { ok?: boolean; id?: string; error?: string };
+      if (!j.ok || !j.id) { setChyba(j.error || "Fotky sa neuložili."); return; }
+      // Porovnanie je v kartotéke; keď zlyhá pripnutie, povie sa to a dá sa zopakovať.
+      if (!(await naStrankuPoUvodnom([j.id]))) { await nacitaj(); return; }
+      setUvPred(null);
+      setUvPo(null);
+      setUvodny(false);
+      setHlaska("Fotky pred a po sú uložené a stránka po úvodnom ich ukáže — aj keď SMS už odišla.");
+      await nacitaj();
+    } catch (e) {
+      setChyba(`Fotky sa nepodarilo poskladať: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`);
+    } finally {
+      setUvUkladam(false);
+    }
+  };
+
   const ulozPoznamku = async (dn: string) => {
     const text = koncepty[dn];
     if (text === undefined || text === (d?.poznamky?.[dn] || "")) return;
@@ -291,7 +355,71 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
             </span>
           </label>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+        {/* ── ÚVODNÝ TRÉNING: PRED A PO ── */}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, color: C.text, cursor: "pointer" }}>
+          <input type="checkbox" checked={uvodny} onChange={(e) => setUvodny(e.target.checked)} style={{ accentColor: C.accent }} />
+          <span>Úvodný tréning — fotky pred a po <span style={{ color: C.textDim, fontSize: 12 }}>(klient ich uvidí na stránke po úvodnom)</span></span>
+        </label>
+        {!!d.uvodny?.length && !uvodny && (() => {
+          const f = zEditora.find((x) => x.id === d.uvodny![0]);
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, fontSize: 12.5, color: C.green, flexWrap: "wrap" }}>
+              {f && <img src={obrazok(f)} alt="" style={{ width: 72, height: 48, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.border}` }} />}
+              <span>✓ Na stránke po úvodnom sú fotky pred a po{f ? ` z ${denCz(f.den)}` : ""}.</span>
+              <button type="button" onClick={() => void (async () => { if (await naStrankuPoUvodnom([])) { setHlaska("Fotky sú zo stránky po úvodnom odobraté (v kartotéke ostali)."); await nacitaj(); } })()}
+                style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                odobrať zo stránky
+              </button>
+            </div>
+          );
+        })()}
+        {uvodny && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${C.border}`, background: mix(C.accent, 5) }}>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
+              {([["Pred (diagnostika)", uvPred, setUvPred], ["Po (po narovnaní)", uvPo, setUvPo]] as const).map(([nadpis, f, nastav]) => (
+                <div key={nadpis} style={{ display: "flex", flexDirection: "column", gap: 6, width: uzke ? 130 : 160 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{nadpis}</span>
+                  {f ? (
+                    <div style={{ position: "relative" }}>
+                      <img src={f.nahlad} alt={nadpis} style={{ width: "100%", aspectRatio: "3 / 4", objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, display: "block" }} />
+                      <button type="button" onClick={() => nastav(null)} aria-label={`Odstrániť — ${nadpis}`} style={rohove("right", C.red, false)}>✕</button>
+                    </div>
+                  ) : (
+                    <label style={{ width: "100%", aspectRatio: "3 / 4", boxSizing: "border-box", borderRadius: 8, border: `1px dashed ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 10, fontSize: 12.5, color: C.accentLight, cursor: "pointer" }}>
+                      Odfotiť alebo vybrať
+                      <input type="file" accept="image/*" hidden onChange={(e) => {
+                        const s = e.target.files?.[0];
+                        e.target.value = "";
+                        if (s) nastav({ nahlad: URL.createObjectURL(s), subor: s });
+                      }} />
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <label style={{ fontSize: 12, color: C.textMuted }}>
+                deň{" "}
+                <input type="date" value={den} max={dnesPraha()} onChange={(e) => setDen(e.target.value || dnesPraha())}
+                  style={{ padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5 }} />
+              </label>
+              <button type="button" disabled={!mozeNahrat || !uvPred || !uvPo || uvUkladam} onClick={() => void ulozUvodny()}
+                style={{
+                  padding: "9px 16px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 14),
+                  color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                  cursor: mozeNahrat && uvPred && uvPo && !uvUkladam ? "pointer" : "default", opacity: mozeNahrat && uvPred && uvPo && !uvUkladam ? 1 : 0.5,
+                }}>
+                {uvUkladam ? "Ukladám…" : "Uložiť a ukázať na stránke po úvodnom"}
+              </button>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55 }}>
+              Fotky sa poskladajú vedľa seba (PŘED · PO), uložia sa do kartotéky ako porovnanie a stránka po úvodnom ich ukáže hneď — aj klientovi, ktorému už SMS odišla.
+              {!mozeNahrat && d.ulozisko && d.sifra && " Najprv potvrď súhlas s fotkami vyššie."}
+            </div>
+          </div>
+        )}
+
+        {!uvodny && <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
           <label style={{ fontSize: 12, color: C.textMuted }} title="Keď má fotka v sebe dátum fotenia (EXIF), použije sa ten. Tento deň platí pre fotky bez neho — snímky obrazovky, fotky zo WhatsAppu.">
             deň (ak ho fotka nemá){" "}
             <input
@@ -324,7 +452,7 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
               cursor: mozeNahrat && !nahravam ? "pointer" : "default", opacity: mozeNahrat && !nahravam ? 1 : 0.5,
             }}
           >{nahravam || "Odfotiť alebo vybrať"}</button>
-        </div>
+        </div>}
         <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
           {prveFotenie
             ? <>Prvé fotenie je z {denCz(prveFotenie)}. Fotky z iného dňa sú ďalšie fotenie („potom") a prvá s poslednou sa postavia vedľa seba.</>

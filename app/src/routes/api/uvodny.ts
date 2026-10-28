@@ -39,6 +39,38 @@ export const Route = createFileRoute("/api/uvodny")({
         try { b = (await request.json()) as Record<string, unknown>; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
+        /**
+         * FOTKY PRED A PO Z PROFILU (Jerry, 28. 10. 2026: „v profile → fotky →
+         * prvé fotenie dať možnosť úvodný tréning; keď ho zaškrtnem, vložím
+         * fotky, uložím — a na stránke po úvodnom sa ukážu"). Pripne porovnanie
+         * k odkazu po úvodnom; keď odkaz ešte nie je, založí ho (SMS sa
+         * neposiela — tú pošle tréner, keď bude chcieť). `fotky: []` ich odoberie.
+         */
+        if (String(b.akcia ?? "") === "fotky") {
+          const klient = String(b.klient ?? "").trim().slice(0, 120);
+          if (!klient || !Array.isArray(b.fotky)) return Response.json({ ok: false, error: "Chýba klient alebo fotky." }, { status: 400 });
+          const ids = (b.fotky as unknown[]).map((x) => String(x ?? "").trim().slice(0, 40)).filter(Boolean).slice(0, 4);
+          if (ids.length) {
+            const r = await DB.prepare(`SELECT id FROM klient_fotky WHERE klient = ?1 AND id IN (SELECT value FROM json_each(?2))`)
+              .bind(klient, JSON.stringify(ids)).all<{ id: string }>();
+            const zname = new Set((r.results || []).map((x) => String(x.id)));
+            if (ids.some((id) => !zname.has(id))) return Response.json({ ok: false, error: "Fotka nepatrí tomuto klientovi." }, { status: 400 });
+          }
+          const json = ids.length ? JSON.stringify(ids) : null;
+          const trener = String(b.trener ?? "").trim() || (await currentUser(request)) || "Jerry";
+          try {
+            await DB.prepare(
+              `INSERT INTO uvodne_odkazy (token, klient, druh, trener, kedy, cena_czk, vytvorene, fotky_json)
+               VALUES (?1, ?2, 'po', ?3, NULL, NULL, ?4, ?5)
+               ON CONFLICT (klient, druh) DO UPDATE SET fotky_json = excluded.fotky_json`,
+            ).bind(novyToken(), klient, trener === "Terezka" ? "Terezka" : "Jerry", new Date().toISOString(), json).run();
+          } catch (e) {
+            return Response.json({ ok: false, error: `Fotky sa k stránke nepripojili: ${String(e).slice(0, 200)}` }, { status: 500 });
+          }
+          await audit(DB, { action: "uvodny-fotky", predmet: klient, neu: ids.length ? `před a po · ${ids.length}` : "odobrané", actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true, fotky: ids }, { headers: { "cache-control": "no-store" } });
+        }
+
         if (String(b.akcia ?? "") !== "odkaz") {
           return Response.json({ ok: false, error: "Neznáma akcia." }, { status: 400 });
         }
@@ -111,6 +143,13 @@ export const Route = createFileRoute("/api/uvodny")({
           const r = await DB.prepare(
             "SELECT token FROM uvodne_odkazy WHERE klient = ?1 AND druh = ?2",
           ).bind(klient, druh).first<{ token: string }>();
+          // Koľko fotiek pred a po stránka ukáže — text SMS ich spomenie len vtedy.
+          const pocetFotiek = druh === "po"
+            ? await DB.prepare("SELECT fotky_json FROM uvodne_odkazy WHERE klient = ?1 AND druh = 'po'").bind(klient)
+                .first<{ fotky_json: string | null }>()
+                .then((x) => { try { return (JSON.parse(x?.fotky_json || "[]") as unknown[]).length; } catch { return 0; } })
+                .catch(() => 0)
+            : 0;
           if (!r) return Response.json({ ok: false, error: "Odkaz sa nepodarilo vyrobiť." }, { status: 500 });
 
           /**
@@ -141,7 +180,7 @@ export const Route = createFileRoute("/api/uvodny")({
           // Krátka adresa — v SMS je rozdiel medzi jednou a dvoma správami.
           const odkaz = verejnyOdkaz(`/u/${r.token}`, new URL(request.url).origin);
           return Response.json(
-            { ok: true, token: r.token, odkaz },
+            { ok: true, token: r.token, odkaz, fotky: pocetFotiek },
             { headers: { "cache-control": "no-store" } },
           );
         } catch (e) {

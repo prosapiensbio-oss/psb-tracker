@@ -161,6 +161,11 @@ export const Route = createFileRoute("/api/fotky")({
           suhlas,
           ulozisko: !!STORAGE,
           sifra: !!ANAMNEZA_KLUC,
+          // Ktoré fotky ukazuje stránka po úvodnom (/u/) — kartotéka pri nich povie „na stránke po úvodnom".
+          uvodny: await DB.prepare("SELECT fotky_json FROM uvodne_odkazy WHERE klient = ?1 AND druh = 'po'").bind(klient)
+            .first<{ fotky_json: string | null }>()
+            .then((x) => { try { return (JSON.parse(x?.fotky_json || "[]") as unknown[]).map(String); } catch { return []; } })
+            .catch(() => [] as string[]),
         }, { headers: { "cache-control": "no-store" } });
       },
 

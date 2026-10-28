@@ -235,7 +235,8 @@ const riadokOdkazu = (href: string, nadpis: string, popis: string) =>
  */
 function fotkyHtml(fotky: string[] | undefined): string {
   if (!fotky?.length) return "";
-  return `<h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před a po dnešní lekci</h2>
+  // Na spodku pod tlačidlami, pred podpisom (Jerry, 28. 10. 2026).
+  return `<h2 style="margin:34px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před a po dnešní lekci</h2>
 <p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Vlevo na začátku, vpravo po dnešní práci. Takhle tělo reaguje, když dostane správný podnět — na tom budeme stavět dál.</p>
 ${fotky.map((src, i) => `<img src="${esc(src)}" alt="Držení těla před a po lekci${fotky.length > 1 ? ` (${i + 1})` : ""}" loading="lazy" style="display:block;width:100%;height:auto;border-radius:16px;border:1px solid #DCE3DD;margin-top:${i ? 12 : 0}px;background:#F6F8F6">`).join("\n")}`;
 }
@@ -320,7 +321,6 @@ ${cennikHtml()}
 </div>`
     : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : "Děkuji za účast a jsem rád, že jsme domluvili pokračování."}</p>
-${fotkyHtml(v.fotky)}
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
@@ -394,6 +394,7 @@ ${telo}
 <a href="tel:${esc(tel)}" style="display:block;text-align:center;text-decoration:none;border:2px solid #1A2E24;color:#1A2E24;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px">Zavolat ${esc(tr.krstne === "Filip" ? "Jerrymu" : tr.krstne)}</a>
 ${v.faktura ? blokFakturyHtml(v.faktura) : ""}
 </div>
+${predUvodnym ? "" : fotkyHtml(v.fotky)}
 
 <div style="margin-top:36px;padding-top:26px;border-top:1px solid #DCE3DD">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
