@@ -28,6 +28,8 @@ type AppEnv = {
   ANTHROPIC_API_KEY?: string;
   // Shared read-only token for the PSB Bitcoin app's /api/reserve endpoint.
   BTC_RESERVE_TOKEN?: string;
+  // Väzba na worker bitcoinovej knihy (`btc`) — volanie zo servera bez siete.
+  BTC?: { fetch: (req: Request) => Promise<Response> };
   // Blink — API kľúč na výrobu lightningových faktúr pre klientov, čo platia
   // bitcoinom. Stačí mu právo na príjem; posielať z neho appka nepotrebuje.
   BLINK_API_KEY?: string;

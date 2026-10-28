@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { isAuthed } from "../../lib/psb/auth.server";
+import { btcVyplatyJerryho } from "../../lib/psb/btcVyplaty.server";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { loadData } from "../../lib/psb/db.server";
 import { mzdoveHodiny } from "../../lib/psb/mzdoveHodiny";
@@ -26,12 +28,14 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
         const env = bindings() as { DB?: D1Database; KAL_CRON_TOKEN?: string };
         const token = env.KAL_CRON_TOKEN;
         const dany = request.headers.get("x-cron-token") || "";
-        if (!token || token.length !== dany.length || token !== dany) {
+        const skuska = new URL(request.url).searchParams.get("skuska") === "1";
+        // Plánovač s tokenom; prihlásený človek smie len skúšku (nič nepošle ani nezapíše).
+        const odPlanovaca = !!token && token.length === dany.length && token === dany;
+        if (!odPlanovaca && !(skuska && (await isAuthed(request)))) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
         const DB = env.DB;
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        const skuska = new URL(request.url).searchParams.get("skuska") === "1";
 
         const dnes = dnesPraha();
         const mesiac = mesiacPraha();
@@ -57,7 +61,10 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
         const minulyNarok = hodiny[minuly] ? model.fix + (hodiny[minuly].jerry - model.prah) * model.sadzba + platbaNavyse(minuly, nav[minuly]).jerry : null;
         const tempo = narokPodlaTempa(model, hodiny[mesiac]?.jerry || 0, den, dniVMesiaci, minulyNarok);
         const narok = tempo.podlaTempa ? { ...tempo, narok: tempo.narok + platbaNavyse(mesiac, navTeraz).jerry } : tempo;
-        const pohyby = fioRs.results as unknown as PohybFio[];
+        // Výplaty v bitcoine (výber s „vyplat“ alebo presun Muun → Blink) sa
+        // rátajú ako výplata z Fio — do čerpania aj do zálohy (28. 10. 2026).
+        const btc = await btcVyplatyJerryho();
+        const pohyby = [...(fioRs.results as unknown as PohybFio[]), ...(btc || []).filter((p) => p.date >= `${mesiac}-01`)];
         const cerpanie = cerpanieMesiaca(pohyby, mesiac);
         let posledny: StavStrazcu = null;
         try { posledny = stavRs?.value ? JSON.parse(stavRs.value) : null; } catch { /* starý zápis */ }
@@ -69,7 +76,8 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
         const strop = stropZalohy(mesiac);
         const zalohy = zalohyMesiaca(pohyby, mesiac);
         const r = strop === null ? rozhodni(mesiac, cerpanie, narok, posledny) : rozhodniZalohu(mesiac, zalohy, strop, posledny);
-        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0, zalohy, stropZalohy: strop };
+        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0, zalohy, stropZalohy: strop,
+          btcVyplaty: btc === null ? "kniha neodpovedala" : btc.filter((p) => p.date >= `${mesiac}-01`).reduce((x, p) => x - p.suma, 0) };
 
         if (!r.poslat || skuska) return Response.json({ ok: true, ...suhrn, poslat: r.poslat, text: r.poslat ? r.text : undefined, skuska });
 

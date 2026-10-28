@@ -69,6 +69,11 @@
   // istom účte a je v platenom pláne.
   "browser": { "binding": "BROWSER" },
 
+  // Bitcoinová kniha (worker `btc`) — väzbou, nie cez workers.dev adresu:
+  // worker → worker cez verejnú adresu na tom istom účte padá. Strážca výberov
+  // z nej v noci berie BTC výplaty (28. 10. 2026).
+  "services": [{ "binding": "BTC", "service": "btc" }],
+
   // Tajomstvá (PSB_PASSWORD, PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
   // BTC_RESERVE_TOKEN) tu nie sú a nikdy tu byť nesmú — nastavujú sa cez
   // `wrangler secret put` a žijú len na Cloudflare.
