@@ -2,7 +2,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { fakturaDocument } from "./fakturaHtml";
-import { mailFaktury } from "./mailFaktury";
+import { mailFaktury, mailFakturyHtml } from "./mailFaktury";
 import { klientiFaktury, popisFaktury, type Faktura } from "./vydanaFaktura";
 
 const f: Faktura = {
@@ -29,5 +29,30 @@ describe("faktúra za viacerých klientov", () => {
     const jedna = { ...f, dalsie: undefined, celkom: 7790 };
     expect(popisFaktury(jedna)).toBe(jedna.popis);
     expect(fakturaDocument(jedna)).not.toContain("Za: Dan Kouřil,");
+  });
+});
+
+// Branislav platí na firmu aj za Lindu (28. 10. 2026): Linda na doklade nemá byť.
+describe("ďalší klient bez popisu — na doklade bez mena", () => {
+  const bezMena: Faktura = {
+    ...f, klient: "Branislav Široký",
+    odberatel: { ...f.odberatel, firma: "Firma s.r.o." },
+    dalsie: [{ klient: "Linda Muth", popis: "", ks: 1, cena: 7790, celkom: 7790 }],
+  };
+  it("doklad má dva riadky s popisom hlavnej položky a Lindu nikde", () => {
+    const html = fakturaDocument(bezMena);
+    expect((html.match(/<tr>\s*<td>6 hodín/g) || []).length).toBe(2);
+    expect(html).not.toContain("Linda Muth");
+    expect(html).toContain("Za: Branislav Široký");
+    expect(html).toMatch(/15\s580,00/);
+  });
+  it("mail Lindu nemenuje; rovnaké položky sa zlúčia", () => {
+    expect(popisFaktury(bezMena)).toBe("6 hodín biomechanického tréningu (2×)");
+    const m = mailFaktury(bezMena);
+    expect(m.telo).not.toContain("Linda Muth");
+    expect(mailFakturyHtml(bezMena)).not.toContain("Linda Muth");
+  });
+  it("Kokpit o Linde vie — platba sa rozdelí", () => {
+    expect(klientiFaktury(bezMena)).toEqual(["Branislav Široký", "Linda Muth"]);
   });
 });

@@ -1,6 +1,6 @@
 import { FARBY_MAILU as FM, czk } from "./mailKlientovi";
 import { krstne, oslovenieKlienta } from "./oslovenie";
-import { DODAVATEL, den, klientiFaktury, polozkyFaktury, popisFaktury, suma, type Faktura } from "./vydanaFaktura";
+import { DODAVATEL, den, klientiNaDoklade, polozkyFaktury, popisFaktury, suma, type Faktura } from "./vydanaFaktura";
 
 /**
  * TEXT MAILU, KTORÝM ODCHÁDZA FAKTÚRA.
@@ -169,8 +169,8 @@ export function mailFakturyHtml(f: Faktura, volby: VolbyHtmlMailu = {}): string 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${FM.platba};border-radius:14px">
       <tr>
         <td style="padding:20px 22px;font-size:14px;color:${FM.platbaText};line-height:1.7">
-          ${klientiFaktury(f).length > 1
-    ? polozkyFaktury(f).map((p) => `${escH(p.popis)} · ${escH(p.klient)} · ${czk(p.celkom)}`).join("<br>")
+          ${polozkyFaktury(f).length > 1
+    ? polozkyFaktury(f).map((p) => `${escH(p.popis)}${klientiNaDoklade(f).length > 1 && !p.bezMena ? ` · ${escH(p.klient)}` : ""} · ${czk(p.celkom)}`).join("<br>")
     : `${escH(f.popis)}${f.ks > 1 ? ` · ${f.ks} ks` : ""}`}<br><b style="font-size:24px">${czk(f.celkom)}</b><br>
           <span style="color:${FM.platbaSlaba}">Účet ${escH(DODAVATEL.ucet)}<br>VS ${escH(f.cislo)} · splatnost ${escH(denCz(f.splatnost))}</span>
         </td>

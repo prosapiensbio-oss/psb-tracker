@@ -91,32 +91,56 @@ export type PolozkaFaktury = {
   cena: number;
   celkom: number;
   balicekId?: string | null;
+  /** Doplnené pri čítaní: ďalšia položka bez vlastného popisu — na doklade bez mena. */
+  bezMena?: boolean;
 };
 
 const zaokruhli = (n: number) => Math.round(n * 100) / 100;
 
-/** Všetky položky v poradí, hlavná prvá. */
+/**
+ * Všetky položky v poradí, hlavná prvá.
+ *
+ * ĎALŠIA POLOŽKA BEZ POPISU (Jerry, 28. 10. 2026: „Branislav chce platiť aj
+ * za Lindu… on platí na firmu a ona by tam nemala byť… popis druhého klienta
+ * by mal byť voliteľný"). Klient pri položke je pre Kokpit — podľa neho sa
+ * platba rozdelí a Linde sa zapíše jej balíček. Na doklade ho firma nechce
+ * vidieť. Položka bez vlastného popisu preto dostane popis hlavnej položky
+ * a značku `bezMena`: doklad ju ukáže ako ďalší kus tej istej služby, bez mena.
+ */
 export function polozkyFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): PolozkaFaktury[] {
   return [
     { klient: f.klient, popis: f.popis, ks: f.ks, cena: f.cena, celkom: zaokruhli(f.ks * f.cena) },
-    ...(f.dalsie || []),
+    ...(f.dalsie || []).map((p) => (p.popis.trim() ? p : { ...p, popis: f.popis, bezMena: true })),
   ];
 }
 
-/** Za koľkých rôznych klientov faktúra je. */
+/** Za koľkých rôznych klientov faktúra je (pre Kokpit — rozdelenie platby). */
 export function klientiFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): string[] {
   return [...new Set(polozkyFaktury(f).map((p) => p.klient))];
 }
 
+/** Mená, ktoré sa smú ukázať NA DOKLADE — bez položiek, ktoré meno nechcú. */
+export function klientiNaDoklade(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): string[] {
+  return [...new Set(polozkyFaktury(f).filter((p) => !p.bezMena).map((p) => p.klient))];
+}
+
 /**
  * Popis jednou vetou — do mailu („…za 6 hodín tréningu").
- * Pri viacerých klientoch je pri každej položke meno, inak by účtovníčka
- * nevedela, za koho platí.
+ * Pri viacerých klientoch na doklade je pri každej položke meno, inak by
+ * účtovníčka nevedela, za koho platí. Položky bez mena sa zlúčia s rovnakým
+ * popisom do „(2×)".
  */
 export function popisFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): string {
   const p = polozkyFaktury(f);
-  if (klientiFaktury(f).length < 2) return f.popis;
-  return p.map((x) => `${x.popis} (${x.klient})`).join("; ");
+  const sMenami = klientiNaDoklade(f).length > 1;
+  if (!sMenami && p.length < 2) return f.popis;
+  const casti: { text: string; n: number }[] = [];
+  for (const x of p) {
+    const text = sMenami && !x.bezMena ? `${x.popis} (${x.klient})` : x.popis;
+    const uz = casti.find((c) => c.text === text);
+    if (uz) uz.n++; else casti.push({ text, n: 1 });
+  }
+  return casti.map((c) => (c.n > 1 ? `${c.text} (${c.n}×)` : c.text)).join("; ");
 }
 
 export type Odberatel = {

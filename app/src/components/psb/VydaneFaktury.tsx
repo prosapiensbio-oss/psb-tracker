@@ -463,7 +463,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   <Pole label="Cena za m. j. (Kč)" hodnota={d.cena} nastav={(v) => nastav({ cena: v })} typ="number" />
                   <button type="button" onClick={() => setDalsie((s) => s.filter((_, j) => j !== i))} style={{ alignSelf: "flex-end", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, cursor: "pointer", fontSize: 12 }}>odobrať</button>
                 </div>
-                <span style={popisStyl}>Popis položky za {d.klient || "tohto klienta"} — vyber alebo napíš vlastný</span>
+                <span style={popisStyl}>Popis položky za {d.klient || "tohto klienta"} — nepovinné. Prázdne = na faktúre ako ďalší kus hlavnej položky, bez mena {d.klient ? `(${d.klient} sa na doklade neukáže, platba sa mu aj tak pripíše)` : ""}</span>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
                   {POPISY.map((p) => (
                     <button
@@ -482,16 +482,24 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     </button>
                   ))}
                 </div>
-                <textarea value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} rows={2} placeholder="čo sa fakturuje za tohto klienta — uvidí to na doklade" style={{ ...poleStyl, resize: "vertical" }} />
+                <textarea value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} rows={2} placeholder="nechaj prázdne, ak meno tohto klienta na faktúre nemá byť" style={{ ...poleStyl, resize: "vertical" }} />
+                {d.popis && (
+                  <button type="button" onClick={() => nastav({ popis: "" })}
+                    style={{ marginTop: 4, background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                    bez popisu a bez mena na faktúre
+                  </button>
+                )}
               </div>
             );
           })}
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
             <button
               type="button"
-              // Predvyplní sa to isté, čo má prvá položka — pri Danovi a
+              // Počet a cena sa predvyplnia z prvej položky — pri Danovi a
               // Monike je to ten istý balíček za tú istú cenu.
-              onClick={() => setDalsie((s) => [...s, { klient: "", popis: f.popis, ks: f.ks || "1", cena: f.cena }])}
+              // Popis sa NEpredvypĺňa (28. 10. 2026): kto platí za druhého na
+              // firmu, jeho meno na doklade nechce. Popis sa dá klepnúť z ponuky.
+              onClick={() => setDalsie((s) => [...s, { klient: "", popis: "", ks: f.ks || "1", cena: f.cena }])}
               style={{ padding: "6px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}
             >
               + ďalší klient na tejto faktúre

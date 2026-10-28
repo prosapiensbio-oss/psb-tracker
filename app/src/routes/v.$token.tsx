@@ -201,8 +201,31 @@ export const Route = createFileRoute("/v/$token")({
 
         let qrUrl: string | undefined;
         if (!jeBitcoin && suma > 0) {
+          /**
+           * OTVORENÁ FAKTÚRA NA TÚ ISTÚ SUMU → TO ISTÉ QR AKO NA FAKTÚRE.
+           *
+           * Jerry, 28. 10. 2026: „keď pošlem FA a tam je QR a pošlem tomu
+           * istému SMS, bude tam tiež to isté QR, aby sa cez neho zaplatila
+           * FA?" Nebolo — stránka dávala QR s menom v správe a bez
+           * variabilného symbolu, faktúra s číslom faktúry. Platba z firmy by
+           * prišla bez čísla a faktúra by visela ako neuhradená. Keď má klient
+           * práve jednu nezaplatenú faktúru na sumu, ktorú stránka žiada,
+           * QR nesie jej číslo a správu presne ako faktúra (`fakturaDocument`)
+           * — Kokpit platbu spáruje podľa čísla (`klientPodlaFaktury`) a pri
+           * faktúre za dvoch ju aj rozdelí. Iná suma = iná vec; ostáva QR
+           * s menom.
+           */
+          const otvorene = ((await DB.prepare(
+            `SELECT cislo, celkom_czk, splatnost FROM vydane_faktury
+              WHERE storno_at IS NULL AND uhradene_at IS NULL
+                AND (klient = ?1 OR id IN (SELECT faktura_id FROM vydane_faktury_polozky WHERE klient = ?1))`,
+          ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as { cislo: string; celkom_czk: number; splatnost: string }[];
+          const naSumu = otvorene.filter((x) => Math.abs(Number(x.celkom_czk) - suma) < 1);
+          const fa = naSumu.length === 1 ? naSumu[0] : null;
           // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
-          const o = qrObrazok(spayd({ suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
+          const o = qrObrazok(spayd(fa
+            ? { suma: Number(fa.celkom_czk), vs: fa.cislo, sprava: `Faktura ${fa.cislo} PSB`, splatnost: fa.splatnost, prijemca: DODAVATEL.meno }
+            : { suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
           const bajty = new Uint8Array(o.data);
           let bin = "";
           for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));

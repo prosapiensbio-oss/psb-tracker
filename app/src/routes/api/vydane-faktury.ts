@@ -479,7 +479,9 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               const cc = Math.round((Number(x.cena) || 0) * 100) / 100;
               const kk = Math.max(0.01, Math.round((Number(x.ks) || 1) * 100) / 100);
               if (!kl) return Response.json({ ok: false, error: "Ďalšia položka nemá klienta." }, { status: 400 });
-              if (pp.length < 3) return Response.json({ ok: false, error: `Popis položky za ${kl} je príliš krátky.` }, { status: 400 });
+              // Prázdny popis je voľba, nie chyba (28. 10. 2026): položka sa na
+              // doklade ukáže s popisom hlavnej a bez mena (`polozkyFaktury`).
+              if (pp && pp.length < 3) return Response.json({ ok: false, error: `Popis položky za ${kl} je príliš krátky — napíš aspoň 3 znaky, alebo ho nechaj prázdny.` }, { status: 400 });
               if (cc <= 0) return Response.json({ ok: false, error: `Cena položky za ${kl} musí byť kladná.` }, { status: 400 });
               dalsie.push({ klient: kl, popis: pp, ks: kk, cena: cc, celkom: Math.round(kk * cc * 100) / 100, balicekId: kus(x.balicekId, 40) || null });
             }

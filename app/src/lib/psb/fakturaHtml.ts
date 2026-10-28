@@ -1,6 +1,6 @@
 import qrcode from "qrcode-generator";
 
-import { DODAVATEL, den, klientiFaktury, polozkyFaktury, spayd, suma, type Faktura } from "./vydanaFaktura";
+import { DODAVATEL, den, klientiNaDoklade, polozkyFaktury, spayd, suma, type Faktura } from "./vydanaFaktura";
 
 /**
  * Faktúra ako tlačiteľný dokument.
@@ -82,7 +82,8 @@ export function fakturaDocument(f: Faktura): string {
   const odberatel = o.firma || f.klient;
   // Faktúra za viacerých klientov: každá položka nesie meno toho, za koho je.
   const polozky = polozkyFaktury(f);
-  const klienti = klientiFaktury(f);
+  // Mená len tých, ktorí na doklade byť chcú — položka bez popisu je bez mena.
+  const klienti = klientiNaDoklade(f);
   const viacKlientov = klienti.length > 1;
   const ic = [o.ico && `IČ ${esc(o.ico)}`, o.dic && `DIČ ${esc(o.dic)}`].filter(Boolean).join(" · ");
   return `<!doctype html>
@@ -177,7 +178,7 @@ export function fakturaDocument(f: Faktura): string {
     <table>
       <thead><tr><th style="width:52%">Označení dodávky</th><th>Počet m. j.</th><th>Cena za m. j.</th><th>Celkem</th></tr></thead>
       <tbody>${polozky.map((p) => `<tr>
-        <td>${esc(p.popis)}${viacKlientov ? `<div style="font-size:8.5pt;color:${B.slaba};margin-top:1mm">${esc(p.klient)}</div>` : ""}</td>
+        <td>${esc(p.popis)}${viacKlientov && !p.bezMena ? `<div style="font-size:8.5pt;color:${B.slaba};margin-top:1mm">${esc(p.klient)}</div>` : ""}</td>
         <td class="n">${suma(p.ks)}</td>
         <td class="n">${suma(p.cena)}</td>
         <td class="n">${suma(p.celkom)}</td>
