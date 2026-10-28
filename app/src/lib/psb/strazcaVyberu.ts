@@ -20,6 +20,9 @@ export type ModelNaroku = { fix: number; prah: number; sadzba: number };
 export type PohybFio = { date: string; suma: number; kat: string };
 export type StavStrazcu = { mesiac: string; prah: number } | null;
 
+/** Suma ide so znamienkom: príchodzie vrátenie s tou istou kategóriou
+ *  („Chata vratenie" +11 000, 20. 10. 2026) čerpanie zníži — rovnako
+ *  ako v J&T Výplatách (`jeVratenieVydavku`). */
 export function cerpanieMesiaca(pohyby: PohybFio[], mesiac: string): number {
   let s = 0;
   for (const p of pohyby) {

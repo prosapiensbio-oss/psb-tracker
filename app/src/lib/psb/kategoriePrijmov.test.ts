@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { jeKategoriaPrijmu, PRIJEM_PRODUKT, prijemDoPnl } from "./kategoriePrijmov";
+import { jeKategoriaPrijmu, jeVratenieVydavku, PRIJEM_INE, PRIJEM_PRODUKT, prijemDoPnl } from "./kategoriePrijmov";
 
 describe("kategórie príjmov", () => {
   it("loptička ide do P&L až od mesiaca tržieb z Kokpitu — predtým je v PTminderi", () => {
@@ -12,5 +12,11 @@ describe("kategórie príjmov", () => {
     expect(jeKategoriaPrijmu("")).toBe(false);
     expect(jeKategoriaPrijmu("mimo")).toBe(false);
     expect(prijemDoPnl("", "2026-10", "2026-10")).toBe(false);
+  });
+  it("príchodzí pohyb s kategóriou výdavku je vrátenie — od októbra 2026", () => {
+    expect(jeVratenieVydavku("vyplaty.jerry", "2026-10")).toBe(true);
+    expect(jeVratenieVydavku("spolocne.Potraviny", "2026-11")).toBe(true);
+    expect(jeVratenieVydavku("spolocne.Potraviny", "2026-09")).toBe(false);
+    for (const k of ["", null, "mimo", "presun", PRIJEM_PRODUKT, PRIJEM_INE]) expect(jeVratenieVydavku(k, "2026-10")).toBe(false);
   });
 });

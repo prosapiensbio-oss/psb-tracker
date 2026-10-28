@@ -32,3 +32,20 @@ export const nazovPrijmu = (k: string | null | undefined) => KATEGORIE_PRIJMU.fi
 export function prijemDoPnl(kategoria: string | null | undefined, mesiac: string, peniazeOd: string | null | undefined): boolean {
   return jeKategoriaPrijmu(kategoria) && !!peniazeOd && mesiac >= peniazeOd;
 }
+
+/**
+ * VRÁTENIE VÝDAVKU (Jerry, 28. 10. 2026). Príchodzí pohyb, ktorému Jerry dal
+ * kategóriu VÝDAVKU, je vrátenie toho výdavku: 16. 10. odišlo 12 500 „Jerry
+ * chata“ (vyplaty.jerry) a 20. 10. prišlo späť 11 000 „Chata vratenie“
+ * s tou istou kategóriou. Výplata za chatu je 1 500, nie 12 500.
+ *
+ * Strážca výberov a Peniaze manažér to tak počítali odjakživa (sčítajú sumu
+ * so znamienkom), obrazovka Kokpitu príchodzie pohyby preskakovala — J&T
+ * Výplaty tak tvrdili o 11 000 viac a dlh bol o toľko horší. Platí od
+ * októbra 2026: staršie mesiace sú uzavreté a nemenia sa (jediný starší
+ * prípad je +377 Kč za Potraviny 29. 9.).
+ */
+export const VRATENIE_OD = "2026-10";
+export function jeVratenieVydavku(kategoria: string | null | undefined, mesiac: string): boolean {
+  return !!kategoria && !jeKategoriaPrijmu(kategoria) && kategoria !== "mimo" && kategoria !== "presun" && mesiac >= VRATENIE_OD;
+}

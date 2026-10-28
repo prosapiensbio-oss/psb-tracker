@@ -10,7 +10,7 @@ import { breakEvenRad, PNL, pnlCalc, SPOLOCNE, VZAS_MONTHS, PRVY_MESIAC_OTAZOK, 
 import { cakaNaPotvrdenie, patriDoFiltra } from "../../lib/psb/filtrePohybov";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prveTreningy, retencia6 } from "../../lib/psb/metrikyKlientov";
-import { prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
+import { jeVratenieVydavku, prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { PRESUN } from "../../lib/psb/fio";
 import { ALZA_CAKA } from "./AlzaUzavierka";
@@ -1656,6 +1656,10 @@ function skupinaFaktur(
           // Príchodzie pohyby sa do nákladov nerátajú, ale sčítať ich treba —
           // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
           // spôsob, ako skontrolovať PTminder.
+          // Príchodzí pohyb s kategóriou výdavku je VRÁTENIE toho výdavku
+          // („Chata vratenie" +11 000 ako vyplaty.jerry, 20. 10. 2026) —
+          // ide ďalej ako výdavok so záporným znamienkom, aby ho znížil.
+          const vratenie = p.suma > 0 && jeVratenieVydavku(p.kategoria, String(p.datum).slice(0, 7));
           if (p.suma > 0) {
             // VŠETKY príchodzie pohyby, bez ohľadu na kategóriu.
             //
@@ -1671,9 +1675,9 @@ function skupinaFaktur(
             // Predaj produktu / iný príjem (nie platba klienta) → Iné príjmy,
             // ale až od mesiaca tržieb z Kokpitu; predtým je v PTminderi.
             if (prijemDoPnl(p.kategoria, mkP, peniazeOdRef.current)) rucnePrijmy[mkP] = (rucnePrijmy[mkP] || 0) + p.suma;
-            continue;
+            if (!vratenie) continue;
           }
-          if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo" || p.kategoria === PRESUN) continue;
+          if (!vratenie && (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo" || p.kategoria === PRESUN)) continue;
           const mk = String(p.datum).slice(0, 7);
           if (p.kategoria.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
@@ -1708,7 +1712,8 @@ function skupinaFaktur(
               && Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000 <= 7
               && dodavatelSedi(d.polozky[0]?.dodavatel || ""))
             .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
-          const skupinaB = skupinaFaktur(kandidatiB, -p.suma, 1);
+          // Vrátenie sa s faktúrou nepáruje — doklad patrí k pôvodnému výdavku.
+          const skupinaB = vratenie ? null : skupinaFaktur(kandidatiB, -p.suma, 1);
           for (const cislo of skupinaB || []) {
             const d = doklady.get(cislo);
             if (!d) continue;
