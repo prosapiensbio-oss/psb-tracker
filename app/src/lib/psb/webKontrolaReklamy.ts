@@ -138,6 +138,31 @@ export type ReklamaNaKontrolu = {
   stranka?: StrankaReklamy | null;
 };
 
+/**
+ * Kedy a kto reklamu naposledy VYPOL — stopa rozhodnutia, nie stav Mety.
+ *
+ * Bez nej kontrola o vypnutej reklame nevie povedať nič lepšie než „možno sa
+ * zastavila sama“ a to isté varovanie sa vracia každé ráno, kým je reklama
+ * zámerne vypnutá. Pritom Kokpit to vie: každé prepnutie kampane zapíše
+ * `vzas_audit` (action `reklama`) a rozhodnutie z dozoru aj
+ * `reklama_vyhodnotenia`. Volajúci odtiaľ podá to najnovšie; keď nič také
+ * nie je, varovanie zostáva — reklamu mohla zastaviť Meta.
+ */
+export type VypnutieReklam = {
+  /** Deň rozhodnutia (RRRR-MM-DD alebo ISO čas). */
+  kedy: string;
+  /** Kto prepol; prázdne, keď to zápis nenesie. */
+  kto?: string;
+  /** Čo sa vtedy vyplo („PSB 2026-09 — … → PAUSED“). */
+  co?: string;
+};
+
+/** „27. 10.“ z RRRR-MM-DD. */
+const denKratko = (d: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || "");
+  return m ? `${Number(m[3])}. ${Number(m[2])}.` : "";
+};
+
 /** Koľko znakov odpovede ide do nálezu. Stavový kód sám nie je stopa. */
 const UKAZKA = 200;
 
@@ -678,6 +703,7 @@ function nalezUtm(r: ReklamaNaKontrolu): { stav: Stav; detail: string } {
 export function skontrolujReklamy(
   reklamy: ReklamaNaKontrolu[],
   stranky: Map<string, StrankaReklamy> = new Map(),
+  vypnutie: VypnutieReklam | null = null,
 ): NalezKontroly[] {
   const vsetky = Array.isArray(reklamy) ? reklamy : [];
   const bezia = vsetky.filter((r) => jeBeziaca(r.stav));
@@ -689,9 +715,13 @@ export function skontrolujReklamy(
   if (!vsetky.length) {
     bezi.stav = "varovanie";
     bezi.detail = "Kokpit nedostal zo Mety ani jednu reklamu — nevie sa, či reklama beží a kam vedie; over sťahovanie kampaní, prázdna odpoveď nie je dôkaz, že je reklama vypnutá";
+  } else if (!bezia.length && vypnutie) {
+    // Vypnuté rozhodnutím. Nie je to porucha a nesmie to svietiť každé ráno —
+    // riadok len povie, odkedy reklama na web nevodí nikoho.
+    bezi.detail = `žiadna reklama nebeží — vypnuté ${denKratko(vypnutie.kedy) || vypnutie.kedy.slice(0, 10)}${vypnutie.kto ? ` (${vypnutie.kto}, z Kokpitu)` : ""}, takže na web z reklamy nikto nechodí; nie je to porucha${vypnutie.co ? `. Naposledy: ${vypnutie.co}` : ""}`;
   } else if (!bezia.length) {
     bezi.stav = "varovanie";
-    bezi.detail = `žiadna z ${pocet(vsetky.length, ["reklamy", "reklám", "reklám"])} nie je zapnutá (stavy: ${[...new Set(vsetky.map((r) => String(r.stav || "?").toUpperCase()))].join(", ")}) — ak to nie je zámer, kampaň sa zastavila sama a web nemá kto navštíviť`;
+    bezi.detail = `žiadna z ${pocet(vsetky.length, ["reklamy", "reklám", "reklám"])} nie je zapnutá (stavy: ${[...new Set(vsetky.map((r) => String(r.stav || "?").toUpperCase()))].join(", ")}) — v Kokpite o vypnutí nie je zápis, takže kampaň zastavila Meta alebo sa zastavila sama a web nemá kto navštíviť`;
   } else if (!sOdkazom.length) {
     bezi.stav = "varovanie";
     bezi.detail = `beží ${pocet(bezia.length, ["reklama", "reklamy", "reklám"])}, ale ani jedna nemá odkaz na web (${mena(bezia)}) — sú to boosty príspevkov, takže platíme za dosah a nie za dopyt, a cesta z reklamy na formulár neexistuje`;

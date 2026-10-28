@@ -196,6 +196,36 @@ describe("značkovanie odkazov", () => {
   });
 });
 
+describe("vypnutá reklama: rozhodnutie verzus porucha", () => {
+  const vypnute = [reklama({ stav: "PAUSED" })];
+
+  it("bez zápisu o vypnutí je to varovanie — zastaviť ju mohla Meta", () => {
+    const b = najdi(skontrolujReklamy(vypnute), "reklama:bezi");
+    expect(b?.stav).toBe("varovanie");
+    expect(b?.detail).toContain("nie je zápis");
+  });
+
+  it("so zápisom o vypnutí je to v poriadku a povie kedy a kto", () => {
+    const b = najdi(
+      skontrolujReklamy(vypnute, new Map(), { kedy: "2026-10-27T10:09:35.352Z", kto: "Jerry", co: "PSB 2026-09 → PAUSED (4 objektov)" }),
+      "reklama:bezi",
+    );
+    expect(b?.stav).toBe("ok");
+    expect(b?.detail).toContain("vypnuté 27. 10.");
+    expect(b?.detail).toContain("Jerry");
+    expect(b?.detail).toContain("nie je to porucha");
+  });
+
+  it("zápis nestačí, keď niečo beží — vtedy riadok hovorí o bežiacej reklame", () => {
+    const b = najdi(
+      skontrolujReklamy([reklama()], new Map(), { kedy: "2026-10-27T10:09:35.352Z", kto: "Jerry" }),
+      "reklama:bezi",
+    );
+    expect(b?.stav).toBe("ok");
+    expect(b?.detail).toContain("beží 1 reklama");
+  });
+});
+
 describe("keď dáta chýbajú, hlási sa neviem", () => {
   it("prázdny zoznam reklám nie je v poriadku", () => {
     const n = skontrolujReklamy([]);

@@ -12,7 +12,8 @@ import {
 import { skontrolujMeranie } from "../../lib/psb/webKontrolaMeranie";
 import { stiahniMeranie } from "../../lib/psb/webKontrolaMeranie.server";
 import {
-  jeBeziacouPodlaSad, type ReklamaNaKontrolu, skontrolujReklamy, stiahniStrankyReklam,
+  jeBeziaca, jeBeziacouPodlaSad, type ReklamaNaKontrolu, skontrolujReklamy, stiahniStrankyReklam,
+  type VypnutieReklam,
 } from "../../lib/psb/webKontrolaReklamy";
 
 /**
@@ -203,6 +204,44 @@ async function castMeranie(DB: D1Database) {
   return skontrolujMeranie(data).map((n) => ({ ...n, trvanie: Date.now() - zac }));
 }
 
+/**
+ * Posledné VYPNUTIE reklamy rukou — aby kontrola nehlásila ako poruchu to,
+ * čo niekto zámerne vypol.
+ *
+ * Čítajú sa dva zápisy, lebo prepnúť kampaň sa dá dvoma cestami a každá píše
+ * inam: rozhodnutie z notifikácie dozoru do `reklama_vyhodnotenia`
+ * (`rozhodnutie = 'vypnut'`), a „zastav kampaň" z obrazovky či od Jarvisa len
+ * do auditu (`action = 'reklama'`, `new_value` tvaru „… → PAUSED"). Berie sa
+ * to novšie z nich.
+ *
+ * Z auditu sa POZERÁ LEN NA PREPNUTIA (`PAUSED`/`ACTIVE`/„vypnutá") a platí
+ * jedine vtedy, keď to najnovšie z nich reklamu vypínalo — po zapnutí už
+ * dnešné ticho zápisom vysvetlené nie je a varovanie má zostať. Prázdna
+ * odpoveď nie je dôkaz, že je vypnutie zámerné: keď zápis chýba, kontrola
+ * ďalej hlási varovanie, lebo reklamu mohla zastaviť Meta.
+ */
+async function poslednevypnutieReklam(DB: D1Database): Promise<VypnutieReklam | null> {
+  type AuditRiadok = { at: string; actor: string | null; new_value: string | null };
+  type RozhodnutieRiadok = { kedy: string; kto: string | null };
+  const [a, v] = await Promise.all([
+    DB.prepare(
+      `SELECT at, actor, new_value FROM vzas_audit
+        WHERE action = 'reklama'
+          AND (new_value LIKE '%PAUSED%' OR new_value LIKE '%ACTIVE%' OR new_value LIKE '%vypnut%')
+        ORDER BY at DESC LIMIT 1`,
+    ).first<AuditRiadok>().catch(() => null),
+    DB.prepare(
+      "SELECT kedy, kto FROM reklama_vyhodnotenia WHERE rozhodnutie = 'vypnut' ORDER BY kedy DESC LIMIT 1",
+    ).first<RozhodnutieRiadok>().catch(() => null),
+  ]);
+  const zAuditu: VypnutieReklam | null = a && /PAUSED|vypnut/i.test(String(a.new_value || "")) && !/ACTIVE/i.test(String(a.new_value || ""))
+    ? { kedy: String(a.at), kto: String(a.actor || "") || undefined, co: String(a.new_value || "") || undefined }
+    : null;
+  const zDozoru: VypnutieReklam | null = v ? { kedy: String(v.kedy), kto: String(v.kto || "") || undefined } : null;
+  if (zAuditu && zDozoru) return zAuditu.kedy >= zDozoru.kedy ? zAuditu : zDozoru;
+  return zAuditu || zDozoru;
+}
+
 async function castReklamy(DB: D1Database) {
   const zac = Date.now();
   const token = await nastavenie(DB, "meta_token");
@@ -244,7 +283,12 @@ async function castReklamy(DB: D1Database) {
       detail: `spojenie s Metou zlyhalo: ${String(e).slice(0, 200)}`, trvanie: Date.now() - zac }];
   }
   const mapa = await stiahniStrankyReklam(reklamy, nacitaj, { znacka: String(zac), ua: UA, timeoutMs: 20000 });
-  return skontrolujReklamy(reklamy, mapa).map((n) => ({ ...n, trvanie: Date.now() - zac }));
+  // Stopa vypnutia sa pýta len vtedy, keď nič nebeží — inak je to dopyt do
+  // databázy, ktorého výsledok kontrola ani nepoužije.
+  const vypnutie = reklamy.length && !reklamy.some((r) => jeBeziaca(r.stav))
+    ? await poslednevypnutieReklam(DB).catch(() => null)
+    : null;
+  return skontrolujReklamy(reklamy, mapa, vypnutie).map((n) => ({ ...n, trvanie: Date.now() - zac }));
 }
 
 export const Route = createFileRoute("/api/web-kontrola")({
