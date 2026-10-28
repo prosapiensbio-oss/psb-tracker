@@ -6,6 +6,7 @@ import { bindings } from "../lib/bindings.server";
 import { uvodnaStrankaHtml } from "../lib/psb/uvodnaStranka";
 import { UKAZKA, jeUkazka } from "../lib/psb/ukazka";
 import { audit } from "../lib/psb/audit.server";
+import { odsifrujBajty } from "../lib/psb/sifra.server";
 import { normName } from "../lib/psb/format";
 import { odlozOdberatela } from "../lib/psb/odberatelOdlozenie.server";
 import {
@@ -53,7 +54,16 @@ async function firmaZAres(ico: string): Promise<UdajeFirmy | null | "nedostupne"
   }
 }
 
-type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string | null; cena_czk: number | null };
+type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string | null; cena_czk: number | null; fotky_json?: string | null };
+
+/** Id fotiek pred a po, ktoré k odkazu pripol tréner (`/api/uvodny`). */
+function fotkyOdkazu(r: RiadokOdkazu): string[] {
+  if (r.druh !== "po" || !r.fotky_json) return [];
+  try {
+    const x = JSON.parse(r.fotky_json);
+    return Array.isArray(x) ? x.map((v) => String(v)).filter(Boolean) : [];
+  } catch { return []; }
+}
 
 /** Celá stránka — z GET aj z POST, keď sa formulár vracia s chybou. */
 async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra: { odpovedPoslana?: boolean; faktura?: BlokFaktury | null }): Promise<string> {
@@ -93,6 +103,8 @@ async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra:
     logoUrl: `${o}/znacka-napis-tmava.svg`,
     figuraUrl: `${o}/znacka-figura-biela.svg`,
     anamnezaUrl: anamneza ? `${o}/a/${anamneza}` : null,
+    // Adresa stránky bez dotazu — fotka sa pýta tej istej routy (?foto=).
+    fotky: fotkyOdkazu(r).map((id) => `${o}${new URL(request.url).pathname}?foto=${encodeURIComponent(id)}`),
     odpovedPoslana: extra.odpovedPoslana,
     faktura: druh === "po"
       ? (extra.faktura ?? { klient: r.klient, udaje: await ulozeneUdaje(DB, r.klient) })
@@ -122,7 +134,7 @@ async function ulozFakturu(DB: D1Database | null, request: Request, token: strin
   const ukazka = jeUkazka(token);
   const r: RiadokOdkazu | null = ukazka
     ? { klient: "Jan Ukázka", druh: "po", trener: "Jerry", kedy: "2026-10-16T09:00", cena_czk: null }
-    : DB ? await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk FROM uvodne_odkazy WHERE token = ?1")
+    : DB ? await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1")
         .bind(token).first<RiadokOdkazu>().catch(() => null) : null;
   if (!r) return new Response(null, { status: 303, headers: { location: `/u/${encodeURIComponent(token)}`, "cache-control": "no-store" } });
 
@@ -227,11 +239,31 @@ export const Route = createFileRoute("/u/$token")({
         if (!DB) return prec("Tento odkaz neplatí.", 404);
 
         const r = await DB.prepare(
-          "SELECT klient, druh, trener, kedy, cena_czk FROM uvodne_odkazy WHERE token = ?1",
+          "SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1",
         ).bind(token).first<RiadokOdkazu>();
         if (!r) return prec("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.", 404);
 
         const q = new URL(request.url).searchParams;
+
+        /**
+         * FOTKA PRED A PO (28. 10. 2026). Vydá sa LEN fotka, ktorej id je
+         * v zozname tohto odkazu a patrí tomu istému klientovi — token je
+         * jediný kľúč a cudziu fotku cez neho dostať nesmie ísť. V R2 leží
+         * zašifrovaná rovnako ako za odkazom /f/.
+         */
+        const fotoId = q.get("foto");
+        if (fotoId) {
+          const { STORAGE, ANAMNEZA_KLUC } = bindings() as { STORAGE?: import("@cloudflare/workers-types").R2Bucket; ANAMNEZA_KLUC?: string };
+          if (!STORAGE || !ANAMNEZA_KLUC || !fotkyOdkazu(r).includes(fotoId)) return new Response("Nenalezeno", { status: 404 });
+          const f = await DB.prepare("SELECT kluc, typ FROM klient_fotky WHERE id = ?1 AND klient = ?2")
+            .bind(fotoId, r.klient).first<{ kluc: string; typ: string | null }>();
+          const obj = f ? await STORAGE.get(f.kluc) : null;
+          if (!f || !obj) return new Response("Nenalezeno", { status: 404 });
+          const cista = await odsifrujBajty(await obj.arrayBuffer(), ANAMNEZA_KLUC);
+          return new Response(cista as unknown as ArrayBuffer, {
+            headers: { "content-type": f.typ || "image/jpeg", "cache-control": "private, no-cache", "x-robots-tag": "noindex" },
+          });
+        }
         const fakturaUlozena = q.get("faktura") === "ok";
         const html = await stranka(DB, request, r, {
           odpovedPoslana: q.get("odpoved") === "1",

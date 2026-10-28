@@ -9,7 +9,8 @@ import { zalozAleboNajdi } from "../../lib/psb/anamneza.server";
 /**
  * ODKAZ NA STRÁNKU PRED ÚVODNÝM / PO ŇOM.
  *
- *   POST { akcia: "odkaz", klient, druh: "pred"|"po", trener?, kedy?, cena? }
+ *   POST { akcia: "odkaz", klient, druh: "pred"|"po", trener?, kedy?, cena?, fotky? }
+ *        fotky = id porovnaní z kartotéky (len po úvodnom); [] ich z odkazu zmaže
  *        → { ok, odkaz, token }
  *
  * Na dvojicu klient + druh je JEDEN token: opakované vyrobenie vráti ten
@@ -62,16 +63,37 @@ export const Route = createFileRoute("/api/uvodny")({
           cena = Math.round(n);
         }
 
+        /**
+         * FOTKY PRED A PO — len po úvodnom (Jerry, 28. 10. 2026). Id musia
+         * patriť TOMUTO klientovi v kartotéke; cudzia fotka by sa inak dala
+         * pripnúť na cudziu stránku. `undefined` = nemeniť, `[]` = zmazať.
+         */
+        let fotkyJson: string | null | undefined;
+        if (druh === "po" && Array.isArray(b.fotky)) {
+          const ids = (b.fotky as unknown[]).map((x) => String(x ?? "").trim().slice(0, 40)).filter(Boolean).slice(0, 4);
+          if (ids.length) {
+            const r = await DB.prepare(
+              `SELECT id FROM klient_fotky WHERE klient = ?1 AND id IN (SELECT value FROM json_each(?2))`,
+            ).bind(klient, JSON.stringify(ids)).all<{ id: string }>();
+            const zname = new Set((r.results || []).map((x) => String(x.id)));
+            if (ids.some((id) => !zname.has(id))) {
+              return Response.json({ ok: false, error: "Fotka nepatrí tomuto klientovi." }, { status: 400 });
+            }
+          }
+          fotkyJson = ids.length ? JSON.stringify(ids) : null;
+        }
+
         try {
           const token = novyToken();
           await DB.prepare(
-            `INSERT INTO uvodne_odkazy (token, klient, druh, trener, kedy, cena_czk, vytvorene)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            `INSERT INTO uvodne_odkazy (token, klient, druh, trener, kedy, cena_czk, vytvorene, fotky_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT (klient, druh) DO UPDATE SET
-               trener   = excluded.trener,
-               kedy     = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
-               cena_czk = excluded.cena_czk`,
-          ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString()).run();
+               trener     = excluded.trener,
+               kedy       = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
+               cena_czk   = excluded.cena_czk,
+               fotky_json = CASE WHEN ?9 = 1 THEN excluded.fotky_json ELSE uvodne_odkazy.fotky_json END`,
+          ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString(), fotkyJson ?? null, fotkyJson === undefined ? 0 : 1).run();
 
           const r = await DB.prepare(
             "SELECT token FROM uvodne_odkazy WHERE klient = ?1 AND druh = ?2",
@@ -99,7 +121,7 @@ export const Route = createFileRoute("/api/uvodny")({
 
           await audit(DB, {
             action: "uvodny-odkaz", predmet: klient,
-            neu: `${druh === "pred" ? "pred úvodným" : "po úvodnom"}${cena == null ? "" : ` · ${cena} Kč`}`,
+            neu: `${druh === "pred" ? "pred úvodným" : "po úvodnom"}${cena == null ? "" : ` · ${cena} Kč`}${fotkyJson ? ` · fotky ${JSON.parse(fotkyJson).length}` : ""}`,
             actor: (await currentUser(request)) || undefined,
           });
 

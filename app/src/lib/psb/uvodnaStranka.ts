@@ -139,6 +139,13 @@ export type VolbyStranky = {
   /** `true` = klient práve odoslal odpoveď; namiesto poľa sa poďakuje. */
   odpovedPoslana?: boolean;
   /**
+   * Fotky pred a po z úvodného — adresy obrázkov (Jerry, 28. 10. 2026:
+   * „odfotíme klienta v rámci diagnostiky, počas tréningu ho narovnáme
+   * a odfotíme znovu — a toto im poslať"). Len po úvodnom; bez nich sa
+   * sekcia nekreslí.
+   */
+  fotky?: string[];
+  /**
    * „Chcete platit fakturou?" — len po úvodnom (Jerry, 28. 10. 2026).
    * Bez hodnoty sa blok nekreslí. Viď `fakturaKlienta.ts`.
    */
@@ -221,6 +228,18 @@ const riadokOdkazu = (href: string, nadpis: string, popis: string) =>
  * Žiadny JavaScript: otvára sa z SMS, často v okne, ktoré si otvorí správa.
  * Skript, ktorý sa nenačíta, by z tlačidiel spravil mŕtve obdĺžniky.
  */
+/**
+ * PŘED A PO — fotka z diagnostiky vedľa fotky po narovnaní. Porovnanie je
+ * už poskladané (vľavo před, vpravo po), stránka ho len ukáže a povie, čo sa
+ * na ňom dá čakať: zmena za jednu lekciu je ukážka, nie výsledok.
+ */
+function fotkyHtml(fotky: string[] | undefined): string {
+  if (!fotky?.length) return "";
+  return `<h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před a po dnešní lekci</h2>
+<p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Vlevo na začátku, vpravo po dnešní práci. Takhle tělo reaguje, když dostane správný podnět — na tom budeme stavět dál.</p>
+${fotky.map((src, i) => `<img src="${esc(src)}" alt="Držení těla před a po lekci${fotky.length > 1 ? ` (${i + 1})` : ""}" loading="lazy" style="display:block;width:100%;height:auto;border-radius:16px;border:1px solid #DCE3DD;margin-top:${i ? 12 : 0}px;background:#F6F8F6">`).join("\n")}`;
+}
+
 export function uvodnaStrankaHtml(v: VolbyStranky): string {
   const t = TRENERI[v.trener] ? v.trener : "Jerry";
   const tr = TRENERI[t];
@@ -301,6 +320,7 @@ ${cennikHtml()}
 </div>`
     : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : "Děkuji za účast a jsem rád, že jsme domluvili pokračování."}</p>
+${fotkyHtml(v.fotky)}
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
