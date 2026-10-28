@@ -3,6 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "./audit.server";
 import { dnesPraha, posunDen } from "./cas";
 import { normName } from "./format";
+import { klientPodlaCelehoMena } from "./kalendarMena";
 import { vlozUdalost } from "./gcal.server";
 import { icsUid, pripravTrening, type VstupTreningu } from "./nahodTrening";
 
@@ -113,6 +114,19 @@ export async function zapisTrening(
   akciaAuditu = "trening-nahodeny",
 ): Promise<{ ok: true; uid: string; zaciatok: string } | { ok: false; chyba: string; status: number }> {
   if (!kluc) return { ok: false, chyba: "Servisný účet nie je nastavený (GCAL_SA_KLUC).", status: 503 };
+  /**
+   * MENO SA PRICHYTÍ K ZNÁMEMU KLIENTOVI (Jerry, 28. 10. 2026: „prečo je
+   * Branislav Široký 2 profily?"). Tréning po úvodnom sa zapísal ako
+   * „Branislav Široky" bez dĺžňa a pravidlo celého mena (nižšie) z neho
+   * spravilo druhého klienta — balíček, platby aj fakturačné údaje ostali pri
+   * „Široký", dochádzka odišla k „Široky". Meno, ktoré sa od práve jedného
+   * známeho klienta líši len diakritikou alebo veľkosťou písmen, je ten istý
+   * človek; do kalendára aj do pravidla ide jeho tvar. Pri dvoch zhodách sa
+   * nehádá (`klientPodlaCelehoMena` vráti null) a ostane, čo prišlo.
+   */
+  const zadane = String(vstup.klient || "").trim();
+  const kanonicke = zadane ? klientPodlaCelehoMena(zadane, await znamiKlienti(DB)) : null;
+  if (kanonicke && kanonicke !== zadane) vstup = { ...vstup, klient: kanonicke };
   const v = pripravTrening(vstup);
   if (!v.ok) return { ok: false, chyba: v.chyba, status: 400 };
   const typNovej = String(vstup.typ || "trening") === "uvodny" ? "uvodny" : "trening";
