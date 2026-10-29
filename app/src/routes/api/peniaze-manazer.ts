@@ -17,6 +17,14 @@ import { CURRENT_ERA } from "../../lib/psb/vzas";
 // a delené (`vyplaty`, `vyplaty.delene`) — pri posledných troch je jeho polovica.
 // Nič iné z Kokpitu (klienti, Terezkine výplaty, tržby) sem nejde.
 //
+// Od 29. 10. 2026 aj:
+//  - `polozky`: rozdelené položky faktúr z Alzy (`faktura_polozky`) s kategóriou
+//    vyplaty.jerry alebo spolocne.* — nákup bitcoinom inak v Kasičke nie je nikde.
+//    Suma je `cena_czk` (celý riadok); `ks` je pri Alze nespoľahlivé (120 kapsúl).
+//  - `vratky`: platby z Fio mimo Jerryho kategórií, ku ktorým do 3 dní prišla na Fio
+//    rovnaká suma späť (lekáreň 560, PANE 286/407) — Jerry ich firme vrátil, takže sú
+//    jeho výdavok. Kasička si ich spáruje so svojím odchodom na Fio.
+//
 // Prístup je len tokenom `PENIAZE_TOKEN` v hlavičke, nie prihlásením do Kokpitu:
 // volá ho druhý worker cez service binding a token nepustí nikam inam. Preto
 // zámerne NEPOUŽÍVA currentUser() — tam by token Strižne-štýlu otvoril celý Kokpit.
@@ -46,6 +54,23 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
             WHERE date >= ?1 AND (category IN ('vyplaty.jerry', 'vyplaty', 'vyplaty.delene') OR category LIKE 'spolocne.%')
             ORDER BY date LIMIT 5000`,
         ).bind(od).all();
+        const polozky = await DB.prepare(
+          `SELECT id, faktura, date, nazov, cena_czk AS suma, category AS kat
+             FROM faktura_polozky
+            WHERE date >= ?1 AND lower(dodavatel) LIKE '%alza%'
+              AND (category = 'vyplaty.jerry' OR category LIKE 'spolocne.%')
+            ORDER BY date LIMIT 5000`,
+        ).bind(od).all();
+        const vratky = await DB.prepare(
+          `SELECT a.id, a.date, a.amount_czk AS suma, a.counterparty, a.note, a.category AS kat
+             FROM fio_transactions a
+            WHERE a.date >= ?1 AND a.amount_czk < 0
+              AND NOT (a.category IN ('vyplaty.jerry', 'vyplaty', 'vyplaty.delene') OR a.category LIKE 'spolocne.%')
+              AND EXISTS (SELECT 1 FROM fio_transactions b
+                           WHERE b.amount_czk = -a.amount_czk
+                             AND abs(julianday(b.date) - julianday(a.date)) <= 3)
+            ORDER BY a.date LIMIT 500`,
+        ).bind(od).all();
         // Nárok z tých istých sedení a toho istého vzorca ako dlh trénera v Kokpite.
         const data = await loadData(DB);
         // Hodiny len po dnešok — kalendár nesie aj budúce termíny (ako strážca výberov).
@@ -56,7 +81,7 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
           // Model A (26. 10. 2026): hodiny navyše × 450, max 40 h — už sú v `narok`.
           navyseOd: NAVYSE.od, navyseSadzba: NAVYSE.sadzba, navyseStrop: NAVYSE.stropHodin,
         };
-        return Response.json({ ok: true, results: rs.results || [], narok, model });
+        return Response.json({ ok: true, results: rs.results || [], polozky: polozky.results || [], vratky: vratky.results || [], narok, model });
       },
     },
   },
