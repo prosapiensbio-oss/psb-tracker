@@ -614,6 +614,51 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             return Response.json({ ok: true, id });
           }
 
+          /**
+           * DLH DOPLNENÝ NA UŽ VYSTAVENÚ FAKTÚRU (Jerry, 29. 10. 2026: „chcem,
+           * aby sa ma Kokpit spýtal, či to tam chcem pridať"). Len na faktúru,
+           * ktorá ešte NEODIŠLA (mail ani SMS) a nie je uhradená ani
+           * stornovaná — odoslaný doklad sa už nemení, má ho klient.
+           */
+          if (b.akcia === "pridaj-polozky") {
+            const f = await DB.prepare(
+              "SELECT cislo, klient, ks, cena_czk, odoslane_at, uhradene_at, storno_at FROM vydane_faktury WHERE id = ?1",
+            ).bind(id).first<{ cislo: string; klient: string; ks: number; cena_czk: number; odoslane_at: string | null; uhradene_at: string | null; storno_at: string | null }>();
+            if (!f) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
+            const sms = await DB.prepare("SELECT 1 FROM vzas_audit WHERE action = 'sms-faktura' AND payment_id LIKE ?1 LIMIT 1")
+              .bind(`%faktúra ${f.cislo}%`).first().catch(() => null);
+            if (f.odoslane_at || sms || f.uhradene_at || f.storno_at) {
+              return Response.json({ ok: false, error: `Faktúra ${f.cislo} už odišla klientovi alebo je uzavretá — doplniť sa nedá. Vystav na dlh novú.` }, { status: 409 });
+            }
+            const nove: PolozkaFaktury[] = [];
+            for (const x of (Array.isArray(b.polozky) ? b.polozky : []) as Record<string, unknown>[]) {
+              const kl = await kanonickeMeno(DB, kus(x.klient, 120));
+              const pp = String(x.popis ?? "").trim().slice(0, 600);
+              const cc = Math.round((Number(x.cena) || 0) * 100) / 100;
+              if (!kl || pp.length < 3 || cc <= 0) return Response.json({ ok: false, error: "Položka potrebuje klienta, popis a kladnú sumu." }, { status: 400 });
+              nove.push({ klient: kl, popis: pp, ks: 1, cena: cc, celkom: cc, balicekId: kus(x.balicekId, 40) || null, naDoklade: false });
+            }
+            if (!nove.length) return Response.json({ ok: false, error: "Nič na pridanie." }, { status: 400 });
+            const stare = (await dalsiePolozky(DB, id)).get(id) || [];
+            if (stare.length + nove.length > 9) return Response.json({ ok: false, error: "Na jednej faktúre najviac desať položiek." }, { status: 400 });
+            if (nove.some((n) => n.balicekId && stare.some((x) => x.balicekId === n.balicekId))) {
+              return Response.json({ ok: false, error: "Tento dlh už na faktúre je." }, { status: 409 });
+            }
+            const celkom = Math.round(((Number(f.ks) || 1) * (Number(f.cena_czk) || 0) + [...stare, ...nove].reduce((n, d) => n + d.celkom, 0)) * 100) / 100;
+            await DB.batch([
+              ...nove.map((d, i) => DB.prepare(
+                `INSERT INTO vydane_faktury_polozky (id, faktura_id, poradie, klient, balicek_id, popis, ks, cena_czk, celkom_czk, na_doklade)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,0)`,
+              ).bind(uid(), id, stare.length + i + 1, d.klient, d.balicekId || null, d.popis, d.ks, d.cena, d.celkom)),
+              DB.prepare("UPDATE vydane_faktury SET celkom_czk = ?2 WHERE id = ?1").bind(id, celkom),
+            ]);
+            await audit(DB, {
+              action: "faktura-doplnena", predmet: `${f.cislo} · ${f.klient}`,
+              neu: nove.map((d) => `${d.klient}: ${d.popis} ${d.celkom} Kč`).join("; "), actor: kto,
+            });
+            return Response.json({ ok: true, celkom });
+          }
+
           if (b.akcia === "storno") {
             const dovod = kus(b.dovod, 300);
             if (!dovod) return Response.json({ ok: false, error: "Storno potrebuje dôvod — o rok už nikto nebude vedieť prečo." }, { status: 400 });

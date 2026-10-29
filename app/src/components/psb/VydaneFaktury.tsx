@@ -900,6 +900,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   zmazať
                 </button>
               </div>
+              {!r.storno_at && !r.uhradene_at && !r.odoslane_at && !r.sms_at && (
+                <DlhMimoFaktury
+                  r={r} dlhy={dlhy} pracujem={pracujem === r.id}
+                  onPridaj={(co) => void posli({
+                    akcia: "pridaj-polozky", id: r.id,
+                    polozky: co.map((d) => ({ klient: d.klient, popis: d.popis, cena: d.suma, balicekId: d.balicekId || undefined })),
+                  }, r.id).then((j) => { if (j?.ok) setHlaska(`Faktúra ${r.cislo} doplnená — otvor PDF a skontroluj ju pred odoslaním.`); })}
+                />
+              )}
               {smsK === r.id && (
                 <div style={{ margin: "6px 0 4px" }}>
                   <SmsKlientovi
@@ -923,6 +932,51 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
         {" "}{DODAVATEL.ucet}, variabilný symbol je číslo faktúry a na doklade je QR platba.
       </div>
     </Card>
+  );
+}
+
+/**
+ * VYSTAVENÁ, EŠTE NEODOSLANÁ FAKTÚRA A DLH, KTORÝ NA NEJ NIE JE.
+ *
+ * Jerry, 29. 10. 2026: „chcem, aby sa ma Kokpit spýtal, či to tam chcem
+ * pridať." Formulár sa pýta pri vystavovaní; toto je tá istá otázka pre
+ * faktúru, ktorá už existuje. „Nie" sa pamätá v prehliadači pri faktúre
+ * a dlhu — keď dlh pribudne nový, spýta sa znova.
+ */
+function DlhMimoFaktury({ r, dlhy, pracujem, onPridaj }: {
+  r: Riadok;
+  dlhy?: DlhPolozka[];
+  pracujem: boolean;
+  onPridaj: (co: ReturnType<typeof dlhyNaFakturu>) => void;
+}) {
+  const kluc = (k: string) => `psb-faktura-dlh-nie|${r.cislo}|${k}`;
+  const [nie, setNie] = useState<string[]>(() => {
+    try { return Object.keys(localStorage).filter((k) => k.startsWith(`psb-faktura-dlh-nie|${r.cislo}|`)).map((k) => k.split("|").slice(2).join("|")); } catch { return []; }
+  });
+  const ponuka = dlhyNaFakturu(dlhy, [r.klient, ...(r.dalsie || []).map((d) => d.klient)], [r.balicek_id, ...(r.dalsie || []).map((d) => d.balicekId)])
+    .filter((d) => !nie.includes(d.kluc));
+  if (!ponuka.length) return null;
+  const odmietni = (d: (typeof ponuka)[number]) => {
+    try { localStorage.setItem(kluc(d.kluc), "1"); } catch { /* len pohodlie */ }
+    setNie((x) => [...x, d.kluc]);
+  };
+  return (
+    <div style={{ margin: "4px 0 2px 12px", padding: "7px 10px", borderRadius: 8, border: `1px solid ${mix(C.orange, 50)}`, background: C.orangeBg, fontSize: 12, color: C.textMuted }}>
+      <div style={{ color: C.text, marginBottom: 3 }}>
+        Na faktúre {r.cislo} nie je dlh <b>{suma(ponuka.reduce((n, d) => n + d.suma, 0))} Kč</b> — pridať ho tam?
+      </div>
+      {ponuka.map((d) => (
+        <div key={d.kluc} style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", padding: "1px 0" }}>
+          <span style={{ flex: "1 1 220px" }}><b style={{ color: C.text }}>{d.klient}</b> · {d.popis}</span>
+          <b style={{ color: C.text, fontVariantNumeric: "tabular-nums" }}>{suma(d.suma)} Kč</b>
+          <button type="button" disabled={pracujem} onClick={() => onPridaj([d])} style={{ ...odkazStyl, color: C.green }}>{pracujem ? "pridávam…" : "pridať"}</button>
+          <button type="button" onClick={() => odmietni(d)} style={{ ...odkazStyl, color: C.textDim }}>nie</button>
+        </div>
+      ))}
+      {ponuka.length > 1 && (
+        <button type="button" disabled={pracujem} onClick={() => onPridaj(ponuka)} style={{ ...odkazStyl, color: C.green, marginTop: 3 }}>pridať všetko</button>
+      )}
+    </div>
   );
 }
 
