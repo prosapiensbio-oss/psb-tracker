@@ -12,7 +12,7 @@ import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { hodnotaKlienta, koncentracia, obnovaBalickov, odchody, prezitie100, prveTreningy, retencia6 } from "../../lib/psb/metrikyKlientov";
 import { jeVratenieVydavku, prijemDoPnl } from "../../lib/psb/kategoriePrijmov";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
-import { PRESUN } from "../../lib/psb/fio";
+import { PRESUN, REZERVA_FIRMY } from "../../lib/psb/fio";
 import { ALZA_CAKA } from "./AlzaUzavierka";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
@@ -1591,7 +1591,7 @@ function skupinaFaktur(
          * je pritom výplata v naturáliách a patrí do „poslané".
          */
         const zapocitajPolozku = (mk: string, pol: FaPol, popis: string, doklad: string) => {
-          if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria === PRESUN) return;
+          if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria === PRESUN || pol.kategoria === REZERVA_FIRMY) return;
           if (pol.kategoria.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
             if (pol.kategoria === "vyplaty.jerry") v.jerry += pol.cena;
@@ -1619,7 +1619,7 @@ function skupinaFaktur(
         // `ciastka` je so znamienkom: záporná = výdavok, kladná = príjem/vrátenie.
         // Vďaka tomu vrátenie (kladná časť na nákladový cieľ) ten náklad odčíta.
         const zaradCiast = (mk: string, ciel: string, ciastka: number, meta: { datum: string; popis: string }) => {
-          if (!ciel || ciel === "mimo" || ciel === PRESUN) return;  // osobné mimo P&L a presuny medzi vlastnými peniazmi
+          if (!ciel || ciel === "mimo" || ciel === PRESUN || ciel === REZERVA_FIRMY) return;  // osobné mimo P&L a presuny medzi vlastnými peniazmi
           if (ciel.startsWith(PRIJEM)) {
             // Od mesiaca, keď sú peniaze z Kokpitu (`data.peniazeOd`), je
             // úvodný v hotovosti PLATBA klienta vo vlastnej evidencii — ako
@@ -1678,7 +1678,7 @@ function skupinaFaktur(
             if (prijemDoPnl(p.kategoria, mkP, peniazeOdRef.current)) rucnePrijmy[mkP] = (rucnePrijmy[mkP] || 0) + p.suma;
             if (!vratenie) continue;
           }
-          if (!vratenie && (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo" || p.kategoria === PRESUN)) continue;
+          if (!vratenie && (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo" || p.kategoria === PRESUN || p.kategoria === REZERVA_FIRMY)) continue;
           const mk = String(p.datum).slice(0, 7);
           if (p.kategoria.startsWith("vyplaty")) {
             const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });

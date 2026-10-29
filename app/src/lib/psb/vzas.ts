@@ -803,6 +803,8 @@ export function skupinyPnl(): { hodnota: string; label: string }[] {
 // nič nehovorí. Meno a hodnotu vie povedať len tento modul, tak to robí on.
 export function nazovKategorie(kat: string): string {
   if (kat.startsWith("spolocne.")) return `Spoločné · ${kat.slice("spolocne.".length)}`;
+  if (kat === "rezerva") return "Rezerva firmy";
+  if (kat === "presun") return "Presun hotovosti na účet";
   const [sekK, subK, itemK] = kat.split(".");
   const sek = (PNL as Record<string, VzasSection>)[sekK];
   const sub = sek?.subcategories?.[subK];

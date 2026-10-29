@@ -22,7 +22,7 @@
  * v databáze ani v odpovedi API. Preto sa v tomto súbore ani raz nelogu je.
  */
 
-import { odhadniKategoriu, PRESUN, protistranaZPopisu, type FioRiadok } from "./fio";
+import { odhadniKategoriu, protistranaZPopisu, REZERVA_FIRMY, type FioRiadok } from "./fio";
 import { jeUcetRezervy, REZERVA_PROTISTRANA } from "./rezervaOdlozenie";
 
 const ZAKLAD = "https://fioapi.fio.cz/v1/rest";
@@ -134,8 +134,8 @@ export function pohybyZOdpovede(
       // Príjem sa nezaraďuje — to robí Jerry sám (platba klienta, vrátenie…).
       // Rovnako ako import zo súboru; bez tejto podmienky dostal Gerich
       // kategóriu „AI aplikácie" z pravidla naučeného na Perplexity.
-      // Prevod na rezervu a späť nie je náklad ani príjem — je to presun.
-      kategoria: protistrana === REZERVA_PROTISTRANA ? PRESUN
+      // Prevod na rezervu a späť nie je náklad ani príjem — má vlastnú kategóriu.
+      kategoria: protistrana === REZERVA_PROTISTRANA ? REZERVA_FIRMY
         : suma < 0 ? odhadniKategoriu(`${protistrana} ${poznamka} ${typ}`, pravidla) : "",
     });
   }

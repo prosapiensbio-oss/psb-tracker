@@ -62,3 +62,12 @@ describe("potvrdené zmiznú z plochy", () => {
     expect(jePotvrdeny({ suma: 6990, kategoria: "", potvrdene: true })).toBe(false);
   });
 });
+
+describe("rezerva firmy (29. 10. 2026)", () => {
+  const rezerva = { suma: -4741, kategoria: "rezerva" };
+  it("nie je náklad a nečaká na potvrdenie", () => {
+    expect(patriDoFiltra(rezerva, "naklady")).toBe(false);
+    expect(cakaNaPotvrdenie(rezerva)).toBe(false);
+    expect(jePotvrdeny(rezerva)).toBe(true);
+  });
+});

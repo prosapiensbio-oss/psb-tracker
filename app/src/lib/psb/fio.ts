@@ -217,6 +217,14 @@ export const MIMO_PNL = "mimo";
  * „Mimo P&L — súkromné" sa líši zámerne: súkromné je míňanie, toto je presun.
  */
 export const PRESUN = "presun";
+/**
+ * REZERVA FIRMY — prevod na rezervný účet PSB a späť (Jerry, 29. 10. 2026:
+ * „doplň rezerve vlastnú kategóriu"). Nie je to náklad ani príjem, rovnako
+ * ako presun hotovosti, ale je to iná vec: odklad 5 % z tržieb (Profit
+ * First), nie vklad z obálky. Pozná sa podľa ČÍSLA protiúčtu
+ * (`jeUcetRezervy`), takže je istá a nečaká na potvrdenie.
+ */
+export const REZERVA_FIRMY = "rezerva";
 /** Výplata bez určenia človeka — zostáva kvôli starším zápisom. */
 export const VYPLATY = "vyplaty";
 // Výplata musí vedieť, KOMU patrí, inak sa z nej nedá počítať dlh voči
@@ -377,7 +385,7 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
     out.push({
       id: iId >= 0 ? (c[iId] || "").trim() : "",
       datum, suma, protistrana, poznamka: popis.slice(0, 200), typ,
-      kategoria: rezerva ? PRESUN : suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
+      kategoria: rezerva ? REZERVA_FIRMY : suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
     });
   }
 

@@ -23,7 +23,8 @@ export function patriDoFiltra(p: PohybNaFilter, f: FilterPohybov, maSplit = fals
     case "potvrdene": return jePotvrdeny(p, maSplit);
     // Náklady = všetko, čo odišlo, okrem výplat a súkromného — aj nezaradené,
     // lebo aj to je náklad, len ešte bez škatuľky.
-    case "naklady": return vydaj && (maSplit || (!kat.startsWith("vyplaty") && kat !== "mimo"));
+    // Rezerva nie je náklad — peniaze ostávajú firme, len na druhom účte.
+    case "naklady": return vydaj && (maSplit || (!kat.startsWith("vyplaty") && kat !== "mimo" && kat !== "rezerva"));
     case "vyplaty": return vydaj && !maSplit && kat.startsWith("vyplaty");
     case "sukromne": return vydaj && !maSplit && kat === "mimo";
     case "prijmy": return p.suma > 0;
@@ -50,7 +51,8 @@ export function stavPrijmu(p: PohybNaFilter, maSplit = false): StavPrijmu {
  * Nezaradený výdavok sa nepotvrdzuje: najprv potrebuje kategóriu.
  */
 export function cakaNaPotvrdenie(p: PohybNaFilter, maSplit = false): boolean {
-  if (p.suma >= 0 || p.potvrdene || maSplit || p.typ === "hotovosť") return false;
+  // Rezervu Kokpit spozná podľa čísla účtu — istá vec, nie návrh.
+  if (p.suma >= 0 || p.potvrdene || maSplit || p.typ === "hotovosť" || p.kategoria === "rezerva") return false;
   return !!p.kategoria;
 }
 

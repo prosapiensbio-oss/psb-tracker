@@ -47,5 +47,5 @@ export function prijemDoPnl(kategoria: string | null | undefined, mesiac: string
  */
 export const VRATENIE_OD = "2026-10";
 export function jeVratenieVydavku(kategoria: string | null | undefined, mesiac: string): boolean {
-  return !!kategoria && !jeKategoriaPrijmu(kategoria) && kategoria !== "mimo" && kategoria !== "presun" && mesiac >= VRATENIE_OD;
+  return !!kategoria && !jeKategoriaPrijmu(kategoria) && kategoria !== "mimo" && kategoria !== "presun" && kategoria !== "rezerva" && mesiac >= VRATENIE_OD;
 }
