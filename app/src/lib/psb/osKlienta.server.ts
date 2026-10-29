@@ -24,6 +24,8 @@ export type KalUdalostServer = { klient: string; trener: string; zaciatok: strin
 export type BalicekServer = {
   klient: string; nazov: string; hodiny: number | null; cena_czk: number | null;
   platnost_od: string; platnost_do: string | null; zdroj: string; zrusene_at: string | null;
+  /** „zostatok prevzatý z PTmindera…" — os ho potrebuje (29. 10. 2026). */
+  poznamka?: string | null;
 };
 
 export async function osKlientaZoServera(
@@ -58,7 +60,7 @@ export async function osKlientaZoServera(
     .filter((u) => normName(u.klient) === kto);
 
   const balicky = (((await DB.prepare(
-    `SELECT klient, nazov, hodiny, cena_czk, platnost_od, platnost_do, zdroj, zrusene_at
+    `SELECT klient, nazov, hodiny, cena_czk, platnost_od, platnost_do, zdroj, zrusene_at, poznamka
        FROM balicky`,
   ).all()).results || []) as unknown as BalicekServer[])
     .filter((b) => normName(b.klient) === kto);

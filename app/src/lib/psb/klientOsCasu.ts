@@ -46,7 +46,9 @@ export type Udalost =
        */
       uvodny?: boolean;
     }
-  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean }
+  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean;
+      /** Zostatok prevzatý z PTmindera pri štarte Kokpitu (snímka, nie predaj) — viď `priebehBalickov`. */
+      zostatokZPtmindera?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean; prepadlo?: number };
 
 /**
@@ -142,6 +144,9 @@ type BalicekKokpitu = {
   klient: string; nazov: string; hodiny?: number | null;
   platnost_od: string; platnost_do?: string | null; cena_czk?: number | null;
   zrusene_at?: string | null; zdroj?: string;
+  poznamka?: string | null;
+  /** `balickyKokpit` z `/api/data` nesie namiesto poznámky hotový príznak. */
+  kotva?: boolean;
 };
 
 const den = (s: string) => (s || "").slice(0, 10);
@@ -439,7 +444,21 @@ export function osCasuKlienta(
     const oprava = opravenyNaliaty(b, d);
     // Od 1. 10. 2026 je každý riadok v Kokpite balíček, aj naliaty z PTmindera
     // (Lucia Podolová 2. 10.) — predaj z exportu od toho dňa na os nejde.
-    if (b.zdroj !== "rucne" && !oprava && d < KOKPIT_OD) continue;
+    /**
+     * ZOSTATOK PREVZATÝ Z PTMINDERA (Regina Obrovská, Janka Šnirychová,
+     * 29. 10. 2026). Naliatie 20.–29. 9. 2026 zapísalo „Doplnenie členstva —
+     * zostatok prevzatý z PTmindera k <deň>": snímku, koľko hodín klient
+     * vtedy mal. Karta z nej počíta, os ju preskakovala — a keď sa staré
+     * členstvo minulo podľa vlastného rátania skôr, tréningy po ňom ostali
+     * bez čísla. Na os ide so značkou; obdobie neotvára a uplatní sa, len keď
+     * predošlé členstvo už skončilo (inak je to tá istá hodina dvakrát).
+     */
+    if (b.zdroj !== "rucne" && !oprava && d < KOKPIT_OD) {
+      if (jeDoplnenie(b.nazov) && (b.kotva || /zostatok prevzat/i.test(String(b.poznamka || ""))) && Number(b.hodiny) > 0) {
+        out.push({ druh: "balicekOd", den: d, nazov: b.nazov, hodin: Number(b.hodiny), zKokpitu: true, zostatokZPtmindera: true });
+      }
+      continue;
+    }
     if (oprava) zKokpitu.add(`${d}|oprava`);
     /**
      * BALÍČOK Z KOKPITU PREBÍJA ČLENSTVO Z EXPORTU V TEN ISTÝ DEŇ, aj keď

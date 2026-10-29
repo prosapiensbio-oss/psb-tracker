@@ -843,3 +843,28 @@ describe("doplnenie z Kokpitu a zvyšok platného balíčka (29. 10. 2026)", () 
     expect(koniec).toBe(6);
   });
 });
+
+describe("zostatok prevzatý z PTmindera (Regina, Jitka, 29. 10. 2026)", () => {
+  const t = (den: string): Udalost => ({ druh: "trening", den });
+  const tren = (os: Udalost[], den: string) => os.find((u) => u.druh === "trening" && u.den === den)!;
+  const zaklad: Udalost[] = [
+    { druh: "balicekOd", den: "2026-07-15", nazov: "OFF - 8 hodín offline", hodin: 8, doDna: "2026-09-08" },
+    { druh: "platba", den: "2026-07-23", suma: 9400, metoda: "bank" },
+    t("2026-07-20"), t("2026-07-27"), t("2026-08-05"), t("2026-08-28"), t("2026-09-02"), t("2026-09-16"),
+    { druh: "balicekOd", den: "2026-09-20", nazov: "Doplnenie členstva", hodin: 4, zKokpitu: true, zostatokZPtmindera: true },
+    t("2026-09-23"), t("2026-09-30"), t("2026-10-12"), t("2026-10-21"),
+  ];
+  it("po skončenom členstve a bez nového balíčka platí snímka: každý tréning má číslo, koniec 0", () => {
+    const { stavy, koniec } = priebehBalickov(zaklad, null, "2026-10-29");
+    expect(["2026-09-23", "2026-09-30", "2026-10-12", "2026-10-21"].map((d) => stavy.get(tren(zaklad, d))?.zostatok)).toEqual([4, 3, 2, 1]);
+    expect(koniec).toBe(0);
+  });
+  it("keď prišiel nový balíček, snímka sa nepoužije (os prevezme tréningy sama)", () => {
+    const os: Udalost[] = [...zaklad.filter((u) => u.den <= "2026-09-20"),
+      { druh: "balicekOd", den: "2026-09-21", nazov: "OFF - 6h BEZ viazanosti", hodin: 6, doDna: "2026-11-15" },
+      { druh: "platba", den: "2026-09-21", suma: 7790, metoda: "bank" },
+      t("2026-09-23")];
+    const { stavy } = priebehBalickov(os, null, "2026-10-29");
+    expect(stavy.get(tren(os, "2026-09-23"))?.zostatok).not.toBe(4);
+  });
+});

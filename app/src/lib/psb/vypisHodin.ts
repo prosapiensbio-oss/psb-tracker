@@ -352,6 +352,9 @@ export function priebehBalickov(
    * = odkaz 2, karta 1). Karta také balíčky vynuluje — hodiny sú v prenose.
    */
   const nahradeneUseky = new Set<unknown>();
+  /** Deň posledného riadneho balíčka (nie prenos, doplnenie, snímka ani úvodný). */
+  const posledneRiadneOd = rad.reduce((a, x) => (x.druh === "balicekOd" && x.hodin > 0 && !x.doplnenie && !x.zostatokZPtmindera
+    && !/prenesen|doplnen|úvodn|uvodn/i.test(x.nazov) && x.den > a ? x.den : a), "");
   const kopiePrenosu = new Set<Udalost>();
   /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
@@ -430,6 +433,30 @@ export function priebehBalickov(
       // Prenos druh nemá (kanalBalicka = null) — pokryje tréning ktoréhokoľvek druhu.
       const i = cakajuce.findIndex((x) => (!x.doDna || u.den <= x.doDna) && (!k || !kanalBalicka(x.nazov) || k === kanalBalicka(x.nazov)));
       if (i >= 0) samostatne.set(u, cakajuce.splice(i, 1)[0]);
+    }
+    /**
+     * ZOSTATOK PREVZATÝ Z PTMINDERA (Regina Obrovská, Janka Šnirychová).
+     * Snímka „koľko hodín mal k <deň>" — platí len vtedy, keď predošlé
+     * členstvo už skončilo alebo podľa osi nemá hodiny; inak je to tá istá
+     * hodina, ktorú os už počíta. Riadok sa klientovi nekreslí (je to
+     * interný údaj, rovnako ako doplnenie z exportu).
+     */
+    if (u.druh === "balicekOd" && u.zostatokZPtmindera) {
+      const posl = useky[useky.length - 1];
+      const platiEste = !!posl.balicek && !posl.balicek.nezaplatene
+        && (!posl.balicek.doDna || posl.balicek.doDna >= u.den) && zvysokUseku(posl) > 0;
+      // Keď si klient potom kúpil nový balíček, os ho rieši sama (prevzaté
+      // tréningy) — snímka by tie isté hodiny započítala druhýkrát (Jitka Heinrichová).
+      prenosy.add(u);
+      if (!platiEste && !(posledneRiadneOd > u.den)) {
+        nahradeneUseky.add(posl);
+        for (let h = u.hodin; h >= 1; h--) {
+          const kopia = { ...u, hodin: h, nezaplatene: undefined };
+          kopiePrenosu.add(kopia);
+          cakajuce.push(kopia);
+        }
+      }
+      continue;
     }
     if (u.druh === "balicekOd" && u.zKokpitu && !u.doplnenie && /prenesen|doplnen/i.test(u.nazov)) {
       const posl = useky[useky.length - 1];

@@ -62,7 +62,7 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promis
   const data = await loadData(DB);
   const clients = deriveClients(data);
   const [bal, kal] = await DB.batch([
-    DB.prepare("SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at FROM balicky"),
+    DB.prepare("SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at, poznamka FROM balicky"),
     DB.prepare("SELECT klient, trener, zaciatok, koniec, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL"),
   ]);
   type B = { klient: string; nazov: string; hodiny: number | null; platnost_od: string; platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null };
