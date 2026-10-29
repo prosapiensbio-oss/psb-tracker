@@ -13,6 +13,11 @@ import { mailKlientovi } from "../lib/psb/mailKlientovi";
 import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
+import { fakturaPodlaTokenu, PREDPONA_FAKTURY } from "../lib/psb/fakturaOdkaz.server";
+import { fakturaStranka } from "../lib/psb/fakturaStranka";
+import { fakturaDoPdf } from "../lib/psb/fakturaPdf.server";
+import { fakturaPodlaId } from "./api/vydane-faktury";
+import { audit } from "../lib/psb/audit.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import { czkZaPolozky } from "../lib/psb/platiZa";
@@ -107,6 +112,42 @@ export const Route = createFileRoute("/v/$token")({
         }
 
         if (!DB) return prec("Tento odkaz neplatí.", 404);
+
+        /**
+         * ODKAZ NA FAKTÚRU (`/v/fa…`, 29. 10. 2026) — doklad na telefóne
+         * s QR a PDF. Viď `fakturaOdkaz.server.ts`, prečo pod `/v/`.
+         */
+        // Token, ktorý na faktúru nesedí, ide ďalej ako odkaz klienta — aj
+        // náhodný token klienta môže začínať na „fa".
+        const idF = token.startsWith(PREDPONA_FAKTURY) ? await fakturaPodlaTokenu(DB, token) : null;
+        const fa = idF ? await fakturaPodlaId(DB, idF) : null;
+        if (fa) {
+          const url = new URL(request.url);
+          if (url.searchParams.get("pdf") === "1") {
+            const { BROWSER, ASSETS } = bindings();
+            if (!BROWSER) return prec("PDF se teď nedá připravit — zkuste to prosím za chvíli.", 503);
+            const pdf = await fakturaDoPdf(BROWSER, ASSETS, fa, url.origin);
+            return new Response(pdf, {
+              headers: {
+                "content-type": "application/pdf",
+                "content-disposition": `inline; filename="Faktura ${fa.cislo}.pdf"`,
+                "cache-control": "no-store", "x-robots-tag": "noindex",
+              },
+            });
+          }
+          const qr = qrObrazok(spayd({ suma: fa.celkom, vs: fa.cislo, sprava: `Faktura ${fa.cislo} PSB`, splatnost: fa.splatnost, prijemca: DODAVATEL.meno }));
+          const bajtyF = new Uint8Array(qr.data);
+          let binF = "";
+          for (let i = 0; i < bajtyF.length; i += 4096) binF += String.fromCharCode(...bajtyF.subarray(i, i + 4096));
+          if (!url.searchParams.has("nahlad")) {
+            await audit(DB, { action: "faktura-odkaz-otvoreny", predmet: fa.cislo, actor: "klient (odkaz na faktúru)" });
+          }
+          return new Response(fakturaStranka({
+            ...fa, dnes: dnesPraha(), pdfUrl: `${url.origin}/v/${token}?pdf=1`,
+            qrUrl: `data:${qr.typ};base64,${btoa(binF)}`, logoUrl: `${url.origin}/znacka-napis-tmava.svg`,
+          }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+        }
+
         const r = await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
           .bind(token).first<{ klient: string; balickov: number | null }>();
         if (!r) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);

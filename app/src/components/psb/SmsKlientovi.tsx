@@ -73,7 +73,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    */
   platba?: { suma: number; datum?: string };
   /** SMS k vystavenej faktúre — veta hovorí o faktúre, za odkazom je jej QR. */
-  faktura?: { cislo: string; suma: number; splatnost: string };
+  faktura?: { id: string; cislo: string; suma: number; splatnost: string };
   /**
    * Dátum balíčka, o ktorý ide — „9. 9. 2026". Ide do vety „za balíček z…".
    * Keď ho obrazovka nepozná, veta drží aj bez neho.
@@ -183,7 +183,16 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
     // keď dorazí — preto je v druhom effecte nižšie.
     if (nahladOdkazu) setNahlad(`${nahladOdkazu}${nahladOdkazu.includes("?") ? "&" : "?"}nahlad=1`);
-    else if (!predvolenyText) {
+    else if (faktura) {
+      // Faktúra má vlastnú stránku (`/v/fa…`): doklad, PDF a QR s jej číslom.
+      void fetch("/api/vydane-faktury", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "odkaz", id: faktura.id }),
+      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string }) => {
+        if (j?.ok && j.url) { setOdkaz(j.url); setStavStranky({ sQr: true }); }
+        if (j?.nahlad) setNahlad(j.nahlad);
+      }).catch(() => null);
+    } else if (!predvolenyText) {
       void fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "odkaz", klient: meno }),
@@ -194,7 +203,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         if (typeof j?.balickov === "number") setBalickov(j.balickov);
       }).catch(() => null);
     }
-  }, [otvorene, meno, predvolenyText, cisloNovehoCloveka, nahladOdkazu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otvorene, meno, predvolenyText, cisloNovehoCloveka, nahladOdkazu, faktura?.id]);
 
   /**
    * Predvolený text sa skladá znova pri zmene rodu aj po príchode odkazu.
@@ -549,7 +559,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
             {/* Koľko histórie mu stránka ukáže. Pri klientovi, ktorému sa
                 mínus prenáša z balíčka do balíčka, jeden nestačí — z jedného
                 sa nedá vyčítať, kam sa hodiny podeli. */}
-            {!nahladOdkazu && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7, alignItems: "center" }}>
+            {!nahladOdkazu && !faktura && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7, alignItems: "center" }}>
               {[1, 2, 3, 0].map((n) => (
                 <button
                   key={n}

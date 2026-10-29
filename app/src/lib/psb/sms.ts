@@ -174,7 +174,7 @@ export function textSms(v: {
   const fa = v.faktura;
   const dd = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.`;
   const telo = fa && v.odkaz
-    ? `QR na platbu faktury c. ${fa.cislo} (${Math.round(fa.suma).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kc, splatnost ${dd(fa.splatnost)}) najdes tady: ${v.odkaz}`
+    ? `posilam fakturu c. ${fa.cislo} na ${Math.round(fa.suma).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kc se splatnosti ${dd(fa.splatnost)}, PDF i QR na platbu: ${v.odkaz}`
     : v.odkaz
     ? (v.sQr ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}` : `tady máš přehled hodin: ${v.odkaz}`)
     : v.sMailom

@@ -16,6 +16,8 @@ import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
 import { faktureUhradeneBalickom, fakturyUhradeneRozdelenim } from "../../lib/psb/fakturaUhradena";
+import { tokenFaktury } from "../../lib/psb/fakturaOdkaz.server";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { odlozOdberatela } from "../../lib/psb/odberatelOdlozenie.server";
 import { kanonickyTvarKlienta } from "../../lib/psb/nahodTrening.server";
@@ -110,6 +112,16 @@ const naFakturu = (r: Record<string, string | number | null>, dalsie: PolozkaFak
     stat: String(r.odb_stat || ""), email: String(r.odb_email || ""),
   },
 });
+
+/** Jedna faktúra aj s ďalšími položkami — pre stránku za odkazom `/v/fa…`. */
+export async function fakturaPodlaId(DB: D1Database, id: string): Promise<Faktura | null> {
+  const r = await DB.prepare(
+    `SELECT cislo, klient, vystavene, splatnost, popis, ks, cena_czk, celkom_czk, poznamka, storno_at, uhradene_at,
+            odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email
+     FROM vydane_faktury WHERE id = ?1`,
+  ).bind(id).first<Record<string, string | number | null>>();
+  return r ? naFakturu(r, (await dalsiePolozky(DB, id)).get(id)) : null;
+}
 
 /** Fakturačné údaje klienta; prázdne, keď ešte žiadne nemá. */
 const prazdneUdaje = {
@@ -657,6 +669,15 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               neu: nove.map((d) => `${d.klient}: ${d.popis} ${d.celkom} Kč`).join("; "), actor: kto,
             });
             return Response.json({ ok: true, celkom });
+          }
+
+          /** Odkaz na stránku faktúry pre SMS (`/v/fa…`) a náhľad bez počítadla. */
+          if (b.akcia === "odkaz") {
+            const f = await DB.prepare("SELECT cislo FROM vydane_faktury WHERE id = ?1").bind(id).first<{ cislo: string }>();
+            if (!f) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
+            const t = await tokenFaktury(f.cislo);
+            const origin = new URL(request.url).origin;
+            return Response.json({ ok: true, url: verejnyOdkaz(`/v/${t}`, origin), nahlad: `${origin}/v/${t}?nahlad=1` });
           }
 
           if (b.akcia === "storno") {

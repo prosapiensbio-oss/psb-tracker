@@ -51,6 +51,15 @@ export async function expectedToken(user = ""): Promise<string> {
   return hmacHex(s, user ? `${MESSAGE}|${user}` : MESSAGE);
 }
 
+/**
+ * Podpis verejného odkazu, ktorý nemá vlastný riadok v databáze (faktúra
+ * `/v/fa…`, 29. 10. 2026). Bez tajomstva sa nedá uhádnuť ani vyrobiť.
+ */
+export async function podpisOdkazu(sprava: string): Promise<string> {
+  const s = secrets().PSB_SESSION_SECRET || "dev-secret";
+  return hmacHex(s, `odkaz|${sprava}`);
+}
+
 // ── Heslá: PBKDF2 so soľou, nikdy v čitateľnej podobe ────────────────────────
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 

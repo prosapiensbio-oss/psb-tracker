@@ -124,6 +124,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   const [otvorenaNova, setOtvorenaNova] = useState(false);
   /** Faktúra, ku ktorej je otvorené okno SMS (id). */
   const [smsK, setSmsK] = useState<string | null>(null);
+  /**
+   * AKO POSLAŤ — MAILOM, SMS ALEBO OBOJE (Jerry, 29. 10. 2026: „nech vznikne
+   * od Kokpitu otázka: chceš FA poslať mailom, SMS alebo oboje?").
+   * `vyber` = faktúra, pri ktorej sa práve pýta; `smsPoMaile` = po úspešnom
+   * maile sa otvorí okno SMS. Každá správa sa aj tak odosiela vlastným
+   * klikom — mail aj SMS idú k cudziemu človeku a späť sa vziať nedajú.
+   */
+  const [vyberPoslania, setVyberPoslania] = useState<string | null>(null);
+  const [smsPoMaile, setSmsPoMaile] = useState<string | null>(null);
   const [upravujemUdaje, setUpravujemUdaje] = useState(false);
   const [f, setF] = useState({
     klient: "", popis: "", ks: "1", cena: "", vystavene: dnes(),
@@ -357,7 +366,12 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     if (!mail) return;
     const j = await posli({ akcia: "posli-mail", id: mail.id, komu: mail.komu, predmet: mail.predmet, telo: mail.telo, uvod: mail.uvod, vykanie: mail.vykanie, trener: mail.trener }, mail.id);
     if (j) {
-      setHlaska(`Faktúra ${mail.cislo} odišla na ${mail.komu}.`);
+      const dalejSms = smsPoMaile === mail.id;
+      setHlaska(dalejSms
+        ? `Faktúra ${mail.cislo} odišla na ${mail.komu}. Teraz skontroluj SMS pod faktúrou a pošli ju.`
+        : `Faktúra ${mail.cislo} odišla na ${mail.komu}.`);
+      if (dalejSms) setSmsK(mail.id);
+      setSmsPoMaile(null);
       setMail(null);
     }
   };
@@ -847,19 +861,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   <button
                     type="button"
                     disabled={pracujem === r.id}
-                    onClick={() => otvorMail(r)}
-                    style={{ ...odkazStyl, color: r.odoslane_at ? C.textDim : C.green }}
+                    onClick={() => setVyberPoslania((x) => (x === r.id ? null : r.id))}
+                    style={{ ...odkazStyl, color: r.odoslane_at || r.sms_at ? C.textDim : C.green }}
                   >
-                    {pracujem === r.id ? "posielam…" : r.odoslane_at ? "poslať znova" : "poslať mailom"}
-                  </button>
-                )}
-                {/* Jerry, 29. 10. 2026: „je tam poslať mailom, ale ja chcem mať
-                    možnosť aj, aj." SMS nesie odkaz na stránku klienta a tá
-                    ukáže QR s číslom faktúry — to isté, aké je na doklade. */}
-                {!r.storno_at && !r.uhradene_at && (
-                  <button type="button" onClick={() => setSmsK((x) => (x === r.id ? null : r.id))}
-                    style={{ ...odkazStyl, color: r.sms_at ? C.textDim : C.green }}>
-                    {smsK === r.id ? "zavrieť SMS" : r.sms_at ? "SMS znova" : "poslať SMS"}
+                    {pracujem === r.id ? "posielam…" : r.odoslane_at || r.sms_at ? "poslať znova" : "poslať"}
                   </button>
                 )}
                 {!r.storno_at && !r.uhradene_at && (
@@ -900,6 +905,31 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   zmazať
                 </button>
               </div>
+              {vyberPoslania === r.id && !r.storno_at && (
+                <div style={{ margin: "4px 0 2px 12px", padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>
+                  <span style={{ color: C.text }}>Ako poslať faktúru {r.cislo}?</span>
+                  {([
+                    ["mail", "mailom"],
+                    ...(r.uhradene_at ? [] : [["sms", "SMS"], ["oboje", "mailom aj SMS"]]),
+                  ] as [string, string][]).map(([ako, nazov]) => (
+                    <button
+                      key={ako} type="button"
+                      onClick={() => {
+                        setVyberPoslania(null);
+                        if (ako === "sms") { setSmsK(r.id); return; }
+                        setSmsPoMaile(ako === "oboje" ? r.id : null);
+                        otvorMail(r);
+                      }}
+                      style={{ padding: "5px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", border: `1px solid ${C.accent}`, background: ako === "oboje" ? mix(C.accent, 14) : "transparent", color: C.accentLight, fontFamily: "inherit" }}
+                    >
+                      {nazov}
+                    </button>
+                  ))}
+                  <span style={{ fontSize: 11.5, color: C.textDim }}>
+                    SMS nesie odkaz na stránku s faktúrou, PDF a QR. {r.odoslane_at ? `Mailom odišla ${den(r.odoslane_at.slice(0, 10))}. ` : ""}{r.sms_at ? `SMS odišla ${den(r.sms_at.slice(0, 10))}.` : ""}
+                  </span>
+                </div>
+              )}
               {!r.storno_at && !r.uhradene_at && !r.odoslane_at && !r.sms_at && (
                 <DlhMimoFaktury
                   r={r} dlhy={dlhy} pracujem={pracujem === r.id}
@@ -911,11 +941,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               )}
               {smsK === r.id && (
                 <div style={{ margin: "6px 0 4px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
+                    <span>SMS k faktúre {r.cislo}</span>
+                    <button type="button" onClick={() => setSmsK(null)} style={{ ...odkazStyl, color: C.textDim }}>zavrieť</button>
+                  </div>
                   <SmsKlientovi
                     vlozene
                     meno={r.klient}
                     trener={treneri?.[r.klient] || "Jerry"}
-                    faktura={{ cislo: r.cislo, suma: Number(r.celkom_czk) || 0, splatnost: r.splatnost.slice(0, 10) }}
+                    faktura={{ id: r.id, cislo: r.cislo, suma: Number(r.celkom_czk) || 0, splatnost: r.splatnost.slice(0, 10) }}
                     druhAuditu="faktura"
                     onOdoslane={() => { setSmsK(null); void nacitaj(); }}
                   />

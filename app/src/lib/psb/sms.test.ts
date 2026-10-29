@@ -174,9 +174,9 @@ describe("slovenské číslo bez predvoľby", () => {
 describe("SMS k faktúre (29. 10. 2026)", () => {
   it("číslo, suma, splatnosť a odkaz; bez diakritiky v jednej správe", () => {
     const t = textSms({ oslovenie: "Branislav", trener: "Jerry", odkaz: "https://prosapiens.cz/v/abc123", sQr: true, faktura: { cislo: "20261014", suma: 15680, splatnost: "2026-11-11" } });
-    expect(t).toContain("faktury c. 20261014");
+    expect(t).toContain("fakturu c. 20261014");
     expect(t).toContain("15 680 Kc");
-    expect(t).toContain("splatnost 11. 11.");
+    expect(t).toContain("splatnosti 11. 11.");
     expect(t).toContain("https://prosapiens.cz/v/abc123");
     expect(dlzkaSpravy(t).sprav).toBe(1);
   });

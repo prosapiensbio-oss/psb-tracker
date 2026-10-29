@@ -282,7 +282,7 @@ ${tlacidloKurzu(s.pozadie)}
 </div>`;
 }
 
-function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
+export function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
   if (!v.platba || v.platba.suma <= 0) return "";
   // `id="platba"` je cieľ CTA zhora — pri bankovej platbe rovnako ako pri bitcoine.
   const s = SADZBA;
