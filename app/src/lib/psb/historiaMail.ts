@@ -106,7 +106,16 @@ export function historiaPreMail(
    * výpis roztiahol na celú históriu od marca.
    */
   const maHodiny = (r: RiadokVypisu) => r.zmena > 0 || hodinZNazvuBalicka(r.popis) > 0;
-  const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" && maHodiny(r) ? [...a, i] : a), []);
+  /**
+   * PRENESENÉ HODINY NIE SÚ BALÍČEK (Jerry, 29. 10. 2026 pri Kalvovi: „klikol
+   * som na 2 balíčky, ukazovalo mi stále iba posledné 3 tréningy, až keď som
+   * dal 3 balíčky, ukázalo cca 9"). „Prenesené hodiny" aj „Doplnenie" z
+   * Kokpitu idú na os ako začiatok balíčka — riadok ostáva (klient vidí, odkiaľ
+   * má hodiny navyše), ale hranicou rozsahu nie je. Inak „2 balíčky" ukázali
+   * nový mesiac a prenos zo starého, a ten starý mesiac s tréningami chýbal.
+   */
+  const jeZvysok = (r: RiadokVypisu) => /prenesen|doplnen/i.test(r.popis);
+  const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" && maHodiny(r) && !jeZvysok(r) ? [...a, i] : a), []);
   const kolko = Math.max(1, Math.floor(balickov));
   const hranica = zaciatky[kolko - 1];
   /**
@@ -120,6 +129,8 @@ export function historiaPreMail(
    */
   const dni = hranica == null ? null : vsetky[hranica]?.prevzateDni;
   let rez = hranica;
+  // Prenos tesne pred balíčkom k nemu patrí — hodiny z neho minie tento balíček.
+  while (rez != null && vsetky[rez + 1]?.druh === "balicekOd" && jeZvysok(vsetky[rez + 1])) rez++;
   if (rez != null && dni?.length) {
     const najstarsi = dni.reduce((a, b) => (a < b ? a : b));
     for (let i = rez; i < vsetky.length; i++) if (vsetky[i].den >= najstarsi) rez = i;

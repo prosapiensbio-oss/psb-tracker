@@ -119,3 +119,28 @@ describe("popisPreKlienta", () => {
     expect(devat.os.map((b) => b.den)).toContain("2026-02-15");
   });
 });
+
+describe("rozsah balíčkov — prenesené hodiny nie sú balíček (Kalva, 29. 10. 2026)", () => {
+  const osK: Udalost[] = [
+    { druh: "balicekOd", den: "2026-09-17", nazov: "OFF - 6h S viazanostou", hodin: 8 },
+    { druh: "trening", den: "2026-09-17" },
+    { druh: "trening", den: "2026-09-24" },
+    { druh: "trening", den: "2026-10-01" },
+    { druh: "trening", den: "2026-10-15" },
+    { druh: "balicekOd", den: "2026-10-16", nazov: "Prenesené hodiny", hodin: 2, zKokpitu: true },
+    { druh: "balicekOd", den: "2026-10-17", nazov: "6h Předplatné", hodin: 6, zKokpitu: true },
+    { druh: "trening", den: "2026-10-19" },
+    { druh: "trening", den: "2026-10-29" },
+  ];
+  const k = { packageRemaining: -1, packageTotal: 6, firstSession: "2026-09-17T00:00:00.000Z", sessions: [] as never, primaryTrainer: "Jerry" };
+  it("2 balíčky = nový mesiac aj celý predošlý", () => {
+    const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 2);
+    expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(
+      ["2026-09-17", "2026-09-24", "2026-10-01", "2026-10-15", "2026-10-19", "2026-10-29"]);
+  });
+  it("1 balíček = od nového mesiaca, prenesené hodiny sú v ňom vidno", () => {
+    const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 1);
+    expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(["2026-10-19", "2026-10-29"]);
+    expect(v.os.some((b) => b.druh === "balicekOd" && b.den === "2026-10-16")).toBe(true);
+  });
+});
