@@ -175,7 +175,14 @@ je kde pozrieť).
        (0126), mená cez `znamiKlienti` (anamnézy, faktúry, override, IG),
        notifikácia `ptrozpor|` vypnutá, `data|` a `novy|` prepísané, Jarvisova
        príručka + SCHEMA_DB: od 1. 10. pravda Kokpit, PTminder = archív.
-6. [ ] **Po zrušení PTmindera (krok 3)**: odstrániť import PTminder súborov
+6. [x] **Hotové 28.–29. 10. 2026** (a449d44, 67f8496, 313ba8b): import a tlačidlá
+       PTmindera, krok uzávierky, prepínač peňazí, porovnávania, dvojité
+       zobrazenie v profile, „Vymazať všetky dáta" (+ /api/reset), kotva
+       „Zostatok podľa PTmindera", texty na obrazovkách aj u Jarvisa. Prechod →
+       záložka „Evidencia". Snímka čísel pred/po nad kópiou D1: 0 rozdielov.
+       Ostáva: nahrať posledný októbrový export (cez Clauda), zrušiť predplatné
+       pred 2. 11.; náklad PTminder vo výsledovke ostáva (bude 0).
+       Pôvodný plán bodu: odstrániť import PTminder súborov
        (Údaje, plocha vo Workspace, „Naliať/Doplniť z PTmindera" — `detectCSVType`
        a `ingest` zdieľajú aj iDoklad/Metricool/GA4/GSC/anamnézy, tie ostanú),
        krok uzávierky „PTminder", prepínač „vrátiť peniaze na PTminder",
