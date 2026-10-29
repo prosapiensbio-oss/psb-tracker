@@ -2,6 +2,7 @@ import { BalickyEvidencia } from "./BalickyEvidencia";
 import { DavkovePlatby } from "./DavkovePlatby";
 import { ParovacKontaktov } from "./ParovacKontaktov";
 import { PlatbyEvidencia } from "./PlatbyEvidencia";
+import { PohybyFio } from "./PohybyFio";
 
 /**
  * Prechod — dočasná záložka na odchod od PTmindera.
@@ -42,6 +43,8 @@ export function Prechod({ mena, onFaktura, onVypis, onKlient }: {
       <div id="prechod-kontakty"><ParovacKontaktov mena={mena} /></div>
       <div id="prechod-davka"><DavkovePlatby mena={mena} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
+      {/* Náhľad účtu (Jerry, 29. 10. 2026): „kedy, kde, koľko" bez dopytu do databázy. */}
+      <div id="prechod-fio"><PohybyFio /></div>
 
     </div>
   );

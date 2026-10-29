@@ -241,10 +241,20 @@ export function dlhyKlientov(v: VstupDlhov): {
     // Dvojča v Kokpite: platba do 10 dní na podobnú sumu (bitcoin s kurzom,
     // zľava do 10 %), alebo viac platieb v tých dňoch, ktoré sa na ňu zložia
     // (splátky). Platba, ktorú Kokpit takto pozná, nie je „len v PTminderi".
+    // A naopak: JEDEN prevod v Kokpite za viac predajov, ktorý PTminder
+    // zapísal po kúskoch. Albert Matl poslal 21. 9. 2026 jedným prevodom
+    // 8 890 Kč (úvodný + 6h); PTminder má 1 100 a 7 790. Úvodný potom vyzeral
+    // ako zaplatený „len v PTminderi", odpustil sa a jeho 1 100 Kč z prevodu
+    // sa presunulo na nový balíček z 29. 10. — „Prišlo 1 100 Kč, 6h stojí 7 790".
+    const ptKlienta = v.ptPlatby.filter((p) => normName(p.klient) === k);
     const maDvojca = (p: { datum: string; suma: number }) => {
       const blizko = kokpitPlatby.filter((q) => dni(den(q.datum), den(p.datum)) <= 10);
       return blizko.some((q) => Math.abs(q.suma - p.suma) <= p.suma * KURZ_BTC)
-        || Math.abs(blizko.reduce((a, q) => a + q.suma, 0) - p.suma) <= Math.max(50, p.suma * 0.01);
+        || Math.abs(blizko.reduce((a, q) => a + q.suma, 0) - p.suma) <= Math.max(50, p.suma * 0.01)
+        || blizko.some((q) => {
+          const kusy = ptKlienta.filter((r) => dni(den(r.datum), den(q.datum)) <= 10);
+          return kusy.length > 1 && Math.abs(kusy.reduce((a, r) => a + r.suma, 0) - q.suma) <= Math.max(50, q.suma * 0.01);
+        });
     };
     const lenVPtminderi = (b: { platnostOd: string; cena: number | null }) => {
       const cena = Math.round(b.cena || 0);

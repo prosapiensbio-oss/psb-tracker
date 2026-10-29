@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { Udalost } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
-import { kandidatiPlatby, navrhNovehoBalicka, otazkyPlatieb, zoznamSms } from "./workspaceKroky";
+import { kandidatiPlatby, klucOtazkyPlatby, navrhNovehoBalicka, otazkyPlatieb, zoznamSms } from "./workspaceKroky";
 import { dlhyKlientov } from "./zaplatene";
 
 const trening = (den: string): Udalost => ({ druh: "trening", den, cas: "11:00" });
@@ -279,5 +279,16 @@ describe("doplnenie vzniká len rozhodnutím (Jerry, 21. 10. 2026)", () => {
     expect(smieVzniknutAutomaticky({ nazov: "SILVER členství", cena: 0, hodiny: 6 })).toBe(false);
     expect(smieVzniknutAutomaticky({ nazov: "6h Balíček", cena: 7790, hodiny: 6 })).toBe(true);
     expect(smieVzniknutAutomaticky({ nazov: "Úvodní trénink", cena: 1100, hodiny: 1 })).toBe(true);
+  });
+});
+
+describe("doplatí zvyšok — odpoveď sa nevráti (Branislav Široký, 29. 10. 2026)", () => {
+  const dlh = [{ klient: "Branislav Široký", den: "2026-10-26", nazov: "Úvodní trénink", cena: 1100, doplatit: 100, zdroj: "kokpit" as const, id: "u1" }];
+  it("bez odpovede sa pýta, s odpoveďou mlčí", () => {
+    expect(otazkyPlatieb(dlh)).toHaveLength(1);
+    expect(otazkyPlatieb(dlh, { [klucOtazkyPlatby({ balicekId: "u1", zaplatene: 1000 })]: { ack: true } })).toHaveLength(0);
+  });
+  it("iná čiastočná platba je nová otázka", () => {
+    expect(otazkyPlatieb([{ ...dlh[0], doplatit: 50 }], { [klucOtazkyPlatby({ balicekId: "u1", zaplatene: 1000 })]: { ack: true } })).toHaveLength(1);
   });
 });

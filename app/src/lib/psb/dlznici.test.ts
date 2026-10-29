@@ -375,3 +375,25 @@ describe("PTminder a Kokpit: iný balíček (21. 10. 2026)", () => {
     expect(r.rozporyPtminder).toEqual([]);
   });
 });
+
+describe("jeden prevod za dva predaje, PTminder po kúskoch — Albert Matl, 29. 10. 2026", () => {
+  // 21. 9. jeden prevod 8 890 (úvodný 1 100 + 6h 7 790); PTminder má dve
+  // platby. Úvodný sa nesmie odpustiť ako „len v PTminderi" — inak jeho
+  // 1 100 Kč zaplatí kus nového balíčka z 29. 10.
+  const vstup = {
+    poplatky: [],
+    balicky: [
+      { id: "u", klient: "Albert Matl", nazov: "Úvodní trénink", cena: 1100, platnostOd: "2026-09-14", zdroj: "rucne" },
+      { id: "s", klient: "Albert Matl", nazov: "OFF - 6h BEZ viazanosti", cena: 7790, platnostOd: "2026-09-16", zdroj: "ptminder" },
+      { id: "n", klient: "Albert Matl", nazov: "6h Balíček", cena: 7790, platnostOd: "2026-10-29", zdroj: "rucne" },
+    ],
+    platby: [{ klient: "Albert Matl", datum: "2026-09-21", suma: 8890 }],
+    ptPlatby: [{ klient: "Albert Matl", datum: "2026-09-21", suma: 1100 }, { klient: "Albert Matl", datum: "2026-09-21", suma: 7790 }],
+    ptHistoria: [{ klient: "Albert Matl", od: "2026-09-16" }],
+  };
+
+  it("nový balíček je nezaplatený celý, nie „prišlo 1 100\"", () => {
+    const { polozky } = dlhyKlientov(vstup as never);
+    expect(polozky.map((p) => [p.id, p.doplatit])).toEqual([["n", 7790]]);
+  });
+});

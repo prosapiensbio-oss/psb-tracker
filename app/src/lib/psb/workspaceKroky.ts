@@ -319,7 +319,15 @@ export type OtazkaPlatby = {
  * balíčku, ktorý dostal NIEČO, ale nie celú cenu. Balíček bez platby nie je
  * otázka — ten len čaká na platbu.
  */
-export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined): OtazkaPlatby[] {
+/**
+ * Kľúč odpovede „doplatí zvyšok" v `anomaly_ack`. Do 29. 10. 2026 sa tá
+ * odpoveď len schovala na obrazovke a po obnovení stránky sa otázka vrátila
+ * (Branislav Široký). Suma je v kľúči zámerne: keď príde ďalšia čiastočná
+ * platba, je to nová situácia a otázka sa spýta znova.
+ */
+export const klucOtazkyPlatby = (o: Pick<OtazkaPlatby, "balicekId" | "zaplatene">) => `suma-nesedi|${o.balicekId}|${o.zaplatene}`;
+
+export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined, acks?: Record<string, unknown>): OtazkaPlatby[] {
   /**
    * Jedno pravidlo „zaplatený" (`data.dlhy`, 5. 10. 2026): otázka vzniká pri
    * balíčku z Kokpitu, ktorý v zozname nezaplatených je, a dostal z ceny
@@ -333,6 +341,7 @@ export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined): OtazkaPlatby[] {
     const cena = x.cena;
     const zaplatene = Math.round(cena - x.doplatit);
     if (zaplatene <= 0 || zaplatene >= cena) continue;
+    if (acks?.[klucOtazkyPlatby({ balicekId: x.id, zaplatene })]) continue;
     const moznosti: MoznostPlatby[] = [];
     for (const s of CENNIK) {
       if (!s.hodiny || !s.cena || s.cena !== zaplatene || s.nazov === nazovProduktu(x.nazov)) continue;

@@ -24,7 +24,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { SOURCES } from "./Klienti";
 import type { PSBData } from "../../lib/psb/types";
-import { otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
+import { klucOtazkyPlatby, otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 
@@ -517,9 +517,11 @@ export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
  * SUMA NESEDÍ NA BALÍČEK — otázka a jedným klikom oprava.
  * Pravidlá v `otazkyPlatieb`; tu sa balíček len prepíše.
  */
-export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOpravene, onKlient }: {
+export function OtazkyPlatieb({ dlhy, acks, balicky, platby, trener, clients, onOpravene, onKlient }: {
   /** Jedno pravidlo „zaplatený" — `data.dlhy`. */
   dlhy: DlhPolozka[] | undefined;
+  /** Odpovede „doplatí zvyšok" (`klucOtazkyPlatby`). */
+  acks: Record<string, unknown>;
   balicky: BalicekRiadokKroku[];
   platby: PlatbaRiadokKroku[];
   trener: string | null;
@@ -532,8 +534,19 @@ export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOprave
   const [chyba, setChyba] = useState("");
   const [odlozene, setOdlozene] = useState<Set<string>>(new Set());
 
-  const otazky = useMemo(() => otazkyPlatieb(dlhy)
-    .filter((o) => !odlozene.has(o.balicekId) && (!trener || clients[o.klient]?.primaryTrainer === trener)), [dlhy, trener, clients, odlozene]);
+  const otazky = useMemo(() => otazkyPlatieb(dlhy, acks)
+    .filter((o) => !odlozene.has(o.balicekId) && (!trener || clients[o.klient]?.primaryTrainer === trener)), [dlhy, acks, trener, clients, odlozene]);
+
+  // Zvyšok ostáva dlhom (karta Dlhujú, QR na odkaze) — zapisuje sa len
+  // odpoveď, aby sa otázka nevrátila.
+  const doplati = async (o: OtazkaPlatby) => {
+    setBezi(o.balicekId); setChyba("");
+    const a = await posli("/api/anomaly", { key: klucOtazkyPlatby(o), ack: true, note: `doplatí zvyšok ${o.cena - o.zaplatene} Kč (prišlo ${o.zaplatene} z ${o.cena})` });
+    setBezi("");
+    if (!a.ok) { setChyba(a.error || "Odpoveď sa neuložila."); return; }
+    setOdlozene((s) => new Set([...s, o.balicekId]));
+    onOpravene();
+  };
 
   if (!otazky.length) return null;
 
@@ -591,7 +604,7 @@ export function OtazkyPlatieb({ dlhy, balicky, platby, trener, clients, onOprave
                     </button>
                   </span>
                 ))}
-            <button style={vedlajsie} onClick={() => setOdlozene((s) => new Set([...s, o.balicekId]))}>
+            <button disabled={bezi === o.balicekId} style={vedlajsie} onClick={() => void doplati(o)}>
               doplatí zvyšok {fmtCZK(o.cena - o.zaplatene)}
             </button>
           </div>

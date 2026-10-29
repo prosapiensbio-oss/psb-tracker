@@ -1868,12 +1868,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         && (!trenerKroku || clients[b.klient]?.primaryTrainer === trenerKroku)).length;
       const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
         && (!trenerKroku || x.trener === trenerKroku)).length;
-      const sumaOtazok = otazkyPlatieb(data.dlhy).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
+      const sumaOtazok = otazkyPlatieb(data.dlhy, data.anomalyAck).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
       const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok;
       return (
         <>
           <FioPrijmy onZapisane={poZapise} />
-          <OtazkyPlatieb dlhy={data.dlhy} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} onKlient={naStol} />
+          <OtazkyPlatieb dlhy={data.dlhy} acks={data.anomalyAck || {}} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} onKlient={naStol} />
           {sekcieKresli}
           <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
           <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
