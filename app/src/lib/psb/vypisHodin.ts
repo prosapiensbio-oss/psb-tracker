@@ -328,6 +328,20 @@ export function priebehBalickov(
   const samostatne = new Map<Udalost, Extract<Udalost, { druh: "balicekOd" }>>();
   const cakajuce: Extract<Udalost, { druh: "balicekOd" }>[] = [];
   /**
+   * PRENESENÉ HODINY SA MÍŇAJÚ PRVÉ, AKO NA KARTE (Jerry, 29. 10. 2026 pri
+   * Kalvovi: karta −1, odkaz „Nezaplaceno 2 h"). Riadok „Prenesené hodiny"
+   * z Kokpitu otváral vlastné obdobie, nový mesiac předplatného hneď po ňom
+   * otvoril ďalšie — a tréning 19. 10. sa odpísal z nezaplateného předplatného,
+   * hoci ho kryla prenesená hodina. Karta (`zostatokKokpitu`) míňa najstarší
+   * platný balíček s hodinami, teda prenos.
+   *
+   * Prenos preto obdobie neotvára: jeho hodiny (najviac toľko, koľko naozaj
+   * zostalo — tak ich strihá aj karta) čakajú po jednej ako samostatné hodiny
+   * a pokryjú najbližšie tréningy, nech patria do ktoréhokoľvek obdobia.
+   */
+  const prenosy = new Set<Udalost>();
+  const kopiePrenosu = new Set<Udalost>();
+  /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
    * −1 = všetko sa zmestilo (alebo je to obdobie bez hodín).
    */
@@ -394,8 +408,23 @@ export function priebehBalickov(
   for (const u of rad) {
     if (u.druh === "trening" && u.zdarma === undefined && cakajuce.length) {
       const k = kanalTreningu(u);
-      const i = cakajuce.findIndex((x) => (!x.doDna || u.den <= x.doDna) && (!k || k === kanalBalicka(x.nazov)));
+      // Prenos druh nemá (kanalBalicka = null) — pokryje tréning ktoréhokoľvek druhu.
+      const i = cakajuce.findIndex((x) => (!x.doDna || u.den <= x.doDna) && (!k || !kanalBalicka(x.nazov) || k === kanalBalicka(x.nazov)));
       if (i >= 0) samostatne.set(u, cakajuce.splice(i, 1)[0]);
+    }
+    if (u.druh === "balicekOd" && u.zKokpitu && !u.doplnenie && /prenesen/i.test(u.nazov)) {
+      const posl = useky[useky.length - 1];
+      const minute = posl.riadky.reduce((a, x) => a + (samostatne.has(x) ? 0 : hodinTreningu(x)), 0);
+      const pridane = posl.riadky.reduce((a, x) => a + (x.druh === "balicekOd" && x.doplnenie && x.hodin > 0 && pridavaHodiny(x, posl.balicek) ? x.hodin : 0), 0);
+      const zvysok = posl.balicek ? Math.max(0, hodinUseku(posl) + pridane - minute) : u.hodin;
+      for (let h = Math.min(u.hodin, zvysok); h >= 1; h--) {
+        const kopia = { ...u, hodin: h };
+        kopiePrenosu.add(kopia);
+        cakajuce.push(kopia);
+      }
+      prenosy.add(u);
+      posl.riadky.push(u);
+      continue;
     }
     if (u.druh === "balicekOd" && !u.doplnenie) {
       const posl = useky[useky.length - 1];
@@ -472,7 +501,7 @@ export function priebehBalickov(
   }
 
   // Samostatná hodina nie je „posledné členstvo“ — to beží ďalej popri nej.
-  const singleBalicky = new Set<Udalost>([...samostatne.values(), ...cakajuce]);
+  const singleBalicky = new Set<Udalost>([...samostatne.values(), ...cakajuce, ...prenosy]);
   const posledny = poslednyBalicek(os.filter((u) => !singleBalicky.has(u)), dnes);
   // Číslo z karty platí ku dňu EXPORTU. Tréningy, ktoré prišli po ňom len
   // z kalendára, o nich PTminder ešte nevedel — zrovnávať sa musí k tomu dňu,
@@ -756,6 +785,10 @@ export function priebehBalickov(
       bezHodiny.forEach((st, i) => { if (hodinBalicka - i > 0) st.buduca = hodinBalicka - i; });
     }
   }
+
+  // Prenesené hodiny, ktoré ešte nik neminul, sú klientove — karta ich v zostatku má tiež.
+  const nevyuzityPrenos = cakajuce.filter((x) => kopiePrenosu.has(x)).length;
+  if (koniec !== null && nevyuzityPrenos) koniec += nevyuzityPrenos;
 
   return { stavy, koniec };
 }

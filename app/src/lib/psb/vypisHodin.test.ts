@@ -781,3 +781,25 @@ describe("koniec platnosti: doplnenie a prepadnutie na osi", () => {
     expect(vypisHodin(os, "", "2026-10-06").riadky[0].popis).toBe("prepadlo 2 h, 1 h — koniec platnosti");
   });
 });
+
+describe("prenesené hodiny sa míňajú prvé, ako na karte (Kalva, 29. 10. 2026)", () => {
+  const t = (den: string): Udalost => ({ druh: "trening", den });
+  const os: Udalost[] = [
+    { druh: "balicekOd", den: "2026-09-17", nazov: "OFF - 6h S viazanostou", hodin: 8, doDna: "2026-10-16", zKokpitu: true },
+    { druh: "platba", den: "2026-09-27", suma: 6990, metoda: "bank" },
+    t("2026-09-17"), t("2026-09-24"), t("2026-10-01"), t("2026-10-05"), t("2026-10-08"), t("2026-10-12"), t("2026-10-15"),
+    { druh: "balicekOd", den: "2026-10-16", nazov: "Prenesené hodiny", hodin: 2, zKokpitu: true },
+    { druh: "balicekOd", den: "2026-10-17", nazov: "6h Předplatné", hodin: 6, doDna: "2026-11-16", zKokpitu: true, nezaplatene: true },
+    t("2026-10-19"), t("2026-10-29"),
+  ];
+  const { stavy, koniec } = priebehBalickov(os, null, "2026-10-29");
+  const st = (den: string) => stavy.get(os.find((u) => u.druh === "trening" && u.den === den)!);
+  it("19. 10. kryje prenesená hodina (zostala len jedna z dvoch)", () => {
+    expect(st("2026-10-19")?.zostatok).toBe(1);
+    expect(st("2026-10-19")?.dlh ?? null).toBe(null);
+  });
+  it("29. 10. je prvý tréning nezaplateného předplatného → −1, koniec −1 ako karta", () => {
+    expect(st("2026-10-29")?.dlh).toBe(1);
+    expect(koniec).toBe(-1);
+  });
+});
