@@ -731,7 +731,26 @@ export function nepriradene(
      * nad ktorým človek rozmýšľal.
      */
     let poznamka: string | undefined;
-    if (!rozdelenie && kandidati.length === 1 && zdrojNavrhu !== "suma") {
+    /**
+     * SPRÁVA PREBÍJA ODOSIELATEĽA.
+     *
+     * Kateřina Mátlová platí za seba, za Richarda aj za Alberta. 28. 10. 2026
+     * poslala 7 790 Kč so správou „ALBERT MATL" a platba šla podľa pravidla
+     * odosielateľa jej — Albert ostal v mínuse, hoci mal zaplatené. Jerry:
+     * „bude dôležité sledovať aj poznámky pri transakciách."
+     * Keď správa menuje JEDNÉHO iného klienta, ide do návrhu prvý a vedľa
+     * neho ostane ten z pravidla; rozhodne človek (nikdy samé priradenie).
+     */
+    if (naucene && !rozdelenie) {
+      const kusy = (r.counterparty || "").split("·");
+      const sprava = [...kusy.slice(0, -1), (r.note || "").trim() !== (r.counterparty || "").trim() ? r.note || "" : ""].join(" ").trim();
+      const zoSpravy = sprava ? najdiKlientaVTexte(sprava, menaKlientov) : [];
+      if (zoSpravy.length === 1 && normName(zoSpravy[0]) !== normName(naucene)) {
+        kandidati = [zoSpravy[0], naucene];
+        poznamka = `V správe stojí ${zoSpravy[0]} — odosielateľ inak platí za ${naucene}.`;
+      }
+    }
+    if (!poznamka && !rozdelenie && kandidati.length === 1 && zdrojNavrhu !== "suma") {
       const k = kandidati[0];
       const den = r.date.slice(0, 10);
       const rovnaka = volne.filter((p) => p.metoda === "bank" && Math.round(p.suma) === Math.round(r.amount_czk));

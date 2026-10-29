@@ -147,6 +147,32 @@ async function opravPravidlo(
 ): Promise<{ naucil: boolean }> {
   if (!vzor) return { naucil: false };
   const stare = await DB.prepare("SELECT klient FROM platba_mapovanie WHERE vzor = ?1").bind(vzor).first<{ klient: string }>();
+  /**
+   * KTO PLATÍ ZA VIACERÝCH, PRAVIDLO NEDOSTANE (29. 10. 2026).
+   *
+   * Kateřina Mátlová platí za seba, za Richarda aj za Alberta. Pravidlo
+   * „mátlová, kateřina → Kateřina" sa naučilo pri jej vlastnej platbe a o deň
+   * neskôr poslalo jej aj prevod so správou „ALBERT MATL". Odosielateľ, ktorý
+   * už platil za iného klienta, nie je dôkaz o klientovi — rozhodne správa
+   * a človek. Staré pravidlo takého odosielateľa sa zmaže.
+   */
+  const pravidlaKlienti = new Set(klienti.map(normName));
+  const jehoPlatby = (((await DB.prepare(
+    `SELECT p.klient, f.id, f.date, f.amount_czk, f.counterparty, f.note, f.typ FROM platby p
+       JOIN fio_transactions f ON f.id = p.fio_id WHERE p.zrusene_at IS NULL`,
+  ).all().catch(() => ({ results: [] }))).results || []) as unknown as (FioRiadok & { klient: string })[])
+    .filter((x) => vzorPlatby(x) === vzor);
+  const zaViacerych = new Set([...jehoPlatby.map((x) => normName(x.klient)), ...pravidlaKlienti]).size > 1;
+  if (zaViacerych) {
+    if (stare) {
+      await DB.prepare("DELETE FROM platba_mapovanie WHERE vzor = ?1").bind(vzor).run();
+      await audit(DB, {
+        action: "platba-pravidlo-zmazane", predmet: vzor, old: stare.klient,
+        neu: "odosielateľ platí za viacerých klientov — rozhoduje správa", actor: kto,
+      });
+    }
+    return { naucil: false };
+  }
   const vRozpore = !!stare && !klienti.some((x) => normName(x) === normName(stare.klient));
   if (naucitPre) {
     await DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")

@@ -511,3 +511,21 @@ describe("fakturačný kontakt pre viacerých klientov (21. 10. 2026)", () => {
     expect(chybaZoznamuMien("Novák, ml.", ["Novák, ml."])).toBeNull();
   });
 });
+
+describe("správa prebíja odosielateľa — Kateřina Mátlová za Alberta, 29. 10. 2026", () => {
+  const mena = ["Albert Matl", "Richard Matl", "Katerina Matlova"];
+  const map = { "matlova, katerina": "Katerina Matlova" };
+  it("správa s menom iného klienta ide do návrhu prvá, pravidlo ostane vedľa", () => {
+    const v = nepriradene([r({ id: "x", counterparty: "Mátlová, Kateřina", note: "ALBERT MATL", amount_czk: 7790 })], [], map, new Set(), mena);
+    expect(v[0].kandidati).toEqual(["Albert Matl", "Katerina Matlova"]);
+    expect(v[0].poznamka).toContain("Albert Matl");
+  });
+  it("správa o nej samej nič nemení", () => {
+    const v = nepriradene([r({ id: "y", counterparty: "Mátlová, Kateřina", note: "KATERINA MATLOVA", amount_czk: 7790 })], [], map, new Set(), mena);
+    expect(v[0].kandidati).toEqual(["Katerina Matlova"]);
+  });
+  it("správa bez mena nič nemení", () => {
+    const v = nepriradene([r({ id: "z", counterparty: "Mátlová, Kateřina", note: "ProSapiens 6h Balíček -10%", amount_czk: 7011 })], [], map, new Set(), mena);
+    expect(v[0].kandidati).toEqual(["Katerina Matlova"]);
+  });
+});
