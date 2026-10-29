@@ -57,3 +57,14 @@ describe("objem hľadania", () => {
     expect(citajUlozeny(JSON.stringify({ zistene: "2026-10-20", vyrazy: [] }))).toMatchObject({ region: "cz", napady: [] });
   });
 });
+
+describe("téma už v Nápadoch (29. 10. 2026)", () => {
+  it("spozná výraz a región bez ohľadu na číslo", async () => {
+    const { kluceVNapadoch, textNapadu } = await import("./objemHladania");
+    const k = kluceVNapadoch([textNapadu({ vyraz: "bolest zad", mesacne: 2400 }, "brno"), textNapadu({ vyraz: "fyzioterapie", mesacne: 0 }, "cz"), "iný nápad"]);
+    expect(k.has("brno|bolest zad")).toBe(true);
+    expect(k.has("cz|fyzioterapie")).toBe(true);
+    expect(k.has("cz|bolest zad")).toBe(false);
+    expect(k.size).toBe(2);
+  });
+});

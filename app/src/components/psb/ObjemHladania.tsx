@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { oznam } from "../../lib/psb/obnovaSignal";
 import {
-  REGIONY_OBJEMU, smerZaujmu, textNapadu, vyrazyZTextu,
+  kluceVNapadoch, REGIONY_OBJEMU, smerZaujmu, textNapadu, vyrazyZTextu,
   type ObjemVyrazu, type RegionObjemu, type UlozenyObjem,
 } from "../../lib/psb/objemHladania";
 import { C, mix } from "../../lib/psb/theme";
@@ -53,6 +53,15 @@ export function ObjemHladania() {
         else setSprava({ text: `Nenačítalo sa: ${j.error || "bez dôvodu"}`, chyba: true });
       })
       .catch(() => zive && setSprava({ text: "Nenačítalo sa – spojenie.", chyba: true }));
+    // Čo už v Nápadoch je — inak sa „+ Nápad" po obnovení ponúkne znova.
+    fetch("/api/napady", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; napady?: { text?: string }[] }) => {
+        if (!zive || !j.ok) return;
+        const uz = kluceVNapadoch((j.napady || []).map((n) => String(n.text || "")));
+        setPridane((p) => new Set([...p, ...uz]));
+      })
+      .catch(() => { /* bez zoznamu ostane tlačidlo aktívne — horšie nič */ });
     return () => {
       zive = false;
     };

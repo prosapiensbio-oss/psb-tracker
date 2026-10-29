@@ -186,6 +186,22 @@ export function textNapadu(o: Pick<ObjemVyrazu, "vyraz" | "mesacne">, region: Re
   return `Téma z hľadania na Googli: „${o.vyraz}“ – ${o.mesacne ? `asi ${o.mesacne}× mesačne` : "málo hľadané"} (${REGIONY_OBJEMU[region]})`;
 }
 
+/**
+ * Je téma už v Nápadoch? Do 29. 10. 2026 to vedela len obrazovka do obnovenia
+ * stránky a „+ Nápad" sa potom ponúkol znova — duplicitný nápad. Číslo
+ * v texte sa s každým zistením mení, preto sa porovnáva výraz a región.
+ */
+export function kluceVNapadoch(texty: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of texty) {
+    const m = /^Téma z hľadania na Googli: „(.+?)“ – .*\(([^()]+)\)\s*$/.exec(t || "");
+    if (!m) continue;
+    const region = (Object.keys(REGIONY_OBJEMU) as RegionObjemu[]).find((r) => REGIONY_OBJEMU[r] === m[2]);
+    if (region) out.add(`${region}|${m[1]}`);
+  }
+  return out;
+}
+
 /** Uložený objem z nastavení (JSON); poškodený alebo starý tvar = null. */
 export function citajUlozeny(json: string | null | undefined): UlozenyObjem | null {
   if (!json) return null;
