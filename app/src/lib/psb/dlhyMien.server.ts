@@ -21,7 +21,8 @@ export async function polozkyDlhovMien(DB: D1Database, mena: string[]): Promise<
     DB.batch([
       DB.prepare("SELECT id, klient, nazov, cena_czk, platnost_od, zdroj, poznamka, zrusene_at FROM balicky"),
       DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby"),
-      DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky"),
+      // Rovnaké poradie ako `loadData` — párovanie v `bezZdvojenych` od neho závisí.
+      DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky ORDER BY datum DESC"),
       DB.prepare("SELECT client_name, date, amount_czk FROM payments"),
     ]),
     DB.prepare("SELECT klient, od FROM ptminder_historia").all().catch(() => ({ results: [] })),

@@ -41,6 +41,16 @@ export type KlientPreKartu = {
 
 type Udalost = { klient: string | null; zaciatok: string; typ: string | null };
 
+/**
+ * Kľúč „vybavené" v `anomaly_ack` (29. 10. 2026). Do toho dňa sa riadok len
+ * schoval do konca sedenia a po obnovení stránky sa vrátil — Jerry: „sú aj
+ * iné chyby tohto typu?" Odklepnutie neznamená, že klient balíček má (to
+ * appka nevie), len že sa to s ním riešilo. Posledný tréning je v kľúči
+ * zámerne: keď príde znova bez balíčka, je to nová situácia a riadok sa vráti.
+ */
+export const klucVybaveniaBezBalicka = (x: Pick<BezBalicka, "meno" | "poslednyTrening">) =>
+  `bezBalicka|${x.meno}|${String(x.poslednyTrening || "").slice(0, 10)}`;
+
 export type BezBalicka = {
   meno: string;
   trener: string;

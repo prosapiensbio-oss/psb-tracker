@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { KOKPIT_OD } from "../../lib/psb/sedeniaZKalendara";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { navrhyNovychBalickov, navrhyPokracovaniaPredplatneho } from "../../lib/psb/automatickeBalicky.server";
@@ -187,6 +188,10 @@ export const Route = createFileRoute("/api/balicky")({
           for (const p of pt) {
             if (uz.has(p.id)) continue;
             const odExportu = denISO(p.valid_from);
+            // Predaj od 1. 10. 2026 vedie Kokpit (balíček vzniká sám prvým
+            // tréningom). Naliaty z PTmindera by bol druhý zápis toho istého
+            // predaja — dlh aj hodiny dvakrát (kontrola 29. 10. 2026).
+            if (odExportu && odExportu >= KOKPIT_OD) { preskocene.push(`${p.client_name} — ${p.package_name} (od ${odExportu} vedie predaje Kokpit)`); continue; }
             if (odExportu && maAutomaticky(p.client_name, odExportu, p.sessions_total > 0 ? p.sessions_total : (p.na_obdobie > 0 ? p.na_obdobie : hodinZNazvuBalicka(p.package_name || "")))) { preskocene.push(`${p.client_name} — ${p.package_name} (Kokpit ho založil prvým tréningom)`); continue; }
             if (odExportu ? podlaObsahu.has(`${p.client_name}|${p.package_name}|${odExportu}`) : podlaNazvu.has(`${p.client_name}|${p.package_name}`)) continue;
             const hodinZExportu = p.sessions_total > 0 ? p.sessions_total : (p.na_obdobie > 0 ? p.na_obdobie : hodinZNazvuBalicka(p.package_name || ""));

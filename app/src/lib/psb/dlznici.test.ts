@@ -397,3 +397,23 @@ describe("jeden prevod za dva predaje, PTminder po kúskoch — Albert Matl, 29.
     expect(polozky.map((p) => [p.id, p.doplatit])).toEqual([["n", 7790]]);
   });
 });
+
+describe("platba tri týždne pred prvým balíčkom — Lucie Podolová, 29. 10. 2026", () => {
+  it("faktúra zaplatená 15 dní vopred sa počíta", () => {
+    const { polozky } = dlhyKlientov({
+      poplatky: [],
+      balicky: [
+        { id: "a", klient: "Lucie Podolova", nazov: "OFF - 6h", cena: 6990, platnostOd: "2026-08-07", zdroj: "rucne" },
+        { id: "b", klient: "Lucie Podolova", nazov: "ON - 6h", cena: 5640, platnostOd: "2026-08-31", zdroj: "ptminder" },
+        { id: "c", klient: "Lucie Podolova", nazov: "ON - 6h", cena: 5640, platnostOd: "2026-10-02", zdroj: "ptminder" },
+      ],
+      platby: [
+        { klient: "Lucie Podolova", datum: "2026-07-23", suma: 6990 },
+        { klient: "Lucie Podolova", datum: "2026-09-21", suma: 6990 },
+        { klient: "Lucie Podolova", datum: "2026-09-29", suma: 6990 },
+      ],
+      ptPlatby: [], ptHistoria: [],
+    } as never);
+    expect(polozky).toEqual([]);
+  });
+});

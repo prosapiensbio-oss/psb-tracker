@@ -95,8 +95,10 @@ function Pole({ label, hodnota, nastav, sirka = 1, typ = "text", placeholder = "
   );
 }
 
-export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana, lenTrenera, dlhy }: {
+export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana, lenTrenera, dlhy, acks }: {
   mena: string[];
+  /** Odpovede „nie" pri dlhu mimo faktúry (`faktura-dlh-nie|…`). */
+  acks?: Record<string, unknown>;
   /** Dlhy klientov (`data.dlhy`) — formulár ponúkne pridať na faktúru, čo na nej nie je. */
   dlhy?: DlhPolozka[];
   /** Kto klienta vedie — podľa toho sa mail podpíše. */
@@ -932,7 +934,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               )}
               {!r.storno_at && !r.uhradene_at && !r.odoslane_at && !r.sms_at && (
                 <DlhMimoFaktury
-                  r={r} dlhy={dlhy} pracujem={pracujem === r.id}
+                  r={r} dlhy={dlhy} acks={acks} pracujem={pracujem === r.id}
                   onPridaj={(co) => void posli({
                     akcia: "pridaj-polozky", id: r.id,
                     polozky: co.map((d) => ({ klient: d.klient, popis: d.popis, cena: d.suma, balicekId: d.balicekId || undefined })),
@@ -974,12 +976,14 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
  *
  * Jerry, 29. 10. 2026: „chcem, aby sa ma Kokpit spýtal, či to tam chcem
  * pridať." Formulár sa pýta pri vystavovaní; toto je tá istá otázka pre
- * faktúru, ktorá už existuje. „Nie" sa pamätá v prehliadači pri faktúre
- * a dlhu — keď dlh pribudne nový, spýta sa znova.
+ * faktúru, ktorá už existuje. „Nie" sa pamätá pri faktúre a dlhu — keď dlh
+ * pribudne nový, spýta sa znova. Od 29. 10. 2026 na serveri (`anomaly_ack`),
+ * nielen v prehliadači: Terezka na inom zariadení sa inak pýtala znova.
  */
-function DlhMimoFaktury({ r, dlhy, pracujem, onPridaj }: {
+function DlhMimoFaktury({ r, dlhy, acks, pracujem, onPridaj }: {
   r: Riadok;
   dlhy?: DlhPolozka[];
+  acks?: Record<string, unknown>;
   pracujem: boolean;
   onPridaj: (co: ReturnType<typeof dlhyNaFakturu>) => void;
 }) {
@@ -988,10 +992,17 @@ function DlhMimoFaktury({ r, dlhy, pracujem, onPridaj }: {
     try { return Object.keys(localStorage).filter((k) => k.startsWith(`psb-faktura-dlh-nie|${r.cislo}|`)).map((k) => k.split("|").slice(2).join("|")); } catch { return []; }
   });
   const ponuka = dlhyNaFakturu(dlhy, [r.klient, ...(r.dalsie || []).map((d) => d.klient)], [r.balicek_id, ...(r.dalsie || []).map((d) => d.balicekId)])
-    .filter((d) => !nie.includes(d.kluc));
+    .filter((d) => !nie.includes(d.kluc) && !acks?.[`faktura-dlh-nie|${r.cislo}|${d.kluc}`]);
+  const [chybaNie, setChybaNie] = useState("");
   if (!ponuka.length) return null;
-  const odmietni = (d: (typeof ponuka)[number]) => {
-    try { localStorage.setItem(kluc(d.kluc), "1"); } catch { /* len pohodlie */ }
+  const odmietni = async (d: (typeof ponuka)[number]) => {
+    setChybaNie("");
+    const j = await fetch("/api/anomaly", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: `faktura-dlh-nie|${r.cislo}|${d.kluc}`, ack: true, note: `dlh ${d.suma} Kč (${d.klient}) na faktúru ${r.cislo} nepridávať` }),
+    }).then((x) => x.json()).catch(() => null) as { ok?: boolean; error?: string } | null;
+    if (!j?.ok) { setChybaNie(j?.error || "Odpoveď sa neuložila."); return; }
+    try { localStorage.setItem(kluc(d.kluc), "1"); } catch { /* server už vie */ }
     setNie((x) => [...x, d.kluc]);
   };
   return (
@@ -1004,12 +1015,13 @@ function DlhMimoFaktury({ r, dlhy, pracujem, onPridaj }: {
           <span style={{ flex: "1 1 220px" }}><b style={{ color: C.text }}>{d.klient}</b> · {d.popis}</span>
           <b style={{ color: C.text, fontVariantNumeric: "tabular-nums" }}>{suma(d.suma)} Kč</b>
           <button type="button" disabled={pracujem} onClick={() => onPridaj([d])} style={{ ...odkazStyl, color: C.green }}>{pracujem ? "pridávam…" : "pridať"}</button>
-          <button type="button" onClick={() => odmietni(d)} style={{ ...odkazStyl, color: C.textDim }}>nie</button>
+          <button type="button" onClick={() => void odmietni(d)} style={{ ...odkazStyl, color: C.textDim }}>nie</button>
         </div>
       ))}
       {ponuka.length > 1 && (
         <button type="button" disabled={pracujem} onClick={() => onPridaj(ponuka)} style={{ ...odkazStyl, color: C.green, marginTop: 3 }}>pridať všetko</button>
       )}
+      {chybaNie && <div style={{ color: C.red, marginTop: 3 }}>{chybaNie}</div>}
     </div>
   );
 }

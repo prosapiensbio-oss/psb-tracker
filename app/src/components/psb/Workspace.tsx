@@ -37,7 +37,7 @@ import { ZdravieKokpitu } from "./ZdravieKokpitu";
 import { KrokDopyty, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
-import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
+import { bezAktivnehoBalicka, klucVybaveniaBezBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { menaPlatiZa, platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
@@ -382,7 +382,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (!zdroje) return [];
     return postavKarty({
       ...zdroje,
-      bezBalicka,
+      bezBalicka: bezBalicka.filter((x) => !data.anomalyAck?.[klucVybaveniaBezBalicka(x)]),
       dlznici: dlzniciRiadky,
       platnost,
       anamnezy,
@@ -396,7 +396,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         return v.typ === "uvodny" ? (v.kandidati[0] || v.meno) : (v.kandidati.length === 1 ? v.kandidati[0] : "");
       },
     });
-  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky, platnost, anamnezy]);
+  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky, platnost, anamnezy, data.anomalyAck]);
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
@@ -689,15 +689,28 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   };
 
   /**
-   * Odklepnutie bez zápisu do databázy.
-   *
-   * Karty „Bez balíčka" a „Dlhujú peniaze" nie sú fronta úkonov v appke —
-   * vybavuje sa telefonátom. Riadok sa preto len schová do konca sedenia
-   * a pri ďalšom otvorení Workspace sa vráti, kým sa nezmenia dáta. Zápis
-   * „vybavené" do databázy by tvrdil, že klient balíček má alebo zaplatil,
-   * a to appka nevie.
+   * Odklepnutie do konca sedenia — už len pre kartu „Dlhujú peniaze" mimo
+   * krokov (`poKrokoch` je naostro stále zapnuté, takže sa nekreslí).
+   * „Bez balíčka" sa od 29. 10. 2026 zapisuje (`vybavBezBalicka`), lebo
+   * riadok, ktorý sa po obnovení vrátil, bol presne tá odpoveď do prázdna,
+   * ktorú Jerry hlásil pri „doplatí zvyšok".
    */
   const oznacHotove = (kluc: string) => setHotove((s) => new Set([...s, kluc]));
+
+  /**
+   * „Bez balíčka" sa od 29. 10. 2026 pamätá (`klucVybaveniaBezBalicka`):
+   * riadok, ktorý sa po obnovení vráti, je odpoveď do prázdna. Zapíše sa
+   * len „riešené", nie že balíček má — a s dňom posledného tréningu, takže
+   * ďalší tréning bez balíčka ho vráti.
+   */
+  const vybavBezBalicka = async (kluc: string, x: BezBalicka) => {
+    setPracujem(kluc); setChyba("");
+    const a = await posli("/api/anomaly", { key: klucVybaveniaBezBalicka(x), ack: true, note: `riešené (${x.dovod}) — balíček to nezakladá` })
+      .catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem("");
+    if (!a.ok) { setChyba(a.error || "Odpoveď sa neuložila."); return; }
+    oznacHotove(kluc);
+  };
 
   /**
    * ODPOVEĎ NA „BOL TAM?" SA ZAPISUJE, POTOM MIZNE Z OBRAZOVKY.
@@ -875,6 +888,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 <VydaneFaktury
                   mena={mena}
                   dlhy={data.dlhy}
+                  acks={data.anomalyAck}
                   treneri={treneriKlientov}
                   lenTrenera={trenerKroku}
                   predvolba={predvolbaFaktury}
@@ -1466,7 +1480,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         {x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}
                       </div>
                     )}
-                    <button onClick={() => oznacHotove(kluc)} style={{ ...vedlajsie, order: 5 }}>vybavené</button>
+                    <button disabled={pracujem === kluc} onClick={() => void vybavBezBalicka(kluc, x)} style={{ ...vedlajsie, order: 5 }}>vybavené</button>
                   </div>
                 );
               })}

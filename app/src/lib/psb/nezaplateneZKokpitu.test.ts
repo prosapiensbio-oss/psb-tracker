@@ -21,8 +21,8 @@ describe("nezaplateneZKokpitu", () => {
   it("čiastočná platba nestačí: 7 790 na 18 h je nezaplatené", () => {
     expect(nezaplateneZKokpitu([b("2026-11-05", 21150)], [p("2026-11-06", 7790)]).length).toBe(1);
   });
-  it("platba viac než dva týždne pred prvým balíčkom bez príznaku vopred sa nepočíta", () => {
-    expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-10-20", 7790)]).length).toBe(1);
+  it("platba viac než tri týždne pred prvým balíčkom bez príznaku vopred sa nepočíta", () => {
+    expect(nezaplateneZKokpitu([b("2026-11-05", 7790)], [p("2026-10-10", 7790)]).length).toBe(1);
   });
   // Kateřina Matlová, 21. 10. 2026: augustový balíček zaplatila 4 dni pred
   // začiatkom a ten si potom zobral jej októbrovú platbu — nový ostal v mínuse.
