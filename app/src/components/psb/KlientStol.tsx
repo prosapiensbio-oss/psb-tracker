@@ -1373,13 +1373,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               <div style={{ color: C.textDim }}>narodeniny nezapísané</div>
             )}
             {spolu && spolu.text && (
-              <div title={spolu.zdroj === "ptminder" ? "Začiatok z registrácie v PTminderi — Kokpit má tréningy až od roku 2025." : "Od prvého tréningu v Kokpite."}>
+              <div title={spolu.zdroj === "ptminder" ? "Začiatok z registrácie (archív) — Kokpit má tréningy od roku 2025." : "Od prvého tréningu v Kokpite."}>
                 <span style={{ color: C.textDim }}>{spolu.skoncila ? "spolupráca trvala" : "spolupracujeme"}</span> {spolu.text}
                 <span style={{ color: C.textDim }}> · od {fmtDMY(spolu.od)}{spolu.skoncila ? ` do ${fmtDMY(spolu.koniec)}` : ""}</span>
               </div>
             )}
             {spolu && spolu.lekcie > 0 && (
-              <div title={spolu.lekciePred ? `${spolu.lekciePred} z nich pred rokom 2025 — z archívu PTmindera; Kokpit má tréningy od 3. 1. 2025.` : "Tréningy v Kokpite."}>
+              <div title={spolu.lekciePred ? `${spolu.lekciePred} z nich pred rokom 2025 — z archívu; Kokpit má tréningy od 3. 1. 2025.` : "Tréningy v Kokpite."}>
                 <span style={{ color: C.textDim }}>lekcií spolu</span> {spolu.lekcie}
                 {spolu.lekciePred > 0 && <span style={{ color: C.textDim }}> · z toho {spolu.lekciePred} pred rokom 2025</span>}
               </div>
@@ -2261,7 +2261,7 @@ function doNarodenin(narodeniny: string): number | null {
  */
 function StavHodin({ stav }: { stav?: StavRiadku }) {
   if (stav?.vyrovnane) {
-    return <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, color: C.textDim }} title="staré obdobie z PTmindera — tréning nad rámec sa nepočíta ani do mínusu, ani do plusu">—</span>;
+    return <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, color: C.textDim }} title="staré obdobie (archív) — tréning nad rámec sa nepočíta ani do mínusu, ani do plusu">—</span>;
   }
   if (!stav || (stav.zostatok === null && !stav.dlh)) return null;
   return (
@@ -2831,7 +2831,7 @@ function stitky(
   };
 
   pridaj("klient od", spolu?.od ? fmtDMY(spolu.od) : c.firstSession ? fmtDMY(c.firstSession) : "", undefined,
-    spolu?.zdroj === "ptminder" ? "prvý tréning z archívu PTmindera (Kokpit má tréningy až od roku 2025)" : "prvý tréning v Kokpite");
+    spolu?.zdroj === "ptminder" ? "prvý tréning z archívu (Kokpit má tréningy od roku 2025)" : "prvý tréning v Kokpite");
   pridaj("lekcií spolu", spolu?.lekcie || "");
   pridaj(spolu?.skoncila ? "spolupráca trvala" : "spolupracujeme", spolu?.text);
   pridaj("naposledy", c.lastSession ? fmtDMY(c.lastSession) : "");
@@ -2845,7 +2845,7 @@ function stitky(
   if (c.packageTotal) {
     pridaj("balíček", `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}`,
       c.packageRemaining <= 1 ? C.orange : undefined,
-      c.packageOdkial || "zostatok z exportu PTmindera");
+      c.packageOdkial || "zostatok z archívu");
   }
   pridaj("platí do", c.packageValidTo ? fmtDMY(c.packageValidTo) : "");
   pridaj("zdroj", c.zdroj || dopyt?.source);
@@ -2857,7 +2857,7 @@ function stitky(
   pridaj("bitcoin", c.bitcoin ? (satoshi ? `${satoshi.toLocaleString("sk-SK")} sat` : "áno") : "", C.accentLight);
   pridaj("modalita", c.modality);
   pridaj("zastupoval", c.substituteCount ? `${c.substituteCount}×` : "");
-  if (poplatky.length) pridaj("nezaplatené", `${poplatky.length}`, C.red, "poplatky z PTmindera");
+  if (poplatky.length) pridaj("nezaplatené", `${poplatky.length}`, C.red, "staré poplatky");
   pridaj("pauza do", c.pauseUntil ? fmtDMY(c.pauseUntil) : "", C.orange);
   pridaj("odišiel", c.duch ? "áno" : "", C.red, c.duch);
   return out;
@@ -2980,8 +2980,8 @@ function NovyKlient({ zapis, onHotovo }: {
         <button onClick={() => onHotovo(null)} style={navrhTlacidlo}>Zrušiť</button>
       </div>
       <div style={{ fontSize: 11.5, color: C.orange, marginTop: 9, lineHeight: 1.5 }}>
-        Meno napíš PRESNE tak, ako ho budeš mať v PTminderi. Podľa neho sa to spojí — pri inom
-        zápise vzniknú dvaja ľudia a sedenia aj platby sa rozdelia medzi nich.
+        Meno napíš PRESNE — celé meno a priezvisko s diakritikou, tak ako bude v kalendári. Podľa neho
+        sa to spojí — pri inom zápise vzniknú dvaja ľudia a sedenia aj platby sa rozdelia medzi nich.
       </div>
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
     </div>

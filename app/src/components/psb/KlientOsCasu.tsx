@@ -51,7 +51,7 @@ export function KlientOsCasu({ meno, data, kalUdalosti }: {
     <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${mix(C.border, 60)}` }}>
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
         <Info
-          text="Všetko, čo sa s klientom stalo, pod sebou v čase: kedy si kúpil balíček a dokedy mu platí, kedy chodil a kedy platil. Karta nič nedopočítava — okrem toho, koľko tréningov padlo do platnosti balíčka, lebo práve to sa ručne počíta najhoršie. Tréning, ktorý je zatiaľ len v kalendári a v PTminderi ešte nie, je označený."
+          text="Všetko, čo sa s klientom stalo, pod sebou v čase: kedy si kúpil balíček a dokedy mu platí, kedy chodil a kedy platil. Karta nič nedopočítava — okrem toho, koľko tréningov padlo do platnosti balíčka, lebo práve to sa ručne počíta najhoršie. Tréning z kalendára je označený."
           label="Os času — čo, kedy a za čo"
         />
       </div>
@@ -134,7 +134,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
         {u.nazov ? <span style={{ color: C.textDim }}> · {nazovProduktu(u.nazov)}</span> : null}
       </span>
       {u.zKalendara && (
-        <span style={{ color: C.blue, fontSize: 11, whiteSpace: "nowrap" }} title="V kalendári je, v PTminderi ešte nie">
+        <span style={{ color: C.blue, fontSize: 11, whiteSpace: "nowrap" }} title="Tréning z Google kalendára">
           z kalendára
         </span>
       )}

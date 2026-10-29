@@ -874,7 +874,7 @@ describe("ručná kotva zostatku má prednosť pred dopočtom", () => {
     // Kotva: PTminder ukazoval 5 h pred tromi dňami; odvtedy dva tréningy.
     const c = postav({ balicekZostatok: 5, balicekKDatumu: den(-3) }, [-10, -5, -3, -2, -1]);
     expect(c.packageRemaining).toBe(3);
-    expect(c.packageOdkial).toContain("podľa PTmindera");
+    expect(c.packageOdkial).toContain("podľa archívu");
   });
 
   it("tréning v deň kotvy sa neodpočítava — PTminder ho už má v sebe", () => {

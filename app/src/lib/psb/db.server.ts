@@ -1145,14 +1145,3 @@ export async function unackAnomaly(DB: D1Database, key: string): Promise<void> {
   await DB.prepare("DELETE FROM anomaly_ack WHERE anomaly_key = ?").bind(key).run();
 }
 
-export async function resetAll(DB: D1Database): Promise<void> {
-  await DB.batch([
-    DB.prepare("DELETE FROM sessions"),
-    DB.prepare("DELETE FROM services"),
-    DB.prepare("DELETE FROM payments"),
-    DB.prepare("DELETE FROM packages"),
-    DB.prepare("DELETE FROM upload_log"),
-    DB.prepare("DELETE FROM anomaly_ack"),
-    // client_overrides are intentionally preserved (manual notes survive a reset).
-  ]);
-}

@@ -24,7 +24,6 @@ import {
   fetchWeekEntries,
   ingestFiles,
   logout as apiLogout,
-  resetAll as apiReset,
   saveAnomaly,
   saveOverride,
   fetchBtcReserve,
@@ -120,7 +119,6 @@ export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => Promise<boolean>;
   ackAnomaly: (key: string, note: string, ack?: boolean) => void;
   ingest: (files: { filename: string; text: string }[]) => Promise<IngestResult[]>;
-  reset: () => Promise<void>;
   refresh: () => Promise<void>;
   /**
    * Prepočítaj všetko okolo peňazí. Volá ho každý, kto zapísal pohyb,
@@ -2065,8 +2063,8 @@ function skupinaFaktur(
       const key = `prijmy|${n.mesiac}`;
       // Od mesiaca s peniazmi z Kokpitu sú tržby `data.payments` platby
       // zapísané v Kokpite, nie PTminder (22. 10. 2026 — veta klamala).
-      const zdrojTrzieb = data.peniazeOd && n.mesiac >= data.peniazeOd ? "Kokpit" : "PTminder";
-      const chybaZapis = zdrojTrzieb === "Kokpit" ? "chýba zapísaná platba v Kokpite (nespárovaná z banky, zošit, bitcoin)" : "chýba platba v PTminderi";
+      const zdrojTrzieb = data.peniazeOd && n.mesiac >= data.peniazeOd ? "Kokpit" : "archív platieb";
+      const chybaZapis = zdrojTrzieb === "Kokpit" ? "chýba zapísaná platba v Kokpite (nespárovaná z banky, zošit, bitcoin)" : "chýba platba v archíve platieb";
       out.push({
         key, category: "Zmena", tone: "orange",
         // Peniaze má na starosti Jerry (31. 8. 2026).
@@ -3025,13 +3023,9 @@ function skupinaFaktur(
         oznam("kalendar");
         return res;
       },
-      reset: async () => {
-        await apiReset();
-        await load();
-      },
       refresh: () => load(true),
       prepocitajPeniaze: () => setPenazVerzia((v) => v + 1),
-      // Stiahne kalendár TERAZ a hneď načíta jeho udalosti aj dáta z PTmindera.
+      // Stiahne kalendár TERAZ a hneď načíta jeho udalosti aj dáta.
       // Cron beží ráno a večer; toto je pre chvíľu, keď človek práve dotrénoval
       // a chce vidieť zostatok bez čakania do večera.
       zapisZrusenie: async (klient, datum, poznamka) => {

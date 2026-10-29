@@ -2473,7 +2473,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
           <Info
             text={zdroj === "karta"
               ? "STAV TERAZ: to isté číslo ako na karte klienta v Kokpite — balíčky z Kokpitu mínus tréningy, ktoré už prebehli. Objednané termíny sa neodčítavajú; na to je pohľad Kalendár. Klienti s paušálnym členstvom sa nezobrazujú. Mení sa podľa prepínača trénera."
-              : "PREDBEŽNÝ stav: zostatok z PTminderu mínus to, čo o ňom vie kalendár. Odznak je koľko má TERAZ (po hodinách, ktoré prebehli, ale do exportu sa ešte nedostali); text pod menom hovorí, čo s tým spravia objednané termíny. Kalendár je len vrstva medzi dvoma exportmi — zrušený tréning sa vráti sám, len čo ho z neho vymažeš. Potvrdené číslo je v pohľade PTminder. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."}
+              : "Stav teraz (ako na karte klienta) mínus termíny objednané v kalendári. Odznak je koľko má TERAZ; text pod menom hovorí, čo s tým spravia objednané termíny. Zrušený tréning sa vráti sám, len čo ho z kalendára vymažeš. Klienti s paušálnym členstvom sa nezobrazujú. Mení sa podľa prepínača trénera."}
             label={zdroj === "karta"
               ? `Balíček dochádza — stav teraz (${riadky.length})`
               : `Balíček dojde po objednaných hodinách (${riadky.length})`}

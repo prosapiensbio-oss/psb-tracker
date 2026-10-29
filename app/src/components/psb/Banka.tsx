@@ -536,7 +536,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
           <div style={{ fontSize: 12, color: C.textDim, marginBottom: 10, lineHeight: 1.6 }}>
             {suhrn.uzMame > 0 && <>{suhrn.uzMame} už v databáze · </>}
             {suhrn.zamknute > 0 && <><b style={{ color: C.red }}>{suhrn.zamknute} v uzavretom mesiaci</b> · </>}
-            Príjmy sa zapisujú tiež, ale slúžia len na kontrolu proti PTminderu — tržby sa z banky nikdy nepočítajú.
+            Príjmy sa zapisujú tiež — ku klientom sa priraďujú v Evidencii → Platby a do tržieb idú odtiaľ, nie priamo z banky.
           </div>
           {filter === "vyplaty" && btcVMesiaci.length > 0 && (
             <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 26)}` }}>

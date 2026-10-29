@@ -878,14 +878,14 @@ function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce
               <Divider label="Výplaty" span={i.length + 3} />
               <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, i)} />
               <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, i)} />
-              <Row label={<Info text="Matyáš je zamestnanec (DPP) — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad. 2025 až jún 2026 z Excelu; od júla 2026 sa počíta sám: jeho odtrénované hodiny z PTmindera × 370 Kč (záskok za Jerryho a Terezku, úvodný ako hodina)." label="Matyáš" />} values={pick(p.matyas, i)} />
+              <Row label={<Info text="Matyáš je zamestnanec (DPP) — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad. 2025 až jún 2026 z Excelu; od júla 2026 sa počíta sám: jeho odtrénované hodiny × 370 Kč (záskok za Jerryho a Terezku, úvodný ako hodina)." label="Matyáš" />} values={pick(p.matyas, i)} />
               <Row label="Výplaty spolu" values={pick(p.vyplatySpolu, i)} bold color={C.red} />
 
               <TotalRow label="Celkové náklady" values={pick(p.celkoveNaklady, i)} color={C.red} />
 
               <Divider label="Tržby & Príjmy" span={i.length + 3} />
               <Row label="Celkové príjmy" values={pick(p.prijmy, i)} bold color={C.green}>
-                <Row label="Tržby (PTminder)" values={pick(PRIJMY_PTMINDER, i)} depth={1} />
+                <Row label="Tržby" values={pick(PRIJMY_PTMINDER, i)} depth={1} />
                 <Row label={<Info text="Príjmy mimo tréningov — v jan/feb 2025 Jarkov preplatok za kurz a bitcoin. Excel ich v hárku „Mesačné výsledky“ nezobrazoval pri tržbách, ale zisk z nich počítal — preto tam tie dva mesiace nesedeli." label="Iné príjmy" />} values={pick(PRIJMY_INE, i)} depth={1} />
               </Row>
 
@@ -1516,7 +1516,7 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
             Matyáš
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>
-            Záskok od {fmtDMY(ZASKOK_OD)} · DPP · {SADZBA_ZASKOK_KC} Kč za odtrénovanú hodinu. Mzdový náklad — žiadny nárok ani dlh. Od júla 2026 sa mzda počíta sama z jeho sedení v PTminderi.
+            Záskok od {fmtDMY(ZASKOK_OD)} · DPP · {SADZBA_ZASKOK_KC} Kč za odtrénovanú hodinu. Mzdový náklad — žiadny nárok ani dlh. Od júla 2026 sa mzda počíta sama z jeho sedení.
           </div>
         </div>
         {posledny >= 0 ? (
@@ -1546,7 +1546,7 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
             </thead>
             <tbody>
               <tr>
-                <td style={{ ...S.td, fontSize: 12, color: C.textMuted, ...sticky() }}>Hodiny (PTminder)</td>
+                <td style={{ ...S.td, fontSize: 12, color: C.textMuted, ...sticky() }}>Hodiny</td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: hod(i) > 0 ? C.text : C.textDim }}>{hod(i) > 0 ? hod(i).toFixed(1) : "—"}</td>)}
                 <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{avg(idx.map(hod)).toFixed(1)}</td>
               </tr>
@@ -3409,7 +3409,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
       {sub === "pnl" && (
         <>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>
-            Tržby idú živé z PTmindera, náklady od júla 2026 z Fio — mesiace do júna zostávajú z Excelu,
+            Tržby idú živé z knihy platieb, náklady od júla 2026 z Fio — mesiace do júna zostávajú z Excelu,
             aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš nižšie
             v <b style={{ color: C.textMuted }}>Zapísané pohyby</b>, kde sa dá prehodiť kategória aj dopísať poznámka.
           </div>

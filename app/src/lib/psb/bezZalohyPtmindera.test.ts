@@ -51,7 +51,7 @@ describe("deriveClients — zostatok bez zálohy z PTmindera", () => {
     const c = deriveClients(data, { bezZalohyPtmindera: false })["Kat Stokl"];
     if (dnes < "2026-10-01") return;
     expect(c.packageRemaining).toBe(1);
-    expect(c.packageOdkial).toContain("z PTmindera");
+    expect(c.packageOdkial).toContain("z archívu");
     expect(c.treningyBezBalicka).toBeUndefined();
   });
 

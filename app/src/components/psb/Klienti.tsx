@@ -160,7 +160,7 @@ export function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove
   return (
     <div style={{ padding: "10px 12px", marginBottom: 12, borderRadius: 8, background: mix(C.accent, 6), border: `1px solid ${mix(C.accent, 28)}` }}>
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 7 }}>
-        Nové meno — presne tak, ako je odteraz v PTminderi. Zmení sa všade vrátane kľúčov,
+        Nové meno — celé a s diakritikou. Zmení sa všade vrátane kľúčov,
         takže sa najbližší export napojí na existujúce riadky namiesto toho, aby klienta založil druhýkrát.
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -600,7 +600,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
         {cakajuci.length > 0 && !focusClient && !skupina && (
           <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 9, border: `1px dashed ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: C.accentLight, marginBottom: 6 }}>
-              Čakajú na potvrdenie z PTmindera ({cakajuci.length})
+              Čakajú na priradenie v Kalendári ({cakajuci.length})
             </div>
             {cakajuci.map((c) => (
               <div key={c.meno} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, padding: "3px 0", flexWrap: "wrap" }}>
@@ -682,7 +682,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                 </td>
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
                 <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={nazovProduktu(c.membership)}>{c.membership ? nazovProduktu(c.membership) : c.clientType}</td>
-                <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: export z PTmindera pri tomto členstve zostatok nedáva, tak sa odčítali odtrénované hodiny od počtu v názve balíčka." : undefined}>
+                <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: od počtu hodín v názve balíčka sa odčítali odtrénované hodiny." : undefined}>
                   {c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
@@ -738,39 +738,9 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               {editC.packageOdkial ? <span style={{ color: C.textDim }}> · {editC.packageOdkial}</span> : null}
             </div>
           )}
-          {/* ── Oprava zostatku podľa PTmindera ───────────────────────────
-              PTminder pri offline členstvách zostatok nevyváža (0 z 0), takže
-              ho appka dopočítava z odtrénovaných hodín — a keď sa dve členstvá
-              prekrývajú, môže byť o hodinu vedľa. Tu sa raz odpíše pravda
-              z PTmindera; appka od nej ďalej odpočítava sama a nemusí sa to
-              opakovať. */}
-          {editC.packageTotal > 0 && (
-            <div style={{ marginBottom: 14, padding: "9px 11px", borderRadius: 8, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>
-                Zostatok podľa PTmindera (appka od neho ďalej odpočítava odtrénované hodiny)
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <input
-                  type="number" min={0} max={99} placeholder="napr. 5"
-                  defaultValue={editC.balicekZostatok ?? ""}
-                  onBlur={(e) => {
-                    const v = e.currentTarget.value.trim();
-                    // Dátum dopĺňa server spolu s číslom — pozri /api/override.
-                    if (v === "") { actions.setOverride(editC.name, "balicekZostatok", null); return; }
-                    const n = Math.max(0, Math.round(Number(v)));
-                    if (!Number.isFinite(n)) return;
-                    actions.setOverride(editC.name, "balicekZostatok", n);
-                  }}
-                  style={{ width: 90, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12, fontFamily: "inherit" }}
-                />
-                <span style={{ fontSize: 11.5, color: C.textDim }}>
-                  {editC.balicekKDatumu
-                    ? `hodín k ${fmtDMY(editC.balicekKDatumu)} — odvtedy odtrénoval ${Math.max(0, (editC.balicekZostatok ?? 0) - editC.packageRemaining)} h`
-                    : "hodín k dnešku (uloží sa aj dátum)"}
-                </span>
-              </div>
-            </div>
-          )}
+          {/* „Zostatok podľa PTmindera" (ručná kotva) je od 29. 10. 2026 preč —
+              od 1. 10. 2026 zostatok počíta Kokpit z vlastných balíčkov a PTminder
+              sa ruší. Uložené kotvy v dátach ostávajú. */}
           {duchOdpoved(editC) === "ano" && (
             // Zadné vrátka. Potvrdenie ducha je rozhodnutie, nie rozsudok —
             // ľudia sa vracajú a vtedy sa to musí dať zrušiť jedným klikom,
@@ -843,7 +813,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               : "Keď doplníš, appka pripomenie narodeniny týždeň dopredu, potom tri dni, deň pred a v deň samotný."}
           </div>
           {/* Vrátil sa po pauze.
-              Dáta z PTmindera siahajú do januára 2025. Kto chodil predtým,
+              Tréningy v Kokpite siahajú do januára 2025. Kto chodil predtým,
               odišiel a vrátil sa, vyzerá v appke ako nový klient — a od
               septembra sa podľa počtu nových klientov meria, čo priniesla
               reklama. Návrat reklama nepriniesla, tak sa do príchodov neráta. */}

@@ -856,7 +856,7 @@ export function vypisAkoText(v: Vypis, klient: string): string {
     "",
     ...riadky,
     "",
-    v.riadky.some((r) => r.odvodene) ? "Hodiny označené ≈ sú z názvu členstva — PTminder ich vo výpise neuvádza." : "",
+    v.riadky.some((r) => r.odvodene) ? "Hodiny označené ≈ sú z názvu členstva." : "",
     "Dĺžka tréningu sa berie zo záznamu o sedení; bežný tréning je hodina.",
   ].filter((r, i, p) => r !== "" || p[i - 1] !== "").join("\n");
 }

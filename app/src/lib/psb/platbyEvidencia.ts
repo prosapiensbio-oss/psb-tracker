@@ -739,7 +739,7 @@ export function nepriradene(
       const ini = [...new Set(rovnaka.filter((p) => normName(p.klient) !== normName(k) && dniMedzi(p.datum, den) <= 1).map((p) => p.klient))];
       if (!maJu && ini.length === 1) {
         kandidati = [k, ini[0]];
-        poznamka = `PTminder má túto platbu pri ${ini[0]}, nie pri ${k}.`;
+        poznamka = `Archív platieb ju má pri ${ini[0]}, nie pri ${k}.`;
       }
     }
 

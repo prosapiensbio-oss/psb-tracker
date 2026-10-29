@@ -43,7 +43,6 @@ import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSmsRouteImport } from './routes/api/sms'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
-import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiReportAkcieRouteImport } from './routes/api/report-akcie'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
@@ -273,11 +272,6 @@ const ApiSessionRoute = ApiSessionRouteImport.update({
 const ApiSekvenciaNavrhRoute = ApiSekvenciaNavrhRouteImport.update({
   id: '/api/sekvencia-navrh',
   path: '/api/sekvencia-navrh',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiResetRoute = ApiResetRouteImport.update({
-  id: '/api/reset',
-  path: '/api/reset',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReportAkcieRoute = ApiReportAkcieRouteImport.update({
@@ -645,7 +639,6 @@ export interface FileRoutesByFullPath {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
@@ -742,7 +735,6 @@ export interface FileRoutesByTo {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
@@ -840,7 +832,6 @@ export interface FileRoutesById {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
@@ -939,7 +930,6 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
@@ -1036,7 +1026,6 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
@@ -1133,7 +1122,6 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
@@ -1231,7 +1219,6 @@ export interface RootRouteChildren {
   ApiPushRanoRoute: typeof ApiPushRanoRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiReportAkcieRoute: typeof ApiReportAkcieRoute
-  ApiResetRoute: typeof ApiResetRoute
   ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiSmsRoute: typeof ApiSmsRoute
@@ -1502,13 +1489,6 @@ declare module '@tanstack/react-router' {
       path: '/api/sekvencia-navrh'
       fullPath: '/api/sekvencia-navrh'
       preLoaderRoute: typeof ApiSekvenciaNavrhRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/reset': {
-      id: '/api/reset'
-      path: '/api/reset'
-      fullPath: '/api/reset'
-      preLoaderRoute: typeof ApiResetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/report-akcie': {
@@ -2009,7 +1989,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPushRanoRoute: ApiPushRanoRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiReportAkcieRoute: ApiReportAkcieRoute,
-  ApiResetRoute: ApiResetRoute,
   ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiSmsRoute: ApiSmsRoute,

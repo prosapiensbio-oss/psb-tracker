@@ -105,7 +105,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
     <Card>
       <H3>
         <Info
-          text="Kokpit si vedie vlastný zoznam predaných balíčkov a zostatok si počíta sám z kalendára. Od 19. 10. 2026 sa do PTmindera nezapisuje, takže porovnanie s ním je vypnuté."
+          text="Kokpit si vedie vlastný zoznam predaných balíčkov a zostatok si počíta sám z kalendára. Balíčky spred 1. 10. 2026 sú prenesené z archívu."
           label="Balíčky — vlastná evidencia"
         />
       </H3>

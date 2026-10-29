@@ -36,7 +36,7 @@ type Navrh = {
 const ZDROJ_ROZDELENIA: Record<string, string> = {
   faktura: "podľa položiek faktúry",
   spolocne: "už raz platili spolu",
-  ptminder: "tak to zapísal PTminder",
+  ptminder: "tak to stojí v archíve platieb",
 };
 
 const ZDROJ: Record<string, string> = {
@@ -44,7 +44,7 @@ const ZDROJ: Record<string, string> = {
   faktura: "variabilný symbol sedí s faktúrou",
   firma: "firma alebo IČO klienta",
   meno: "meno v platbe",
-  suma: "suma a deň sedia s PTminderom",
+  suma: "suma a deň sedia s archívom platieb",
 };
 
 export function DavkovePlatby({ mena }: { mena: string[] }) {
@@ -200,7 +200,7 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
       <H3>
         <Info
           label="Bankové príjmy bez klienta"
-          text="Appka ku každému príjmu navrhne klienta — z mena v platbe, z pravidla, ktoré si raz potvrdil, alebo podľa sumy a dňa oproti PTminderu. Sama nezapíše nič; zapíše sa len to, čo tu odklikneš. Jednoznačné návrhy sú predzaškrtnuté, pri viacerých kandidátoch rozhoduje človek."
+          text="Appka ku každému príjmu navrhne klienta — z mena v platbe, z pravidla, ktoré si raz potvrdil, alebo podľa sumy a dňa oproti archívu platieb. Sama nezapíše nič; zapíše sa len to, čo tu odklikneš. Jednoznačné návrhy sú predzaškrtnuté, pri viacerých kandidátoch rozhoduje človek."
         />
       </H3>
 

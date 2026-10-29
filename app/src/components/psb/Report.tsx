@@ -159,7 +159,7 @@ export function Report({
           })}
         </div>
         <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>
-          {trener !== "obaja" && "Filter podľa trénera platí na sedenia a hodiny — platby v PTminderi trénera nemajú, takže tržby zostávajú za celé štúdio. "}
+          {trener !== "obaja" && "Filter podľa trénera platí na sedenia a hodiny — platby trénera nemajú, takže tržby zostávajú za celé štúdio. "}
           Report sa prepisuje sám, ako meníš filtre. Grafy sú len v PDF — v texte na kopírovanie by boli šum.
         </div>
       </Card>

@@ -88,7 +88,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
     <Card>
       <H3>
         <Info
-          text="Kokpit si vedie vlastnú knihu platieb: bankové z výpisu Fio, hotovosť prepísanú zo zošita. Od 19. 10. 2026 sa do PTmindera nezapisuje, porovnanie s ním je vypnuté."
+          text="Kokpit si vedie vlastnú knihu platieb: bankové z výpisu Fio, hotovosť prepísanú zo zošita, bitcoin z BTC knihy."
           label={`Platby — vlastná evidencia${celkom ? ` (${celkom} čaká)` : ""}`}
         />
       </H3>
@@ -98,9 +98,9 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
           z Kokpitu natrvalo; staršie mesiace ostávajú v archíve PTmindera. */}
       <div style={{ fontSize: 12.5, lineHeight: 1.55, margin: "2px 0 12px", padding: "8px 10px", borderRadius: 8, background: mix(peniazeOd ? C.green : C.orange, 14) }}>
         {peniazeOd ? (
-          <><b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b> Staršie mesiace sú z archívu PTmindera.</>
+          <><b style={{ color: C.green }}>Tržby a grafy od {mesiacKratko(peniazeOd)} berú platby z Kokpitu.</b> Staršie mesiace sú z archívu (do 9/2026).</>
         ) : (
-          <b style={{ color: C.orange }}>Chýba nastavenie, od ktorého mesiaca sú peniaze z Kokpitu — tržby teraz berú archív PTmindera. Napíš to Claudovi.</b>
+          <b style={{ color: C.orange }}>Chýba nastavenie, od ktorého mesiaca sú peniaze z Kokpitu — tržby teraz berú archív. Napíš to Claudovi.</b>
         )}
       </div>
 

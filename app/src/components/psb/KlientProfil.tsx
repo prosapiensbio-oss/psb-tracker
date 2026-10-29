@@ -219,14 +219,14 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             "Narodeniny",
             casti.join(" · "),
             dni !== undefined && dni <= 7 ? C.orange : undefined,
-            "Dátum narodenia z PTmindera. Appka pripomenie týždeň, tri dni a deň pred — a v deň samotný.",
+            "Dátum narodenia. Appka pripomenie týždeň, tri dni a deň pred — a v deň samotný.",
           );
         })()}
         {stat("Prvé sedenie", c.firstSession ? fmtDMY(c.firstSession) : "—")}
         {stat("Posledné", p.posledne ? `${fmtDMY(p.posledne)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
           p.dniTicha != null && p.dniTicha > 21 ? C.orange : undefined,
           p.poslednezKalendara
-            ? "Posledný tréning podľa KALENDÁRA — v exporte z PTmindera ešte nie je. Appka ho berie ako platný, rovnako ako notifikácie; do počtu sedení a do tempa sa dostane až po importe."
+            ? "Posledný tréning podľa kalendára."
             : "Posledné sedenie a koľko dní odvtedy ubehlo.")}
         {/* Zátvorka s hodinami len keď sa líšia od počtu — pri hodinových
             sedeniach je „4 (4 h)" to isté číslo dvakrát. */}
@@ -253,7 +253,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             // v exporte NEDÁVA (stojí tam 0 z 0), takže appka odčíta
             // odtrénované hodiny od počtu v názve. Číslo, ktoré sa tvári ako
             // výpis, pritom Jerry povie klientovi nahlas.
-            c.packageOdvodeny ? "≈ dopočítané z odtrénovaných hodín — PTminder tento zostatok nevyváža" : "",
+            c.packageOdvodeny ? "≈ dopočítané z odtrénovaných hodín" : "",
           ].filter(Boolean).join(" · ") || undefined)}
         {p.priemMedzera != null && stat("Ø medzi nákupmi", `${Math.round(p.priemMedzera)} dní`, undefined,
           "Priemerný odstup medzi platbami (platby menej než 7 dní od seba sa rátajú ako doplnky k tej istej kúpe). Hovorí, ako často klient reálne obnovuje.")}

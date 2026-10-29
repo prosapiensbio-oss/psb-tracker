@@ -134,7 +134,7 @@ function BtcKontrola({ data }: { data: PSBData }) {
 
   return (
     <Card>
-      <H3><Info text="Porovnáva bitcoinové platby zapísané v appke prosapiens-btc s knihou platieb (od 10/2026 Kokpit, staršie mesiace archív PTmindera) — kontrola, či niečo nechýba. Tolerancia sú 4 dni a 400 Kč: kurz medzi okamihom platby a prepočtom sa vždy trochu líši. Rozdiel nemusí znamenať chybu — do uzávierky (prvý víkend nasledujúceho mesiaca) nemusí byť platba ešte zapísaná." label="Kontrola bitcoinových platieb" /></H3>
+      <H3><Info text="Porovnáva bitcoinové platby zapísané v appke prosapiens-btc s knihou platieb (od 10/2026 Kokpit, staršie mesiace archív) — kontrola, či niečo nechýba. Tolerancia sú 4 dni a 400 Kč: kurz medzi okamihom platby a prepočtom sa vždy trochu líši. Rozdiel nemusí znamenať chybu — do uzávierky (prvý víkend nasledujúceho mesiaca) nemusí byť platba ešte zapísaná." label="Kontrola bitcoinových platieb" /></H3>
       {stav === "nacitava" && <div style={{ fontSize: 12.5, color: C.textDim, padding: "6px 0" }}>Načítavam z BTC appky…</div>}
       {stav === "chyba" && <Empty>BTC appka neodpovedala. Skús obnoviť stránku.</Empty>}
       {stav === "hotovo" && (
@@ -224,7 +224,7 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <H3>
-            <Info text="PRIJATÉ = peniaze, ktoré reálne prišli za mesiac (report Payments Recorded) — presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu. VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session), teda koľko práce sa naozaj odviedlo. Tie dve čísla sa nemajú rovnať a ani jedno nie je „správnejšie“ — prijaté hovoria o cashflowe, vyfakturované o práci. Delenie na trénerov má zmysel len pri vyfakturovanom; platba trénera nemá." label="Peniaze po mesiacoch" />
+            <Info text="PRIJATÉ = peniaze, ktoré reálne prišli za mesiac — to, čo je v knihe platieb (do 9/2026 archív, od 10/2026 Kokpit). Skáče, keď si niekto kúpi väčší balíček dopredu. VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session), teda koľko práce sa naozaj odviedlo. Tie dve čísla sa nemajú rovnať a ani jedno nie je „správnejšie“ — prijaté hovoria o cashflowe, vyfakturované o práci. Delenie na trénerov má zmysel len pri vyfakturovanom; platba trénera nemá." label="Peniaze po mesiacoch" />
           </H3>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 3 }}>

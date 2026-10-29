@@ -90,7 +90,7 @@ export function PlatobneKanaly({
   if (!kanaly.length) {
     return (
       <Card>
-        <H3><Info text="Rozdelenie tržieb podľa platobnej metódy z PTmindera." label="Čím klienti platia" /></H3>
+        <H3><Info text="Rozdelenie tržieb podľa spôsobu platby — do 9/2026 archív, od 10/2026 kniha platieb Kokpitu." label="Čím klienti platia" /></H3>
         <Empty>Za zvolené obdobie nie sú žiadne platby.</Empty>
       </Card>
     );
@@ -113,7 +113,7 @@ export function PlatobneKanaly({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <H3>
           <Info
-            text="Z PTmindera — každá platba tam nesie metódu (bank/cash/other) a presné meno. „other“ je v praxi bitcoin: v roku 2026 sedí s BTC knihou na percentá; rok 2025 v BTC knihe chýba. Koláč ukazuje PENIAZE — klient platiaci dvoma cestami je v počtoch oboch kanálov, preto sa počty nesčítavajú. Či peniaze naozaj prišli, stráži nezávisle kontrola príjmov (účet + zošit + BTC vs PTminder). Klik na výsek otvorí tých klientov."
+            text="Z knihy platieb — každá platba nesie spôsob (účet/hotovosť/iné) a meno. „other“ je v praxi bitcoin: v roku 2026 sedí s BTC knihou na percentá; rok 2025 v BTC knihe chýba. Koláč ukazuje PENIAZE — klient platiaci dvoma cestami je v počtoch oboch kanálov, preto sa počty nesčítavajú. Či peniaze naozaj prišli, stráži nezávisle kontrola príjmov (účet + zošit + BTC vs kniha platieb). Klik na výsek otvorí tých klientov."
             label="Čím klienti platia"
           />
         </H3>

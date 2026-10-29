@@ -707,12 +707,12 @@ export function deriveClients(
       })();
       c.packageRemaining = Math.max(0, kotva - poKotve);
       c.packageOdvodeny = true;
-      c.packageOdkial = `podľa PTmindera k ${kotvaDen}${poKotve ? ` mínus ${poKotve} odtrénovaných` : ""}`;
+      c.packageOdkial = `podľa archívu k ${kotvaDen}${poKotve ? ` mínus ${poKotve} odtrénovaných` : ""}`;
     } else if (exportMlci && totalZNazvu > 0 && active?.validFrom) {
       const minute = odtrenovaneOd(active.validFrom);
       c.packageRemaining = Math.max(0, totalZNazvu - minute);
       c.packageOdvodeny = true;
-      c.packageOdkial = `dopočítané: ${totalZNazvu} h ${(active.naObdobie || 0) > 0 ? "na obdobie podľa PTmindera" : "z názvu"} mínus ${minute} odtrénovaných od ${active.validFrom}`;
+      c.packageOdkial = `dopočítané: ${totalZNazvu} h ${(active.naObdobie || 0) > 0 ? "na obdobie podľa archívu" : "z názvu"} mínus ${minute} odtrénovaných od ${active.validFrom}`;
     }
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";
@@ -771,7 +771,7 @@ export function deriveClients(
         c.packageOdkial = "Kokpit: žiadny aktívny balíček";
         c.treningyBezBalicka = treningyBezBalicka(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), KOKPIT_OD, dnesPack, zdarmaDni);
       } else if (c.packageTotal > 0) {
-        c.packageOdkial = `z PTmindera — v Kokpite nie je aktívny balíček${c.packageOdkial ? ` (${c.packageOdkial})` : ""}`;
+        c.packageOdkial = `z archívu — v Kokpite nie je aktívny balíček${c.packageOdkial ? ` (${c.packageOdkial})` : ""}`;
       }
     }
 
@@ -2687,7 +2687,7 @@ const DRUH_KLUCA: Record<string, string> = {
   bezdopytu: "úvodný bez dopytu", orphan: "platba bez sedení", pauzakoniec: "koniec pauzy",
   zdroj: "chýba zdroj klienta", dnes: "dnešný tréning", zmena: "skok v metrike",
   naklad: "náklad v P&L", dvojity: "možná dvojitá platba", nezhody: "nezhoda s bankou",
-  prijmy: "príjmy", barter: "barterové členstvo", data: "staré dáta z PTmindera",
+  prijmy: "príjmy", barter: "barterové členstvo", data: "staré dáta",
   web: "text webu", zapis: "chýbajúci zápis", cap: "kapacita", zaver: "záver z debaty",
   balicek: "končiaci balíček", btcbezdokladu: "bitcoin bez dokladu", odchody: "odchody klientov",
   platnost: "platnosť končí a hodiny zostávajú", hodiny: "posledná hodina alebo mínus",
@@ -3106,7 +3106,7 @@ export function dnesneTreningy(
         // Keď zostatok appka dopočítala (export ho pri offline členstvách
         // nedáva), musí to v pripomienke zaznieť — inak by Jerry pred
         // klientom tvrdil číslo, ktoré v PTminderi nikde nestojí.
-        const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín — over v PTminderi)" : "";
+        const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín)" : "";
         if (pred === 1) dovody.push(`dnes má poslednú hodinu z balíčka${odkial}`);
         else if (pred <= 0) dovody.push(`hodiny má minuté — dnešný tréning je nad rámec (−${1 - pred})${odkial}`);
         // Tlačidlo „Poslať SMS" aj tu (9. 10. 2026) — samostatná notifikácia
@@ -4287,7 +4287,7 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       tone: "orange",
       trener: trener || undefined,
       title: `Bol tam, alebo nie? (${hodin})`,
-      detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať, a v PTminderi zápis nemá — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa vo Workspace → 1 · Kalendár.`,
+      detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa vo Workspace → 1 · Kalendár.`,
       client: "workspace|kalendar",
       priority: 13,
     });

@@ -89,7 +89,7 @@ export function porovnajBtcPlatby(payments: PaymentRow[], btcPlatby: BtcKnihaPla
     if (najdene < 0) {
       nesedi.push({
         kluc: `btc|chyba|${den}|${b.meno}`, klient: b.meno, datum: den, tone: "orange",
-        text: `«${b.meno}» ${fmtCZK(b.suma)} z ${fmtDMY(den)} — v BTC appke je, v PTminderi nie`,
+        text: `«${b.meno}» ${fmtCZK(b.suma)} z ${fmtDMY(den)} — v BTC appke je, v knihe platieb nie`,
       });
       continue;
     }
@@ -106,7 +106,7 @@ export function porovnajBtcPlatby(payments: PaymentRow[], btcPlatby: BtcKnihaPla
     } else if (-rozdiel > limit) {
       nesedi.push({
         kluc: `btc|viac|${den}|${b.meno}`, klient: b.meno, datum: den, tone: "orange",
-        text: `«${b.meno}» ${fmtDMY(den)}: BTC appka ${fmtCZK(b.suma)} vs PTminder ${fmtCZK(pt[najdene].suma)} — v BTC prišlo o ${fmtCZK(-rozdiel)} VIAC`,
+        text: `«${b.meno}» ${fmtDMY(den)}: BTC appka ${fmtCZK(b.suma)} vs kniha platieb ${fmtCZK(pt[najdene].suma)} — v BTC prišlo o ${fmtCZK(-rozdiel)} VIAC`,
       });
     } else sedi++;
   }

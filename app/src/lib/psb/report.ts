@@ -100,7 +100,7 @@ export function buildReport(
   out.push(
     `*Vygenerované ${dnesPraha()} z Trackera.* ` +
       (trenerFilter
-        ? `Filter: **${f.trener}** — platí na sedenia, hodiny a vyfakturované. Prijaté tržby trénera nerozlišujú (platba v PTminderi nemá trénera), takže sú za celé štúdio.`
+        ? `Filter: **${f.trener}** — platí na sedenia, hodiny a vyfakturované. Prijaté tržby trénera nerozlišujú (platba nemá trénera), takže sú za celé štúdio.`
         : "Čísla sú za oboch trénerov spolu."),
   );
   out.push("");

@@ -22,7 +22,7 @@ describe("porovnajBtcPlatby", () => {
     const v = porovnajBtcPlatby([], [btc("Jan Novak", "2026-08-10", 9000)]);
     expect(v.nesedi.length).toBe(1);
     expect(v.nesedi[0].klient).toBe("Jan Novak");
-    expect(v.nesedi[0].text).toContain("v PTminderi nie");
+    expect(v.nesedi[0].text).toContain("v knihe platieb nie");
   });
 
   it("v PTminderi VIAC = čiastočná platba, NEhlási sa", () => {

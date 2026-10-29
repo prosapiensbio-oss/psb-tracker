@@ -229,8 +229,8 @@ export function PeniazePrehlad({ data, onNavigate }: {
       pasmo: nezaplatene === 0 ? "ok" : nezaplatene > 30000 ? "zle" : "pozor",
       poznamka: nezaplatene === 0
         ? "Nikto nič nedlhuje."
-        : `Predané balíčky a úvodné tréningy bez platby — z PTmindera aj z Kokpitu. Klik ${nezaplateneOtvorene ? "zoznam zavrie" : "ukáže, kto a za čo"}.`,
-      vysvetlenie: "Jedno pravidlo „zaplatený“ pre celý Kokpit: otvorené poplatky z PTmindera mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili, a ten istý predaj zapísaný v oboch systémoch len raz. To isté číslo ukazuje karta dlžníkov, profil klienta aj stránka za odkazom. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
+        : `Predané balíčky a úvodné tréningy bez platby — z archívu aj z Kokpitu. Klik ${nezaplateneOtvorene ? "zoznam zavrie" : "ukáže, kto a za čo"}.`,
+      vysvetlenie: "Jedno pravidlo „zaplatený“ pre celý Kokpit: staré otvorené poplatky (archív) mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili, a ten istý predaj zapísaný v oboch systémoch len raz. To isté číslo ukazuje karta dlžníkov, profil klienta aj stránka za odkazom. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
       dobreHore: false,
       // Preklik viedol na Dnes a človek pristál hore na dashboarde — číslo
       // teda poslalo hľadať. Teraz rozbalí zoznam pod sebou a druhý klik ho
@@ -279,7 +279,7 @@ export function PeniazePrehlad({ data, onNavigate }: {
           <H3>
             <Info
               label={`Nezaplatené · ${dlhy.length} položiek · ${fmtCZK(nezaplatene)}`}
-              text="Predaný balíček alebo úvodný tréning, ku ktorému nie je platba — z PTmindera aj z Kokpitu (jedno pravidlo „zaplatený“). Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
+              text="Predaný balíček alebo úvodný tréning, ku ktorému nie je platba — z archívu aj z Kokpitu (jedno pravidlo „zaplatený“). Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
             />
             <button
               onClick={() => setNezaplateneOtvorene(false)}

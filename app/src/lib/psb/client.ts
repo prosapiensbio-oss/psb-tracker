@@ -132,10 +132,6 @@ export async function saveAnomaly(key: string, note: string, ack = true): Promis
   }
 }
 
-export async function resetAll(): Promise<void> {
-  await post("/api/reset", {});
-}
-
 export type MonthNote = { month: string; note: string; answers: Record<string, string>; updatedAt?: string };
 
 export async function fetchMonthNotes(): Promise<Record<string, MonthNote>> {

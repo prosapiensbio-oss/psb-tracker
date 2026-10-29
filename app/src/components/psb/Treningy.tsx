@@ -281,7 +281,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
           <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
           <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
-          <StatCard value={fmtCZK(summary.avgCzk)} label={<Info text="Cena ZAPÍSANÁ pri sedení, sčítaná a delená počtom sedení. Je nižšia než „Ø cena sedenia“ na Kokpite a v Peniazoch — tá ráta z prijatých peňazí. Rozdiel je v tom, že pri 19 % sedení je cena v PTminderi nulová, lebo platba visí na balíčku; tu tie nuly priemer stláčajú, tam sa platba za balíček započíta. Toto číslo hovorí „koľko je odtrénované ocenené v PTminderi“, to druhé „koľko peňazí prišlo na hodinu“." label="Ø zapísané / sedenie" />} />
+          <StatCard value={fmtCZK(summary.avgCzk)} label={<Info text="Cena ZAPÍSANÁ pri sedení, sčítaná a delená počtom sedení. Je nižšia než „Ø cena sedenia“ na Kokpite a v Peniazoch — tá ráta z prijatých peňazí. Rozdiel je v tom, že pri časti sedení je zapísaná cena nulová, lebo platba visí na balíčku; tu tie nuly priemer stláčajú, tam sa platba za balíček započíta. Toto číslo hovorí „koľko je odtrénované ocenené“, to druhé „koľko peňazí prišlo na hodinu“." label="Ø zapísané / sedenie" />} />
         </div>
       )}
 

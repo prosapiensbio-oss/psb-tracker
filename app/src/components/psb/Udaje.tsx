@@ -67,7 +67,7 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   // tlačidlo je tu na dobehnutie histórie, keby sa niekedy nazbierali ľudia bez
   // zapísaného dopytu. Pri prestavbe obrazovky vypadlo, hoci parser aj serverová
   // časť celý čas fungovali.
-  { druh: "anamneza", label: "Anamnéza — zdroj klienta a dátum narodenia (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie DVE polia: „Jak jste se o nás dozvěděli?“ (plus meno odporúčateľa) a dátum narodenia — ten PTminder neexportuje vôbec, takže formulár je jediný zdroj. Zdravotná časť sa neukladá vôbec: nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba." },
+  { druh: "anamneza", label: "Anamnéza — zdroj klienta a dátum narodenia (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie DVE polia: „Jak jste se o nás dozvěděli?“ (plus meno odporúčateľa) a dátum narodenia. Zdravotná časť sa neukladá vôbec: nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba." },
 ];
 
 export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc, pohybSplits, nastavPohybSplit }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void }; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
@@ -145,7 +145,9 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <div style={{ fontSize: 11, color: C.textDim }}>
           {data.uploadLog[0] ? `Posledný upload: ${new Date(data.uploadLog[0].date).toLocaleString("cs-CZ")}` : "Zatiaľ žiadny upload"}
         </div>
-        <ResetButton onReset={actions.reset} />
+        {/* „Vymazať všetky dáta" je od 29. 10. 2026 preč (Jerry: „tlačidlo
+            vymazať všetky dáta odstráň"). Zmazalo by aj archív z PTmindera —
+            jedinú históriu pred 1. 10. 2026. Serverová cesta /api/reset tiež. */}
       </div>
 
       {/* Verzia úplne dole a nenápadne. Nie je to nastavenie, je to odpoveď na
@@ -714,23 +716,6 @@ function ZoznamZdrojaKroku({ zameranie, data, obnova, mesiac }: { zameranie: "me
         return riadok(!!f && pokryva(f.filename), d.nazov, f ? [obdobie(f.filename), `nahraté ${denMes(f.uploaded_at)}`].filter(Boolean).join(" · ") : "ešte nie je");
       })}
       {riadok(!!pdf && (!mesiac || pdf.slice(0, 7) > mesiac), "Mesačná zostava (PDF)", pdf ? `nahraté ${denMes(pdf)}` : "ešte nie je", "číta ju Jarvis — všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads")}
-    </div>
-  );
-}
-
-function ResetButton({ onReset }: { onReset: () => Promise<void> }) {
-  const [confirm, setConfirm] = useState(false);
-  if (!confirm)
-    return (
-      <button onClick={() => setConfirm(true)} style={{ ...btn("outline"), color: C.red, borderColor: mix(C.red, 33) }}>
-        Vymazať všetky dáta
-      </button>
-    );
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <span style={{ fontSize: 12, color: C.red }}>Naozaj vymazať všetky dáta?</span>
-      <button onClick={() => { void onReset(); setConfirm(false); }} style={{ ...btn("danger"), fontSize: 12, padding: "6px 12px" }}>Áno</button>
-      <button onClick={() => setConfirm(false)} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Zrušiť</button>
     </div>
   );
 }

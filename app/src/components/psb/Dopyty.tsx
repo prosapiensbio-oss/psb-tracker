@@ -318,7 +318,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Zapisuje sa len to, čo appka inak nezistí; či klient reálne prišiel a či začal chodiť, vyčíta z PTminder CSV." label="Dopyty" /></H3>
+          <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Zapisuje sa len to, čo appka inak nezistí; či klient reálne prišiel a či začal chodiť, vyčíta z tréningov v Kokpite." label="Dopyty" /></H3>
           {/* Rýchly zápis. Modálne okno so šiestimi poľami zostáva na doplnenie
               detailu, ale prvý zápis musí trvať desať sekúnd — inak sa nestane.
               Meno a zdroj stačia; dátum je dnešok a stav „ozval sa". */}
@@ -358,7 +358,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
           <StatCard value={String(counts.dohodnuty)} label="Dohodnutý úvodný" color={C.accentLight} />
           <StatCard value={String(counts.neodpisal)} label="Neodpísali" color={C.red} />
           <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
-            label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi v PTminderi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
+            label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
           <StatCard
             value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Math.round(counts.median / 24)} dni`}
             label={<Info text="Medián času od dopytu po našu prvú odpoveď. V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia než cena aj než text reklamy. Meria sa tlačidlom „ozvali sme sa“ pri dopyte; medián preto, aby jeden zabudnutý dopyt neroztiahol celé číslo." label="Ozveme sa za" />}
@@ -465,7 +465,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                   <td style={S.td}>
                     <input defaultValue={l.name} placeholder="meno (ak vieme)" onBlur={(e) => e.target.value !== l.name && save({ ...l, name: e.target.value })}
                       style={inputStyle} />
-                    {converted(l) && <span title="už je medzi klientmi v PTminderi" style={{ color: C.green, fontSize: 11, marginLeft: 6 }}>✓ klient</span>}
+                    {converted(l) && <span title="už je medzi klientmi" style={{ color: C.green, fontSize: 11, marginLeft: 6 }}>✓ klient</span>}
                   </td>
                   <td style={S.td}>
                     <Select value={l.source} onChange={(v) => save({ ...l, source: v as Lead["source"], referrer: v === "referencia" ? l.referrer : "" })}

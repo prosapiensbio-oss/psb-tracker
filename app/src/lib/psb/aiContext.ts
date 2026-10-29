@@ -399,7 +399,7 @@ export function buildAiContext(
       .sort((a, b) => a.den.localeCompare(b.den));
 
     return {
-      poznamka: "Zdroj: Google Kalendár, rozdiel medzi dvoma stiahnutiami. Sleduje sa od 31. 7. 2026 — na skoršie mesiace odpoveď NEEXISTUJE, nie je to „nula“. Kalendár je predpoveď, PTminder je účtovníctvo: objednaná hodina nie je tržba. Obrazovka: Kalendár → Zmeny v kalendári. „zrusenePodlaKlienta“ je hotový rebríček zoradený od najviac zrušení — na otázku „komu najviac“ ber odtiaľ, NEPOČÍTAJ výskyty z riadkov v „zmeny“.",
+      poznamka: "Zdroj: Google Kalendár, rozdiel medzi dvoma stiahnutiami. Sleduje sa od 31. 7. 2026 — na skoršie mesiace odpoveď NEEXISTUJE, nie je to „nula“. Kalendár je predpoveď, kniha platieb je účtovníctvo: objednaná hodina nie je tržba. Obrazovka: Kalendár → Zmeny v kalendári. „zrusenePodlaKlienta“ je hotový rebríček zoradený od najviac zrušení — na otázku „komu najviac“ ber odtiaľ, NEPOČÍTAJ výskyty z riadkov v „zmeny“.",
       zmenyOd: od,
       zruseneSpolu: zrusene.length,
       zruseneNevysvetlene: zrusene.filter((z) => !z.vysvetlene).length,
@@ -643,7 +643,7 @@ export function buildAiContext(
         valuta: GADS_VALUTA || "neznáma — nestiahlo sa",
         poznamkaKMene: "Náklad je v mene ÚČTU INZERENTA, ktorá je EUR — nie v korunách. Keď to prepočítavaš na koruny alebo porovnávaš s Metou (31 452 Kč) či s P&L, VŽDY to najprv preveď kurzom a povedz, aký kurz si použil. Manažérsky účet je vedený v korunách a preto v Google Ads ukazuje pri tomto účte nulu — to nie je chyba dát.",
         konverziePozor: "Hlásené konverzie z Google Ads NIE SÚ klienti. Kampaň Search_UvodniTrenink_03_2025 hlásila 299 konverzií za 437 EUR (marec–júl 2025) a za to isté obdobie začalo trénovať 16 klientov zo VŠETKÝCH kanálov spolu, z toho z Googlu jeden. Konverzná akcia meria niečo iné než klienta. NIKDY neuvádzaj cenu za konverziu z Google Ads ako cenu za klienta a nikdy podľa nej neodporúčaj budget. Zároveň z toho NEVYVODZUJ, že reklama nefungovala — z pokazenej metriky sa nedá vyvodiť ani úspech, ani neúspech.",
-        overitelnostPozor: "Dáta o klientoch (PTminder) začínajú v roku 2025. Kampane z 2023–2024 sú 558 z 857 konverzií a nemajú s čím byť porovnané — nikdy mať nebudú. Keď sa o nich Jerry spýta, povedz, že sa overiť NEDAJÚ, nie že boli neúspešné.",
+        overitelnostPozor: "Dáta o klientoch začínajú v roku 2025 (do 30. 9. 2026 archív PTmindera, od 1. 10. Kokpit). Kampane z 2023–2024 sú 558 z 857 konverzií a nemajú s čím byť porovnané — nikdy mať nebudú. Keď sa o nich Jerry spýta, povedz, že sa overiť NEDAJÚ, nie že boli neúspešné.",
         coDopytyHovoria: "Hľadané výrazy sú takmer výhradne informačné („cviky na záda“ 3413 zobrazení, „zdravotni cviceni“ 1322, „joga na bolavá záda“ 1191) — ľudia hľadajúci cvik zadarmo, nie trenéra. Komerčné miestne dopyty sú za 2,5 roka platenej reklamy nepatrné („osobní trenér brno“ 141 zobrazení, „trener brno“ 164, „fitness brno“ 299), čo POTVRDZUJE to isté, čo hovorí Search Console organicky. Z toho vyplýva, že platené hľadanie na získavanie klientov pre PSB zmysel nemá; hodnota týchto 16 587 dopytov je v OBSAHU — sú to presné slová, ktorými ľudia opisujú svoj problém.",
         objemHladania: "NIE JE k dispozícii. Plánovač kľúčových slov blokuje token na úrovni „prieskumník“; žiadosť o Basic bola podaná 14. 8. 2026. Ak sa Jerry pýta na objem hľadania, povedz, že sa čaká na Google, a NEODHADUJ ho — Search Console meria len tam, kde sa web už zobrazil, takže z nej sa objem dopytu vyčítať nedá.",
       },
@@ -955,7 +955,7 @@ export function buildAiContext(
         return e ? { czk: Math.round(e.czk), pct: pct(e.czk), klientov: e.mena.size } : { czk: 0, pct: 0, klientov: 0 };
       };
       return {
-        poznamka: "Zdroj: PTminder (payment_method), celá história. Kanál „Bitcoin“ = metóda other — v roku 2026 sedí s BTC appkou na percentá; rok 2025 v BTC appke chýba (kniha platí až od 31.7.2025). Percentá sú z PEŇAZÍ; klient platiaci dvoma cestami je v počtoch oboch kanálov. Graf: Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
+        poznamka: "Zdroj: kniha platieb — do 9/2026 archív PTmindera (payment_method), od 10/2026 vlastná kniha Kokpitu. Kanál „Bitcoin“ = metóda other — v roku 2026 sedí s BTC appkou na percentá; rok 2025 v BTC appke chýba (kniha platí až od 31.7.2025). Percentá sú z PEŇAZÍ; klient platiaci dvoma cestami je v počtoch oboch kanálov. Graf: Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
         ucet: rad("bank"),
         hotovost: rad("cash"),
         bitcoin: rad("other"),
@@ -1000,10 +1000,10 @@ export function buildAiContext(
       }, {}),
       polozky: (data.dlhy || []).map((d) => ({
         klient: d.klient, sumaCzk: r0(d.doplatit), cenaCzk: r0(d.cena), datum: d.den, zaCo: d.nazov,
-        zdroj: d.zdroj === "kokpit" ? "balíček z Kokpitu" : "poplatok z PTmindera",
+        zdroj: d.zdroj === "kokpit" ? "balíček z Kokpitu" : "starý poplatok z archívu PTmindera",
         trener: clients[d.klient]?.primaryTrainer || "neznámy",
       })),
-      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Jedno pravidlo „zaplatený“ pre celý Kokpit: otvorené poplatky z PTmindera mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili (sumaCzk = koľko ešte chýba, cenaCzk = celá cena), a ten istý predaj zapísaný v oboch systémoch len raz. Kto má nezaplatený balíček, nemá z neho hodiny. Je to stav k poslednému importu a stiahnutiu banky — nehovor „dlhuje dnes“, ale „podľa Kokpitu je otvorené“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera. Surový dopyt do tabuľky poplatky alebo balicky dá iné čísla — odpovedaj odtiaľto.",
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Jedno pravidlo „zaplatený“ pre celý Kokpit: staré otvorené poplatky z archívu PTmindera mínus platby zapísané v Kokpite, balíčky nahodené v Kokpite, na ktoré platby nestačili (sumaCzk = koľko ešte chýba, cenaCzk = celá cena), a ten istý predaj zapísaný v oboch systémoch len raz. Kto má nezaplatený balíček, nemá z neho hodiny. Je to stav k poslednému importu a stiahnutiu banky — nehovor „dlhuje dnes“, ale „podľa Kokpitu je otvorené“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera. Surový dopyt do tabuľky poplatky alebo balicky dá iné čísla — odpovedaj odtiaľto.",
     },
     /**
      * KTO CHODÍ BEZ BALÍČKA a KTO DLŽÍ — to isté, čo ukazujú dve karty vo
@@ -1022,7 +1022,7 @@ export function buildAiContext(
     // Predaje z PTmindera od 1. 10., ktoré Kokpit nemá v rovnakej podobe
     // (notifikácia „PTminder a Kokpit: iný balíček", 21. 10. 2026).
     rozporyPtminder: {
-      poznamka: "Od 1. 10. 2026 je pravda Kokpit: dlh a hodiny sa počítajú z jeho balíčkov, tieto predaje z PTmindera dlh NEROBIA. Každý riadok je otázka pre trénera, ktorá verzia platí — kým neodpovie, nehovor, že klient dlží sumu z PTmindera.",
+      poznamka: "Od 1. 10. 2026 je pravda Kokpit: dlh a hodiny sa počítajú z jeho balíčkov, tieto predaje z PTmindera dlh NEROBIA. Jerry 23. 10. 2026 rozhodol, že platí Kokpit — riadky sú len stopa po poslednom exporte, nehlásia sa a NIKDY netvrď, že klient dlží sumu z PTmindera.",
       polozky: (data.rozporyPtminder || []).map((r) => ({ klient: r.klient, od: r.den, ptminder: r.popis, sumaCzk: r.suma, kokpit: r.kokpit })),
     },
     dlznici: {
@@ -1047,7 +1047,7 @@ export function buildAiContext(
           ...(bitcoin ? { platiBitcoinom: true, btcZlavaPct: Number(data.clientOverrides?.[d.meno]?.btcZlava) || 0, poslednePlatbyZBtcKnihy: btcPlatby } : {}),
         };
       }),
-      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk z PTmindera, zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto. Pri klientovi s platiBitcoinom NEHĽADAJ platbu vo Fio: platí cez Lightning, jeho platby sú v BTC knihe (Bitcoin appka) — poslednePlatbyZBtcKnihy sú tri najnovšie odtiaľ (czkVtedy = koruny podľa kurzu v deň platby). Platba z BTC knihy sa do Kokpitu prevezme sama a ak je do 10 % od ceny balíčka, dlh zmaže; keď v knihe platba je, ale dlh ostal, povedz to nahlas (napr. iný deň alebo meno sa nespárovalo). Keď má dlžník `zaNehoPlati`, platí zaňho ten druhý (client_overrides.plati_za) — výzvu posielaj platiteľovi, nie jemu; v jeho odkaze /v/ je QR na súčet oboch dlhov a prijatá platba sa rozdelí späť na dve.",
+      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sú to položky z „nezaplatene“ zoskupené po klientoch (jedno pravidlo „zaplatený“): zPoplatkovCzk zo starých poplatkov (archív PTmindera), zBalickovCzk za balíčky z Kokpitu. Na otázku „kto dlží“ odpovedaj odtiaľto. Pri klientovi s platiBitcoinom NEHĽADAJ platbu vo Fio: platí cez Lightning, jeho platby sú v BTC knihe (Bitcoin appka) — poslednePlatbyZBtcKnihy sú tri najnovšie odtiaľ (czkVtedy = koruny podľa kurzu v deň platby). Platba z BTC knihy sa do Kokpitu prevezme sama a ak je do 10 % od ceny balíčka, dlh zmaže; keď v knihe platba je, ale dlh ostal, povedz to nahlas (napr. iný deň alebo meno sa nespárovalo). Keď má dlžník `zaNehoPlati`, platí zaňho ten druhý (client_overrides.plati_za) — výzvu posielaj platiteľovi, nie jemu; v jeho odkaze /v/ je QR na súčet oboch dlhov a prijatá platba sa rozdelí späť na dve.",
     },
     platnostAHodiny: {
       pocet: (fronty?.platnost || []).length,
@@ -1092,7 +1092,7 @@ export function buildAiContext(
     // Odkiaľ sú tržby (`spojPlatby`): bez toho by Jarvis rozdiel medzi
     // mesiacmi vysvetľoval biznisom, hoci sa zmenil zdroj.
     zdrojPenazi: {
-      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Tržby, grafy aj príjem v P&L berú platby pred mesiacom „od“ z exportu PTmindera, od neho z vlastnej evidencie Kokpitu (banka z Fio, hotovosť zo zošita, bitcoin ručne). Keď je „od“ prázdne, všetko je ešte z PTmindera. Rozdiel medzi mesiacmi na hranici môže byť zdrojom, nie biznisom.",
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Tržby, grafy aj príjem v P&L berú platby pred mesiacom „od“ z archívu PTmindera, od neho z vlastnej evidencie Kokpitu (banka z Fio, hotovosť zo zošita, bitcoin z BTC knihy). „od“ je 2026-10 natrvalo — prepínač späť na PTminder bol 28. 10. 2026 zrušený, PTminder sa ruší. Rozdiel medzi mesiacmi na hranici môže byť zdrojom, nie biznisom.",
       od: data.peniazeOd || null,
     },
     uzavierka: uzavierka

@@ -800,7 +800,7 @@ export function Dashboard({
       pasmo: "ok",
       poznamka: cakaSa > 0 ? `čaká sa ešte ~${fmtCZK(cakaSa)} od ${cakaSaKlienti.length} klientov` : undefined,
       poznamkaKam: cakaSaKlienti.length ? () => otvorCakajucich() : undefined,
-      vysvetlenie: "Peniaze, ktoré v tomto mesiaci UŽ prišli (účet + hotovosť + BTC) — aktualizuje sa s každým importom z PTmindera, takže sa dá sledovať priebežne. Pruh ukazuje, kam to smeruje: kde je dnes a kde bude, ak dobehnú aj očakávané obnovy. Zisk sa takto ukázať nedá — náklady chodia z banky raz mesačne a rozbehnutý mesiac by vyzeral ako rekordný. Uzavretý mesiac je v riadku pod prístrojmi.",
+      vysvetlenie: "Peniaze, ktoré v tomto mesiaci UŽ prišli (účet + hotovosť + BTC) — aktualizuje sa s každou zapísanou platbou, takže sa dá sledovať priebežne. Pruh ukazuje, kam to smeruje: kde je dnes a kde bude, ak dobehnú aj očakávané obnovy. Zisk sa takto ukázať nedá — náklady chodia z banky raz mesačne a rozbehnutý mesiac by vyzeral ako rekordný. Uzavretý mesiac je v riadku pod prístrojmi.",
       seria: cashRad,
       kotva: cakaSa > 0
         ? { hodnota: stats.beziaciCash, ciel: stats.beziaciCash + cakaSa }
@@ -915,7 +915,7 @@ export function Dashboard({
         : zmenaTyzdna !== null
           ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h${nezMinuly ? ` + ${nezText(nezMinuly)}` : ""})`
           : hZobraz > zonaHi ? "nad zónou — riziko vyhorenia" : hZobraz < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
-      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Počítajú sa len udalosti zaradené ako tréning alebo úvodný; udalosť s novým menom (nový klient, záskok za druhého trénera) je nezaradená, kým ju v Kalendári nezaradíš — dlaždica ju nezapočíta, ale napíše, koľko ich je. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
+      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Počítajú sa len udalosti zaradené ako tréning alebo úvodný; udalosť s novým menom (nový klient, záskok za druhého trénera) je nezaradená, kým ju v Kalendári nezaradíš — dlaždica ju nezapočíta, ale napíše, koľko ich je. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z dát. Krivka pod číslom je história odtrénovaných týždňov.`,
       seria: uplne.slice(-12).map(hodinyTyzdna),
       kam: () => onNavigate("kalendar"),
     });
@@ -1460,7 +1460,7 @@ export function Dashboard({
                 o peniazoch. Jerry, 31. 8. 2026. */}
             <H3 style={{ marginBottom: 8 }}>
               <Info
-                text="Poplatky, ktoré v PTminderi stále stoja otvorené — Finances → Transactions. Po zaplatení sa poplatok v PTminderi maže, takže tu je presne to, čo ešte neprišlo; netreba to s ničím párovať. Zoznam je zrkadlo posledného importu: keď niekto zaplatí, zmizne až po ďalšom nahratí Transactions. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček sa v PTminderi nahodí hneď a klient z neho čerpá, platba príde neskôr."
+                text="Predané balíčky a úvodné tréningy, ku ktorým zatiaľ neprišla platba — jedno pravidlo „zaplatený“ pre celý Kokpit. Keď klient zaplatí a platba sa priradí (banka, zošit, bitcoin), z prehľadu zmizne sama. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček vzniká prvým tréningom a klient z neho čerpá, platba príde neskôr."
                 /* Suma červeno, tou istou farbou ako odznaky pri menách nižšie.
                    Nadpis a zoznam tak hovoria jednou farbou o jednej veci —
                    inak nadpis vyzeral ako neutrálny popisok a červené pilulky
@@ -1615,7 +1615,7 @@ export function Dashboard({
             <Info
               text={earnMode === "vyfakturovane"
                 ? "VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session) — koľko si reálne odpracoval. Posledné 2 svetlé stĺpce (⌁) sú odhad. Priemer/max/min bez odhadu. POZOR: sú v tom aj Sofiine hodiny (barter proti Jarkovmu dlhu, ~2 600 Kč/mes), ktoré nie sú tržba — v „Prijaté“ správne nie sú. A posledné dni mesiaca bývajú neúplné: uzávierka je až prvý víkend nasledujúceho mesiaca."
-                : "PRIJATÉ PLATBY (tržby) = peniaze reálne prijaté za mesiac (Payments Recorded) — presne to, čo vidíš v PTminderi ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu. Za celé štúdio (nedelí sa na trénera)."}
+                : "PRIJATÉ PLATBY (tržby) = peniaze reálne prijaté za mesiac — to, čo je v knihe platieb (do 9/2026 archív, od 10/2026 Kokpit). Skáče, keď si niekto kúpi väčší balíček dopredu. Za celé štúdio (nedelí sa na trénera)."}
               label={earnMode === "prijate" ? "Mesačné tržby (prijaté)" : trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`}
             />
           </H3>
@@ -1692,7 +1692,7 @@ export function Dashboard({
           </div>
           {lievikMes.bezDat && (
             <div style={{ fontSize: 11, color: C.orange, marginTop: 8, lineHeight: 1.5 }}>
-              Z PTmindera zatiaľ nie je nahratý žiadny uzavretý mesiac. Dopyty sú zapísané ručne, tie platia.
+              Zatiaľ nie je uzavretý žiadny mesiac s dátami. Dopyty sú zapísané ručne, tie platia.
             </div>
           )}
           {/* Bežiaci mesiac ako priebeh, nie ako výsledok — vizuálne slabší,
