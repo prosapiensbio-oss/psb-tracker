@@ -10,6 +10,9 @@ import {
   DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura, type PolozkaFaktury,
 } from "../../lib/psb/vydanaFaktura";
 import { Card, H3, Info } from "./ui";
+import { SmsKlientovi } from "./SmsKlientovi";
+import { dlhyNaFakturu } from "../../lib/psb/fakturaDlhy";
+import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
 
 /**
@@ -33,10 +36,15 @@ type Riadok = {
   uhradene_at: string | null; storno_at: string | null; storno_dovod: string;
   /** Položky za ďalších klientov na tej istej faktúre. */
   dalsie?: PolozkaFaktury[];
+  /** Kedy faktúra naposledy odišla SMS (z auditu `sms-faktura`). */
+  sms_at?: string;
 };
 
-/** Rozpísaná položka za ďalšieho klienta — čísla ako text, kým sa píšu. */
-type DalsiaPolozka = { klient: string; popis: string; ks: string; cena: string };
+/**
+ * Rozpísaná položka za ďalšieho klienta — čísla ako text, kým sa píšu.
+ * `naDoklade` — meno klienta sa ukáže pri jeho položke na doklade (predvolene nie).
+ */
+type DalsiaPolozka = { klient: string; popis: string; ks: string; cena: string; naDoklade: boolean; balicekId?: string | null };
 
 type Odberatel = { id: string; klient: string; firma: string; ico: string; dic: string; ulica: string; psc: string; mesto: string; stat: string };
 
@@ -87,8 +95,10 @@ function Pole({ label, hodnota, nastav, sirka = 1, typ = "text", placeholder = "
   );
 }
 
-export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana, lenTrenera }: {
+export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana, lenTrenera, dlhy }: {
   mena: string[];
+  /** Dlhy klientov (`data.dlhy`) — formulár ponúkne pridať na faktúru, čo na nej nie je. */
+  dlhy?: DlhPolozka[];
   /** Kto klienta vedie — podľa toho sa mail podpíše. */
   treneri?: Record<string, string>;
   /**
@@ -112,6 +122,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   const [hlaska, setHlaska] = useState("");
   const [pracujem, setPracujem] = useState("");
   const [otvorenaNova, setOtvorenaNova] = useState(false);
+  /** Faktúra, ku ktorej je otvorené okno SMS (id). */
+  const [smsK, setSmsK] = useState<string | null>(null);
   const [upravujemUdaje, setUpravujemUdaje] = useState(false);
   const [f, setF] = useState({
     klient: "", popis: "", ks: "1", cena: "", vystavene: dnes(),
@@ -182,6 +194,26 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
    * Dovtedy to bol tlmený odkaz „doplniť" na pravom okraji riadku.
    */
   const dalsieFirmy = useMemo(() => odberatelia.filter((o) => o.klient === f.klient), [odberatelia, f.klient]);
+  /** Dlhy, ktoré „nie" odmietol — pre túto faktúru sa už neponúknu. */
+  const [odmietnuteDlhy, setOdmietnuteDlhy] = useState<string[]>([]);
+  const ponukaDlhov = useMemo(
+    () => dlhyNaFakturu(dlhy, [f.klient, ...dalsie.map((d) => d.klient)], [f.balicekId, ...dalsie.map((d) => d.balicekId)])
+      .filter((d) => !odmietnuteDlhy.includes(d.kluc)),
+    [dlhy, f.klient, f.balicekId, dalsie, odmietnuteDlhy],
+  );
+  const pridajDlhy = (co: typeof ponukaDlhov) => setDalsie((s) => [
+    ...s,
+    ...co.map((d) => ({ klient: d.klient, popis: d.popis, ks: "1", cena: String(d.suma), naDoklade: false, balicekId: d.balicekId })),
+  ]);
+  /** Za koho tento klient platil na svojich starších faktúrach (nie stornovaných). */
+  const zaKohoMinule = useMemo(() => {
+    const out: string[] = [];
+    for (const r of riadky || []) {
+      if (r.storno_at || r.klient !== f.klient.trim()) continue;
+      for (const d of r.dalsie || []) if (d.klient !== r.klient && !out.includes(d.klient)) out.push(d.klient);
+    }
+    return out;
+  }, [riadky, f.klient]);
   const vybrana = dalsieFirmy.find((o) => o.id === odberatelId) || null;
   useEffect(() => { setOdberatelId(""); }, [f.klient]);
   useEffect(() => {
@@ -275,7 +307,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       splatnostDni: Number(f.splatnostDni) || SPLATNOST_DNI,
       poznamka: f.poznamka, balicekId: f.balicekId || undefined,
       odberatelId: vybrana?.id || undefined,
-      dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0 })),
+      dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0, naDoklade: d.naDoklade, balicekId: d.balicekId || undefined })),
     }, "vystav");
     if (!j) return;
     if (!j.ok) {
@@ -284,6 +316,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       return;
     }
     setDalsie([]);
+    setOdmietnuteDlhy([]);
     setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
@@ -463,7 +496,18 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   <Pole label="Cena za m. j. (Kč)" hodnota={d.cena} nastav={(v) => nastav({ cena: v })} typ="number" />
                   <button type="button" onClick={() => setDalsie((s) => s.filter((_, j) => j !== i))} style={{ alignSelf: "flex-end", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, cursor: "pointer", fontSize: 12 }}>odobrať</button>
                 </div>
-                <span style={popisStyl}>Popis položky za {d.klient || "tohto klienta"} — nepovinné. Prázdne = na faktúre ako ďalší kus hlavnej položky, bez mena {d.klient ? `(${d.klient} sa na doklade neukáže, platba sa mu aj tak pripíše)` : ""}</span>
+                <label style={{ display: "flex", gap: 7, alignItems: "flex-start", fontSize: 12.5, color: C.textMuted, margin: "2px 0 8px", cursor: "pointer" }}>
+                  <input type="checkbox" checked={d.naDoklade} onChange={(e) => nastav({ naDoklade: e.target.checked })} style={{ marginTop: 2 }} />
+                  <span>
+                    Meno {d.klient || "tohto klienta"} uviesť na faktúre
+                    <span style={{ display: "block", fontSize: 11.5, color: C.textDim }}>
+                      {d.naDoklade
+                        ? "Pri jeho položke bude na doklade aj meno."
+                        : "Na doklade bude len položka, bez mena. Kokpit aj tak vie, že je za neho: platbu mu pripíše a v profile uvidí, na ktorej faktúre je."}
+                    </span>
+                  </span>
+                </label>
+                <span style={popisStyl}>Popis položky — nepovinné, prázdne = rovnaký ako hlavná položka</span>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
                   {POPISY.map((p) => (
                     <button
@@ -482,11 +526,11 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     </button>
                   ))}
                 </div>
-                <textarea value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} rows={2} placeholder="nechaj prázdne, ak meno tohto klienta na faktúre nemá byť" style={{ ...poleStyl, resize: "vertical" }} />
+                <textarea value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} rows={2} placeholder="prázdne = popis hlavnej položky" style={{ ...poleStyl, resize: "vertical" }} />
                 {d.popis && (
                   <button type="button" onClick={() => nastav({ popis: "" })}
                     style={{ marginTop: 4, background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
-                    bez popisu a bez mena na faktúre
+                    rovnaký popis ako hlavná položka
                   </button>
                 )}
               </div>
@@ -499,11 +543,27 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               // Monike je to ten istý balíček za tú istú cenu.
               // Popis sa NEpredvypĺňa (28. 10. 2026): kto platí za druhého na
               // firmu, jeho meno na doklade nechce. Popis sa dá klepnúť z ponuky.
-              onClick={() => setDalsie((s) => [...s, { klient: "", popis: "", ks: f.ks || "1", cena: f.cena }])}
+              onClick={() => setDalsie((s) => [...s, { klient: "", popis: "", ks: f.ks || "1", cena: f.cena, naDoklade: false }])}
               style={{ padding: "6px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}
             >
               + ďalší klient na tejto faktúre
             </button>
+            {/*
+              ZA KOHO PLATIL MINULE — návrh z jeho starších faktúr, nie trvalá
+              väzba. Jerry, 29. 10. 2026: „čo keď sa jedného dňa rozídu — túto
+              väzbu budeme musieť ničiť." Väzba žije na faktúre; keď za Lindu
+              platiť prestane, na ďalšej faktúre jednoducho nebude.
+            */}
+            {zaKohoMinule.filter((m) => !dalsie.some((d) => d.klient.trim() === m)).map((m) => (
+              <button
+                key={m} type="button"
+                onClick={() => setDalsie((s) => [...s, { klient: m, popis: "", ks: f.ks || "1", cena: f.cena, naDoklade: false }])}
+                title={`${f.klient} platil za ${m} na staršej faktúre`}
+                style={{ padding: "6px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), color: C.accentLight, fontFamily: "inherit" }}
+              >
+                + aj za {m} (ako minule)
+              </button>
+            ))}
             {dalsie.length > 0 && (
               <span style={{ fontSize: 12.5, color: C.textMuted }}>
                 spolu na faktúre <b style={{ fontSize: 15, color: C.text }}>{suma(
@@ -514,6 +574,29 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               </span>
             )}
           </div>
+
+          {/* DLH, KTORÝ NA FAKTÚRE NIE JE (Jerry, 29. 10. 2026: „faktúra by
+              mi mala sama navrhnúť, že je tam dlh 100 Kč, a spýtať sa").
+              Pýta sa za všetkých klientov na faktúre — pridaním Lindy pribudne
+              aj jej dlh. Samo sa nepridá nič. */}
+          {f.klient.trim() && ponukaDlhov.length > 0 && (
+            <div style={{ padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.orange, 50)}`, background: C.orangeBg, marginBottom: 10 }}>
+              <div style={{ fontSize: 12.5, color: C.text, marginBottom: 6 }}>
+                Na faktúre ešte nie je dlh <b>{suma(ponukaDlhov.reduce((n, d) => n + d.suma, 0))} Kč</b> — pridať ho na faktúru?
+              </div>
+              {ponukaDlhov.map((d) => (
+                <div key={d.kluc} style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", fontSize: 12, color: C.textMuted, padding: "2px 0" }}>
+                  <span style={{ flex: "1 1 220px" }}><b style={{ color: C.text }}>{d.klient}</b> · {d.popis}</span>
+                  <b style={{ color: C.text, fontVariantNumeric: "tabular-nums" }}>{suma(d.suma)} Kč</b>
+                  <button type="button" onClick={() => pridajDlhy([d])} style={{ ...odkazStyl, color: C.green }}>pridať</button>
+                  <button type="button" onClick={() => setOdmietnuteDlhy((x) => [...x, d.kluc])} style={{ ...odkazStyl, color: C.textDim }}>nie</button>
+                </div>
+              ))}
+              {ponukaDlhov.length > 1 && (
+                <button type="button" onClick={() => pridajDlhy(ponukaDlhov)} style={{ ...odkazStyl, color: C.green, marginTop: 4 }}>pridať všetko</button>
+              )}
+            </div>
+          )}
 
           <span style={popisStyl}>Poznámka pod položkou (nepovinné)</span>
           <input value={f.poznamka} onChange={(e) => setF((s) => ({ ...s, poznamka: e.target.value }))} style={{ ...poleStyl, marginBottom: 10 }} />
@@ -729,8 +812,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
           {mojeRiadky.map((r) => {
             const mesk = poSplatnosti(naFakturu(r), dnes());
             return (
+              <div key={r.id}>
               <div
-                key={r.id}
                 style={{
                   display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap",
                   padding: "8px 10px", borderRadius: 9,
@@ -757,6 +840,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                       {r.odoslane_komu ? ` na ${r.odoslane_komu}` : ""}
                     </span>
                     : null}
+                  {r.sms_at && !r.storno_at ? ` · SMS ${den(r.sms_at.slice(0, 10))}` : ""}
                 </span>
                 <button type="button" onClick={() => void stiahniPdf(r)} disabled={pdfBezi === r.id} style={odkazStyl}>{pdfBezi === r.id ? "pripravujem PDF…" : "PDF"}</button>
                 {!r.storno_at && (
@@ -767,6 +851,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     style={{ ...odkazStyl, color: r.odoslane_at ? C.textDim : C.green }}
                   >
                     {pracujem === r.id ? "posielam…" : r.odoslane_at ? "poslať znova" : "poslať mailom"}
+                  </button>
+                )}
+                {/* Jerry, 29. 10. 2026: „je tam poslať mailom, ale ja chcem mať
+                    možnosť aj, aj." SMS nesie odkaz na stránku klienta a tá
+                    ukáže QR s číslom faktúry — to isté, aké je na doklade. */}
+                {!r.storno_at && !r.uhradene_at && (
+                  <button type="button" onClick={() => setSmsK((x) => (x === r.id ? null : r.id))}
+                    style={{ ...odkazStyl, color: r.sms_at ? C.textDim : C.green }}>
+                    {smsK === r.id ? "zavrieť SMS" : r.sms_at ? "SMS znova" : "poslať SMS"}
                   </button>
                 )}
                 {!r.storno_at && !r.uhradene_at && (
@@ -806,6 +899,19 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 >
                   zmazať
                 </button>
+              </div>
+              {smsK === r.id && (
+                <div style={{ margin: "6px 0 4px" }}>
+                  <SmsKlientovi
+                    vlozene
+                    meno={r.klient}
+                    trener={treneri?.[r.klient] || "Jerry"}
+                    faktura={{ cislo: r.cislo, suma: Number(r.celkom_czk) || 0, splatnost: r.splatnost.slice(0, 10) }}
+                    druhAuditu="faktura"
+                    onOdoslane={() => { setSmsK(null); void nacitaj(); }}
+                  />
+                </div>
+              )}
               </div>
             );
           })}

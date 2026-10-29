@@ -52,7 +52,7 @@ const kontakty = () =>
     .then((j) => ({ udaje: (j?.udaje || []) as Kontakt[], dopyty: (j?.dopyty || []) as DopytKontakt[] }))
     .catch(() => ({ udaje: [] as Kontakt[], dopyty: [] as DopytKontakt[] }));
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane, cisloNovehoCloveka, druhAuditu, nahladOdkazu }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, faktura, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false, vlozene = false, onOdoslane, cisloNovehoCloveka, druhAuditu, nahladOdkazu }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -72,6 +72,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * správa píše — takže text sa skladá až po jeho príchode.
    */
   platba?: { suma: number; datum?: string };
+  /** SMS k vystavenej faktúre — veta hovorí o faktúre, za odkazom je jej QR. */
+  faktura?: { cislo: string; suma: number; splatnost: string };
   /**
    * Dátum balíčka, o ktorý ide — „9. 9. 2026". Ide do vety „za balíček z…".
    * Keď ho obrazovka nepozná, veta drží aj bez neho.
@@ -102,7 +104,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * v audite `sms-<druh>`. Ako `sms-odoslana` by klienta vyčistila zo
    * zoznamu kroku 2 · SMS, ktorý stojí na stave hodín.
    */
-  druhAuditu?: "ponuka" | "kalendar" | "fotky" | "anamneza";
+  druhAuditu?: "ponuka" | "kalendar" | "fotky" | "anamneza" | "faktura";
   /**
    * Náhľad INEJ stránky než /v/ (anamnéza /a/<token>). Keď je, okno sa na
    * odkaz /v/ nepýta a výber rozsahu balíčkov sa nekreslí.
@@ -219,12 +221,13 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
           // než stručná správa (pamäť „Jedna SMS, stav hovorí stránka").
           // Odpoveď príde do sekundy a text sa preskladá.
           sQr: stavStranky ? stavStranky.sQr : false,
+          faktura,
         }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz, stavStranky]);
+  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz, stavStranky, faktura?.cislo]);
 
   /**
    * Rozsah sa ULOŽÍ, až potom sa prekreslí náhľad. Keď zápis zlyhá, číslo
@@ -315,7 +318,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     setBezi(true); setHlaska("");
     const r = await fetch("/api/sms", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu), ...(druhAuditu ? { druh: druhAuditu } : {}) }),
+      body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu), ...(druhAuditu ? { druh: druhAuditu } : {}), ...(faktura ? { faktura: faktura.cislo } : {}) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setBezi(false);
     if (r?.ok) {

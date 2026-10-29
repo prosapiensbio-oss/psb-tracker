@@ -141,6 +141,14 @@ export type VypisKlienta = {
     /** Koľko hodín sa z nového balíčka hneď odpíše (tréningy nad rámec). */
     odpocet?: number;
     /**
+     * Platí sa OTVORENÁ FAKTÚRA (29. 10. 2026): variabilný symbol = jej číslo
+     * a QR je to isté, aké je na doklade. Kokpit podľa čísla platbu spáruje
+     * a pri faktúre za viacerých ju aj rozdelí.
+     */
+    vs?: string;
+    /** Splatnosť faktúry (ISO deň), keď sa platí faktúra. */
+    splatnost?: string;
+    /**
      * `true` = je to ponuka ĎALŠIEHO balíčka, nie dlh za starý.
      *
      * Samostatný príznak, nie odvodenie z `odpocet > 0`: klient, ktorý
@@ -386,7 +394,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     "",
     ...staty.map(([cislo, popis]) => `${popis}: ${cislo}`),
     v.platba
-      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}${rozpisTextom(v)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}`
+      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}${rozpisTextom(v)}\nÚčet ${v.platba.ucet}, ${v.platba.vs ? `variabilný symbol ${v.platba.vs}` : `do poznámky uveď: ${v.platba.sprava}`}`
       : null,
     v.uplna ? null : `\nChceš celú históriu tréningov a platieb? Napíš na ${ADRESA_HISTORIE}.`,
     "",
@@ -478,7 +486,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
         <td style="padding:20px 22px;font-size:14px;color:${F.platbaText};line-height:1.7">
           ${esc(v.platba.popis)}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
           ${esc(rozpisTextom(v).trim())}${rozpisTextom(v) ? "<br>" : ""}
-          <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>do poznámky: ${esc(v.platba.sprava)}</span>
+          <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>${v.platba.vs ? `variabilní symbol: ${esc(v.platba.vs)}` : `do poznámky: ${esc(v.platba.sprava)}`}</span>
         </td>
         ${v.qrCid || v.qrUrl ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">
           <img src="${v.qrCid ? `cid:${esc(v.qrCid)}` : esc(v.qrUrl || "")}" width="110" height="110" alt="QR platba" style="display:block;background:#fff;padding:5px;border-radius:8px;margin-left:auto;border:0">

@@ -37,3 +37,34 @@ export function faktureUhradeneBalickom(
   }
   return out;
 }
+
+/**
+ * FAKTÚRA ZA VIACERÝCH JE UHRADENÁ, KEĎ Z JEDNÉHO PREVODU DOSTAL SVOJ DIEL KAŽDÝ.
+ *
+ * Jerry, 29. 10. 2026 nad Branislavom a Lindou. Pravidlo „zaplatený balíček
+ * = uhradená faktúra" pozná len balíček hlavného klienta — Branislavov
+ * balíček zaplatený inou platbou by tak uhradil aj Lindinu polovicu. Pri
+ * faktúre s položkami za iných preto rozhoduje rozdelený prevod: platby
+ * s tým istým `fio_id`, v ktorých má každý klient z faktúry svoj diel (± 1 Kč).
+ * Deň úhrady je deň toho prevodu; `platbaId` je diel hlavného klienta.
+ */
+export function fakturyUhradeneRozdelenim(
+  faktury: { id: string; klient: string; vystavene: string; diely: { klient: string; suma: number }[] }[],
+  platby: { id: string; klient: string; datum: string; suma: number; fioId: string | null }[],
+): { id: string; den: string; platbaId: string | null }[] {
+  const podlaPrevodu = new Map<string, typeof platby>();
+  for (const p of platby) if (p.fioId) podlaPrevodu.set(p.fioId, [...(podlaPrevodu.get(p.fioId) || []), p]);
+  const out: { id: string; den: string; platbaId: string | null }[] = [];
+  for (const f of faktury) {
+    if (f.diely.length < 2) continue;
+    for (const kusy of podlaPrevodu.values()) {
+      if (kusy[0].datum < f.vystavene.slice(0, 10)) continue;
+      const sedi = f.diely.every((d) => kusy.some((p) => normName(p.klient) === normName(d.klient) && Math.abs(Math.round(p.suma) - Math.round(d.suma)) <= 1));
+      if (!sedi) continue;
+      const hlavny = kusy.find((p) => normName(p.klient) === normName(f.klient));
+      out.push({ id: f.id, den: kusy[0].datum, platbaId: hlavny?.id || null });
+      break;
+    }
+  }
+  return out;
+}

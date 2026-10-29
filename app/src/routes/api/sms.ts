@@ -219,8 +219,9 @@ export const Route = createFileRoute("/api/sms")({
         await audit(DB, {
           // Hromadná správa a ponuka termínov nie sú správa o hodinách —
           // `sms-odoslana` by klienta vyčistil zo zoznamu kroku 2 · SMS.
-          action: jeDotaznik ? "sms-dotaznik" : b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : b.druh === "fotky" ? "sms-fotky" : b.druh === "anamneza" ? "sms-anamneza" : "sms-odoslana",
-          predmet: `${klient} · ${cislo}`,
+          action: jeDotaznik ? "sms-dotaznik" : b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : b.druh === "fotky" ? "sms-fotky" : b.druh === "anamneza" ? "sms-anamneza" : b.druh === "faktura" ? "sms-faktura" : "sms-odoslana",
+          // Číslo faktúry v predmete — zoznam faktúr podľa neho ukáže „SMS odoslaná".
+          predmet: `${klient} · ${cislo}${b.druh === "faktura" && /^\d{8}$/.test(String(b.faktura || "")) ? ` · faktúra ${b.faktura}` : ""}`,
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,
         });

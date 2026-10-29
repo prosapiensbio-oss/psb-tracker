@@ -91,7 +91,12 @@ export type PolozkaFaktury = {
   cena: number;
   celkom: number;
   balicekId?: string | null;
-  /** Doplnené pri čítaní: ďalšia položka bez vlastného popisu — na doklade bez mena. */
+  /**
+   * Ukázať meno klienta pri položke na doklade (`vydane_faktury_polozky.na_doklade`).
+   * Predvolene NIE — viď `polozkyFaktury`.
+   */
+  naDoklade?: boolean;
+  /** Doplnené pri čítaní: položka sa na doklade ukáže bez mena. */
   bezMena?: boolean;
 };
 
@@ -100,17 +105,18 @@ const zaokruhli = (n: number) => Math.round(n * 100) / 100;
 /**
  * Všetky položky v poradí, hlavná prvá.
  *
- * ĎALŠIA POLOŽKA BEZ POPISU (Jerry, 28. 10. 2026: „Branislav chce platiť aj
- * za Lindu… on platí na firmu a ona by tam nemala byť… popis druhého klienta
- * by mal byť voliteľný"). Klient pri položke je pre Kokpit — podľa neho sa
- * platba rozdelí a Linde sa zapíše jej balíček. Na doklade ho firma nechce
- * vidieť. Položka bez vlastného popisu preto dostane popis hlavnej položky
- * a značku `bezMena`: doklad ju ukáže ako ďalší kus tej istej služby, bez mena.
+ * ĎALŠÍ KLIENT NA FAKTÚRE BEZ MENA (Jerry, 28. a 29. 10. 2026: „Branislav
+ * chce platiť aj za Lindu… on platí na firmu a ona by tam nemala byť").
+ * Klient pri položke je pre Kokpit — podľa neho sa platba rozdelí a Linde sa
+ * zapíše jej diel. Na doklade sa meno ukáže LEN pri výslovnom `naDoklade`;
+ * do 29. 10. o tom rozhodoval popis, takže Lindina položka s vlastným
+ * popisom by na doklade firmy niesla jej meno. Položka bez popisu dostane
+ * popis hlavnej.
  */
 export function polozkyFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): PolozkaFaktury[] {
   return [
     { klient: f.klient, popis: f.popis, ks: f.ks, cena: f.cena, celkom: zaokruhli(f.ks * f.cena) },
-    ...(f.dalsie || []).map((p) => (p.popis.trim() ? p : { ...p, popis: f.popis, bezMena: true })),
+    ...(f.dalsie || []).map((p) => ({ ...p, popis: p.popis.trim() || f.popis, bezMena: !p.naDoklade })),
   ];
 }
 

@@ -1,0 +1,12 @@
+-- MENO ĎALŠIEHO KLIENTA NA FAKTÚRE — VÝSLOVNE, NIE PODĽA POPISU.
+--
+-- Jerry, 29. 10. 2026: „chcem mu vystaviť faktúru, chcem tam mať možnosť, že
+-- je to aj pre Lindu, ale ona nemusí byť na tej faktúre." Dovtedy rozhodoval
+-- popis: ďalšia položka s vlastným popisom ukázala na doklade aj meno, bez
+-- popisu nie. Na faktúre 20261014 tak mala Linda popis „Předplatné 6 h"
+-- a jej meno by na doklade firmy stálo.
+--
+-- 1 = meno klienta sa na doklade ukáže pri jeho položke; 0 (predvolené) =
+-- položka je na doklade bez mena. Klient pri položke ostáva vždy — podľa
+-- neho Kokpit rozdelí platbu a zapíše ju aj tomu, za koho bola.
+ALTER TABLE vydane_faktury_polozky ADD COLUMN na_doklade INTEGER NOT NULL DEFAULT 0;

@@ -154,6 +154,12 @@ export function textSms(v: {
   sMailom?: boolean;
   /** Je na stránke QR? Vtedy a len vtedy ho správa menuje. */
   sQr?: boolean;
+  /**
+   * SMS k vystavenej faktúre (Jerry, 29. 10. 2026: „chcem mať možnosť aj
+   * mailom, aj SMS"). Stránka za odkazom vtedy ukáže QR s číslom faktúry
+   * ako variabilným symbolom — to isté, aké je na doklade.
+   */
+  faktura?: { cislo: string; suma: number; splatnost: string };
 }): string {
   /**
    * O QR SA PÍŠE LEN VTEDY, KEĎ NA STRÁNKE NAOZAJ JE.
@@ -165,7 +171,11 @@ export function textSms(v: {
    * nenájde, je horšia než stručná.
    */
   const za = v.datum ? ` za balíček z ${v.datum}` : "";
-  const telo = v.odkaz
+  const fa = v.faktura;
+  const dd = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.`;
+  const telo = fa && v.odkaz
+    ? `QR na platbu faktury c. ${fa.cislo} (${Math.round(fa.suma).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kc, splatnost ${dd(fa.splatnost)}) najdes tady: ${v.odkaz}`
+    : v.odkaz
     ? (v.sQr ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}` : `tady máš přehled hodin: ${v.odkaz}`)
     : v.sMailom
       ? `v maili najdeš dochádzku aj QR na platbu${za}.`

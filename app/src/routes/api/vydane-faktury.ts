@@ -15,7 +15,7 @@ import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
-import { faktureUhradeneBalickom } from "../../lib/psb/fakturaUhradena";
+import { faktureUhradeneBalickom, fakturyUhradeneRozdelenim } from "../../lib/psb/fakturaUhradena";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { odlozOdberatela } from "../../lib/psb/odberatelOdlozenie.server";
 import { kanonickyTvarKlienta } from "../../lib/psb/nahodTrening.server";
@@ -77,9 +77,10 @@ async function nastaveniaMailu(DB: D1Database): Promise<{ host: string; user: st
  * Chýbajúca tabuľka (migrácia ešte nebežala) = žiadne položky, nie pád.
  */
 async function dalsiePolozky(DB: D1Database, idFaktury?: string): Promise<Map<string, PolozkaFaktury[]>> {
+  const stlpce = "faktura_id, klient, balicek_id, popis, ks, cena_czk, celkom_czk, na_doklade";
   const rs = await (idFaktury
-    ? DB.prepare("SELECT faktura_id, klient, balicek_id, popis, ks, cena_czk, celkom_czk FROM vydane_faktury_polozky WHERE faktura_id = ?1 ORDER BY poradie").bind(idFaktury)
-    : DB.prepare("SELECT faktura_id, klient, balicek_id, popis, ks, cena_czk, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie")
+    ? DB.prepare(`SELECT ${stlpce} FROM vydane_faktury_polozky WHERE faktura_id = ?1 ORDER BY poradie`).bind(idFaktury)
+    : DB.prepare(`SELECT ${stlpce} FROM vydane_faktury_polozky ORDER BY poradie`)
   ).all().catch(() => ({ results: [] }));
   const out = new Map<string, PolozkaFaktury[]>();
   for (const r of (rs.results || []) as Record<string, string | number | null>[]) {
@@ -88,6 +89,7 @@ async function dalsiePolozky(DB: D1Database, idFaktury?: string): Promise<Map<st
       klient: String(r.klient), popis: String(r.popis), ks: Number(r.ks) || 1,
       cena: Number(r.cena_czk) || 0, celkom: Number(r.celkom_czk) || 0,
       balicekId: r.balicek_id ? String(r.balicek_id) : null,
+      naDoklade: Number(r.na_doklade) === 1,
     }]);
   }
   return out;
@@ -137,25 +139,45 @@ export const Route = createFileRoute("/api/vydane-faktury")({
            * „čaká na zaplatenie". Chyba tu zoznam faktúr nezhodí.
            */
           try {
-            type R = { id: string; klient: string; balicek_id: string | null; vystavene: string; celkom_czk: number; uhradene_at: string | null; storno_at: string | null; platba_id: string | null };
+            type R = { id: string; klient: string; balicek_id: string | null; vystavene: string; celkom_czk: number; ks: number; cena_czk: number; uhradene_at: string | null; storno_at: string | null; platba_id: string | null };
             const riadky = (f.results || []) as unknown as R[];
-            const otvorene = riadky.filter((r) => !r.uhradene_at && !r.storno_at && r.balicek_id);
-            if (otvorene.length) {
+            // Faktúra s položkami za iných sa uhrádza LEN rozdeleným prevodom
+            // (`fakturyUhradeneRozdelenim`) — zaplatený balíček hlavného
+            // klienta by inak uhradil aj diel toho druhého.
+            const sPolozkami = await dalsiePolozky(DB);
+            const otvoreneVsetky = riadky.filter((r) => !r.uhradene_at && !r.storno_at);
+            const otvorene = otvoreneVsetky.filter((r) => r.balicek_id && !sPolozkami.has(r.id));
+            const spolocne = otvoreneVsetky.filter((r) => sPolozkami.has(r.id));
+            if (otvorene.length || spolocne.length) {
               const mena = [...new Set(otvorene.map((r) => r.klient))];
               const [zive, pl] = await DB.batch([
                 DB.prepare(`SELECT id FROM balicky WHERE zrusene_at IS NULL AND id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(otvorene.map((r) => r.balicek_id))),
-                DB.prepare("SELECT id, klient, datum, suma_czk FROM platby WHERE zrusene_at IS NULL"),
+                DB.prepare("SELECT id, klient, datum, suma_czk, fio_id FROM platby WHERE zrusene_at IS NULL"),
               ]);
-              const uhradit = faktureUhradeneBalickom(
-                otvorene.map((r) => ({ id: r.id, klient: r.klient, balicekId: r.balicek_id, vystavene: String(r.vystavene).slice(0, 10), celkom: Number(r.celkom_czk) || 0, uhradeneAt: r.uhradene_at, stornoAt: r.storno_at })),
-                new Set(((zive.results || []) as { id: string }[]).map((x) => x.id)),
-                await polozkyDlhovMien(DB, mena),
-                ((pl.results || []) as { id: string; klient: string; datum: string; suma_czk: number }[]).map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0 })),
-                dnesPraha(),
-              );
+              const platby = ((pl.results || []) as { id: string; klient: string; datum: string; suma_czk: number; fio_id: string | null }[])
+                .map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0, fioId: x.fio_id }));
+              const uhradit = [
+                ...(otvorene.length ? faktureUhradeneBalickom(
+                  otvorene.map((r) => ({ id: r.id, klient: r.klient, balicekId: r.balicek_id, vystavene: String(r.vystavene).slice(0, 10), celkom: Number(r.celkom_czk) || 0, uhradeneAt: r.uhradene_at, stornoAt: r.storno_at })),
+                  new Set(((zive.results || []) as { id: string }[]).map((x) => x.id)),
+                  await polozkyDlhovMien(DB, mena),
+                  platby,
+                  dnesPraha(),
+                ) : []),
+                ...fakturyUhradeneRozdelenim(
+                  spolocne.map((r) => {
+                    const diely = new Map<string, number>();
+                    const pridaj = (k: string, n: number) => diely.set(k, (diely.get(k) || 0) + n);
+                    pridaj(r.klient, (Number(r.ks) || 1) * (Number(r.cena_czk) || 0));
+                    for (const p of sPolozkami.get(r.id) || []) pridaj(p.klient, p.celkom);
+                    return { id: r.id, klient: r.klient, vystavene: String(r.vystavene), diely: [...diely].map(([klient, suma]) => ({ klient, suma })) };
+                  }),
+                  platby,
+                ),
+              ];
               for (const u of uhradit) {
                 await DB.prepare("UPDATE vydane_faktury SET uhradene_at = ?2, platba_id = ?3 WHERE id = ?1 AND uhradene_at IS NULL").bind(u.id, u.den, u.platbaId).run();
-                await audit(DB, { action: "faktura-uhradena-auto", predmet: u.id, neu: `uhradená ${u.den} — balíček zaplatený` });
+                await audit(DB, { action: "faktura-uhradena-auto", predmet: u.id, neu: `uhradená ${u.den} — ${sPolozkami.has(u.id) ? "rozdelený prevod sedí na všetky položky" : "balíček zaplatený"}` });
                 const r = riadky.find((x) => x.id === u.id);
                 if (r) { r.uhradene_at = u.den; r.platba_id = u.platbaId; }
               }
@@ -239,9 +261,17 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           // Bez keše: faktúra sa číta hneď po vystavení a stará odpoveď by
           // ukázala doklad bez čísla.
           const polozky = await dalsiePolozky(DB);
+          // Kedy faktúra naposledy odišla SMS — z auditu (`sms-faktura`), stĺpec netreba.
+          const smsAt = new Map<string, string>();
+          for (const a of ((await DB.prepare("SELECT payment_id, at FROM vzas_audit WHERE action = 'sms-faktura' ORDER BY at")
+            .all().catch(() => ({ results: [] }))).results || []) as { payment_id: string | null; at: string }[]) {
+            const c = /faktúra (\d{8})/.exec(a.payment_id || "")?.[1];
+            if (c) smsAt.set(c, a.at);
+          }
           const faktury = ((f.results || []) as Record<string, unknown>[]).map((r) => {
             const d = polozky.get(String(r.id));
-            return d ? { ...r, dalsie: d } : r;
+            const sms = smsAt.get(String(r.cislo));
+            return { ...r, ...(d ? { dalsie: d } : {}), ...(sms ? { sms_at: sms } : {}) };
           });
           return Response.json({ ok: true, faktury, udaje, odberatelia, kontakty: k.results || [], dopyty },
             { headers: { "cache-control": "no-store" } });
@@ -473,10 +503,11 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               const kk = Math.max(0.01, Math.round((Number(x.ks) || 1) * 100) / 100);
               if (!kl) return Response.json({ ok: false, error: "Ďalšia položka nemá klienta." }, { status: 400 });
               // Prázdny popis je voľba, nie chyba (28. 10. 2026): položka sa na
-              // doklade ukáže s popisom hlavnej a bez mena (`polozkyFaktury`).
+              // doklade ukáže s popisom hlavnej. Meno na doklade rozhoduje
+              // LEN `naDoklade` (29. 10. 2026), predvolene nie.
               if (pp && pp.length < 3) return Response.json({ ok: false, error: `Popis položky za ${kl} je príliš krátky — napíš aspoň 3 znaky, alebo ho nechaj prázdny.` }, { status: 400 });
               if (cc <= 0) return Response.json({ ok: false, error: `Cena položky za ${kl} musí byť kladná.` }, { status: 400 });
-              dalsie.push({ klient: kl, popis: pp, ks: kk, cena: cc, celkom: Math.round(kk * cc * 100) / 100, balicekId: kus(x.balicekId, 40) || null });
+              dalsie.push({ klient: kl, popis: pp, ks: kk, cena: cc, celkom: Math.round(kk * cc * 100) / 100, balicekId: kus(x.balicekId, 40) || null, naDoklade: x.naDoklade === true });
             }
             if (dalsie.length > 9) return Response.json({ ok: false, error: "Na jednej faktúre najviac desať položiek." }, { status: 400 });
             const celkom = Math.round((ks * cena + dalsie.reduce((n, d) => n + d.celkom, 0)) * 100) / 100;
@@ -547,9 +578,9 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               odb.stat, odb.email, String(b.poznamka ?? "").slice(0, 600), teraz(), kto).run();
             if (dalsie.length) {
               await DB.batch(dalsie.map((d, i) => DB.prepare(
-                `INSERT INTO vydane_faktury_polozky (id, faktura_id, poradie, klient, balicek_id, popis, ks, cena_czk, celkom_czk)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
-              ).bind(uid(), id, i + 1, d.klient, d.balicekId || null, d.popis, d.ks, d.cena, d.celkom)));
+                `INSERT INTO vydane_faktury_polozky (id, faktura_id, poradie, klient, balicek_id, popis, ks, cena_czk, celkom_czk, na_doklade)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
+              ).bind(uid(), id, i + 1, d.klient, d.balicekId || null, d.popis, d.ks, d.cena, d.celkom, d.naDoklade ? 1 : 0)));
             }
             await audit(DB, {
               action: "faktura-vystavena",

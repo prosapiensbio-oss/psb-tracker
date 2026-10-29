@@ -9,7 +9,7 @@ const f: Faktura = {
   cislo: "20261010", klient: "Dan Kouřil", vystavene: "2026-10-30", splatnost: "2026-11-13",
   popis: "6 hodín biomechanického tréningu", ks: 1, cena: 7790, celkom: 15580,
   odberatel: { firma: "DK Consulting, s.r.o.", ico: "29211441", dic: "", ulica: "", psc: "", mesto: "", stat: "", email: "" },
-  dalsie: [{ klient: "Monika Schonwalderova", popis: "6 hodín biomechanického tréningu", ks: 1, cena: 7790, celkom: 7790 }],
+  dalsie: [{ klient: "Monika Schonwalderova", popis: "6 hodín biomechanického tréningu", ks: 1, cena: 7790, celkom: 7790, naDoklade: true }],
 };
 
 describe("faktúra za viacerých klientov", () => {
@@ -51,6 +51,15 @@ describe("ďalší klient bez popisu — na doklade bez mena", () => {
     const m = mailFaktury(bezMena);
     expect(m.telo).not.toContain("Linda Muth");
     expect(mailFakturyHtml(bezMena)).not.toContain("Linda Muth");
+  });
+  it("vlastný popis meno NEPRIDÁ — rozhoduje len „meno na faktúre“ (29. 10. 2026)", () => {
+    const sPopisom: Faktura = { ...bezMena, dalsie: [{ klient: "Linda Muth", popis: "Předplatné 6 h", ks: 1, cena: 7790, celkom: 7790 }] };
+    const html = fakturaDocument(sPopisom);
+    expect(html).toContain("Předplatné 6 h");
+    expect(html).not.toContain("Linda Muth");
+    expect(mailFaktury(sPopisom).telo).not.toContain("Linda Muth");
+    const sMenom: Faktura = { ...sPopisom, dalsie: [{ ...sPopisom.dalsie![0], naDoklade: true }] };
+    expect(fakturaDocument(sMenom)).toContain("Linda Muth");
   });
   it("Kokpit o Linde vie — platba sa rozdelí", () => {
     expect(klientiFaktury(bezMena)).toEqual(["Branislav Široký", "Linda Muth"]);

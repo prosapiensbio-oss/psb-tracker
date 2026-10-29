@@ -298,6 +298,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * číslo") oznámi „klienti" a profil ho hneď ukáže.
    */
   const [kontaktVerzia, setKontaktVerzia] = useState(0);
+  /**
+   * FAKTÚRY, NA KTORÝCH JE KLIENT S NIEKÝM ĎALŠÍM (Jerry, 29. 10. 2026:
+   * „pre Lindu sa to stratí, aj keď za ňu platí on"). Väzba žije na faktúre,
+   * nie pri klientovi — profil ju preto číta odtiaľ: za koho platí, kto
+   * platí zaňho a či je faktúra zaplatená.
+   */
+  const [spolocneFaktury, setSpolocneFaktury] = useState<SpolocnaFaktura[]>([]);
   useEffect(() => pocuvaj("klienti", () => setKontaktVerzia((v) => v + 1)), []);
   useEffect(() => {
     let zive = true;
@@ -309,6 +316,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         // Keď má klient dva maily, výpis odíde na oba — nevieme, ktorý číta.
         setKontaktMail(adresyMailu([u?.email || "", u?.dalsie_maily || ""].join(",")).adresy.join(", "));
         setKontaktTelefon(String(u?.telefon || ""));
+        setSpolocneFaktury(spolocneFakturyKlienta(meno, j?.faktury || []));
       })
       .catch(() => null);
     return () => { zive = false; };
@@ -1555,6 +1563,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 {pisemPlatbu ? "Zavrieť" : "+ Pridať platbu"}
               </button>
             )}
+          </div>
+        )}
+        {filter === "peniaze" && spolocneFaktury.length > 0 && (
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+            {spolocneFaktury.map((x) => (
+              <div key={x.cislo} style={{ fontSize: 12, color: C.textMuted, padding: "6px 9px", borderRadius: 8, border: `1px solid ${x.otvorena ? mix(C.accent, 35) : C.border}` }}>
+                <b style={{ color: C.text }}>Faktúra {x.cislo}</b>
+                {" · "}{x.platitel === meno ? `platí aj za ${x.ostatni.join(", ")}` : `platí ${x.platitel}`}
+                {" · "}diel <b style={{ color: C.text }}>{x.diel.toLocaleString("cs-CZ")} Kč</b>
+                {" · "}{x.storno ? "stornovaná" : x.otvorena ? `čaká na úhradu, splatná ${Number(x.splatnost.slice(8, 10))}. ${Number(x.splatnost.slice(5, 7))}.` : `uhradená${x.uhradene ? ` ${Number(x.uhradene.slice(8, 10))}. ${Number(x.uhradene.slice(5, 7))}.` : ""}`}
+              </div>
+            ))}
           </div>
         )}
         {filter === "peniaze" && (
@@ -3343,6 +3363,34 @@ function GrafPocitov({ rady }: { rady: Rad[] }) {
  * klienta potom pýta súčet dlhov a prijatá platba sa rozdelí späť na toľko
  * platieb, koľko je ľudí (`lib/psb/platiZa.ts`).
  */
+type SpolocnaFaktura = {
+  cislo: string; platitel: string; ostatni: string[]; diel: number;
+  splatnost: string; uhradene: string | null; otvorena: boolean; storno: boolean;
+};
+
+/** Faktúry s položkami za viacerých, na ktorých je `meno` — ako platiteľ alebo ako ďalší klient. */
+function spolocneFakturyKlienta(meno: string, faktury: {
+  cislo: string; klient: string; ks: number; cena_czk: number; splatnost: string;
+  uhradene_at: string | null; storno_at: string | null; dalsie?: { klient: string; celkom: number }[];
+}[]): SpolocnaFaktura[] {
+  const ja = normName(meno);
+  const out: SpolocnaFaktura[] = [];
+  for (const f of faktury) {
+    const dalsie = f.dalsie || [];
+    const vsetci = [f.klient, ...dalsie.map((d) => d.klient)];
+    if (new Set(vsetci.map(normName)).size < 2 || !vsetci.some((k) => normName(k) === ja)) continue;
+    const diel = (normName(f.klient) === ja ? (Number(f.ks) || 1) * (Number(f.cena_czk) || 0) : 0)
+      + dalsie.filter((d) => normName(d.klient) === ja).reduce((n, d) => n + (Number(d.celkom) || 0), 0);
+    out.push({
+      cislo: f.cislo, platitel: normName(f.klient) === ja ? meno : f.klient,
+      ostatni: [...new Set(vsetci.filter((k) => normName(k) !== ja))], diel: Math.round(diel),
+      splatnost: String(f.splatnost).slice(0, 10), uhradene: f.uhradene_at ? String(f.uhradene_at).slice(0, 10) : null,
+      otvorena: !f.uhradene_at && !f.storno_at, storno: !!f.storno_at,
+    });
+  }
+  return out.filter((x) => !x.storno).slice(0, 6);
+}
+
 function PlatiZa({ meno, mena, hodnota, zapis }: {
   meno: string;
   mena: string[];
@@ -3393,7 +3441,7 @@ function PlatiZa({ meno, mena, hodnota, zapis }: {
         />
       </div>
       <span style={{ fontSize: 11, color: C.textDim }}>
-        Jeho odkaz `/v/` potom pýta súčet dlhov a prijatá platba sa rozdelí.
+        Jeho odkaz `/v/` potom pýta súčet dlhov a prijatá platba sa rozdelí. Pri faktúre to netreba — kto je na nej, za toho platí.
       </span>
     </div>
   );

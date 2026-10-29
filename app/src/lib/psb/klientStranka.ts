@@ -325,7 +325,9 @@ ${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
 ${rozpisPlatby(v)}
 ${qr}
 <div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.pozadie}">
-Do zprávy pro příjemce napiš <b>${esc(v.platba.sprava)}</b> — podle toho platbu spárujeme.
+${v.platba.vs
+    ? `Variabilní symbol <b>${esc(v.platba.vs)}</b> — je to číslo faktury, podle něj platbu spárujeme.`
+    : `Do zprávy pro příjemce napiš <b>${esc(v.platba.sprava)}</b> — podle toho platbu spárujeme.`}
 </div>
 <!-- Číslo účtu v poli, nie v texte: dlhé podržanie ponúkne Kopírovať bez
      toho, aby klient trafil presne začiatok a koniec čísla. Prepísať sa

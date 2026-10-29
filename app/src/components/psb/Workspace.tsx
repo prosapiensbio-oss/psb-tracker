@@ -874,6 +874,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}
+                  dlhy={data.dlhy}
                   treneri={treneriKlientov}
                   lenTrenera={trenerKroku}
                   predvolba={predvolbaFaktury}

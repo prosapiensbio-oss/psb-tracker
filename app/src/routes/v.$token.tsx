@@ -153,7 +153,8 @@ export const Route = createFileRoute("/v/$token")({
         const prepis = data.clientOverrides?.[c.name];
         const jeBitcoin = !!prepis?.bitcoin;
         let lightning: VypisKlienta["lightning"];
-        if (jeBitcoin && suma > 0) {
+        // Faktúra sa platí na účet (VS = jej číslo), aj keď klient inak platí v BTC.
+        if (jeBitcoin && suma > 0 && !vypis.platba?.vs) {
           /**
            * ZĽAVA SA POČÍTA Z CENNÍKA, NIE ZO ZAPLATENEJ SUMY.
            *
@@ -200,7 +201,7 @@ export const Route = createFileRoute("/v/$token")({
         }
 
         let qrUrl: string | undefined;
-        if (!jeBitcoin && suma > 0) {
+        if ((!jeBitcoin || vypis.platba?.vs) && suma > 0) {
           /**
            * OTVORENÁ FAKTÚRA NA TÚ ISTÚ SUMU → TO ISTÉ QR AKO NA FAKTÚRE.
            *
@@ -209,22 +210,18 @@ export const Route = createFileRoute("/v/$token")({
            * FA?" Nebolo — stránka dávala QR s menom v správe a bez
            * variabilného symbolu, faktúra s číslom faktúry. Platba z firmy by
            * prišla bez čísla a faktúra by visela ako neuhradená. Keď má klient
-           * práve jednu nezaplatenú faktúru na sumu, ktorú stránka žiada,
-           * QR nesie jej číslo a správu presne ako faktúra (`fakturaDocument`)
-           * — Kokpit platbu spáruje podľa čísla (`klientPodlaFaktury`) a pri
-           * faktúre za dvoch ju aj rozdelí. Iná suma = iná vec; ostáva QR
-           * s menom.
+           * práve jednu otvorenú faktúru ako platiteľ, stránka od 29. 10. 2026
+           * pýta celú faktúru (`obsahOdkazu`) a QR nesie jej číslo a správu
+           * presne ako faktúra (`fakturaDocument`) — Kokpit platbu spáruje
+           * podľa čísla (`klientPodlaFaktury`) a pri faktúre za dvoch ju aj
+           * rozdelí.
            */
-          const otvorene = ((await DB.prepare(
-            `SELECT cislo, celkom_czk, splatnost FROM vydane_faktury
-              WHERE storno_at IS NULL AND uhradene_at IS NULL
-                AND (klient = ?1 OR id IN (SELECT faktura_id FROM vydane_faktury_polozky WHERE klient = ?1))`,
-          ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as { cislo: string; celkom_czk: number; splatnost: string }[];
-          const naSumu = otvorene.filter((x) => Math.abs(Number(x.celkom_czk) - suma) < 1);
-          const fa = naSumu.length === 1 ? naSumu[0] : null;
-          // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
-          const o = qrObrazok(spayd(fa
-            ? { suma: Number(fa.celkom_czk), vs: fa.cislo, sprava: `Faktura ${fa.cislo} PSB`, splatnost: fa.splatnost, prijemca: DODAVATEL.meno }
+          // Otvorenú faktúru vyberá `obsahOdkazu` (jedna faktúra, kde je
+          // klient platiteľom) — stránka tu len prepíše jej číslo do QR.
+          const p = vypis.platba;
+          const o = qrObrazok(spayd(p?.vs
+            ? { suma, vs: p.vs, sprava: `Faktura ${p.vs} PSB`, splatnost: p.splatnost, prijemca: DODAVATEL.meno }
+            // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
             : { suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
           const bajty = new Uint8Array(o.data);
           let bin = "";

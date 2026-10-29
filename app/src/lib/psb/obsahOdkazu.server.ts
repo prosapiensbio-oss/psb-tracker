@@ -29,6 +29,7 @@ import { nazovProduktu } from "./nazvyProduktov";
 import { osKlientaZoServera } from "./osKlienta.server";
 import { menaPlatiZa, platiteliaZOverridov, type PolozkaPlatby } from "./platiZa";
 import { DODAVATEL } from "./vydanaFaktura";
+import { fakturyUhradeneRozdelenim } from "./fakturaUhradena";
 import type { PSBData } from "./types";
 
 /**
@@ -119,9 +120,23 @@ export async function obsahOdkazu(
    * posiela Jakub. QR na tú istú sumu na oboch stránkach je návod zaplatiť
    * dvakrát — a späť sa to vracia horšie, než sa to vybralo.
    */
-  const zaNehoPlati = platiteliaZOverridov(data.clientOverrides)[
+  const platitelZOverridu = platiteliaZOverridov(data.clientOverrides)[
     Object.keys(data.clientOverrides || {}).find((x) => normName(x) === normName(c.name)) || c.name
   ];
+
+  /**
+   * OTVORENÁ FAKTÚRA JE VÄZBA, NIE ZÁPIS PRI KLIENTOVI.
+   *
+   * Jerry, 29. 10. 2026 nad Branislavom a Lindou: „pre Lindu sa to stratí,
+   * aj keď je nastavené, že za ňu platí on — a čo keď sa jedného dňa
+   * rozídu, túto väzbu budeme musieť ničiť." Kto za koho platí, hovorí
+   * faktúra: položka za Lindu na Branislavovej faktúre. Kým je faktúra
+   * otvorená, Branislavova stránka pýta CELÚ faktúru (QR s jej číslom, to
+   * isté ako na doklade) a Lindina povie, že za ňu platí on. Keď ju zaplatí,
+   * väzba skončí sama; na ďalšej faktúre Linda buď je, alebo nie.
+   */
+  const fa = sPlatbou ? await otvoreneFaktury(DB, c.name) : { moja: null, zaNeho: null };
+  const zaNehoPlati = platitelZOverridu || fa.zaNeho || undefined;
 
   const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
 
@@ -183,5 +198,81 @@ export async function obsahOdkazu(
     };
   }
 
+  /**
+   * Faktúra s jednou položkou sa pýta len vtedy, keď klient naozaj dlží:
+   * jej balíček mohla zaplatiť platba z banky skôr, než si faktúru ktokoľvek
+   * otvoril a appka ju označila za uhradenú (`faktureUhradeneBalickom` beží
+   * pri čítaní zoznamu faktúr). Faktúra za viacerých má vlastnú kontrolu
+   * rozdeleným prevodom priamo v `otvoreneFaktury`.
+   */
+  if (fa.moja && !zaNehoPlati && (fa.moja.spolocna || dlh.dlzi > 0)) {
+    const f = fa.moja;
+    vypis.platba = {
+      popis: `Faktura ${f.cislo} · splatná ${Number(f.splatnost.slice(8, 10))}. ${Number(f.splatnost.slice(5, 7))}. ${f.splatnost.slice(0, 4)}`,
+      suma: f.celkom, ucet: DODAVATEL.ucet, sprava: `Faktura ${f.cislo} PSB`,
+      polozky: f.polozky, vs: f.cislo, splatnost: f.splatnost, odpocet: 0, novy: false,
+    };
+    return { vypis, suma: f.celkom, sQr: true, sprava: `Faktura ${f.cislo} PSB` };
+  }
+
   return { vypis, suma, sQr: suma > 0, sprava: c.name };
+}
+
+/**
+ * Otvorené faktúry z Kokpitu, ktorých sa klient týka:
+ *  - `moja` — jediná otvorená faktúra, na ktorej je HLAVNÝM klientom (platiteľom),
+ *    s rozpisom po klientoch; pri dvoch a viac sa stránka nerozhoduje sama;
+ *  - `zaNeho` — platiteľ otvorenej faktúry, na ktorej je klient ďalšou položkou.
+ */
+async function otvoreneFaktury(DB: D1Database, meno: string): Promise<{
+  moja: { cislo: string; celkom: number; splatnost: string; polozky: PolozkaPlatby[]; spolocna: boolean } | null;
+  zaNeho: string | null;
+}> {
+  const kto = normName(meno);
+  const fa = (((await DB.prepare(
+    "SELECT id, cislo, klient, popis, ks, cena_czk, celkom_czk, splatnost FROM vydane_faktury WHERE storno_at IS NULL AND uhradene_at IS NULL",
+  ).all().catch(() => null))?.results) || []) as { id: string; cislo: string; klient: string; popis: string; ks: number; cena_czk: number; celkom_czk: number; splatnost: string }[];
+  if (!fa.length) return { moja: null, zaNeho: null };
+  const pol = (((await DB.prepare(
+    "SELECT faktura_id, klient, popis, celkom_czk FROM vydane_faktury_polozky WHERE faktura_id IN (SELECT value FROM json_each(?1)) ORDER BY poradie",
+  ).bind(JSON.stringify(fa.map((f) => f.id))).all().catch(() => null))?.results) || []) as { faktura_id: string; klient: string; popis: string; celkom_czk: number }[];
+  // Faktúra za viacerých zaplatená rozdeleným prevodom už nie je otvorená,
+  // aj keď ju ešte nikto neoznačil (to robí zoznam faktúr pri čítaní).
+  const spolocne = fa.filter((f) => pol.some((p) => p.faktura_id === f.id));
+  let uhradene = new Set<string>();
+  if (spolocne.length) {
+    const platby = (((await DB.prepare("SELECT id, klient, datum, suma_czk, fio_id FROM platby WHERE zrusene_at IS NULL AND fio_id IS NOT NULL")
+      .all().catch(() => null))?.results) || []) as { id: string; klient: string; datum: string; suma_czk: number; fio_id: string }[];
+    uhradene = new Set(fakturyUhradeneRozdelenim(
+      spolocne.map((f) => ({ id: f.id, klient: f.klient, vystavene: "", diely: dielyFaktury(f, pol) })),
+      platby.map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0, fioId: x.fio_id })),
+    ).map((x) => x.id));
+  }
+  const otvorene = fa.filter((f) => !uhradene.has(f.id));
+  const moje = otvorene.filter((f) => normName(f.klient) === kto);
+  const zaNeho = otvorene.find((f) => normName(f.klient) !== kto && pol.some((p) => p.faktura_id === f.id && normName(p.klient) === kto));
+  let moja = null;
+  if (moje.length === 1) {
+    const f = moje[0];
+    const polozky: PolozkaPlatby[] = dielyFaktury(f, pol).map((d) => ({
+      klient: d.klient, suma: d.suma, ja: normName(d.klient) === kto,
+      nazov: normName(d.klient) === kto ? f.popis : (pol.find((p) => p.faktura_id === f.id && p.klient === d.klient)?.popis || f.popis),
+    }));
+    moja = { cislo: f.cislo, celkom: Math.round(Number(f.celkom_czk) || 0), splatnost: String(f.splatnost).slice(0, 10), polozky, spolocna: polozky.length > 1 };
+  }
+  return { moja, zaNeho: zaNeho ? zaNeho.klient : null };
+}
+
+/** Komu koľko z faktúry patrí — hlavná položka plus ďalšie, po klientoch. */
+function dielyFaktury(
+  f: { id: string; klient: string; ks: number; cena_czk: number },
+  pol: { faktura_id: string; klient: string; celkom_czk: number }[],
+): { klient: string; suma: number }[] {
+  const out = [{ klient: f.klient, suma: Math.round((Number(f.ks) || 1) * (Number(f.cena_czk) || 0)) }];
+  for (const p of pol.filter((x) => x.faktura_id === f.id)) {
+    const uz = out.find((x) => normName(x.klient) === normName(p.klient));
+    if (uz) uz.suma += Math.round(Number(p.celkom_czk) || 0);
+    else out.push({ klient: p.klient, suma: Math.round(Number(p.celkom_czk) || 0) });
+  }
+  return out;
 }
