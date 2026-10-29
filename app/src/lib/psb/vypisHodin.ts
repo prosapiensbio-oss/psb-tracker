@@ -338,8 +338,20 @@ export function priebehBalickov(
    * Prenos preto obdobie neotvára: jeho hodiny (najviac toľko, koľko naozaj
    * zostalo — tak ich strihá aj karta) čakajú po jednej ako samostatné hodiny
    * a pokryjú najbližšie tréningy, nech patria do ktoréhokoľvek obdobia.
+   *
+   * To isté „Doplnenie členstva" zapísané v Kokpite (Vanková, Papiež, 29. 10.
+   * 2026) — len bez strihania: doplnenie je rozhodnutie trénera o počte hodín
+   * a karta ho berie celé. A zvyšok STAREJ platnosti, keď nový balíček príde
+   * skôr, než starý skončí (Albert Matl: 1 h do 10. 11., nový balíček 29. 10.)
+   * — karta minie najprv starý, os ho dovtedy zahodila.
    */
   const prenosy = new Set<Udalost>();
+  /**
+   * Obdobia, ktorých zvyšok NAHRADIL prenos alebo doplnenie zapísané v deň
+   * konca platnosti či neskôr (Katarína Tchuřová: 1 h zvyšku + doplnenie 1 h
+   * = odkaz 2, karta 1). Karta také balíčky vynuluje — hodiny sú v prenose.
+   */
+  const nahradeneUseky = new Set<unknown>();
   const kopiePrenosu = new Set<Udalost>();
   /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
@@ -386,6 +398,13 @@ export function priebehBalickov(
   /** Hodiny, z ktorých sa v období naozaj odpočítava: nezaplatené členstvo má nulu. */
   const hodinUseku = (u: Usek): number => (u.balicek?.nezaplatene ? 0 : u.hodin);
 
+  /** Koľko hodín v období ešte zostáva podľa doterajších riadkov (samostatné hodiny sa nerátajú). */
+  const zvysokUseku = (u: Usek): number => {
+    const minute = u.riadky.reduce((a, x) => a + (samostatne.has(x) ? 0 : hodinTreningu(x)), 0);
+    const pridane = u.riadky.reduce((a, x) => a + (x.druh === "balicekOd" && x.doplnenie && x.hodin > 0 && pridavaHodiny(x, u.balicek) ? x.hodin : 0), 0);
+    return Math.max(0, hodinUseku(u) + pridane - minute);
+  };
+
   const prvyNekryty = (u: Usek): number => {
     if (!u.balicek || neznameDoplnenie(u)) return -1;
     if (hodinUseku(u) <= 0) {
@@ -412,13 +431,14 @@ export function priebehBalickov(
       const i = cakajuce.findIndex((x) => (!x.doDna || u.den <= x.doDna) && (!k || !kanalBalicka(x.nazov) || k === kanalBalicka(x.nazov)));
       if (i >= 0) samostatne.set(u, cakajuce.splice(i, 1)[0]);
     }
-    if (u.druh === "balicekOd" && u.zKokpitu && !u.doplnenie && /prenesen/i.test(u.nazov)) {
+    if (u.druh === "balicekOd" && u.zKokpitu && !u.doplnenie && /prenesen|doplnen/i.test(u.nazov)) {
       const posl = useky[useky.length - 1];
-      const minute = posl.riadky.reduce((a, x) => a + (samostatne.has(x) ? 0 : hodinTreningu(x)), 0);
-      const pridane = posl.riadky.reduce((a, x) => a + (x.druh === "balicekOd" && x.doplnenie && x.hodin > 0 && pridavaHodiny(x, posl.balicek) ? x.hodin : 0), 0);
-      const zvysok = posl.balicek ? Math.max(0, hodinUseku(posl) + pridane - minute) : u.hodin;
+      const zvysok = /prenesen/i.test(u.nazov) && posl.balicek ? zvysokUseku(posl) : u.hodin;
+      if (posl.balicek?.doDna && u.den >= posl.balicek.doDna) nahradeneUseky.add(posl);
       for (let h = Math.min(u.hodin, zvysok); h >= 1; h--) {
-        const kopia = { ...u, hodin: h };
+        // Prenos aj doplnenie sú 0 Kč — „nezaplatené" by zdedili len od dňa
+        // (nezaplatený poplatok v ten istý deň, Štigut a Stoklasko).
+        const kopia = { ...u, hodin: h, nezaplatene: undefined };
         kopiePrenosu.add(kopia);
         cakajuce.push(kopia);
       }
@@ -443,6 +463,16 @@ export function priebehBalickov(
         posl.hodin += u.hodin;
         posl.riadky.push(u);
         continue;
+      }
+      // Zvyšok členstva, ktoré v deň nového balíčka ešte platí, sa minie prvý
+      // (len od KOKPIT_OD — história z PTmindera sa neprepisuje).
+      if (u.den >= KOKPIT_OD && posl.balicek && !posl.balicek.nezaplatene && posl.balicek.doDna
+        && posl.balicek.doDna >= u.den && !neznameDoplnenie(posl)) {
+        for (let h = zvysokUseku(posl); h >= 1; h--) {
+          const kopia = { ...posl.balicek, hodin: h };
+          kopiePrenosu.add(kopia);
+          cakajuce.push(kopia);
+        }
       }
       const novy: Usek = { balicek: u, hodin: u.hodin, riadky: [] };
       /**
@@ -579,6 +609,7 @@ export function priebehBalickov(
   }
 
   let koniec: number | null = null;
+  let koniecUkotveny = false;
 
   for (const usek of useky) {
     const b = usek.balicek;
@@ -765,9 +796,13 @@ export function priebehBalickov(
      * ďalej, len sa to už nepremieta do histórie.
      */
     let koniecUseku: number | null = bezi !== null ? bezi - nekryte : null;
-    if (b && b === posledny && !b.zKokpitu && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
-      if (koniecUseku !== null) koniecUseku += zostatokTeraz - kExportu;
-    }
+    // Zarovnanie s kartou (členstvo z PTmindera): číslo z karty už prenos aj
+    // doplnenie v sebe má, takže sa nič nenuluje ani nepripočítava.
+    const ukotvene = !!(b && b === posledny && !b.zKokpitu && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz);
+    if (ukotvene) {
+      if (koniecUseku !== null) koniecUseku += zostatokTeraz! - kExportu!;
+      if (b === posledny) koniecUkotveny = true;
+    } else if (nahradeneUseky.has(usek) && koniecUseku !== null && koniecUseku > 0) koniecUseku = 0;
 
     if (b === posledny) {
       koniec = koniecUseku;
@@ -787,8 +822,9 @@ export function priebehBalickov(
   }
 
   // Prenesené hodiny, ktoré ešte nik neminul, sú klientove — karta ich v zostatku má tiež.
-  const nevyuzityPrenos = cakajuce.filter((x) => kopiePrenosu.has(x)).length;
-  if (koniec !== null && nevyuzityPrenos) koniec += nevyuzityPrenos;
+  // Zvyšok starej platnosti, ktorá už skončila, prepadol — ten sa nepočíta.
+  const nevyuzityPrenos = cakajuce.filter((x) => kopiePrenosu.has(x) && (x.druh !== "balicekOd" || !x.doDna || x.doDna >= dnes)).length;
+  if (koniec !== null && nevyuzityPrenos && !koniecUkotveny) koniec += nevyuzityPrenos;
 
   return { stavy, koniec };
 }

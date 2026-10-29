@@ -803,3 +803,43 @@ describe("prenesené hodiny sa míňajú prvé, ako na karte (Kalva, 29. 10. 202
     expect(koniec).toBe(-1);
   });
 });
+
+describe("doplnenie z Kokpitu a zvyšok platného balíčka (29. 10. 2026)", () => {
+  const t = (den: string): Udalost => ({ druh: "trening", den });
+  const tren = (os: Udalost[], den: string) => os.find((u) => u.druh === "trening" && u.den === den)!;
+  it("Vanková: doplnenie 1 h pokryje 29. 10., nezaplatené předplatné ostane netknuté → 0", () => {
+    const os: Udalost[] = [
+      { druh: "balicekOd", den: "2026-09-24", nazov: "OFF - 6h S viazanostou", hodin: 6, doDna: "2026-10-23", zKokpitu: true },
+      { druh: "platba", den: "2026-09-14", suma: 6291, metoda: "bank" },
+      t("2026-09-24"), t("2026-09-29"), t("2026-10-06"), t("2026-10-09"), t("2026-10-13"),
+      { druh: "balicekOd", den: "2026-10-23", nazov: "Doplnenie členstva", hodin: 1, zKokpitu: true },
+      { druh: "balicekOd", den: "2026-10-24", nazov: "6h Předplatné", hodin: 6, doDna: "2026-11-23", zKokpitu: true, nezaplatene: true },
+      t("2026-10-29"),
+    ];
+    const { stavy, koniec } = priebehBalickov(os, null, "2026-10-29");
+    expect(stavy.get(tren(os, "2026-10-29"))?.zostatok).toBe(1);
+    expect(koniec).toBe(0);
+  });
+  it("Tchuřová: doplnenie po konci nahradí zvyšok, nezdvojí ho → 1", () => {
+    const os: Udalost[] = [
+      { druh: "balicekOd", den: "2026-08-05", nazov: "OFF - 6h BEZ viazanosti", hodin: 6, doDna: "2026-09-29", zKokpitu: true },
+      { druh: "platba", den: "2026-08-19", suma: 7790, metoda: "bank" },
+      t("2026-08-05"), t("2026-08-19"), t("2026-08-26"), t("2026-08-31"), t("2026-09-09"),
+      { druh: "balicekOd", den: "2026-09-29", nazov: "Doplnenie členstva", hodin: 1, zKokpitu: true },
+    ];
+    expect(priebehBalickov(os, null, "2026-10-29").koniec).toBe(1);
+  });
+  it("Albert Matl: hodina zo starého platného balíčka sa minie prvá → nový ostane celý (6)", () => {
+    const os: Udalost[] = [
+      { druh: "balicekOd", den: "2026-10-01", nazov: "6h Balíček", hodin: 6, doDna: "2026-11-25", zKokpitu: true },
+      { druh: "platba", den: "2026-10-01", suma: 7790, metoda: "bank" },
+      t("2026-10-02"), t("2026-10-06"), t("2026-10-09"), t("2026-10-14"), t("2026-10-20"),
+      { druh: "balicekOd", den: "2026-10-29", nazov: "6h Balíček", hodin: 6, doDna: "2026-12-23", zKokpitu: true },
+      { druh: "platba", den: "2026-10-28", suma: 7790, metoda: "bank" },
+      t("2026-10-29"),
+    ];
+    const { stavy, koniec } = priebehBalickov(os, null, "2026-10-29");
+    expect(stavy.get(tren(os, "2026-10-29"))?.zostatok).toBe(1);
+    expect(koniec).toBe(6);
+  });
+});
