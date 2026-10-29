@@ -2438,9 +2438,6 @@ function skupinaFaktur(
     const chybaju = (["jerry", "terezka"] as const).filter((kto) => !odpovedalKto(kto));
     const odpovedane = Object.values(z?.answers || {}).filter((v) => String(v).trim()).length;
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
-    // bankaPohyby[mesiac] je mapa KATEGÓRIA → pohyby, nie pole. `.length` na
-    // nej dávalo „undefined pohybov v mesiaci"; treba spočítať cez kategórie.
-    const pohybovMes = Object.values(bankaPohyby[mk] || {}).reduce((a, v) => a + v.length, 0);
     /**
      * Kto mal v tomto mesiaci úvodný tréning a nemá zapísaný zdroj.
      *
@@ -2478,16 +2475,10 @@ function skupinaFaktur(
       // Krok „PTminder" je od 28. 10. 2026 preč (Jerry: „odstrániť import,
       // tlačidlá, porovnávania a krok uzávierky — môžeš už teraz, import spravím
       // cez teba"). Posledný export za október nahrá Claude, nie uzávierka.
-      {
-        id: "fio",
-        label: "Výpis z Fio",
-        hotovo: !!bankaSumy[mk] && !bankaNaPotvrdenie[mk],
-        detail: !bankaSumy[mk] ? "chýba výpis"
-          : bankaNaPotvrdenie[mk] ? `${bankaNaPotvrdenie[mk]} výdavkov čaká na potvrdenie alebo kategóriu`
-          : pohybovMes ? `${pohybovMes} pohybov, všetky potvrdené` : "nahratý",
-        tab: "workspace",
-        sub: "uzavierka",
-      },
+      // Krok „Výpis z Fio" je od 29. 10. 2026 preč (Jerry: „zatrieďovanie
+      // robiť na týždennej báze… a potom to odstráň z uzávierky"). Banka sa
+      // sťahuje sama každú noc, výdavky sa potvrdzujú v Kontrole peňazí.
+      // Zamknutie to stráži ďalej — viď `prekazkyZamku`.
       {
         id: "zosit",
         label: "Zošit (hotovosť)",
@@ -2871,8 +2862,12 @@ function skupinaFaktur(
     // zodpovedané otázky mesiaca".
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
     for (const r of nevybavene) out.push(`nevysvetlené upozornenie „${r.title}" (key: ${r.key})`);
+    // Zamknutý mesiac sa už nedá potvrdiť — nepotvrdené výdavky by v ňom
+    // ostali navždy. Nie je to krok uzávierky (robia sa týždenne), len stráž.
+    if (bankaNaPotvrdenie[mk]) out.push(`${bankaNaPotvrdenie[mk]} výdavkov čaká na potvrdenie (Workspace → Kontrola peňazí)`);
+    if (!bankaSumy[mk]) out.push("za mesiac nie je stiahnutý výpis z Fio");
     return out;
-  }, [krokyZamku, registerAll]);
+  }, [krokyZamku, registerAll, bankaNaPotvrdenie, bankaSumy]);
 
   // Uzávierka pre mesiac, ktorý sa práve zatvára — posledný PLNÝ podľa kotvy.
   // Bežiaci mesiac sa nezatvára, takže jeho kroky by boli len šum.
@@ -3425,7 +3420,7 @@ function skupinaFaktur(
             onKlient={onClientClick}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} register={registerAll} rozpory={[
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} vydavkyNaPotvrdenie={Object.entries(bankaNaPotvrdenie).filter(([m]) => !zamknuteMesiace.includes(m)).reduce((a, [, n]) => a + (n || 0), 0)} register={registerAll} rozpory={[
             // Porovnania Kokpit vs PTminder sú od 20. 10. 2026 vypnuté (do PTmindera sa nezapisuje).
           ]} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
 

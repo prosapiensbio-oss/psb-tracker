@@ -64,7 +64,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
  * ako ho číta sťahovanie kalendára (`typZNazvu`).
  */
 const typPriradenia = (nazov: string) => (typZNazvu(nazov) === "uvodny" ? "uvodny" : "trening");
-import { dnesPraha, posunDen } from "../../lib/psb/cas";
+import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
 
 /**
  * Otázka pre Jarvisa k mesačnej kontrole.
@@ -121,7 +121,7 @@ function textSmsAnamnezy(url: string, uzBol: boolean): string {
     : `Dobry den, pred uvodni lekci Vas prosime o kratky dotaznik: ${url} Dekujeme, ProSapiens Biomechanic`);
 }
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -163,6 +163,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   pohybSplits?: PohybSplits;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
+  /**
+   * Výdavky z odomknutých mesiacov, ktoré čakajú na potvrdenie alebo
+   * kategóriu — robia sa v Kontrole peňazí každý týždeň (29. 10. 2026).
+   */
+  vydavkyNaPotvrdenie?: number;
   btcUzavierky?: Parameters<typeof AlzaUzavierka>[0]["btc"];
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
@@ -1744,12 +1749,30 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     })();
     if (k.krok === "kontroly") {
       const polozky = kontrolaPenazi;
-      return actions && onNavigate ? (
+      return (
         <>
-          {polozky.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />)}
-          {!polozky.length && <VsetkoVybavene text="Všetko vybavené — náklady sedia a staré zaradenia sú vysvetlené." />}
+          {/* VÝDAVKY NA POTVRDENIE — každý týždeň, nie pri uzávierke (Jerry,
+              29. 10. 2026). Banka sa sťahuje sama každú noc; tu sa len
+              potvrdí, čo pravidlá zaradili, a doplní, čo nezaradili. */}
+          <div style={{ marginBottom: 16 }}>
+            <BankaUlozene
+              kontrola pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
+              onPlatby={() => {
+                const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "platby");
+                if (idx >= 0) setI(idx);
+              }}
+            />
+            <IneObdobieFio onHotovo={() => void actions?.refresh()} />
+          </div>
+          {actions && onNavigate && (
+            <>
+              <NadpisSekcie pocet={polozky.length}>Náklady, ktoré nesedia</NadpisSekcie>
+              {polozky.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />)}
+              {!polozky.length && <VsetkoVybavene text="Všetko vybavené — náklady sedia a staré zaradenia sú vysvetlené." />}
+            </>
+          )}
         </>
-      ) : null;
+      );
     }
     if (k.krok === "dopyty") {
       const zdroje = (krokyUzavierky?.(mesiacUzavierky) || []).find((x) => x.id === "zdroje");
@@ -1798,21 +1821,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               kontroly: <ZdravieKokpitu rozpory={rozpory || []} mesiac={mk} />,
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,
               // 8. 10. 2026) — okno na CSV Jerry v ten istý deň zrušil.
-              // Pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026). Sťahuje sa
-              // zeleným tlačidlom v riadku kroku; druhý import s dátumami bol
-              // to isté ešte raz, tak je schovaný za odkazom (7. 10. 2026).
-              fio: (
-                <>
-                  <BankaUlozene
-                    uzavierka focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
-                    onPlatby={() => {
-                      const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "platby");
-                      if (idx >= 0) setI(idx);
-                    }}
-                  />
-                  <IneObdobieFio onHotovo={() => void actions?.refresh()} />
-                </>
-              ),
+              // Fio a zaraďovanie výdavkov z uzávierky ODIŠLI (29. 10. 2026):
+              // banka sa sťahuje sama každú noc a výdavky sa potvrdzujú
+              // týždenne v Kontrole peňazí. Zamknúť mesiac s nepotvrdenými
+              // výdavkami aj tak nejde (`prekazkyZamku` v App).
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
               otazky: <OtazkyMesiaca mesiac={mk} ja={trenerKroku === "Terezka" ? "terezka" : trenerKroku === "Jerry" ? "jerry" : undefined} />,
               hotovostStav: <KamOdisliCard />,
@@ -1903,6 +1915,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return (
       <>
         {(kto === "Jerry" || kto === "Terezka") && <VytazenostTyzdna key={kto} kto={kto} udalosti={(kalUdalosti || []) as never} />}
+        {/* Piatok – pondelok: spolu s vyťaženosťou aj výdavky týždňa (29. 10. 2026). */}
+        {kto === "Jerry" && vydavkyNaPotvrdenie > 0 && [5, 6, 7, 1].includes(denVTyzdniPraha()) && (() => {
+          const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "kontroly");
+          return idx >= 0 ? (
+            <button type="button" onClick={() => setI(idx)}
+              style={{ display: "block", width: "100%", textAlign: "left", margin: "0 0 12px", padding: "9px 12px", borderRadius: 9, border: `1px solid ${mix(C.orange, 45)}`, background: mix(C.orange, 8), color: C.text, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+              Výdavky týždňa: <b>{vydavkyNaPotvrdenie}</b> na potvrdenie → Kontrola peňazí
+            </button>
+          ) : null;
+        })()}
         {sekcieKresli}
         {!sekcie.length && <VsetkoVybavene text="Všetko vybavené — kalendár nemá výnimky." />}
       </>
@@ -1923,7 +1945,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           polozky={zive.map((x) => ({
             kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
             nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
+            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
           }))}
           aktivna={Math.min(i, zive.length - 1)}
           onVyber={(j, smer) => prepni(smer, j)}

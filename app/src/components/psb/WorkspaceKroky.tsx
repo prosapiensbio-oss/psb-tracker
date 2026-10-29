@@ -1065,9 +1065,8 @@ const nazovMesiaca = (mk: string) => {
  * Kroky sú tie isté, aké stráži zámok v Údajoch (`krokyZamku` v App) — dva
  * zoznamy „čo je hotové" by sa rozišli. Pridané sú len dve veci:
  *  • KTO: „Odkiaľ prišli" je Terezkin krok (Jerry), ostatné Jerryho;
- *  • FIO CEZ API: „je to potrebné, keď je API?" Súbor netreba — mesiac sa
- *    stiahne tu, všetky pohyby (aj výdavky) sa zapíšu a zaradia podľa
- *    naučených pravidiel. Čo pravidlo nemá, zaradí sa v Banke.
+ *  • FIO tu od 29. 10. 2026 nie je: banka sa sťahuje sama každú noc
+ *    a výdavky sa potvrdzujú týždenne v Kontrole peňazí.
  */
 export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [], reportVstup }: {
   mesiac: string;
@@ -1192,32 +1191,6 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
     onZmena();
   };
 
-  const stiahniMesiac = async () => {
-    setBezi("fio"); setChyba(""); setHlaska("");
-    const od = `${mesiac}-01`;
-    const [r, m] = mesiac.split("-").map(Number);
-    const doDna = new Date(Date.UTC(r, m, 0)).toISOString().slice(0, 10);
-    const j = await posli("/api/fio", { akcia: "stiahni", od, do: doDna });
-    if (!j.ok) { setBezi(""); setChyba(String(j.chyba || j.error || "Fio sa nestiahlo.")); return; }
-    type R = { suma: number; uzMame?: boolean; zamknuty?: boolean; kategoria?: string };
-    const riadky = (Array.isArray(j.riadky) ? j.riadky : []) as R[];
-    const nove = riadky.filter((x) => !x.uzMame && !x.zamknuty);
-    if (nove.length) {
-      const z = await posli("/api/fio", { akcia: "zapis", riadky: nove });
-      if (!z.ok) { setBezi(""); setChyba(String(z.error || "Pohyby sa nezapísali.")); return; }
-    }
-    setBezi("");
-    const nezaradene = nove.filter((x) => !x.kategoria).length;
-    setHlaska(nove.length
-      ? `Zapísané ${nove.length} pohybov za ${nazovMesiaca(mesiac)}${nezaradene ? `, ${nezaradene} bez kategórie — zaraď ich v Banke` : ", všetky majú kategóriu"}.`
-      : `Za ${nazovMesiaca(mesiac)} je z Fio všetko v Kokpite.`);
-    oznam("peniaze");
-    onZmena();
-    // Po stiahnutí sa ukáže, čo prišlo (Jerry, 7. 10. 2026: tabuľka sa má
-    // zobraziť po kliknutí na zelené tlačidlo, inak nesvieti).
-    setOtvoreny("fio");
-  };
-
   const zamkni = async () => {
     setBezi("zamok"); setChyba("");
     const j = await posli("/api/periods", { month: mesiac, locked: true, note: "zamknuté z Workspace" });
@@ -1257,16 +1230,11 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
                 aria-expanded={otvorene}
                 style={{ background: "none", border: "none", padding: 0, cursor: maObsah ? "pointer" : "default", fontFamily: "inherit", textAlign: "left", fontSize: 13, fontWeight: 600, color: C.text, minWidth: 190 }}
               >
-                {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.label}
+                {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.label}
                 {nahrate[k.id] && <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.textDim, marginLeft: maObsah ? 14 : 0 }}>nahraté {nahrate[k.id]}</span>}
               </button>
               <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>
               {!trener && <span style={{ fontSize: 11, color: C.textDim, minWidth: 54 }}>{kto(k.id)}</span>}
-              {k.id === "fio" && (
-                <button disabled={!!bezi} style={hlavne(!bezi)} onClick={() => void stiahniMesiac()}>
-                  {bezi === "fio" ? "sťahujem…" : "Stiahnuť mesiac z Fio"}
-                </button>
-              )}
               {k.id === "metricool" && metricool === true && (
                 <button disabled={!!bezi} style={hlavne(!bezi)} onClick={() => void stiahniMetricool()}>
                   {bezi === "metricool" ? "sťahujem…" : "Stiahnuť mesiac z Metricoolu"}

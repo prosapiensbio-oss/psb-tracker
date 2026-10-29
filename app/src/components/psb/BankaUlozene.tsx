@@ -2,6 +2,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
@@ -41,7 +42,7 @@ type KrokSpat = { popis: string; stav: { kluc: string; kategoria: string; potvrd
 const KROKOV_SPAT = 10;
 const SPAT_KLUC = "psb-banka-spat";
 
-export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby }: {
+export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierkaProp, onPlatby, kontrola }: {
   focus?: { month?: string; kategoria?: string; nonce?: number } | null;
   /** Rozdelenia/priradenia pohybov z App (split telefónu, príjem, vrátenie). */
   pohybSplits?: PohybSplits;
@@ -52,7 +53,29 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
   uzavierka?: boolean;
   /** Preklik na krok Platby a balíčky — tam sa príjmy priraďujú klientom. */
   onPlatby?: () => void;
+  /**
+   * KONTROLA PEŇAZÍ — výdavky sa potvrdzujú priebežne, nie pri uzávierke
+   * (Jerry, 29. 10. 2026: „rozdeľovanie a zatrieďovanie platieb robiť na
+   * týždennej báze… postav to do Kontroly peňazí a potom to odstráň
+   * z uzávierky"). Správa sa ako uzávierka (potvrdené miznú, začína na
+   * nákladoch), ale cez VŠETKY odomknuté mesiace — v zamknutom by sa
+   * potvrdiť nedalo nič a riadok by tam visel navždy.
+   */
+  kontrola?: boolean;
 } = {}) {
+  const uzavierka = !!uzavierkaProp || !!kontrola;
+  const [zamknute, setZamknute] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!kontrola) return;
+    let zive = true;
+    void fetch("/api/periods", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { periods?: { month: string; locked: boolean }[] }) => {
+        if (zive) setZamknute(new Set((j.periods || []).filter((x) => x.locked).map((x) => x.month)));
+      })
+      .catch(() => {});
+    return () => { zive = false; };
+  }, [kontrola]);
   const [pohyby, setPohyby] = useState<Pohyb[]>([]);
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
   const [pravidlaOtvorene, setPravidlaOtvorene] = useState(false);
@@ -104,18 +127,20 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
   };
   useEffect(nacitaj, []);
 
-  const mesiace = [...new Set(pohyby.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
+  // V Kontrole peňazí len odomknuté mesiace; inde všetko.
+  const pohybyVidno = kontrola ? pohyby.filter((p) => !zamknute.has(String(p.datum).slice(0, 7))) : pohyby;
+  const mesiace = [...new Set(pohybyVidno.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
   const maSplit = (p: Pohyb) => platnySplit(pohybSplits?.[p.kluc]);
   // Počty na tlačidlách platia pre zvolený mesiac — „Všetko (912)" pri
   // septembri, z ktorého je vidieť 122, mátlo.
-  const zMesiaca = mesiac ? pohyby.filter((p) => String(p.datum).slice(0, 7) === mesiac) : pohyby;
+  const zMesiaca = mesiac ? pohybyVidno.filter((p) => String(p.datum).slice(0, 7) === mesiac) : pohybyVidno;
   // V uzávierke potvrdené výdavky z plochy miznú — vidieť ich pod
   // „Potvrdené" a „Všetko". Počty na tlačidlách hovoria, čo ešte ostáva.
   const skryPotvrdene = !!uzavierka && filter !== "potvrdene" && filter !== "vsetko";
   const pocet = (f: FilterPohybov) => zMesiaca.filter((p) => patriDoFiltra(p, f, maSplit(p))
     && !(uzavierka && f !== "potvrdene" && f !== "vsetko" && jePotvrdeny(p, maSplit(p)))).length;
   const cakaPrijmov = zMesiaca.filter((p) => p.suma > 0 && stavPrijmu(p, maSplit(p)) === "caka").length;
-  const viditelne = pohyby.filter((p) => {
+  const viditelne = pohybyVidno.filter((p) => {
     if (mesiac && String(p.datum).slice(0, 7) !== mesiac) return false;
     if (ibaKat && p.kategoria !== ibaKat) return false;
     if (!patriDoFiltra(p, filter, maSplit(p))) return false;
@@ -129,6 +154,11 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
 
   // Čo ešte treba prejsť: návrhy Kokpitu aj výdavky bez kategórie.
   const naKontrolu = zMesiaca.filter((p) => cakaNaPotvrdenie(p, maSplit(p)) || patriDoFiltra(p, "nezaradene", maSplit(p))).length;
+  /** Z toho za bežiaci týždeň (od pondelka) — to, kvôli čomu sa karta otvára v piatok. */
+  const pondelok = (() => { const d = dnesPraha(); return posunDen(d, -((denVTyzdniPraha(new Date()) + 6) % 7)); })();
+  const tentoTyzden = kontrola
+    ? zMesiaca.filter((p) => String(p.datum).slice(0, 10) >= pondelok && (cakaNaPotvrdenie(p, maSplit(p)) || patriDoFiltra(p, "nezaradene", maSplit(p)))).length
+    : 0;
 
   /** Bez `kluce` sa mení celý označený výber; s nimi len tie riadky. */
   const zmen = async (kategoria: string, kluce?: string[], poznamka?: string) => {
@@ -261,9 +291,9 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka, onPlatby 
       } : undefined}>
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
-        <H3><Info label={uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
+        <H3><Info label={kontrola ? "Výdavky na potvrdenie" : uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
         {uzavierka && (
-          <span style={{ fontSize: 11.5, color: naKontrolu ? C.orange : C.green }}>{naKontrolu ? `${naKontrolu} na kontrolu` : "všetko skontrolované ✓"}</span>
+          <span style={{ fontSize: 11.5, color: naKontrolu ? C.orange : C.green }}>{naKontrolu ? `${naKontrolu} na kontrolu${kontrola && tentoTyzden ? ` · ${tentoTyzden} z tohto týždňa` : ""}` : "všetko skontrolované ✓"}</span>
         )}
         {(uzavierka ? pocet("nezaradene") : nezaradenych) > 0 && (
           <span style={{ fontSize: 11.5, color: C.orange }}>{uzavierka ? pocet("nezaradene") : nezaradenych} výdavkov bez kategórie</span>
