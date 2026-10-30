@@ -1,3 +1,4 @@
+import { nechceHovor } from "../../lib/psb/dopytTestPostury";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
@@ -157,7 +158,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
   // dopyt — jediný, s ktorým sa reálne pracuje — končil mimo obrazovky.
   const zoradene = useMemo(() => {
     const zaklad = lenCakajuci
-      ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy")
+      ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy" && !nechceHovor(l))
       : lenNevyriesene
         // TÁ ISTÁ funkcia ako tlačidlo nad zoznamom. Filter mal vlastnú
         // inline kópiu bez 30-dňovej výnimky pre „dohodnutý" — tlačidlo
@@ -263,7 +264,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
       .filter((h) => Number.isFinite(h) && h >= 0)
       .sort((a, b) => a - b);
     const median = casy.length ? casy[Math.floor(casy.length / 2)] : null;
-    const bezOdpovede = leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy").length;
+    const bezOdpovede = leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy" && !nechceHovor(l)).length;
     return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv, median, bezOdpovede };
   }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -496,6 +497,9 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                     {!meraSa(l) ? (
                       <span title={`Rýchlosť odpovede sa meria až od ${fmtDMY(MERANIE_OD)} — pri starších dopytoch sa už nedá zistiť.`}
                         style={{ color: C.textDim, fontSize: 12 }}>—</span>
+                    ) : !l.odpovedaneAt && nechceHovor(l) ? (
+                      <span title="Test postury so začiarknutým „Hovor: Ne, stačí mi analýza e-mailem“ — analýzu posiela web sám, neozývame sa."
+                        style={{ fontSize: 11.5, color: C.textMuted }}>nechce hovor</span>
                     ) : l.odpovedaneAt ? (
                       upravCas === l.id ? (
                         <input

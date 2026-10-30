@@ -1,5 +1,6 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
+import { jeTestPostury, nechceHovor } from "./dopytTestPostury";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { klucNezaplateneho, treningyBezBalicka, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
 import { nazovProduktu } from "./nazvyProduktov";
@@ -3469,6 +3470,28 @@ export function deriveRegister(
           : `cez ${l.source}`;
     const kontakt = [l.email, l.telefon].filter(Boolean).join(" · ");
     const uryvok = String(l.note || "").replace(/\s+/g, " ").trim().slice(0, 140);
+    /**
+     * Test postury s „Hovor: Ne" (Jerry, 30. 10. 2026): analýzu posiela web
+     * sám, telefonát si človek nepraje. Pripomienka „ozvi sa" by radila
+     * opak — namiesto nej modrá veta, že sa neozývame, s tým istým kľúčom,
+     * aby ju „vybavené" zhaslo.
+     */
+    if (nechceHovor(l)) {
+      const bolest = /bolí:\s*([^|]+)/i.exec(String(l.note || ""))?.[1]?.trim();
+      add(
+        `odpoved|${l.id}`,
+        "Zápis",
+        "blue",
+        `Test postury — ${meno}: neozývať sa`,
+        `Test postury od ${meno} prišiel ${fmtDMY(den)}${bolest ? ` (bolí: ${bolest})` : ""} so začiarknutým „Hovor: Ne, stačí mi analýza e-mailem“. Analýza odchádza z webu e-mailom sama — netelefonuj a nepíš SMS. Keď sa ozve, je to nový dopyt.${kontakt ? ` Kontakt: ${kontakt}.` : ""}`,
+        16,
+        "marketing|dopyty",
+        "odpoved",
+        { trener: "Terezka", oKom: meno },
+      );
+      continue;
+    }
+    const testPostury = jeTestPostury(l);
     const hodin = Math.max(0, Math.round((dnesOdpoved.getTime() - Date.parse(String(l.createdAt || l.date))) / 3600000));
     const caka = dni >= 1 ? `${dni} ${dni === 1 ? "deň" : dni < 5 ? "dni" : "dní"}` : `${hodin} h`;
     add(
@@ -3478,8 +3501,8 @@ export function deriveRegister(
       // Čaká sa v HODINÁCH, kým je to prvý deň. „Nový dopyt — Hana Marko"
       // bez čísla vyzeralo rovnako po hodine aj po dvadsiatich troch, a to
       // je práve to okno, v ktorom sa rozhoduje, či človek napíše inam.
-      `${l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno} (čaká ${caka})`,
-      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede. Keď je úvodný dohodnutý, doplň termín tlačidlom vedľa a appka pripraví SMS s odkazom.`,
+      `${testPostury ? "Test postury" : l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno} (čaká ${caka})`,
+      `${testPostury ? `Test postury od ${meno} prišiel` : `${meno} sa ozval`} ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede. Keď je úvodný dohodnutý, doplň termín tlačidlom vedľa a appka pripraví SMS s odkazom.`,
       dni >= 1 ? 2 : 4,
       "marketing|dopyty",
       "odpoved",
@@ -4109,7 +4132,7 @@ export function ziskavanieKlientov(
  * vie, kto je kto. Zmeny v kalendári tomu, komu sa v kalendári stali.
  */
 export type NezapisaneVstup = {
-  leads: Pick<Lead, "id" | "name" | "date" | "dovod" | "status" | "odpovedaneAt" | "createdAt" | "druh">[];
+  leads: (Pick<Lead, "id" | "name" | "date" | "dovod" | "status" | "odpovedaneAt" | "createdAt" | "druh"> & { note?: string; stranka?: string })[];
   /** Dnešok ako ISO deň — kvôli testovateľnosti sa neberie zo systému. */
   dnes: string;
   /** Mená klientov — dopyt, z ktorého klient vznikol, sa nerieši. */
@@ -4155,12 +4178,14 @@ export const DOVOD_DOPYTU_OD = "2026-10-06";
  * v kalendári · je čerstvo dohodnutý.
  */
 function zivyDopyt(
-  l: Pick<Lead, "name" | "date" | "dovod" | "status">,
+  l: Pick<Lead, "name" | "date" | "dovod" | "status"> & { note?: string; stranka?: string },
   menaKlientov: string[],
   dnes: string,
 ): boolean {
   const meno = String(l.name || "").trim();
   if (!meno) return false;
+  // Test postury bez hovoru — dôvod je známy, chcel len analýzu e-mailom.
+  if (nechceHovor(l)) return false;
   if (String(l.date || "").slice(0, 10) < DOVOD_DOPYTU_OD) return false;
   if (String(l.dovod || "").trim()) return false;
   if (najdiKlienta(menaKlientov, meno)) return false;

@@ -24,6 +24,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { SOURCES } from "./Klienti";
 import type { PSBData } from "../../lib/psb/types";
+import { nechceHovor } from "../../lib/psb/dopytTestPostury";
 import { klucOtazkyPlatby, otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
@@ -914,10 +915,11 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
   const jeKlient = (l: { name: string }) => !!(l.name && najdiKlienta(menaKlientov, l.name));
   const dopyty = leads.filter((l) => (l.druh || "dopyt") === "dopyt" && l.date >= "2026-08-12");
   const cakaju = dopyty
-    .filter((l) => l.status === "novy" && !l.odpovedaneAt && !jeKlient(l) && !maTermin(l.name || ""))
+    // Test postury s „Hovor: Ne" nečaká — analýzu posiela web (30. 10. 2026).
+    .filter((l) => l.status === "novy" && !l.odpovedaneAt && !jeKlient(l) && !maTermin(l.name || "") && !nechceHovor(l))
     .sort((a, b) => a.date.localeCompare(b.date));
   const bezVysledku = dopyty.filter((l) => {
-    if (cakaju.includes(l) || jeKlient(l) || (l.dovod || "").trim() || maTermin(l.name || "")) return false;
+    if (cakaju.includes(l) || jeKlient(l) || (l.dovod || "").trim() || maTermin(l.name || "") || nechceHovor(l)) return false;
     if (l.date < DOVOD_DOPYTU_OD) return false;
     if (l.status === "dohodnuty" && (Date.now() - Date.parse(`${l.date}T12:00:00Z`)) / 86400000 <= 30) return false;
     return l.status !== "novy" || !!l.odpovedaneAt;

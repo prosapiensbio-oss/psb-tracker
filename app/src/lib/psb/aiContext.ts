@@ -4,6 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
+import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
 import {
@@ -762,7 +763,9 @@ export function buildAiContext(
             poznamka: "Medián hodín od dopytu po našu prvú odpoveď. Meria sa až od 12. 8. 2026 — staršie dopyty odpoveď zaznamenanú nemajú a nedá sa doplniť. V službách je to najsilnejšia páka na konverziu, silnejšia než cena aj než text reklamy.",
             medianHodin: casy.length ? Math.round(casy[Math.floor(casy.length / 2)]) : null,
             zmeranych: casy.length,
-            cakaBezOdpovede: (data.leads || []).filter((l) => l.date >= "2026-08-12" && !l.odpovedaneAt && l.status === "novy").length,
+            cakaBezOdpovede: (data.leads || []).filter((l) => l.date >= "2026-08-12" && !l.odpovedaneAt && l.status === "novy" && !nechceHovor(l)).length,
+            // Test postury so začiarknutým „Hovor: Ne" — analýzu posiela web, neozývať sa (30. 10. 2026).
+            testPosturyBezHovoru: (data.leads || []).filter((l) => l.date >= "2026-08-12" && l.status === "novy" && nechceHovor(l)).map((l) => ({ meno: l.name, den: l.date })),
           },
         };
       })(),

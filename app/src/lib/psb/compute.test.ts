@@ -931,6 +931,23 @@ describe("nový dopyt čaká na odpoveď", () => {
     expect(najdi([lead({ odpovedaneAt: new Date().toISOString() })])).toHaveLength(0);
   });
 
+  // Radka Pelánová, 30. 10. 2026: test postury s „Hovor: Ne" — neozývať sa.
+  it("test postury bez hovoru: modrá veta „neozývať sa\", žiadne „čaká\" ani SMS", () => {
+    const [x] = najdi([lead({ date: den(-1), source: "web", name: "Radka Pelánová", telefon: "+420776843034",
+      note: "TEST POSTURY | bolí: Bedro, SI kloub | hovor: Ne, stačí mi analýza e-mailem" })]);
+    expect(x.tone).toBe("blue");
+    expect(x.title).toBe("Test postury — Radka Pelánová: neozývať sa");
+    expect(x.detail).toContain("Hovor: Ne");
+    expect(x.detail).toContain("Bedro, SI kloub");
+    expect(x.telefon).toBeUndefined();
+  });
+
+  it("test postury s hovorom povie, že je to test postury", () => {
+    const [x] = najdi([lead({ source: "web", note: "TEST POSTURY | bolí: krk | hovor: Ano, zavolejte mi" })]);
+    expect(x.tone).toBe("orange");
+    expect(x.title).toContain("Test postury — Hana Marko");
+  });
+
   it("dohodnutý dopyt sa už nepripomína", () => {
     expect(najdi([lead({ status: "dohodnuty" })])).toHaveLength(0);
   });
