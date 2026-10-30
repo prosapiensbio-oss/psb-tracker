@@ -3,7 +3,7 @@ import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { DOVODY_ZRUSENIA } from "../../lib/psb/kalendarZmeny";
+import { DOVODY_S_DOCHADZKOU, DOVODY_ZRUSENIA } from "../../lib/psb/kalendarZmeny";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { bezDiakritiky as textBezDiakritiky } from "../../lib/psb/sms";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -1906,7 +1906,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — nezmazalo sa" }));
     setMazem(false);
     if (!j.ok) { setChyba(j.error || "Zmazanie sa nepodarilo."); return; }
-    if (j.zmenaId) onZmazane({ id: j.zmenaId, kto: u.klient || u.nazov, zaciatok: u.zaciatok, trener: u.trener });
+    if (j.zmenaId) onZmazane({ id: j.zmenaId, uid: u.uid, kto: u.klient || u.nazov, zaciatok: u.zaciatok, trener: u.trener });
     await onHotovo();
   };
 
@@ -2170,7 +2170,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   );
 }
 
-type ZrusenaHodina = { id: string; kto: string; zaciatok: string; trener: string };
+type ZrusenaHodina = { id: string; uid: string; kto: string; zaciatok: string; trener: string };
 
 /**
  * PREČO SA HODINA RUŠÍ (Jerry, 30. 10. 2026: „po potvrdení vymazania hodiny
@@ -2185,10 +2185,17 @@ type ZrusenaHodina = { id: string; kto: string; zaciatok: string; trener: string
  *
  * Je to modal (na rozdiel od okna udalosti): mriežka pod ním už nie je to,
  * na čom sa pracuje, a otázka má jednu odpoveď.
+ *
+ * ZAPOČÍTAŤ DO DOCHÁDZKY (Jerry, 30. 10. 2026). Pri zrušení na poslednú
+ * chvíľu a pri neprídení bez ozvania príde druhá otázka. Odpoveď sa zapíše
+ * NAJPRV do `kal_konanie` (tá istá cesta ako „bol tam" vo Workspace), až
+ * potom dôvod — keď padne prvé, dôvod sa nezapíše a otázka ostane otvorená.
+ * Zmazaná hodina s konal = 1 sa počíta, len čo nastane jej čas.
  */
 function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavri: () => void; onHotovo: () => Promise<void> }) {
   const [ine, setIne] = useState(false);
   const [text, setText] = useState("");
+  const [dochadzka, setDochadzka] = useState<string | null>(null);
   const [uklada, setUklada] = useState(false);
   const [chyba, setChyba] = useState("");
   // Esc zavrie — poslucháč sa registruje raz, aktuálne zavretie číta cez ref.
@@ -2200,10 +2207,17 @@ function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavr
     return () => window.removeEventListener("keydown", k);
   }, []);
 
-  const uloz = async (poznamka: string) => {
+  const uloz = async (poznamka: string, zapocitat?: boolean) => {
     if (!poznamka.trim() || uklada) return;
+    if (zapocitat === undefined && DOVODY_S_DOCHADZKOU.has(poznamka)) { setDochadzka(poznamka); setIne(false); return; }
     setUklada(true); setChyba("");
-    const j = await posli({ akcia: "vysvetli", id: z.id, poznamka: poznamka.trim() })
+    if (zapocitat !== undefined) {
+      const k = await posli({ akcia: "konanie", uid: z.uid, trener: z.trener, klient: z.kto, zaciatok: z.zaciatok, konal: zapocitat })
+        .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — dochádzka sa nezapísala" }));
+      if (!k.ok) { setUklada(false); setChyba(k.error || "Dochádzka sa nezapísala."); return; }
+    }
+    const zapis = zapocitat === undefined ? poznamka.trim() : `${poznamka.trim()} — ${zapocitat ? "hodina započítaná" : "hodina nezapočítaná"}`;
+    const j = await posli({ akcia: "vysvetli", id: z.id, poznamka: zapis })
       .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — dôvod sa nezapísal" }));
     setUklada(false);
     if (!j.ok) { setChyba(j.error || "Dôvod sa nezapísal."); return; }
@@ -2228,13 +2242,30 @@ function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavr
         <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, margin: "4px 0 11px" }}>
           Zmazané: <b style={{ color: C.text }}>{z.kto}</b> · {den(z.zaciatok)} o {cas(z.zaciatok)} · {z.trener}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {DOVODY_ZRUSENIA.map((d) => (
-            <button key={d} onClick={() => void uloz(d)} disabled={uklada} style={stitok(false)}>{d}</button>
-          ))}
-          <button onClick={() => setIne(!ine)} disabled={uklada} style={stitok(ine)}>iné…</button>
-        </div>
-        {ine && (
+        {dochadzka ? (
+          <div>
+            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginBottom: 4 }}>
+              <b>{dochadzka}</b> — započítať hodinu do dochádzky?
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginBottom: 9 }}>
+              Áno = odpočíta sa z balíčka, akoby prišiel{z.zaciatok.slice(0, 16) > terazPraha().slice(0, 16) ? " (až keď nastane čas tréningu)" : ""}.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <button onClick={() => void uloz(dochadzka, true)} disabled={uklada} style={stitok(false)}>{uklada ? "…" : "Áno, započítať"}</button>
+              <button onClick={() => void uloz(dochadzka, false)} disabled={uklada} style={stitok(false)}>{uklada ? "…" : "Nie"}</button>
+            </div>
+            <button onClick={() => setDochadzka(null)} disabled={uklada}
+              style={{ marginTop: 8, background: "none", border: "none", color: C.textMuted, fontSize: 11.5, cursor: "pointer", padding: 0 }}>← iný dôvod</button>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {DOVODY_ZRUSENIA.map((d) => (
+              <button key={d} onClick={() => void uloz(d)} disabled={uklada} style={stitok(false)}>{d}</button>
+            ))}
+            <button onClick={() => setIne(!ine)} disabled={uklada} style={stitok(ine)}>iné…</button>
+          </div>
+        )}
+        {ine && !dochadzka && (
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <input autoFocus value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void uloz(text); } }}

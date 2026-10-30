@@ -205,8 +205,18 @@ export const DOVODY_ZRUSENIA = [
   "rodina",
   "dovolenka / cesta",
   "bolesť / zranenie",
+  "zrušil na poslednú chvíľu / meškal",
   "neprišiel bez ozvania",
   "zrušil tréner",
   "presunuli sme",
   "chyba v zápise",
 ] as const;
+
+/**
+ * Pri týchto dôvodoch sa okno spýta, či hodinu započítať do dochádzky
+ * (Jerry, 30. 10. 2026: „zrušil na poslednú chvíľu — a keď to dám, nech sa
+ * ma spýta, či započítať hodinu"). Neprišiel bez ozvania je ten istý prípad:
+ * termín prepadol bez možnosti ho zaplniť. Odpoveď ide do `kal_konanie` —
+ * konal = 1 znamená, že sa zmazaná hodina počíta, akoby klient prišiel.
+ */
+export const DOVODY_S_DOCHADZKOU: ReadonlySet<string> = new Set(["zrušil na poslednú chvíľu / meškal", "neprišiel bez ozvania"]);
