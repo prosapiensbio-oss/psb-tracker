@@ -3473,20 +3473,21 @@ export function deriveRegister(
     /**
      * Test postury s „Hovor: Ne" (Jerry, 30. 10. 2026): analýzu posiela web
      * sám, telefonát si človek nepraje. Pripomienka „ozvi sa" by radila
-     * opak — namiesto nej modrá veta, že sa neozývame, s tým istým kľúčom,
-     * aby ju „vybavené" zhaslo.
+     * opak — namiesto nej modrá veta, že sa neozývame. Vlastný kľúč
+     * `testpostury|`: na `odpoved|` visia tlačidlá „Ozval som sa" a „Úvodný
+     * dohodnutý" (Dashboard), ktoré by tu radili presný opak.
      */
     if (nechceHovor(l)) {
       const bolest = /bolí:\s*([^|]+)/i.exec(String(l.note || ""))?.[1]?.trim();
       add(
-        `odpoved|${l.id}`,
+        `testpostury|${l.id}`,
         "Zápis",
         "blue",
         `Test postury — ${meno}: neozývať sa`,
         `Test postury od ${meno} prišiel ${fmtDMY(den)}${bolest ? ` (bolí: ${bolest})` : ""} so začiarknutým „Hovor: Ne, stačí mi analýza e-mailem“. Analýza odchádza z webu e-mailom sama — netelefonuj a nepíš SMS. Keď sa ozve, je to nový dopyt.${kontakt ? ` Kontakt: ${kontakt}.` : ""}`,
         16,
         "marketing|dopyty",
-        "odpoved",
+        "testpostury",
         { trener: "Terezka", oKom: meno },
       );
       continue;

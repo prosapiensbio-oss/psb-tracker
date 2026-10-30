@@ -933,8 +933,11 @@ describe("nový dopyt čaká na odpoveď", () => {
 
   // Radka Pelánová, 30. 10. 2026: test postury s „Hovor: Ne" — neozývať sa.
   it("test postury bez hovoru: modrá veta „neozývať sa\", žiadne „čaká\" ani SMS", () => {
-    const [x] = najdi([lead({ date: den(-1), source: "web", name: "Radka Pelánová", telefon: "+420776843034",
+    const vsetko = register([lead({ date: den(-1), source: "web", name: "Radka Pelánová", telefon: "+420776843034",
       note: "TEST POSTURY | bolí: Bedro, SI kloub | hovor: Ne, stačí mi analýza e-mailem" })]);
+    // Žiadne `odpoved|` — na ňom visia tlačidlá „Ozval som sa" a „Úvodný dohodnutý".
+    expect(vsetko.filter((r) => r.key.startsWith("odpoved|"))).toHaveLength(0);
+    const [x] = vsetko.filter((r) => r.key.startsWith("testpostury|"));
     expect(x.tone).toBe("blue");
     expect(x.title).toBe("Test postury — Radka Pelánová: neozývať sa");
     expect(x.detail).toContain("Hovor: Ne");
