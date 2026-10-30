@@ -669,8 +669,8 @@ export const Route = createFileRoute("/api/kalendar")({
           const kalendar = KALENDAR_TRENERA[trener];
           const ics = uid.split("|")[0];
           if (!ics.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
-          const riadok = await DB.prepare("SELECT zaciatok FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
-            .bind(uid, trener).first<{ zaciatok: string }>();
+          const riadok = await DB.prepare("SELECT zaciatok, nazov, klient, typ FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
+            .bind(uid, trener).first<{ zaciatok: string; nazov: string; klient: string | null; typ: string | null }>();
           if (!riadok) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
           try {
             // Séria sa NIKDY nemaže celá — zásah ide na jeden výskyt.
@@ -679,10 +679,25 @@ export const Route = createFileRoute("/api/kalendar")({
           } catch (e) {
             return Response.json({ ok: false, error: `Google kalendár zrušenie odmietol: ${String(e instanceof Error ? e.message : e)}` }, { status: 502 });
           }
-          await DB.prepare("UPDATE kal_udalosti SET zmizla_at = ?1 WHERE uid = ?2 AND trener = ?3").bind(teraz(), uid, trener).run();
+          /**
+           * DÔVOD ZRUŠENIA (Jerry, 30. 10. 2026: „po potvrdení vymazania okno,
+           * ktoré sa pýta, prečo mažem tú hodinu“). Zmazanie cez Kokpit píše
+           * `zmizla_at` priamo, takže ho snímka preskočí a do `kal_zmeny` sa
+           * dovtedy nedostalo nič — po zrušení z Kokpitu neostal dôvod ani
+           * riadok v denníku klienta. Teraz vznikne ten istý riadok, aký by
+           * zapísala snímka; okno ho hneď vysvetlí (`vysvetli`). Keď ho Jerry
+           * zavrie bez odpovede, otázka ostane v karte Zmeny v kalendári.
+           */
+          const zmenaId = ohlasitZmenu("zrusene", riadok.zaciatok, null, dnesPraha(), riadok.typ) ? crypto.randomUUID() : null;
+          await DB.batch([
+            DB.prepare("UPDATE kal_udalosti SET zmizla_at = ?1 WHERE uid = ?2 AND trener = ?3").bind(teraz(), uid, trener),
+            ...(zmenaId ? [DB.prepare(
+              "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
+            ).bind(zmenaId, teraz(), trener, uid, "zrusene", riadok.nazov, riadok.klient, riadok.zaciatok, null)] : []),
+          ]);
           const kto = (await currentUser(request)) || "";
           await audit(DB, { action: "trening-zruseny-z-kokpitu", predmet: uid, actor: kto });
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, zmenaId });
         }
 
         /**

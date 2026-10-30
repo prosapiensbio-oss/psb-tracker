@@ -2,6 +2,8 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { DOVODY_ZRUSENIA } from "../../lib/psb/kalendarZmeny";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { bezDiakritiky as textBezDiakritiky } from "../../lib/psb/sms";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -108,6 +110,8 @@ async function posli(telo: Record<string, unknown>) {
   type Snimka = { ok: boolean; zmien?: number; udalosti?: number; chyba?: string; prveStiahnutie?: boolean };
   return (await r.json()) as {
     ok: boolean; error?: string;
+    /** `trening-zrus`: riadok v kal_zmeny, ku ktorému sa pýta dôvod (null = súkromná udalosť). */
+    zmenaId?: string | null;
     /** Od 24. 8. 2026 sa sťahuje po jednom kalendári — odpoveď nesie jeden výsledok. */
     trener?: string; vysledok?: Snimka; zostava?: string[];
     vysledky?: Record<string, Snimka>;
@@ -1145,6 +1149,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 }) {
   const [posun, setPosun] = useState(0);
   const [vyber, setVyber] = useState<VyberMriezky | null>(null);
+  const [zrusene, setZrusene] = useState<ZrusenaHodina | null>(null);
 
   // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
   const pondelok = useMemo(() => {
@@ -1649,6 +1654,8 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
               </div>
             ))}
 
+            {zrusene && <OknoDovoduZrusenia z={zrusene} onZavri={() => setZrusene(null)} onHotovo={async () => { setZrusene(null); await onObnov(); }} />}
+
             {/* OKNO vedľa označenej hodiny — nie modal, nič sa nestmavuje. */}
             {vyber && (
               <OknoUdalosti
@@ -1660,6 +1667,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 onZmen={setVyber}
                 onZavri={() => setVyber(null)}
                 onHotovo={async () => { setVyber(null); await onObnov(); }}
+                onZmazane={setZrusene}
                 style={uzke
                   ? {
                     // Na telefóne sa okno lepí na SPODOK obrazovky. Plávajúce
@@ -1710,7 +1718,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
  * v kalendári trénera, ktorý je zdieľaný servisnému účtu — chyba z Googlu
  * sa ukazuje doslovne aj s radou, čo zdieľať.
  */
-function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri, onHotovo, style }: {
+function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri, onHotovo, onZmazane, style }: {
   vyber: VyberMriezky;
   mena: string[];
   clients: Record<string, ClientAgg>;
@@ -1718,6 +1726,8 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   onZmen: (v: VyberMriezky) => void;
   onZavri: () => void;
   onHotovo: () => Promise<void>;
+  /** Po zmazaní tréningu — rodič otvorí okno s otázkou na dôvod. */
+  onZmazane: (z: ZrusenaHodina) => void;
   style: React.CSSProperties;
 }) {
   const u = vyber.u;
@@ -1896,6 +1906,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — nezmazalo sa" }));
     setMazem(false);
     if (!j.ok) { setChyba(j.error || "Zmazanie sa nepodarilo."); return; }
+    if (j.zmenaId) onZmazane({ id: j.zmenaId, kto: u.klient || u.nazov, zaciatok: u.zaciatok, trener: u.trener });
     await onHotovo();
   };
 
@@ -2156,6 +2167,93 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         </div>
       )}
     </div>
+  );
+}
+
+type ZrusenaHodina = { id: string; kto: string; zaciatok: string; trener: string };
+
+/**
+ * PREČO SA HODINA RUŠÍ (Jerry, 30. 10. 2026: „po potvrdení vymazania hodiny
+ * okno, ktoré sa ma pýta, prečo mažem tú hodinu — chorý, pracovné, rodinné…
+ * a možnosť iné, kam by som napísal vlastný").
+ *
+ * Udalosť je v tej chvíli už zmazaná aj z Googlu; okno len dopĺňa dôvod
+ * k riadku v `kal_zmeny`, ktorý pri zmazaní založil server. Klik na štítok
+ * rovno uloží (ako v karte Zmeny — jeden klik na jednu odpoveď). Zavretie bez
+ * odpovede nič nestratí: riadok ostane nevysvetlený a spýta sa karta Zmeny
+ * v kalendári. Chyba zápisu ostáva v okne, nezmizne potichu.
+ *
+ * Je to modal (na rozdiel od okna udalosti): mriežka pod ním už nie je to,
+ * na čom sa pracuje, a otázka má jednu odpoveď.
+ */
+function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavri: () => void; onHotovo: () => Promise<void> }) {
+  const [ine, setIne] = useState(false);
+  const [text, setText] = useState("");
+  const [uklada, setUklada] = useState(false);
+  const [chyba, setChyba] = useState("");
+  // Esc zavrie — poslucháč sa registruje raz, aktuálne zavretie číta cez ref.
+  const zavriRef = useRef(onZavri);
+  zavriRef.current = onZavri;
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") zavriRef.current(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, []);
+
+  const uloz = async (poznamka: string) => {
+    if (!poznamka.trim() || uklada) return;
+    setUklada(true); setChyba("");
+    const j = await posli({ akcia: "vysvetli", id: z.id, poznamka: poznamka.trim() })
+      .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — dôvod sa nezapísal" }));
+    setUklada(false);
+    if (!j.ok) { setChyba(j.error || "Dôvod sa nezapísal."); return; }
+    await onHotovo();
+  };
+
+  const stitok = (aktivny: boolean) => ({
+    padding: "8px 11px", borderRadius: 8, fontSize: 12.5, cursor: uklada ? "wait" : "pointer", textAlign: "left" as const,
+    border: `1px solid ${aktivny ? C.accent : C.border}`, background: aktivny ? C.accentBg : "transparent", color: aktivny ? C.accentLight : C.text,
+  });
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div onClick={onZavri}
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Prečo sa hodina ruší"
+        style={{ width: "100%", maxWidth: 380, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 15px", boxShadow: "0 12px 36px rgba(0,0,0,.55)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Prečo sa hodina ruší?</div>
+          <button onClick={onZavri} aria-label="Zavrieť" style={{ background: "none", border: "none", color: C.textDim, fontSize: 15, cursor: "pointer", lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, margin: "4px 0 11px" }}>
+          Zmazané: <b style={{ color: C.text }}>{z.kto}</b> · {den(z.zaciatok)} o {cas(z.zaciatok)} · {z.trener}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {DOVODY_ZRUSENIA.map((d) => (
+            <button key={d} onClick={() => void uloz(d)} disabled={uklada} style={stitok(false)}>{d}</button>
+          ))}
+          <button onClick={() => setIne(!ine)} disabled={uklada} style={stitok(ine)}>iné…</button>
+        </div>
+        {ine && (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input autoFocus value={text} onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void uloz(text); } }}
+              placeholder="vlastnými slovami… (Enter uloží)"
+              style={{ flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+            <button onClick={() => void uloz(text)} disabled={uklada || !text.trim()}
+              style={{ padding: "7px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, opacity: text.trim() ? 1 : 0.5 }}>
+              {uklada ? "…" : "Uložiť"}
+            </button>
+          </div>
+        )}
+        {chyba && <div style={{ fontSize: 11.5, color: C.red, lineHeight: 1.5, marginTop: 8 }}>{chyba}</div>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 11 }}>
+          <span style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.4 }}>Bez odpovede sa spýta karta Zmeny v kalendári.</span>
+          <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Teraz nie</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

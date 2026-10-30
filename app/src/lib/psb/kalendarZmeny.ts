@@ -184,3 +184,29 @@ export function najdiPresun(
   kandidati.sort((a, b) => a.odstup - b.odstup || a.u.zaciatok.localeCompare(b.u.zaciatok));
   return { zaciatok: kandidati[0].u.zaciatok, uid: kandidati[0].u.uid, kandidatov: kandidati.length };
 }
+
+/**
+ * DÔVODY ZRUŠENIA — ponuka v okne po zmazaní tréningu z Kokpitu
+ * (Jerry, 30. 10. 2026: „chorý, pracovné záležitosti, rodinné… aké možnosti
+ * by si navrhoval ty?"). Zapisuje sa holý štítok do `kal_zmeny.poznamka`,
+ * teda rovnaké miesto ako odpoveď z karty Zmeny v kalendári — denník klienta
+ * aj Jarvis ho čítajú bez úprav.
+ *
+ * „presunuli sme" a „chyba v zápise" sú doslova tie isté slová ako v karte
+ * Zmeny, aby sa dali spočítať spolu. Bolesť je zvlášť od choroby: pri
+ * biomechanike je to iný signál (klient sa môže vrátiť s problémom, nie
+ * zdravý). „neprišiel bez ozvania" a „zrušil tréner" nie sú klientova
+ * výhovorka — tie dve treba vedieť oddeliť skôr, než sa začne zrušenia
+ * počítať.
+ */
+export const DOVODY_ZRUSENIA = [
+  "choroba",
+  "práca",
+  "rodina",
+  "dovolenka / cesta",
+  "bolesť / zranenie",
+  "neprišiel bez ozvania",
+  "zrušil tréner",
+  "presunuli sme",
+  "chyba v zápise",
+] as const;
