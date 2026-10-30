@@ -3478,6 +3478,9 @@ export function deriveRegister(
      * dohodnutý" (Dashboard), ktoré by tu radili presný opak.
      */
     if (nechceHovor(l)) {
+      // Kto si napriek tomu dohodol úvodný (Klára Malíčková: termín 12. 11.,
+      // Terezka to odklepla pod `odpoved|` 28. 10.), tomu „neozývať sa" nepatrí.
+      if (data.anomalyAck?.[`odpoved|${l.id}`] || maTermin(meno)) continue;
       const bolest = /bolí:\s*([^|]+)/i.exec(String(l.note || ""))?.[1]?.trim();
       add(
         `testpostury|${l.id}`,

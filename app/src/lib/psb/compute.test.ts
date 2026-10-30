@@ -945,6 +945,12 @@ describe("nový dopyt čaká na odpoveď", () => {
     expect(x.telefon).toBeUndefined();
   });
 
+  it("test postury bez hovoru mlčí, keď už odpoveď padla pod starým kľúčom (Klára Malíčková)", () => {
+    const l = lead({ id: "k", source: "web", note: "TEST POSTURY | hovor: Ne, stačí mi analýza e-mailem" });
+    const r = deriveRegister({ ...EMPTY_DATA, leads: [l], anomalyAck: { "odpoved|k": { note: "úvodný dohodnutý", acked_at: "" } } } as never, {}, [], []);
+    expect(r.filter((x) => x.key.startsWith("testpostury|"))).toHaveLength(0);
+  });
+
   it("test postury s hovorom povie, že je to test postury", () => {
     const [x] = najdi([lead({ source: "web", note: "TEST POSTURY | bolí: krk | hovor: Ano, zavolejte mi" })]);
     expect(x.tone).toBe("orange");
