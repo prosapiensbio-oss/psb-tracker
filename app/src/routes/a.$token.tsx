@@ -7,6 +7,8 @@ import { FORMULAR } from "../lib/psb/anamnezaFormular";
 import { UKAZKA_KLIENT, jeUkazka } from "../lib/psb/ukazka";
 import { podlaTokenu, ulozKlienta } from "../lib/psb/anamneza.server";
 import { strankaHtml } from "../lib/psb/anamnezaStranka";
+import { setOverride } from "../lib/psb/db.server";
+import { datumNarodenia } from "../lib/psb/parse";
 
 /**
  * ANAMNÉZA PRE KLIENTA — verejná stránka za tokenom.
@@ -49,10 +51,14 @@ function popisUvodneho(zaciatok: string | null): string | null {
 async function kontext(DB: import("@cloudflare/workers-types").D1Database, klient: string) {
   const fa = await DB.prepare("SELECT email, telefon FROM klient_fakturacia WHERE klient = ?1")
     .bind(klient).first<{ email: string | null; telefon: string | null }>();
+  // Narodeniny (Jerry, 30. 10. 2026): PTminder ich už nedodá a nová anamnéza
+  // sa na ne nepýtala — klient po 1. 10. tak bez nich zostal navždy.
+  const nar = await DB.prepare("SELECT narodeniny FROM client_overrides WHERE name = ?1")
+    .bind(klient).first<{ narodeniny: string | null }>();
   const u = await DB.prepare(
     "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
   ).bind(klient, terazPraha()).first<{ z: string | null }>();
-  return { kontakt: { email: fa?.email, telefon: fa?.telefon }, uvodny: popisUvodneho(u?.z || null) };
+  return { kontakt: { email: fa?.email, telefon: fa?.telefon, narodeniny: nar?.narodeniny || null }, uvodny: popisUvodneho(u?.z || null) };
 }
 
 /**
@@ -71,8 +77,8 @@ async function kontext(DB: import("@cloudflare/workers-types").D1Database, klien
 async function ulozOpravu(
   DB: import("@cloudflare/workers-types").D1Database,
   klient: string,
-  stare: { email?: string | null; telefon?: string | null },
-  nove: { meno: string; email: string; telefon: string },
+  stare: { email?: string | null; telefon?: string | null; narodeniny?: string | null },
+  nove: { meno: string; email: string; telefon: string; narodeniny: string },
 ): Promise<void> {
   const zmeny: string[] = [];
   const email = nove.email.trim().slice(0, 200);
@@ -90,6 +96,15 @@ async function ulozOpravu(
     ).bind(klient, email, telefon, teraz).run();
     if (inak(stare.email, email)) zmeny.push(`e-mail: ${stare.email || "—"} → ${email}`);
     if (inak(stare.telefon, telefon)) zmeny.push(`telefon: ${stare.telefon || "—"} → ${telefon}`);
+  }
+
+  // Dátum narodenia: ten istý strážca ako pri importoch (rok 2036 neprejde).
+  // Prázdne miesto sa doplní potichu; ZMENU existujúceho dátumu uvidí tréner
+  // v denníku, lebo prepisuje to, čo niekto zapísal predtým.
+  const narodeniny = datumNarodenia(nove.narodeniny);
+  if (narodeniny && narodeniny !== (stare.narodeniny || "")) {
+    await setOverride(DB, klient, "narodeniny", narodeniny);
+    if (stare.narodeniny) zmeny.push(`datum narození: ${stare.narodeniny} → ${narodeniny}`);
   }
 
   // Meno sa porovnáva bez diakritiky a veľkých písmen — „Josef Pavek"
@@ -210,7 +225,7 @@ export const Route = createFileRoute("/a/$token")({
         const kStare = await kontext(DB, a.klient);
         try {
           await ulozOpravu(DB, a.klient, kStare.kontakt, {
-            meno: jedno("oprava_meno"), email: jedno("oprava_email"), telefon: jedno("oprava_telefon"),
+            meno: jedno("oprava_meno"), email: jedno("oprava_email"), telefon: jedno("oprava_telefon"), narodeniny: jedno("narodeniny"),
           });
         } catch { /* ticho — odpovede sú dôležitejšie */ }
 

@@ -49,9 +49,10 @@ const STYL = `
   .oprava summary u{color:${F.text};text-underline-offset:3px}
   .oprava[open] summary:after{content:"×";margin-left:6px;opacity:.75}
   .oprava .poly{display:flex;flex-direction:column;gap:9px;margin-top:11px}
-  .oprava label{display:block;font-size:11.5px;color:${F.slaba}}
-  .oprava input{margin-top:4px}
-  input[type=email],input[type=tel]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid ${F.linka};background:${F.pozadie};color:${F.text};font:inherit;font-size:14px}
+  .oprava label,.nar label{display:block;font-size:11.5px;color:${F.slaba}}
+  .oprava input,.nar input{margin-top:4px}
+  .nar{margin-top:11px}
+  input[type=email],input[type=tel],input[type=date]{color-scheme:dark;width:100%;padding:11px 12px;border-radius:9px;border:1px solid ${F.linka};background:${F.pozadie};color:${F.text};font:inherit;font-size:14px}
   fieldset{border:0;margin:26px 0 0;padding:0}
   legend{padding:0;font-size:16px;line-height:1.4}
   .pomoc{font-size:12.5px;color:${F.slaba};margin-top:5px}
@@ -129,6 +130,12 @@ function otazkaHtml(o: Otazka): string {
 export function strankaHtml(v: VstupStranky): string {
   const sekcia = v.formular.klient[0];
   const krstne = esc(oslovenieKlienta(v.klient || ""));
+  // Datum narození (30. 10. 2026): kto ho v Kokpite nemá, vidí políčko hneď,
+  // kto ho má, môže ho opraviť pod „Opravte nás". Nepovinné. Jedno meno poľa
+  // pre oba prípady — server ho číta rovnako.
+  const nar = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.kontakt.narodeniny || "");
+  const narText = nar ? `nar. ${Number(nar[3])}. ${Number(nar[2])}. ${nar[1]}` : "";
+  const polNarodeniny = `<label>Datum narození${narText ? "" : ` <em style="font-style:normal;color:${F.slaba}">· nepovinné</em>`}<input type="date" name="narodeniny" value="${esc(nar ? v.kontakt.narodeniny : "")}" min="1920-01-01" max="${new Date().toISOString().slice(0, 10)}" autocomplete="bday"></label>`;
 
   const telo = v.hotovo
     ? `<div class="hotovo">
@@ -139,7 +146,7 @@ export function strankaHtml(v: VstupStranky): string {
     : `<form method="post" id="f">
         <div class="viem">
           <b>${esc(v.klient)}</b><br>
-          <span>${[v.kontakt.email, v.kontakt.telefon].filter(Boolean).map(esc).join(" · ")}</span>
+          <span>${[v.kontakt.email, v.kontakt.telefon, narText].filter(Boolean).map(esc).join(" · ")}</span>
           ${v.uvodny ? `<br><span>úvodní trénink: ${esc(v.uvodny)}</span>` : ""}
           <details class="oprava">
             <summary>Nesedí něco? <u>Opravte nás.</u></summary>
@@ -147,9 +154,11 @@ export function strankaHtml(v: VstupStranky): string {
               <label>Jméno a příjmení<input type="text" name="oprava_meno" value="${esc(v.klient)}" autocomplete="name"></label>
               <label>E-mail<input type="email" name="oprava_email" value="${esc(v.kontakt.email || "")}" autocomplete="email" inputmode="email"></label>
               <label>Telefon<input type="tel" name="oprava_telefon" value="${esc(v.kontakt.telefon || "")}" autocomplete="tel" inputmode="tel"></label>
+              ${narText ? polNarodeniny : ""}
               <div class="pomoc">Opravené údaje se uloží spolu s odpověďmi.</div>
             </div>
           </details>
+          ${narText ? "" : `<div class="nar">${polNarodeniny}</div>`}
         </div>
         ${sekcia.otazky.map(otazkaHtml).join("")}
         <div class="suhlasy">
