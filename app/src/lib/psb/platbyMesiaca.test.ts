@@ -53,4 +53,10 @@ describe("platby mesiaca", () => {
     const s = stavPlatieb("2026-10", [p("2026-09-28", -29750, "fixne.prevadzka.najom", "Měsíčni nájem Fanderlíkova")], {}, "2026-10-30");
     expect(stav(s, "najom-fanderlikova").zaplatene).toBeNull();
   });
+
+  test("odložená notifikácia nie je zaplatená — po termíne sa vráti", () => {
+    const ack = { [klucPlatbyMesiaca("stat-jerry", "2026-11")]: { note: "odlozene|2026-11-20|" } };
+    expect(stavPlatieb("2026-11", [], ack, "2026-11-16").find((x) => x.platba.id === "stat-jerry")!.zaplatene).toBeNull();
+    expect(platbyNaZaplatenie([], ack, "2026-11-16").some((x) => x.platba.id === "stat-jerry")).toBe(true);
+  });
 });

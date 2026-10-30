@@ -78,6 +78,16 @@ export type StavPlatby = {
   pripomenut: boolean;
 };
 
+type Ack = Record<string, { note?: string } | undefined>;
+
+/**
+ * Odklik je odpoveď BEZ odloženia. „Odložiť" v notifikácii píše do toho
+ * istého kľúča `odlozene|<deň>|…` — keby sa to rátalo ako zaplatené, platba
+ * by po odložení zmizla navždy namiesto toho, aby sa v ten deň vrátila
+ * (našla to kontrola nad ostrými dátami 30. 10. 2026).
+ */
+const jeOdklik = (a: { note?: string } | undefined) => !!a && !String(a.note || "").startsWith("odlozene|");
+
 const predoslyMesiac = (m: string) => {
   const [r, mm] = m.split("-").map(Number);
   return mm === 1 ? `${r - 1}-12` : `${r}-${String(mm - 1).padStart(2, "0")}`;
@@ -87,14 +97,14 @@ const predoslyMesiac = (m: string) => {
 export function stavPlatieb(
   mesiac: string,
   pohyby: PohybPlatby[],
-  ack: Record<string, unknown>,
+  ack: Ack,
   dnes: string = dnesPraha(),
 ): StavPlatby[] {
   const vMesiaci = pohyby.filter((p) => p.datum.slice(0, 7) === mesiac && p.suma < 0);
   return PRAVIDELNE_PLATBY.map((platba) => {
     const kryje = vMesiaci.filter(platba.je);
     const zaplatene = kryje.length >= (platba.pocet || 1) ? "banka" as const
-      : ack[klucPlatbyMesiaca(platba.id, mesiac)] ? "rucne" as const : null;
+      : jeOdklik(ack[klucPlatbyMesiaca(platba.id, mesiac)]) ? "rucne" as const : null;
     const denPripomenutia = `${mesiac}-${String(platba.den).padStart(2, "0")}`;
     return { platba, mesiac, pohyby: kryje, zaplatene, pripomenut: dnes.slice(0, 10) >= denPripomenutia };
   });
@@ -108,7 +118,7 @@ export function stavPlatieb(
  */
 export function platbyNaZaplatenie(
   pohyby: PohybPlatby[],
-  ack: Record<string, unknown>,
+  ack: Ack,
   dnes: string = dnesPraha(),
 ): StavPlatby[] {
   const teraz = dnes.slice(0, 7);

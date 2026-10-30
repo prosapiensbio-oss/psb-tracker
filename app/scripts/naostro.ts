@@ -56,6 +56,12 @@ const base: PSBData = {
   poplatky: nacitaj("poplatky").map((r: any) => ({
     id: String(r.id), datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: r.suma_czk })),
   clientOverrides: {}, anomalyAck: {},
+  // Platby mesiaca — to isté mapovanie ako `loadData` (30. 10. 2026). Bez
+  // nich by kontrola hlásila každý nájom ako nezaplatený.
+  platbyPohyby: (() => { try { return nacitaj("platby_pohyby"); } catch { return []; } })().map((r: any) => ({
+    datum: String(r.date).slice(0, 10), suma: Number(r.amount_czk) || 0,
+    kategoria: r.category || "", text: `${r.counterparty || ""} ${r.note || ""}`,
+  })),
   // Dozor reklám — to isté mapovanie ako `nacitajDozor` (reklamaDozor.server.ts).
   reklamaDozor: (() => {
     const nacitajTicho = (n: string) => { try { return nacitaj(n); } catch { return []; } };
