@@ -27,6 +27,8 @@ import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
 import { NaCeluObrazovku } from "./NaCeluObrazovku";
 import { jeKontrolaPenazi, jeReklamaDozoru } from "../../lib/psb/kontrolaPenazi";
+import { platbyNaZaplatenie } from "../../lib/psb/platbyMesiaca";
+import { PlatbyMesiaca } from "./PlatbyMesiaca";
 import type { Actions } from "./App";
 import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
@@ -1754,6 +1756,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           {/* VÝDAVKY NA POTVRDENIE — každý týždeň, nie pri uzávierke (Jerry,
               29. 10. 2026). Banka sa sťahuje sama každú noc; tu sa len
               potvrdí, čo pravidlá zaradili, a doplní, čo nezaradili. */}
+          {/* PLATBY MESIACA (Jerry, 30. 10. 2026) — nájmy, štát, Jarek na odklikanie. */}
+          {actions && (
+            <PlatbyMesiaca
+              pohyby={data.platbyPohyby || []}
+              ack={data.anomalyAck || {}}
+              onAck={(key, note, zapnut) => actions.ackAnomaly(key, note, zapnut)}
+            />
+          )}
           <div style={{ marginBottom: 16 }}>
             <BankaUlozene
               kontrola pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
@@ -1945,7 +1955,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           polozky={zive.map((x) => ({
             kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
             nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
+            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
           }))}
           aktivna={Math.min(i, zive.length - 1)}
           onVyber={(j, smer) => prepni(smer, j)}

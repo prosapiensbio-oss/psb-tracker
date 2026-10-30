@@ -274,6 +274,8 @@ export type PSBData = {
   hodinyNavyse?: import("./hodinyNavyse").HodinyNavyse;
   /** Pohyby hlavného účtu na rezervný účet PSB a späť (− = odložené). */
   rezervaPrevody?: { date: string; amount: number }[];
+  /** Odchádzajúce pohyby z Fio od začiatku predošlého mesiaca — kontrola Platieb mesiaca (platbyMesiaca.ts). */
+  platbyPohyby?: import("./platbyMesiaca").PohybPlatby[];
   /**
    * Balíčky zapísané v Kokpite (vrátane naliatych z PTmindera). Od 1. 10.
    * 2026 sa z nich počíta zostatok na karte klienta (`zostatokKokpitu`).

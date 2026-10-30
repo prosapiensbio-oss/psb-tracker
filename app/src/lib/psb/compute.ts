@@ -19,6 +19,7 @@ import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
 import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
+import { klucPlatbyMesiaca, platbyNaZaplatenie } from "./platbyMesiaca";
 import { obdobieRezervy, odlozeneOd, predosleObdobie, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
 import type {
   Lead,
@@ -3242,6 +3243,31 @@ export function deriveRegister(
         { trener: "Jerry" },
       );
     }
+  }
+
+  // PLATBY MESIACA (Jerry, 30. 10. 2026): nájmy, štát a Jarek sa platia
+  // ručne a dajú sa zabudnúť — v októbri chýbal nájom Fanderlíková a nikto
+  // to nepovedal. Od dňa pripomenutia, kým platba nie je vo výpise alebo
+  // odkliknutá. Kľúč je ten istý ako v zozname vo Workspace, takže
+  // „Vybavené" tu odškrtne aj tam.
+  for (const s of platbyNaZaplatenie(data.platbyPohyby || [], ack)) {
+    const minuly = s.mesiac < dnesPraha().slice(0, 7);
+    const ciastocne = s.pohyby.length ? ` Vo výpise je zatiaľ ${s.pohyby.length} z ${s.platba.pocet} platieb.` : "";
+    add(
+      klucPlatbyMesiaca(s.platba.id, s.mesiac),
+      "Zápis",
+      minuly ? "red" : "orange",
+      `Zaplatiť: ${s.platba.nazov} ${s.platba.suma}${minuly ? ` — za ${monthLabel(s.mesiac)}` : ""}`,
+      `Zaplatiť: ${s.platba.nazov} ${s.platba.suma}${minuly ? ` za ${monthLabel(s.mesiac)} — mesiac skončil a vo výpise nie je` : ` (pripomína sa od ${s.platba.den}.${s.platba.termin ? `, zaplatiť ${s.platba.termin}` : ""})`}.`
+        + ciastocne
+        + " Keď prevod Kokpit v noci uvidí vo výpise z Fio, zmizne sám; inak klikni Vybavené."
+        + " Celý zoznam: Workspace → Kontrola peňazí.",
+      minuly ? 1 : 3,
+      "workspace|kontroly",
+      // Rodina po platbe: „Nehlásiť" pri Jarkovi nesmie umlčať nájom.
+      `platba-mesiaca|${s.platba.id}`,
+      { trener: "Jerry" },
+    );
   }
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.

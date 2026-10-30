@@ -454,6 +454,19 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         "SELECT date, amount_czk FROM fio_transactions WHERE counterparty LIKE ?1 ORDER BY date",
       ).bind(`%${REZERVA_CISLO}%`).all()).results || []) as { date: string; amount_czk: number }[])
         .map((r) => ({ date: String(r.date).slice(0, 10), amount: Number(r.amount_czk) || 0 }));
+      // PLATBY MESIACA (30. 10. 2026): nájmy, štát, Jarek — čo sa platí ručne.
+      // Stačí predošlý a bežný mesiac; register sa na starší nepýta.
+      const odMesiaca = (() => {
+        const [r, m] = dnesPraha().slice(0, 7).split("-").map(Number);
+        return m === 1 ? `${r - 1}-12-01` : `${r}-${String(m - 1).padStart(2, "0")}-01`;
+      })();
+      data.platbyPohyby = (((await DB.prepare(
+        "SELECT date, amount_czk, category, counterparty, note FROM fio_transactions WHERE amount_czk < 0 AND date >= ?1",
+      ).bind(odMesiaca).all()).results || []) as { date: string; amount_czk: number; category: string | null; counterparty: string | null; note: string | null }[])
+        .map((r) => ({
+          datum: String(r.date).slice(0, 10), suma: Number(r.amount_czk) || 0,
+          kategoria: r.category || "", text: `${r.counterparty || ""} ${r.note || ""}`,
+        }));
     }
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
       klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,

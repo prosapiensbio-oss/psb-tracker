@@ -4,6 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
+import { platbyNaZaplatenie, stavPlatieb, type StavPlatby } from "./platbyMesiaca";
 import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
@@ -1135,6 +1136,20 @@ export function buildAiContext(
         odlozeneVybavene: !!data.anomalyAck?.[`rezerva|${o.splatne}`],
         rezervnyUcet: `${REZERVA_CISLO}/2010`,
         stavRezervnehoUctu: stavRezervnehoUctu(data.rezervaPrevody || []),
+      };
+    })(),
+    platbyMesiaca: (() => {
+      const teraz = dnesPraha().slice(0, 7);
+      const riadok = (x: StavPlatby) => ({
+        platba: x.platba.nazov, suma: x.platba.suma, mesiac: x.mesiac, pripomenutOd: x.platba.den, termin: x.platba.termin || null,
+        stav: x.zaplatene === "banka" ? "zaplatené (vo výpise)" : x.zaplatene === "rucne" ? "odkliknuté ako zaplatené" : x.pripomenut ? "NEZAPLATENÉ" : "ešte nie je čas",
+        voVypise: x.pohyby.map((p) => ({ den: p.datum, suma: p.suma })),
+      });
+      return {
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Ručné pravidelné platby (Jerry, 30. 10. 2026): nájom Fanderlíková (prevádzka, nie stará adresa) a nájom Přadlácká sú DVA rôzne nájmy, plus štát Jerry, štát Terezka (2 platby) a splátka Jarkovi. Na otázku „je všetko zaplatené“ odpovedz z tohto poľa, nie z hľadania v banke. Zoznam na odklikanie je vo Workspace → Kontrola peňazí, pripomienky v registri majú kľúč platba-mesiaca|<id>|<mesiac>. Štát Jerry a nájom Přadlácká idú na Jerryho vlastný účet 2323438014 — vo výpise je presun k nemu, nie platba štátu či prenajímateľovi.",
+        mesiac: teraz,
+        platby: stavPlatieb(teraz, data.platbyPohyby || [], data.anomalyAck || {}).map(riadok),
+        nezaplateneZaMinulyMesiac: platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).filter((x) => x.mesiac < teraz).map(riadok),
       };
     })(),
     dlhyVyplaty: (() => {
