@@ -127,6 +127,40 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
   };
   useEffect(nacitaj, []);
 
+  /**
+   * STIAHNUŤ Z FIO rovno nad zoznamom na potvrdenie (Jerry, 30. 10. 2026).
+   *
+   * Je to tá istá akcia `auto`, ktorú púšťa nočný plánovač: posledných 35 dní,
+   * zapíše len nové pohyby, nepotvrdené, kategória z pravidiel. Náhľad netreba
+   * — potvrdzuje sa práve v tomto zozname. Banka pustí jedno volanie za 30 s;
+   * jej odmietnutie sa ukáže vetou a nezmizne.
+   */
+  const [fioBezi, setFioBezi] = useState(false);
+  const stiahniFio = async () => {
+    if (fioBezi) return;
+    setFioBezi(true); setSprava("");
+    let r: { ok?: boolean; chyba?: string; error?: string; vydavky?: number; prijmy?: number; zamknute?: number };
+    try {
+      const res = await fetch("/api/fio", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "auto" }),
+      });
+      const text = await res.text();
+      try { r = JSON.parse(text) as typeof r; }
+      catch { r = { ok: false, chyba: `Server odpovedal ${res.status}: ${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)}` }; }
+    } catch (e) {
+      r = { ok: false, chyba: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    setFioBezi(false);
+    if (!r.ok) { setSprava(`Fio sa nestiahlo — ${r.chyba || r.error || "neznáma chyba"}`); return; }
+    const v = r.vydavky || 0, p = r.prijmy || 0;
+    setSprava(v || p
+      ? `Stiahnuté z Fio: ${v} ${v === 1 ? "nový výdavok" : v > 1 && v < 5 ? "nové výdavky" : "nových výdavkov"}, ${p} ${p === 1 ? "príjem" : p > 1 && p < 5 ? "príjmy" : "príjmov"}.`
+      : "Stiahnuté z Fio — nič nové, všetko už je v Kokpite.");
+    nacitaj();
+    if (v || p) oznam("peniaze");
+  };
+
   // V Kontrole peňazí len odomknuté mesiace; inde všetko.
   const pohybyVidno = kontrola ? pohyby.filter((p) => !zamknute.has(String(p.datum).slice(0, 7))) : pohyby;
   const mesiace = [...new Set(pohybyVidno.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
@@ -292,6 +326,13 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
         <H3><Info label={kontrola ? "Výdavky na potvrdenie" : uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
+        {kontrola && (
+          <button onClick={(e) => { e.stopPropagation(); void stiahniFio(); }} disabled={fioBezi}
+            title="Stiahne pohyby za posledných 35 dní — to isté, čo Kokpit robí každú noc"
+            style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: fioBezi ? "default" : "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600, opacity: fioBezi ? 0.5 : 1 }}>
+            {fioBezi ? "sťahujem…" : "↻ Stiahnuť Fio"}
+          </button>
+        )}
         {uzavierka && (
           <span style={{ fontSize: 11.5, color: naKontrolu ? C.orange : C.green }}>{naKontrolu ? `${naKontrolu} na kontrolu${kontrola && tentoTyzden ? ` · ${tentoTyzden} z tohto týždňa` : ""}` : "všetko skontrolované ✓"}</span>
         )}
@@ -339,7 +380,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
               style={{ flex: "1 1 180px", minWidth: 0, padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           </div>
 
-          {sprava && <div style={{ marginBottom: 10, padding: "8px 11px", borderRadius: 8, background: mix(C.green, 12), color: C.text, fontSize: 12.5 }}>{sprava}</div>}
+          {sprava && <div style={{ marginBottom: 10, padding: "8px 11px", borderRadius: 8, background: mix(sprava.startsWith("Fio sa nestiahlo") ? C.orange : C.green, 12), color: C.text, fontSize: 12.5 }}>{sprava}</div>}
 
           {oznacene.size > 0 && (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 32)}` }}>
