@@ -74,9 +74,9 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 10b. [x] (31. 10., strizna 712120c) Brief príspevku „O čom to je“ – jeden zdroj faktov pre caption, nápady, text titulky, karusel.
 10c. [x] (31. 10., strizna 712120c) Výsledky späť do písania – 5 najlepších háčikov účtu v briefe.
 10d. [x] (31. 10., strizna 06ec25e) Profily bez tichého PSB – čo profilu chýba, viditeľná náhrada, feed a Jarvis podľa profilu.
-10e. [ ] Obal ako jeden krok v Zverejniť (snímka · karta v štýle účtu · AI), predvolený podľa profilu.
-10f. [ ] Jeden zoznam príspevkov so stavom + „+ Nový príspevok“ s výberom druhu.
-10g. [ ] Dizajn: farby appky podľa aktívneho profilu; obrazovka hotového videa v užšom okne.
+10e. [x] (31. 10., strizna ca6d87b) Obal ako jeden krok v Zverejniť (snímka · karta v štýle účtu · AI), predvolený podľa profilu.
+10f. [x] (31. 10., strizna 8cf9003 – rozšírený Prehľad, nie nová obrazovka) Jeden zoznam príspevkov so stavom + „+ Nový príspevok“ s výberom druhu.
+10g. [x] (31. 10., strizna d04199f, f0394fa, dace52f – téma už bola od 20. 10., teraz s kontrolou čitateľnosti; editor podľa účtu strihu) Dizajn: farby appky podľa aktívneho profilu; obrazovka hotového videa v užšom okne.
 10h. [ ] Kruh nanečisto (Claude ako Terezka na kópii dát) – opraviť, čo padne; potom bod 8 so skutočnou Terezkou.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
