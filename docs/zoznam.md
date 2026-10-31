@@ -77,7 +77,10 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 10e. [x] (31. 10., strizna ca6d87b) Obal ako jeden krok v Zverejniť (snímka · karta v štýle účtu · AI), predvolený podľa profilu.
 10f. [x] (31. 10., strizna 8cf9003 – rozšírený Prehľad, nie nová obrazovka) Jeden zoznam príspevkov so stavom + „+ Nový príspevok“ s výberom druhu.
 10g. [x] (31. 10., strizna d04199f, f0394fa, dace52f – téma už bola od 20. 10., teraz s kontrolou čitateľnosti; editor podľa účtu strihu) Dizajn: farby appky podľa aktívneho profilu; obrazovka hotového videa v užšom okne.
-10h. [ ] Kruh nanečisto (Claude ako Terezka na kópii dát) – opraviť, čo padne; potom bod 8 so skutočnou Terezkou.
+10h. [x] (31. 10., strizna 9888c08 – zápis v docs/test-terezka.md) Kruh nanečisto (Claude ako Terezka na kópii dát) – opraviť, čo padne; potom bod 8 so skutočnou Terezkou.
+
+10i. [x] (31. 10.) Pri kontrole kritiky dorobené: audit editora (Inšpektor na plnú výšku, strizna 732caec), editor pod pruhmi, scenár karty podľa účtu + háčiky účtu, hashtagy podľa účtu, Jarvis bez fáz štúdia pre osobné účty.
+10j. [ ] Naživo po prihlásení Clauda (`~/.local/bin/claude` → /login): Napísať, ✦ text titulky, scenár osobnej karty, prvý strih, feed iného účtu.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
