@@ -40,7 +40,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **C · Strižňa 1.0 (hranica v sekcii 2) — Jerry: na zajtra, 14. 10. 2026**
 8. [ ] Terezka prejde jeden reel celým kruhom; opraviť, čo padne.
-9. [ ] Upload do Higgsfieldu (SSL pri PUT) – opravované 3× (eba67c2, 741b0fe, dfa9b7b); nechať otvorené, kým ďalšie veľké nahratie neprejde.
+9. [x] Upload do Higgsfieldu (SSL pri PUT) – opravované 3× (eba67c2, 741b0fe, dfa9b7b). Overené 31. 10. v dátach: po poslednej chybe prešli 3 naplánovania vrátane repostu Filipa 174 MB (28. 10.) a dvoch hotových videí Ahsoky (27. 10., 4. 11.).
 9b. [ ] Overiť naživo: nahratie 1–2 GB z iPhonu, mikrofón v Electrone, klávesy a ⌘± na reálnej klávesnici.
 9c. [x] Staré projekty so zastaraným renderom – 20. 10. 2026 Strižňa hlási 0 zastaraných (GET /api/zastarane), nie je čo prerenderovať.
 9f. [x] Ďalšie profily v Strižni – hotové 19. 10. 2026 (Jerry: „priprav Strižňu pre tie ďalšie naše profily“): PSB,
@@ -64,7 +64,7 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9n. [ ] Terezka: `~/.local/bin/claude` → `/login`, potom znova spracovať jej dni a prejsť test (`docs/test-terezka.md`).
 9o. [x] (hotové 22.–23. 10.: Cvičenie v pohybe, podpisové prvky, 10 prechodov) Strih cvičebných videí je mdlý (Jerry 22. 10.): diagnóza (strih vs. natočenie), výskum techník (strih v pohybe medzi uhlami, rytmus, zrýchlenie/spomalenie, detail) a štýl „Cvičenie v pohybe“ v Strižni; skúšobné zábery v ~/Downloads/filip_stranavsky fp insta.
 9p. [x] (hotové 23. 10.; YouTube sťahuje cez ~/bin/yt-dlp) Strižňa – Vložky (Jerry 23. 10.): filmové reakcie (obraz, hlas ide ďalej) aj hlášky so zvukom, CZ/SK klasiky aj Hollywood; banka vložiek, hľadanie scén na YouTube cez titulky, návrhy z prepisu. Vzor: @nadacia_zastavmekorupciu (vložka každé 3–4 s, Poirot ako vizuálny vtip).
-9q. [ ] Prvé ostré skúšky (26. 10.): hotové video #24 Ahsoky → titulka + naplánovať v Metricoole; AI titulka Ahsoky (Higgsfield, kredity); prvý presun ťahaním v Kalendári po oprave twitterData; Príbeh z klipov na ďalšom priečinku (#22, #28–32).
+9q. [ ] Prvé ostré skúšky (26. 10.): ~~hotové video Ahsoky → titulka + naplánovať v Metricoole~~ (prešlo: 27. 10. a 4. 11.); AI titulka Ahsoky (Higgsfield, kredity); prvý presun ťahaním v Kalendári po oprave twitterData; Príbeh z klipov na ďalšom priečinku (#22, #28–32).
 9r. [x] Push na GitHub (28. 10.): Príbeh z klipov, palety profilov, fotky/videá v infografikách a 4 psie štýly Ahsoky (Vodítko, Mapa, Štartové číslo, Pamlsky) – main a1cbbe6.
 9s. [ ] Naostro overiť: karusel s fotkou/videom do Metricoolu, grafika od Clauda/Higgsfieldu v štýloch Ahsoky.
 
