@@ -68,6 +68,17 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 9r. [x] Push na GitHub (28. 10.): Príbeh z klipov, palety profilov, fotky/videá v infografikách a 4 psie štýly Ahsoky (Vodítko, Mapa, Štartové číslo, Pamlsky) – main a1cbbe6.
 9s. [ ] Naostro overiť: karusel s fotkou/videom do Metricoolu, grafika od Clauda/Higgsfieldu v štýloch Ahsoky.
 
+**C2 · Strižňa – kritika 31. 10. 2026 (Jerry: „rob to v poradí, ako navrhuješ, sprav všetko“)**
+Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástroje – len tieto body a opravy.
+10a. [ ] Zdravie Strižne – pruh hore, keď je Claude odhlásený / Metricool / Higgsfield nedostupný / joby padajú na pozadí.
+10b. [ ] Brief príspevku „O čom to je“ – jeden zdroj faktov pre caption, nápady, text titulky, karusel.
+10c. [ ] Výsledky späť do písania – 5 najlepších háčikov účtu v briefe.
+10d. [ ] Profily bez tichého PSB – čo profilu chýba, viditeľná náhrada, feed a Jarvis podľa profilu.
+10e. [ ] Obal ako jeden krok v Zverejniť (snímka · karta v štýle účtu · AI), predvolený podľa profilu.
+10f. [ ] Jeden zoznam príspevkov so stavom + „+ Nový príspevok“ s výberom druhu.
+10g. [ ] Dizajn: farby appky podľa aktívneho profilu; obrazovka hotového videa v užšom okne.
+10h. [ ] Kruh nanečisto (Claude ako Terezka na kópii dát) – opraviť, čo padne; potom bod 8 so skutočnou Terezkou.
+
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
 14. [x] Osobné profily — nahradené 19.–20. 10.: profily sú v Strižni (prepínač účtov, značky Metricoolu, farby) – Jerry to tak chcel (Jerry 13. 10.; otvorené otázky v sekcii 2).
