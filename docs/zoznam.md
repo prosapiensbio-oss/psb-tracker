@@ -70,10 +70,10 @@ otvorené, zoradené podľa toho, čo sa dá stratiť, čo je lacné a čo na č
 
 **C2 · Strižňa – kritika 31. 10. 2026 (Jerry: „rob to v poradí, ako navrhuješ, sprav všetko“)**
 Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástroje – len tieto body a opravy.
-10a. [ ] Zdravie Strižne – pruh hore, keď je Claude odhlásený / Metricool / Higgsfield nedostupný / joby padajú na pozadí.
-10b. [ ] Brief príspevku „O čom to je“ – jeden zdroj faktov pre caption, nápady, text titulky, karusel.
-10c. [ ] Výsledky späť do písania – 5 najlepších háčikov účtu v briefe.
-10d. [ ] Profily bez tichého PSB – čo profilu chýba, viditeľná náhrada, feed a Jarvis podľa profilu.
+10a. [x] (31. 10., strizna 258a9d5) Zdravie Strižne – pruh hore, keď je Claude odhlásený / Metricool / Higgsfield nedostupný / joby padajú na pozadí.
+10b. [x] (31. 10., strizna 712120c) Brief príspevku „O čom to je“ – jeden zdroj faktov pre caption, nápady, text titulky, karusel.
+10c. [x] (31. 10., strizna 712120c) Výsledky späť do písania – 5 najlepších háčikov účtu v briefe.
+10d. [x] (31. 10., strizna 06ec25e) Profily bez tichého PSB – čo profilu chýba, viditeľná náhrada, feed a Jarvis podľa profilu.
 10e. [ ] Obal ako jeden krok v Zverejniť (snímka · karta v štýle účtu · AI), predvolený podľa profilu.
 10f. [ ] Jeden zoznam príspevkov so stavom + „+ Nový príspevok“ s výberom druhu.
 10g. [ ] Dizajn: farby appky podľa aktívneho profilu; obrazovka hotového videa v užšom okne.
