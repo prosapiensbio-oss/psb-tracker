@@ -10,7 +10,7 @@ import { CURRENT_ERA } from "../../lib/psb/vzas";
 // Most pre Jerryho súkromnú appku Peniaze manažér (worker `peniaze`).
 //
 // GET ?od=YYYY-MM-DD → { ok, results: [{ id, date, suma, counterparty, note, typ, kat }],
-//                        narok: [{ mesiac, hodiny, narok, beziaci, planovane? }], model: { fix, prah, sadzba } }
+//                        narok: [{ mesiac, hodiny, narok, beziaci, planovane?, hodinySpolu?, narokOdhad? }], model: { fix, prah, sadzba } }
 //
 // Vracia LEN Jerryho čerpanie z Fio: `vyplaty.jerry` (prevody na Air Bank aj
 // platby kartou), `spolocne.*` (spoločné s Terezkou) a výplaty bez mena
@@ -80,7 +80,18 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
         // Termíny v kalendári do konca bežiaceho mesiaca (Jerry 30. 10. 2026): Kasička nimi
         // nahradí odhad podľa tempa — na konci mesiaca tempo rátalo hodiny, ktoré už neprídu.
         const buduce = mzdoveHodiny(data.sessions.filter((s) => s.date.slice(0, 10) > dnes && s.date.slice(0, 7) === mesiac))[mesiac];
-        for (const n of narok) if (n.beziaci) Object.assign(n, { planovane: Math.round((buduce?.jerry || 0) * 100) / 100 });
+        // Odhad celého mesiaca počíta LEN Kokpit (Jerry 31. 10. 2026: nárok na jednom mieste) —
+        // Kasička ho ukazuje tak, ako príde: odrobené + v kalendári, tým istým vzorcom.
+        for (const n of narok) {
+          if (!n.beziaci) continue;
+          const planovane = Math.round((buduce?.jerry || 0) * 100) / 100;
+          const spolu = Math.round((n.hodiny + planovane) * 100) / 100;
+          Object.assign(n, {
+            planovane,
+            hodinySpolu: spolu,
+            narokOdhad: Math.round(CURRENT_ERA.fix + (spolu - CURRENT_ERA.hoursThreshold) * CURRENT_ERA.hourlyRate + n.navyse),
+          });
+        }
         const model = {
           fix: CURRENT_ERA.fix, prah: CURRENT_ERA.hoursThreshold, sadzba: CURRENT_ERA.hourlyRate,
           // Model A (26. 10. 2026): hodiny navyše × 450, max 40 h — už sú v `narok`.
