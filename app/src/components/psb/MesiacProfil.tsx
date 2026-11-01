@@ -132,7 +132,7 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
     "",
     "Čísla (hodnota | odchýlka od priemeru ostatných mesiacov):",
     ...metriky.map((m) => `${m.label}: ${m.hodnota == null ? "—" : cislo(m.hodnota)}${m.odchylka == null ? "" : ` | ${m.odchylka > 0 ? "+" : ""}${Math.round(m.odchylka)} %`}`),
-    `Dopytov: ${lievik.dopyty.length}${priemeryLievika.dopyty == null ? "" : ` (priemer ostatných mesiacov ${priemeryLievika.dopyty.toFixed(1)})`}`,
+    `Dopytov: ${lievik.dopyty.length}${priemeryLievika.dopyty == null ? "" : ` (priemer ostatných mesiacov ${priemeryLievika.dopyty.toFixed(1).replace(".", ",")})`}`,
     `Úvodných tréningov: ${lievik.uvodne}`,
     `Nových klientov: ${lievik.novi.length}`,
     "",

@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
-import { normName } from "../../lib/psb/format";
+import { fmtCZK, normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import {
   chybaZoznamuMien, fakturyZIdokladu, nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
@@ -280,7 +280,7 @@ async function zapisDiely(
   if (kusy.some((d) => !d.klient || d.suma <= 0)) return { ok: false, error: "Každý diel potrebuje klienta a kladnú sumu." };
   const spolu = kusy.reduce((n, d) => n + d.suma, 0);
   if (Math.abs(spolu - Math.round(r.amount_czk)) > 1) {
-    return { ok: false, error: `Diely dávajú ${spolu} Kč, pohyb je ${Math.round(r.amount_czk)} Kč.` };
+    return { ok: false, error: `Diely dávajú ${fmtCZK(spolu)}, pohyb je ${fmtCZK(r.amount_czk)}.` };
   }
   if (new Set(kusy.map((d) => normName(d.klient))).size !== kusy.length) {
     return { ok: false, error: "Ten istý klient je v dieloch dvakrát — spoj jeho diely do jedného." };

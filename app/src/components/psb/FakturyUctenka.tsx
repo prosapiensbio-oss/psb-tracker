@@ -5,6 +5,7 @@ import { jeNehmotny, popisNehmotnych, rozdelDoklad } from "../../lib/psb/faktura
 import { rychleVolby } from "../../lib/psb/kategorieRychle";
 import { C, mix } from "../../lib/psb/theme";
 import { VyberKategorie } from "./VyberKategorie";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * FAKTÚRY AKO ÚČTENKA — návrh A, zatiaľ len v bete (Jerry, 10. 10. 2026).
@@ -150,8 +151,8 @@ export function FakturyUctenka({
                     disabled={!!uklada}
                     onClick={() => {
                       const veta = r.maZlavuKPolozke
-                        ? `Medzi nimi je zľava k tovaru — zmazaním bude nákup o ${fmtCZK(Math.abs(r.nehmotneSuma))} drahší. Zmazať ${r.nehmotne.length} riadkov?`
-                        : `Zmazať ${r.nehmotne.length} riadkov dopravy a zliav (${fmtCZK(r.nehmotneSuma)})?`;
+                        ? `Medzi nimi je zľava k tovaru — zmazaním bude nákup o ${fmtCZK(Math.abs(r.nehmotneSuma))} drahší. Zmazať ${Sk.riadky(r.nehmotne.length)}?`
+                        : `Zmazať ${Sk.riadky(r.nehmotne.length)} dopravy a zliav (${fmtCZK(r.nehmotneSuma)})?`;
                       if (confirm(veta)) onZmaz(r.nehmotne.map((p) => p.id));
                     }}
                     style={{ border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11, borderRadius: 10, padding: "2px 9px", cursor: "pointer", fontFamily: "inherit" }}>

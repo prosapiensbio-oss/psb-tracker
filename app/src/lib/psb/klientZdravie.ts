@@ -108,14 +108,14 @@ export function zdravieKlienta(
     {
       id: "tempo",
       nazov: "Tempo",
-      hodnota: `${vstupy.tempoTeraz.toFixed(1)} / mes.`,
+      hodnota: `${vstupy.tempoTeraz.toFixed(1).replace(".", ",")} / mes.`,
       podiel: podiel(vstupy.tempoTeraz, maxTempo),
       priemer: podiel(vstupy.priemery.tempo, maxTempo),
-      priemerHodnota: `${vstupy.priemery.tempo.toFixed(1)} / mes.`,
+      priemerHodnota: `${vstupy.priemery.tempo.toFixed(1).replace(".", ",")} / mes.`,
       lepsieJeViac: true,
       mierka: "priemer aktívnych klientov",
       detail: vstupy.tempoPredtym > 0
-        ? `${vstupy.tempoPredtym.toFixed(1)} → ${vstupy.tempoTeraz.toFixed(1)} za pol roka`
+        ? `${vstupy.tempoPredtym.toFixed(1).replace(".", ",")} → ${vstupy.tempoTeraz.toFixed(1).replace(".", ",")} za pol roka`
         : "kratšia história, než aby sa dal porovnať trend",
       tón: vstupy.tempoPredtym <= 0 ? "nevieme" : zmenaTempa <= -25 ? "zle" : zmenaTempa <= -10 ? "vsimnut" : "dobre",
       doZaveru: true,
@@ -129,7 +129,7 @@ export function zdravieKlienta(
       // raz meria vec a raz jej opak.
       podiel: podiel(vstupy.zrusene, maxZrusene),
       priemer: podiel(vstupy.priemery.zrusene, maxZrusene),
-      priemerHodnota: `${vstupy.priemery.zrusene.toFixed(1)} za 90 dní`,
+      priemerHodnota: `${vstupy.priemery.zrusene.toFixed(1).replace(".", ",")} za 90 dní`,
       lepsieJeViac: false,
       mierka: "priemer aktívnych klientov",
       detail: vstupy.zrusene === 0 ? "nezrušil ani jeden" : "",
@@ -174,7 +174,7 @@ export function zdravieKlienta(
       }
       return {
         id: "vztah" as const, nazov: "Dĺžka vzťahu",
-        hodnota: m >= 12 ? `${(m / 12).toFixed(1)} roka` : `${Math.round(m)} mes.`,
+        hodnota: m >= 12 ? `${(m / 12).toFixed(1).replace(".", ",")} roka` : `${Math.round(m)} mes.`,
         podiel: podiel(m, max), priemer: podiel(vstupy.priemery.vztah, max),
         priemerHodnota: `${Math.round(vstupy.priemery.vztah)} mes.`,
         lepsieJeViac: true,

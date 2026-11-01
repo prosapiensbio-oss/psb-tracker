@@ -28,6 +28,8 @@ import type {
   PSBData,
   SessionRow,
 } from "./types";
+import { podlaRodu } from "./rodKlienta";
+import * as Sk from "./sklonovanie";
 
 export const TRAINERS = ["Jerry", "Terezka"] as const;
 export type TrainerName = string;
@@ -43,15 +45,18 @@ const DOPLNKOVY_NAZOV = /doplnenie|za protokol|členství/i;
 
 export const membershipBucket = (m: string): string => {
   const s = (m || "").toLowerCase();
-  if (/s viazanost/.test(s)) return "6h S viazanostou (6M)";
-  if (/one year|ročn|rok/.test(s)) return "Ročné (ONE YEAR)";
+  // Názvy skupín sú Předplatné a Balíček (Jerry, 29. 9. a 22. 10. 2026). Nové
+  // balíčky sa volajú „6h Balíček", „18h Balíček", staré „OFF - 8 hodín
+  // offline" — bez oboch tvarov padla väčšina klientov do „Iné" (59 %).
+  if (jePredplatne(s)) return "6h Předplatné";
+  if (/one year|ročn|rok/.test(s)) return "Ročné";
   // "^on[ -]" matches the online product prefix ("ON - 6h…") without catching
   // words that merely start with "on" (e.g. "ONE YEAR", handled just above).
   if (/^on[ -]|online/.test(s)) return "Online balíček";
-  if (/18 hod/.test(s)) return "18 hodín";
-  if (/8 hod/.test(s)) return "8 hodín";
-  if (/1 hod/.test(s)) return "1 hodina";
-  if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
+  if (/(^|\D)18\s*(hod|h\b)/.test(s)) return "18h Balíček";
+  if (/(^|\D)8\s*(hod|h\b)/.test(s)) return "8h Balíček";
+  if (/(^|\D)1\s*(hod|h\b)/.test(s)) return "1h Balíček";
+  if (/bez viazanosti|(^|\D)6\s*(hod|h\b)/.test(s)) return "6h Balíček";
   // Doplnenie je dokúpená hodina k paušálnemu členstvu (GOLD/SILVER/DIAMOND/
   // ONE), nie balíček. Ako názov skupiny to znelo ako produkt, ktorý si klient
   // kúpil — pritom hovorí len to, že balíček s hodinami evidovaný nemá.
@@ -61,13 +66,13 @@ export const membershipBucket = (m: string): string => {
   return "Iné";
 };
 export const MEMBERSHIP_ORDER = [
-  "6h S viazanostou (6M)",
-  "6h BEZ viazanosti",
-  "8 hodín",
-  "18 hodín",
-  "1 hodina",
+  "6h Předplatné",
+  "6h Balíček",
+  "8h Balíček",
+  "18h Balíček",
+  "1h Balíček",
   "Online balíček",
-  "Ročné (ONE YEAR)",
+  "Ročné",
   "Členstvo (bez balíčka hodín)",
   "Špeciál",
   "Bez balíčka",
@@ -1127,7 +1132,7 @@ export function capacityByTrainer(
     const advice =
       util >= 100
         ? `Na strope — typický ${recentWeekly.toFixed(0)}h / rušný ${busyWeekly.toFixed(0)}h; priestor len cez zástup`
-        : `Zvládne ešte ~${canTake} klientov (typický týždeň → ${TARGET_H}h, rušný → ${BUSY_CAP}h)`;
+        : `Zvládne ešte ~${Sk.klienti(canTake)} (typický týždeň → ${TARGET_H}h, rušný → ${BUSY_CAP}h)`;
 
     return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, busyWeekly, peakWeekly, canTake, util, advice };
   });
@@ -2204,7 +2209,7 @@ export function deriveAnomalies(
     const dni = (now.getTime() - Date.parse(c.firstSession)) / 86400000;
     if (dni >= 0 && dni <= 60) {
       push(`zdroj|${c.name}`, "blue", "Chýba zdroj",
-        `${c.name}: nový klient bez zdroja — dopíš, odkiaľ prišiel, kým sa to vie`, c.name);
+        `${c.name}: nový klient bez zdroja — dopíš zdroj, kým sa to vie`, c.name);
     }
   }
 
@@ -2228,7 +2233,7 @@ export function deriveAnomalies(
     if (daysBetween(posledny, dnesISO) > 30) continue;
     const vypis = dni.filter((d) => daysBetween(d, dnesISO) <= 30).map((d) => fmtDMY(d)).join(", ");
     push(`bezbalicka|${c.name}`, "orange", "Tréning bez balíčka",
-      `${c.name}: bol na tréningu (${vypis}) a nemá v Kokpite aktívny balíček — zapíš mu balíček v profile, inak sa tréning nemá z čoho odpočítať a nevznikne platba.`,
+      `${c.name}: tréning (${vypis}) bez aktívneho balíčka v Kokpite — zapíš balíček v profile, inak sa tréning nemá z čoho odpočítať a nevznikne platba.`,
       c.name, undefined, posledny);
   }
 
@@ -2350,7 +2355,7 @@ export function deriveAnomalies(
       // s klientom, appka nemá o dva riadky nižšie pýtať to isté — pripomienku
       // vydá sám záver v deň, na ktorý si ju nastavil.
       if (!odpovedEpizody && !najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
-        push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name, undefined, poslednyDen);
+        push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Nechodí", `${c.name}: ${Sk.dni(days)} bez tréningu (${c.segment}) — ozvi sa`, c.name, undefined, poslednyDen);
       }
     }
 
@@ -2408,7 +2413,7 @@ export function deriveAnomalies(
         `duch|${c.name}`,
         days >= 60 ? "red" : "orange",
         "Je toto duch?",
-        `${c.name}: ${days} dní bez tréningu${hodiny} — je to duch, alebo to má vysvetlenie?`,
+        `${c.name}: ${Sk.dni(days)} bez tréningu${hodiny} — je to duch, alebo to má vysvetlenie?`,
         c.name,
         undefined,
         poslednyDen,
@@ -2549,7 +2554,7 @@ export function deriveAnomalies(
       `vedomost|${v.id}|${dnesPraha().slice(0, 7)}`,
       "blue",
       "Rešerš treba obnoviť",
-      `„${v.nazov}" má ${dni} dní a mala sa obnovovať po ${v.obnovovatPoDnoch}. ${v.oCom} `
+      `„${v.nazov}" má ${Sk.dni(dni)} a mala sa obnovovať po ${v.obnovovatPoDnoch}. ${v.oCom} `
       + `Povedz Claudovi, nech ju prejde znova — čísla a odporúčania sa v tomto obore menia rýchlo.`,
     );
   }
@@ -2683,8 +2688,8 @@ const casOdpovede = (t?: string | null) => String(t || "").replace(" ", "T").sli
 
 /** Z kľúča na ľudskú vetu — čoho sa odpoveď týkala. */
 const DRUH_KLUCA: Record<string, string> = {
-  duch: "je toto duch", gone: "prestal chodiť", strata: "po úvodnom už neprišiel",
-  dovod: "prečo neprišiel znova", sixm: "6M proces", narodeniny: "narodeniny",
+  duch: "je toto duch", gone: "nechodí", strata: "po úvodnom koniec",
+  dovod: "dôvod po úvodnom", sixm: "6M proces", narodeniny: "narodeniny",
   referral: "odmena za odporúčanie", sms: "SMS po úvodnom", odmena: "odporúčanie bez mena",
   bezdopytu: "úvodný bez dopytu", orphan: "platba bez sedení", pauzakoniec: "koniec pauzy",
   zdroj: "chýba zdroj klienta", dnes: "dnešný tréning", zmena: "skok v metrike",
@@ -3532,7 +3537,7 @@ export function deriveRegister(
       // bez čísla vyzeralo rovnako po hodine aj po dvadsiatich troch, a to
       // je práve to okno, v ktorom sa rozhoduje, či človek napíše inam.
       `${testPostury ? "Test postury" : l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno} (čaká ${caka})`,
-      `${testPostury ? `Test postury od ${meno} prišiel` : `${meno} sa ozval`} ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede. Keď je úvodný dohodnutý, doplň termín tlačidlom vedľa a appka pripraví SMS s odkazom.`,
+      `${testPostury ? `Test postury od ${meno} prišiel` : `Dopyt od ${meno} prišiel`} ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede. Keď je úvodný dohodnutý, doplň termín tlačidlom vedľa a appka pripraví SMS s odkazom.`,
       dni >= 1 ? 2 : 4,
       "marketing|dopyty",
       "odpoved",
@@ -4637,7 +4642,7 @@ export function pripomienkySlubov(
       category: "Zápis",
       tone: "orange",
       title: `Odporúčanie bez mena — ${l.name}`,
-      detail: `${l.name} prišiel ${fmtDMY(d)} cez odporúčanie, ale nie je zapísané od koho — bez mena nemá 10 % zľavu komu dať. Dopíš odporúčateľa v Marketing → Dopyty.`,
+      detail: `Dopyt od ${l.name} prišiel ${fmtDMY(d)} cez odporúčanie, ale nie je zapísané od koho — bez mena nemá 10 % zľavu komu dať. Dopíš odporúčateľa v Marketing → Dopyty.`,
       priority: 12,
       client: "marketing|dopyty",
       // Prvý kontakt s dopytom je Terezkina práca — rovnako ako pri
@@ -4680,7 +4685,7 @@ export function pripomienkySlubov(
       category: "Zápis",
       tone: "orange",
       title: `Úvodný bez dopytu — ${meno}`,
-      detail: `${meno} — úvodný ${fmtDMY(d)}, ale v dopytoch nie je. Bez dopytu appka nevie, odkiaľ prišiel. Dopíš ho v Marketing → Dopyty, stačí meno a zdroj.`,
+      detail: `${meno} — úvodný ${fmtDMY(d)}, ale v dopytoch nie je. Bez dopytu appka nevie, odkiaľ človek prišiel. Dopíš ho v Marketing → Dopyty, stačí meno a zdroj.`,
       priority: 11,
       // Cieľ nesie aj MENO — Dopyty ho predvyplnia do rýchleho zápisu.
       // Predtým klik doviedol na zoznam a meno, ktoré appka práve povedala,
@@ -4787,7 +4792,7 @@ export function pripomienkaDovodu(
         key,
         category: "Rozhodnutie" as const,
         tone: "orange" as const,
-        title: `Prečo neprišiel znova — ${c.meno}`,
+        title: `Prečo ${podlaRodu(c.meno, { m: "neprišiel", z: "neprišla", neutralne: "sa neukázal(a)" })} znova — ${c.meno}`,
         detail: `${c.meno} — úvodný tréning ${fmtDMY(c.uvodny)} a odvtedy nič. Vieš prečo? Jedno slovo stačí — z opakovaných dôvodov sa dá niečo urobiť, z prázdneho poľa nič.`,
         priority: 11,
         client: c.meno,

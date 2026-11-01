@@ -136,7 +136,7 @@ function zVyhladavania(p: Prilezitost[], vlastnik?: (dopyt: string) => Vlastnik)
     const kto = vlastnik ? vlastnik(x.dopyt) : null;
     const maDomov = kto?.druh === "titulok";
     const naPrvejStrane = x.pozicia <= 10;
-    const dokaz = `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1)}`;
+    const dokaz = `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1).replace(".", ",")}`;
 
     if (!maDomov) {
       return {
@@ -228,7 +228,7 @@ function zTempa(prispevkovMesacne: number, prispevkovVSilnychMesiacoch: number |
     skryDni: SKRY_DNI.tempo,
     co: `Vráť tempo na ${Math.round(prispevkovVSilnychMesiacoch)} príspevkov mesačne`,
     preco: "V mesiacoch s najviac dopytmi si publikoval viac. Nie je to príčina, ale je to jediná vec z tohto zoznamu, ktorú máš plne v rukách.",
-    dokaz: `teraz ${prispevkovMesacne.toFixed(1)} mesačne, v najsilnejších mesiacoch ${prispevkovVSilnychMesiacoch.toFixed(1)}`,
+    dokaz: `teraz ${prispevkovMesacne.toFixed(1).replace(".", ",")} mesačne, v najsilnejších mesiacoch ${prispevkovVSilnychMesiacoch.toFixed(1).replace(".", ",")}`,
     zdroj: "tempo",
     poradie: 4,
   }];

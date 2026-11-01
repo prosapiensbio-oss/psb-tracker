@@ -114,7 +114,7 @@ describe("popisZmeny", () => {
   });
   it("presun povie odkiaľ a kam", () => {
     expect(popisZmeny(zmena({ id: "z", trener: "Jerry", druh: "posunute", pred: "2026-09-22T16:00", po: "2026-09-24T14:00" })))
-      .toBe("presun z 22. 9. na 24. 9.");
+      .toBe("presun z 22. 9. 16:00 na 24. 9. 14:00");
   });
 });
 

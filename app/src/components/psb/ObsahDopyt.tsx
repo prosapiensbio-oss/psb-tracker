@@ -6,6 +6,7 @@ import { OBDOBIA_OBSAH, vOknePodlaDna } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
 import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Po čom nám niekto napísal.
@@ -156,7 +157,7 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
       ) : (
         <>
           <div style={{ fontSize: 12, color: C.textDim, margin: "10px 0 8px" }}>
-            {v.dopytov} dopytov · základ počítaný z {v.dniZakladu} dní · okno {OKNO} dní
+            {Sk.dopyty(v.dopytov)} · základ počítaný z {v.dniZakladu} dní · okno {OKNO} dní
             {!ajOdporucania && odporucani > 0 && (
               <span style={{ color: C.textMuted }}> · {odporucani} odporúčaní nepočítaných</span>
             )}

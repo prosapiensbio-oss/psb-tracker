@@ -9,6 +9,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3, Info, Select } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Report — appka po sebe napíše, ako jej to išlo, a text sa dá vziať preč.
 //
@@ -172,7 +173,7 @@ export function Report({
           <button onClick={doPdf} style={tlac(true)}>PDF</button>
           <button onClick={stiahni} style={tlac(false)}>Stiahnuť .md</button>
           <span style={{ fontSize: 11, color: C.textDim, marginLeft: "auto" }}>
-            {text.split("\n").length} riadkov · {Math.round(text.length / 1000)} tis. znakov
+            {Sk.riadky(text.split("\n").length)} · {Math.round(text.length / 1000)} tis. znakov
           </span>
         </div>
         <pre

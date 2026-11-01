@@ -116,7 +116,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
       <div style={zaklad}>
         <span style={denStyl}>{fmtDMY(u.den)}</span>
         <span style={{ flex: 1, color: u.suma < 0 ? C.orange : C.green }}>
-          {u.suma < 0 ? "vrátené" : "zaplatil"} {METODA[u.metoda] || u.metoda}
+          {u.suma < 0 ? "vrátené" : "zaplatené"} {METODA[u.metoda] || u.metoda}
           {u.poznamka ? <span style={{ color: C.textDim }}> · {u.poznamka.slice(0, 40)}</span> : null}
         </span>
         <span style={{ color: u.suma < 0 ? C.orange : C.green, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(u.suma)}</span>

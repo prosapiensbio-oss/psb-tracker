@@ -28,6 +28,7 @@ import { nechceHovor } from "../../lib/psb/dopytTestPostury";
 import { klucOtazkyPlatby, otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
+import { podlaRodu } from "../../lib/psb/rodKlienta";
 
 export type BalicekRiadokKroku = {
   id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
@@ -857,7 +858,7 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene,
                 aria-label={`Iná veľkosť balíčka pre ${b.klient}`}
               >
                 <option value="">iná veľkosť…</option>
-                {VELKOSTI.map((x) => <option key={x.nazov} value={x.nazov}>{x.nazov} · {x.cena} Kč</option>)}
+                {VELKOSTI.map((x) => <option key={x.nazov} value={x.nazov}>{x.nazov} · {fmtCZK(x.cena)}</option>)}
               </select>
               {velkost[id] && <button disabled={bezi === id} style={vedlajsie} onClick={() => void odpovedz(b, "zmen")}>zmeniť</button>}
               <button disabled={bezi === id} style={vedlajsie} onClick={() => void odpovedz(b, "zrus")}>zrušiť balíček</button>
@@ -949,7 +950,7 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
             {[l.source, l.telefon, l.email].filter(Boolean).join(" · ")}{l.note ? ` · ${l.note.slice(0, 60)}` : ""}
           </span>
           <button disabled={bezi === l.id} style={hlavne(bezi !== l.id)} onClick={() => void ozvalaSom(l.id)}>
-            {bezi === l.id ? "…" : "Ozvala som sa"}
+            {bezi === l.id ? "…" : "Ozvané"}
           </button>
         </div>
       ))}
@@ -959,7 +960,7 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
           <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170 }}>{l.name || "(bez mena)"}</span>
           <span style={{ fontSize: 12, color: C.textDim, minWidth: 90 }}>{fmtDMY(l.date)}</span>
           <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 200px" }}>
-            {l.status === "neodpisal" ? "neodpísal" : l.status === "zruseny" ? "zrušený" : l.status === "dohodnuty" ? "dohodnutý, ale neprišiel" : "ozvala si sa, ďalej nič"} — dôvod chýba; doplň ho v zozname nižšie
+            {l.status === "neodpisal" ? "bez odpovede" : l.status === "zruseny" ? "zrušené" : l.status === "dohodnuty" ? `dohodnuté, ale ${podlaRodu(l.name, { m: "neprišiel", z: "neprišla", neutralne: "bez príchodu" })}` : "ozvali sme sa, ďalej nič"} — dôvod chýba; doplň ho v zozname nižšie
           </span>
           <button style={vedlajsie} onClick={() => setVsetky(true)}>otvoriť zoznam</button>
         </div>
@@ -1011,7 +1012,7 @@ export function ZdrojeKlientov({ mena, zdroje, onOverride }: {
   return (
     <>
       <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 8 }}>
-        Úvodný tréning mali, zdroj nemajú. Vyber, odkiaľ prišiel — zapíše sa hneď.
+        Úvodný tréning mali, zdroj nemajú. Vyber zdroj — zapíše sa hneď.
       </div>
       {mena.map((m) => {
         const hodnota = hotove[m] ?? zdroje?.[m] ?? "";
@@ -1020,7 +1021,7 @@ export function ZdrojeKlientov({ mena, zdroje, onOverride }: {
             <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170, flex: "1 1 170px" }}>{m}</span>
             <select
               value={hodnota}
-              aria-label={`Odkiaľ prišiel ${m}`}
+              aria-label={`Zdroj: ${m}`}
               onChange={(e) => {
                 const v = e.target.value;
                 setHotove((p) => ({ ...p, [m]: v }));

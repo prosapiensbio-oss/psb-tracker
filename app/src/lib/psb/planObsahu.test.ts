@@ -24,7 +24,7 @@ describe("plán obsahu", () => {
     const [n] = planObsahu({ ...zaklad, prilezitosti: [p("fasce", 2, 3959, 4.8)] });
     expect(n.co).toContain("fasce");
     expect(bezPevnej(n.dokaz)).toContain("3 959");
-    expect(n.dokaz).toContain("4.8");
+    expect(n.dokaz).toContain("4,8");
     expect(n.zdroj).toBe("vyhľadávanie");
   });
 

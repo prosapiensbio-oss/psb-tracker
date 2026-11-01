@@ -12,6 +12,7 @@ import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, H3, Info, Modal, Select } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Marketingový plán — cieľ, obdobie, metriky, prístup, rozpočet.
@@ -329,7 +330,7 @@ function Editor({ plan, data, clients, onUloz, onZavri, onJarvis, onDoMapy }: {
       </div>
       {mesiace.length > 0 && (
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
-          {mesiace.length} mesiacov: {mesiace.join(" · ")}
+          {Sk.mesiace(mesiace.length)}: {mesiace.join(" · ")}
         </div>
       )}
 

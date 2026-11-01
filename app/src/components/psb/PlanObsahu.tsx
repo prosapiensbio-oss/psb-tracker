@@ -9,6 +9,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, Empty, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Čo publikovať ďalej.
@@ -207,7 +208,7 @@ export function PlanObsahu({ data, chat, onNavigate, onAck }: { data: PSBData; c
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px 0 6px" }}>
                 {onAck && (
                   <button onClick={() => onAck(klucHotoveho(n.kluc), true)}
-                    title={`Skryje sa na ${n.skryDni} dní. Ak sa téma nepohne, vráti sa.`}
+                    title={`Skryje sa na ${Sk.dni(n.skryDni)}. Ak sa téma nepohne, vráti sa.`}
                     style={{
                       fontSize: 11.5, padding: "6px 10px", borderRadius: 6,
                       border: `1px solid ${C.border}`, background: "none",

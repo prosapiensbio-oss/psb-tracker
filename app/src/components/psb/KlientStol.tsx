@@ -41,6 +41,8 @@ import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { dniDoNarodenin, trvanieText, zaciatokSpoluprace } from "../../lib/psb/spolupraca";
 import { fakturaZBalicka } from "../../lib/psb/fakturaZBalicka";
 import { historiaBalickov, historiaPlatieb } from "../../lib/psb/profilHistoria";
+import { podlaRodu } from "../../lib/psb/rodKlienta";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -1140,7 +1142,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               človek nedivil, prečo tam stav, ktorý zapísal, nie je. */}
           {c?.pauzaZrusenaTreningom && (
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
-              Ručná pauza padla — odvtedy bol na tréningu. Appka stav počíta znova sama.
+              Ručná pauza padla — odvtedy prebehol tréning. Appka stav počíta znova sama.
             </div>
           )}
           {/* „Neaktívny" tréning neprebíja: je to rozhodnutie o konci vzťahu,
@@ -1190,7 +1192,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               ? `${dlh.pocet === 1 ? "balíček" : `${dlh.pocet} balíčky`} za ${fmtCZK(dlh.zaBalicky)}${dlh.zaplatene ? `, zaplatené ${fmtCZK(dlh.zaplatene)}` : ", zatiaľ bez platby"}`
               : dlzi > 0
                 ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "starý poplatok" : poplatkyKlienta.length < 5 ? "staré poplatky" : "starých poplatkov"}`
-                : `zaplatil spolu ${fmtCZK(zaplatene)}`}
+                : `zaplatené spolu ${fmtCZK(zaplatene)}`}
             {dlh.dlzi > 0 && dlzi > 0 ? ` · a ${fmtCZK(dlzi)} starý poplatok` : ""}
           </div>
           {/* „+ X zapísané v Kokpite" je od 28. 10. 2026 preč: `zaplatene` je už
@@ -1248,7 +1250,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         {c && c.packageTotal > 0 && (
           <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 40)}` }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.accentLight }}>
-              {c.packageOdvodeny || mimoExportu > 0 ? "≈" : ""}{c.packageRemaining - mimoExportu} h zostáva
+              {c.packageOdvodeny || mimoExportu > 0 ? "≈" : ""}{c.packageRemaining - mimoExportu < 0 ? `${mimoExportu - c.packageRemaining} h nad rámec` : `${c.packageRemaining - mimoExportu} h zostáva`}
             </div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
               {nazovProduktu(c.membership) || `z ${c.packageTotal}`}
@@ -1373,7 +1375,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 <span style={{ color: C.textDim }}>narodeniny</span> {fmtDMY(c.narodeniny)}
                 {doNarodenin(c.narodeniny) != null && (
                   <span style={{ color: doNarodenin(c.narodeniny)! <= 14 ? C.accentLight : C.textDim }}>
-                    {" "}· {doNarodenin(c.narodeniny) === 0 ? "dnes!" : `o ${doNarodenin(c.narodeniny)} dní`}
+                    {" "}· {doNarodenin(c.narodeniny) === 0 ? "dnes!" : `o ${Sk.dni(doNarodenin(c.narodeniny))}`}
                   </span>
                 )}
               </div>
@@ -1407,7 +1409,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 )}
               </div>
             )}
-            {c.zdrojKto && <div><span style={{ color: C.textDim }}>priviedol</span> {c.zdrojKto}</div>}
+            {c.zdrojKto && <div><span style={{ color: C.textDim }}>{podlaRodu(c.zdrojKto, { m: "priviedol", z: "priviedla", neutralne: "odporúčanie od" })}</span> {c.zdrojKto}</div>}
             <UpravitProfil
               meno={meno}
               c={c}
@@ -1982,7 +1984,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     <div style={{ padding: "12px 14px", borderRadius: 11, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 40)}`, marginBottom: 12 }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: C.orange }}>{sats.toLocaleString("cs-CZ")} sats</div>
                       <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
-                        zaplatil za {fmtCZK(vtedy)}
+                        zaplatené {fmtCZK(vtedy)}
                         {dnes !== null && <> · dnes {fmtCZK(dnes)}</>}
                         {rozdiel !== null && vtedy > 0 && (
                           <span style={{ color: rozdiel >= 0 ? C.green : C.red, fontWeight: 700 }}>
@@ -2084,7 +2086,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 }}
               />
               {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
-              {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
+              {c?.precoNeprisiel && <Blok nadpis="Dôvod odchodu po úvodnom">{c.precoNeprisiel}</Blok>}
               {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}
               {c?.specialRateNote && <Blok nadpis="Špeciálna sadzba">{c.specialRateNote}</Blok>}
               {zavery.map((z, i) => (
@@ -2217,8 +2219,8 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
     { k: "email" as const, l: "e-mail", w: 210, typ: "email" },
     { k: "telefon" as const, l: "telefón", w: 150, typ: "tel" },
     { k: "narodeniny" as const, l: "narodeniny", w: 150, typ: "date" },
-    { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150, typ: "text" },
-    { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170, typ: "text" },
+    { k: "zdroj" as const, l: "zdroj", w: 150, typ: "text" },
+    { k: "zdrojKto" as const, l: "kto odporučil", w: 170, typ: "text" },
   ];
 
   return (
@@ -2375,7 +2377,7 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
     return (
       <div style={riadok}>
         <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
-        <span style={{ flex: 1, color: u.suma < 0 ? C.orange : C.green }}>{u.suma < 0 ? "vrátené" : "zaplatil"} {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
+        <span style={{ flex: 1, color: u.suma < 0 ? C.orange : C.green }}>{u.suma < 0 ? "vrátené" : "zaplatené"} {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
         <span style={{ color: u.suma < 0 ? C.orange : C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
         <StavHodin stav={stav} />
       </div>
@@ -2789,7 +2791,7 @@ function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }
   return (
     <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: "11px 12px", borderRadius: 10, background: mix(C.border, 40) }}>
       <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
-        kedy zaplatil
+        dátum platby
         <input type="date" value={p.datum} onChange={(e) => setP({ ...p, datum: e.target.value } as never)}
           style={{ width: 145, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }} />
       </label>
@@ -2825,7 +2827,7 @@ function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }
       <div style={{ fontSize: 11, color: p.sposob === "prevod" ? C.orange : C.textDim, flexBasis: "100%", lineHeight: 1.5 }}>
         {p.sposob === "prevod"
           ? "Pozor: prevod z účtu sa sem dostane sám z výpisu Fio. Ručne ho píš len vtedy, keď vo výpise nie je (cudzí účet, Revolut) — inak bude klient zaplatený dvakrát."
-          : "Bankové platby sem nepíš — tie sa priraďujú z výpisu v karte „Platby z banky“, inak by sa započítali dvakrát."}
+          : "Bankové platby sem nepíš — tie sa priraďujú z výpisu v kroku „3 · Platby a balíčky“ vo Workspace, inak by sa započítali dvakrát."}
       </div>
     </div>
   );
@@ -2860,7 +2862,7 @@ function stitky(
   pridaj("hodín", c.totalHours ? c.totalHours.toFixed(0) : "");
   pridaj("Ø hodina", c.avgPrice ? fmtCZK(Math.round(c.avgPrice)) : "");
   const doNar = c.narodeniny ? dniDoNarodenin(c.narodeniny, dnesPraha()) : null;
-  pridaj("narodeniny", c.narodeniny ? `${fmtDMY(c.narodeniny)}${doNar == null ? "" : doNar === 0 ? " · dnes!" : ` · o ${doNar} dní`}` : "", C.accentLight);
+  pridaj("narodeniny", c.narodeniny ? `${fmtDMY(c.narodeniny)}${doNar == null ? "" : doNar === 0 ? " · dnes!" : ` · o ${Sk.dni(doNar)}`}` : "", C.accentLight);
   pridaj("členstvo", c.membership);
   if (c.packageTotal) {
     pridaj("balíček", `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}`,
@@ -2869,8 +2871,8 @@ function stitky(
   }
   pridaj("platí do", c.packageValidTo ? fmtDMY(c.packageValidTo) : "");
   pridaj("zdroj", c.zdroj || dopyt?.source);
-  pridaj("priviedol ho", c.zdrojKto);
-  if (priviedol.length) pridaj("priviedol", `${priviedol.length}`, C.green);
+  pridaj("odporúčanie od", c.zdrojKto);
+  if (priviedol.length) pridaj(podlaRodu(c.name, { m: "priviedol", z: "priviedla", neutralne: "počet odporúčaní" }), `${priviedol.length}`, C.green);
   pridaj("6M", c.is6m ? "áno" : "", C.accentLight);
   pridaj("zmluva", c.contractSigned ? "podpísaná" : "", C.green);
   pridaj("sadzba", c.specialRate ? "špeciálna" : "", C.orange, c.specialRateNote);
@@ -2879,7 +2881,7 @@ function stitky(
   pridaj("zastupoval", c.substituteCount ? `${c.substituteCount}×` : "");
   if (poplatky.length) pridaj("nezaplatené", `${poplatky.length}`, C.red, "staré poplatky");
   pridaj("pauza do", c.pauseUntil ? fmtDMY(c.pauseUntil) : "", C.orange);
-  pridaj("odišiel", c.duch ? "áno" : "", C.red, c.duch);
+  pridaj("odchod", c.duch ? "áno" : "", C.red, c.duch);
   return out;
 }
 
@@ -2971,8 +2973,8 @@ function NovyKlient({ zapis, onHotovo }: {
           { k: "email" as const, l: "e-mail", w: 210, typ: "email" },
           { k: "telefon" as const, l: "telefón", w: 150, typ: "tel" },
           { k: "narodeniny" as const, l: "narodeniny", w: 150, typ: "date" },
-          { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150, typ: "text" },
-          { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170, typ: "text" },
+          { k: "zdroj" as const, l: "zdroj", w: 150, typ: "text" },
+          { k: "zdrojKto" as const, l: "kto odporučil", w: 170, typ: "text" },
           { k: "poznamka" as const, l: "poznámka", w: 200, typ: "text" },
         ]).map((x) => (
           <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>

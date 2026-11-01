@@ -67,6 +67,9 @@ import { typZNazvu } from "../../lib/psb/kalendar";
  */
 const typPriradenia = (nazov: string) => (typZNazvu(nazov) === "uvodny" ? "uvodny" : "trening");
 import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
+import { podlaRodu } from "../../lib/psb/rodKlienta";
+import * as Sk from "../../lib/psb/sklonovanie";
+import { bezDovetkuMena } from "../../lib/psb/kalendarMena";
 
 /**
  * Otázka pre Jarvisa k mesačnej kontrole.
@@ -912,7 +915,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       onClick={() => { setAnamnezaOtvorena(""); void nacitajAnamnezy(); }}
                       style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
                     >← späť na zoznam</button>
-                    <b style={{ fontSize: 15 }}>{anamnezaOtvorena}</b>
+                    <b style={{ fontSize: 15 }}>{bezDovetkuMena(anamnezaOtvorena)}</b>
                   </div>
                   <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto" }}>
                     <AnamnezaPanel meno={anamnezaOtvorena} mena={mena} />
@@ -995,7 +998,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                               <button
                                 onClick={() => setAnamnezaOtvorena(a.klient)}
                                 style={{ background: "none", border: "none", padding: 0, color: C.text, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                              >{a.klient}</button>
+                              >{bezDovetkuMena(a.klient)}</button>
                               {kedy && (
                                 <span style={{ fontSize: 11.5, color: a.uzBol ? C.textDim : C.orange }}>
                                   úvodný {a.uzBol ? "bol" : "bude"} {kedy}
@@ -1212,7 +1215,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         e.currentTarget.blur();
                         void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: t.trim() });
                       }}
-                      placeholder="alebo vlastnými slovami… (Enter odošle)"
+                      placeholder="iný dôvod… (Enter)"
                       style={vstup(false)}
                     />
                     {/* „Vybavené" sa dá stlačiť VŽDY, aj bez dôvodu.
@@ -1283,7 +1286,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       title={t.trim().length >= 3 ? `Priradiť ${n.nazov} klientovi ${t.trim()}` : "Najprv napíš, kto to je — bez mena nie je čo priradiť"}
                       style={hlavne(t.trim().length >= 3)}
                     >
-                      {pracujem === kluc ? "…" : "Je to on"}
+                      {pracujem === kluc ? "…" : "Priradiť"}
                     </button>
                     {/* „Súkromné" chýbalo (Jerry, 23. 9. 2026) — v Kalendári
                         je v ponuke typov, v kope nie, takže sa tu plávanie
@@ -1309,7 +1312,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     {pripravene.length > 1 && (
                       <div style={{ ...riadok, background: mix(C.accent, 8), borderRadius: 8, marginBottom: 6 }}>
                         <div style={{ flex: 1, fontSize: 12, color: C.textMuted }}>
-                          {pripravene.length} platieb má vyplneného klienta — dajú sa zapísať naraz.
+                          S vyplneným klientom: {Sk.platby(pripravene.length)} — dajú sa zapísať naraz.
                         </div>
                         <button onClick={() => void potvrdDavku(k.polozky)} disabled={pracujem === "davka-platby"} style={hlavne(true)}>
                           {pracujem === "davka-platby" ? "…" : `Priradiť všetkých ${pripravene.length}`}
@@ -1436,9 +1439,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                             onClick={() => void odpovedzKonanie(p, true)}
                             style={{ ...vedlajsie, border: `1px solid ${mix(C.green, 40)}`, background: mix(C.green, 10), color: C.green, fontWeight: 600 }}
                           >
-                            bol tam
+                            {podlaRodu(p.klient, { m: "bol tam", z: "bola tam", neutralne: "tréning prebehol" })}
                           </button>
-                          <button onClick={() => void odpovedzKonanie(p, false)} style={{ ...vedlajsie }}>neprišiel</button>
+                          <button onClick={() => void odpovedzKonanie(p, false)} style={{ ...vedlajsie }}>{podlaRodu(p.klient, { m: "neprišiel", z: "neprišla", neutralne: "tréning neprebehol" })}</button>
                         </div>
                       ))}
                       {poKrokoch && denOtvoreny === kluc && [...new Set(zostavajuce.map((p) => `${tyzdenOd(p.zaciatok)}|${p.trener}`))].map((tk) => {
@@ -1480,11 +1483,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       {x.dovod}
                       {x.membership ? ` · ${nazovProduktu(x.membership)}` : ""}
                       {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
-                      {uzke ? ` · ${x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}` : ""}
+                      {uzke ? ` · ${x.dni >= 0 ? `pred ${x.dni} ${x.dni === 1 ? "dňom" : "dňami"}` : "bez tréningu"}` : ""}
                     </div>
                     {!uzke && (
                       <div style={{ fontSize: 11.5, color: C.textDim, minWidth: 96, textAlign: "right", order: 4 }}>
-                        {x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}
+                        {x.dni >= 0 ? `pred ${x.dni} ${x.dni === 1 ? "dňom" : "dňami"}` : "bez tréningu"}
                       </div>
                     )}
                     <button disabled={pracujem === kluc} onClick={() => void vybavBezBalicka(kluc, x)} style={{ ...vedlajsie, order: 5 }}>vybavené</button>
@@ -1600,7 +1603,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       {x.platiZaNeho ? <span style={{ color: C.accent, fontWeight: 600 }}> · platí {x.platiZaNeho}</span> : null}
                     </div>
                     <div style={{ fontSize: 11.5, color: x.dni > 30 ? C.orange : C.textDim, minWidth: 80, textAlign: "right" }}>
-                      {x.dni >= 0 ? `${x.dni} dní` : ""}
+                      {x.dni >= 0 ? `neuhradené ${Sk.dni(x.dni)}` : ""}
                     </div>
                     {/* V bete „vybavené" nie je: dlh zmizne až spárovanou platbou
                         (Jerry, 4. 10. 2026: „keď dám vybavené, zmizne to a nič sa
@@ -1961,12 +1964,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           onVyber={(j, smer) => prepni(smer, j)}
         />
         <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
-          {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
+          {vybavenych > 0 ? `${vybavenych} vybavených` : `celkom ${Sk.veci(spolu)}`}
         </div>
         {/* Čie veci — vždy vidieť, aj keď to appka vybrala sama. Doteraz to
             bola len veta na konci riadku a pri identite „app" nebola žiadna. */}
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {([["auto", automat ? (automat === "Jerry" ? "Jerryho" : "Terezkine") : "všetko"], ["Jerry", "Jerryho"], ["Terezka", "Terezkine"], ["vsetko", "všetko"]] as const)
+          {([["auto", automat || "Obaja"], ["Jerry", "Jerry"], ["Terezka", "Terezka"], ["vsetko", "Obaja"]] as const)
             .filter(([id]) => id !== "auto" || !!automat)
             .filter(([id]) => !(automat && id === automat))
             .map(([id, l]) => (

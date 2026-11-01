@@ -8,6 +8,7 @@ import { ZDROJE } from "./Klienti";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Fluktuácia — druhá polovica rovnice rastu.
 //
@@ -62,16 +63,16 @@ export function RastAStrata({ data, clients, onKlient, onSkupina }: { data: PSBD
 
         <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "12px 0 4px" }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.green, fontVariantNumeric: "tabular-nums" }}>+{prisloMes.toFixed(1)}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.green, fontVariantNumeric: "tabular-nums" }}>+{prisloMes.toFixed(1).replace(".", ",")}</div>
             <div style={{ fontSize: 11.5, color: C.textMuted }}>príchodov / mesiac</div>
           </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.red, fontVariantNumeric: "tabular-nums" }}>−{odisloMes.toFixed(1)}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.red, fontVariantNumeric: "tabular-nums" }}>−{odisloMes.toFixed(1).replace(".", ",")}</div>
             <div style={{ fontSize: 11.5, color: C.textMuted }}>odchodov / mesiac</div>
           </div>
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, color: prisloMes - odisloMes > 0.5 ? C.accentLight : C.orange, fontVariantNumeric: "tabular-nums" }}>
-              {prisloMes - odisloMes >= 0 ? "+" : ""}{(prisloMes - odisloMes).toFixed(1)}
+              {prisloMes - odisloMes >= 0 ? "+" : ""}{(prisloMes - odisloMes).toFixed(1).replace(".", ",")}
             </div>
             <div style={{ fontSize: 11.5, color: C.textMuted }}>čistý rast / mesiac</div>
           </div>
@@ -83,19 +84,19 @@ export function RastAStrata({ data, clients, onKlient, onSkupina }: { data: PSBD
 
         <div style={{ marginTop: 14, padding: "11px 13px", borderRadius: 9, background: mix(C.accent, 7), border: `1px solid ${mix(C.accent, 24)}` }}>
           <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
-            Aby si rástol o{" "}
+            Na rast o{" "}
             <select
               value={cielRastu} onChange={(e) => setCielRastu(e.target.value)}
               style={{ ...S.select, display: "inline-block", width: "auto", padding: "2px 6px", fontSize: 12.5 }}
             >
               {["1", "2", "3", "4", "5"].map((n) => <option key={n} value={n} style={{ background: C.card }}>{n}</option>)}
             </select>{" "}
-            klientov mesačne, musíš získať <b style={{ color: C.accentLight, fontSize: 15 }}>{trebaZiskat.toFixed(1)}</b> nových —
-            lebo {odisloMes.toFixed(1)} mesačne odíde bez ohľadu na to, koľko ich pribudne.
+            klientov mesačne, musíš získať <b style={{ color: C.accentLight, fontSize: 15 }}>{trebaZiskat.toFixed(1).replace(".", ",")}</b> nových —
+            lebo {odisloMes.toFixed(1).replace(".", ",")} mesačne odíde bez ohľadu na to, koľko ich pribudne.
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.55 }}>
             Toto je zadanie pre reklamu. Keby sa podarilo znížiť odchody o polovicu, ten istý rast by stál{" "}
-            {(odisloMes / 2 + Number(cielRastu)).toFixed(1)} nových klientov mesačne — teda výrazne menej peňazí.
+            {(odisloMes / 2 + Number(cielRastu)).toFixed(1).replace(".", ",")} nových klientov mesačne — teda výrazne menej peňazí.
           </div>
         </div>
 
@@ -480,7 +481,7 @@ function DovodyOdchodu({ mesiac, mena, clients }: { mesiac: string; mena: string
                 <input
                   value={pisem[meno] || ""}
                   onChange={(e) => setPisem({ ...pisem, [meno]: e.target.value })}
-                  placeholder="prečo prestal chodiť?"
+                  placeholder="dôvod odchodu?"
                   style={{ flex: "1 1 240px", padding: "5px 9px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
                 />
                 <button onClick={() => void uloz(meno)} disabled={uklada === meno || !(pisem[meno] || "").trim()}

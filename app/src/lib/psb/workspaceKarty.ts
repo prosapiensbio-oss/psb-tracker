@@ -231,9 +231,15 @@ export const terminSK = (iso: string): string => {
   return `${denVTyzdni(d)} ${denSK(d)}${h ? ` o ${h}` : ""}`;
 };
 
+/** „28. 10. 10:00" — pri presune v rámci dňa je čas to jediné, čo sa zmenilo. */
+const denACas = (iso: string): string => {
+  const h = (iso || "").slice(11, 16);
+  return `${denSK(iso)}${h ? ` ${h}` : ""}`;
+};
+
 export const popisZmeny = (x: Zmena): string =>
   x.druh === "zrusene" ? `zmizol tréning z ${denSK(x.pred || x.kedy)}`
-    : x.druh === "posunute" ? `presun z ${denSK(x.pred || "")} na ${denSK(x.po || "")}`
+    : x.druh === "posunute" ? `presun z ${denACas(x.pred || "")} na ${denACas(x.po || "")}`
       : x.druh === "pridane" ? `pribudol tréning ${denSK(x.po || x.kedy)}`
         : "premenované";
 

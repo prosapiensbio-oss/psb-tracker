@@ -302,7 +302,7 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
                 <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.byTrainer["Jerry"]?.revenue || 0)}</td>
                 <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.byTrainer["Terezka"]?.revenue || 0)}</td>
                 <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{m.sessions}</td>
-                <td style={{ ...S.td, textAlign: "right", color: arrowColor(m.mom) }}>{m.mom == null ? "—" : `${arrow(m.mom)} ${m.mom.toFixed(1)}%`}</td>
+                <td style={{ ...S.td, textAlign: "right", color: arrowColor(m.mom) }}>{m.mom == null ? "—" : `${arrow(m.mom)} ${m.mom.toFixed(1).replace(".", ",")}%`}</td>
               </tr>
             ))}
           </tbody>
@@ -380,7 +380,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
               <SortTh label="Mesiac" sortKey="month" sort={sort} onSort={toggle} />
               <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Zárobky" sortKey="revenue" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="CZK/sedenie" sortKey="perSess" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Kč/sedenie" sortKey="perSess" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Využitie kapacity" sortKey="util" sort={sort} onSort={toggle} align="right" info="Podiel z teoretického maxima 260 sedení/mesiac pre 2 trénerov." />
               <th style={S.th}>Status</th>
             </tr>
@@ -536,7 +536,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
                   <td style={{ ...S.td, fontWeight: 500 }}>{c.name}</td>
                   <td style={S.td}>{c.trainer}</td>
                   <td style={{ ...S.td, textAlign: "right" }}>{c.remaining || "—"}</td>
-                  <td style={{ ...S.td, textAlign: "right" }}>{(tempoUnit === "mes" ? c.burnRate : c.burnWeek).toFixed(1)}</td>
+                  <td style={{ ...S.td, textAlign: "right" }}>{(tempoUnit === "mes" ? c.burnRate : c.burnWeek).toFixed(1).replace(".", ",")}</td>
                   <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.monthlyRevenue)}</td>
                   <td style={{ ...S.td, textAlign: "right", color: c.confidence >= 0.8 ? C.green : c.confidence >= 0.5 ? C.orange : C.red }}>{(c.confidence * 100).toFixed(0)}%</td>
                 </tr>

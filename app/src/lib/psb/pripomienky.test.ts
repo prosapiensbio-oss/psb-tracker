@@ -109,7 +109,7 @@ describe("úvodný bez dopytu", () => {
     const [x] = pripomienkySlubov([u("2026-08-06T10:00:00Z", "Zuzana Spoligova")], [], {}, DNES)
       .filter((i) => i.key.startsWith("bezdopytu|"));
     expect(x.title).toContain("Úvodný bez dopytu");
-    expect(x.detail).toContain("odkiaľ prišiel");
+    expect(x.detail).toContain("odkiaľ človek prišiel");
     // Cieľ nesie aj meno — Dopyty ho predvyplnia do rýchleho zápisu.
     expect(x.client).toBe("marketing|dopyty|Zuzana Spoligova");
   });

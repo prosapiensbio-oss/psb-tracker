@@ -11,7 +11,7 @@ import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, 
 import { FinancieObsah } from "./Financie";
 import { GuillermoKarta } from "./Kalendar";
 import { objednaneVerzia, monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
-import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, mesiacCely, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlHodnotaOpravy, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
@@ -81,13 +81,14 @@ import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
 const signColor = (n: number) => (n > 0 ? C.green : n < 0 ? C.red : C.textMuted);
 const avg = (a: Vals) => (a.length ? vSum(a) / a.length : 0);
 const pct = (cur: number, prev: number) => (prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null);
-const pctStr = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v < 0 ? "▼" : "►"} ${v.toFixed(1)} %`);
+const pctStr = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v < 0 ? "▼" : "►"} ${v.toFixed(1).replace(".", ",")} %`);
 
 // ── period filter shared by the tabs ─────────────────────────────────────────
 const ALL_IDX = MONTHS.map((_, i) => i);
@@ -363,7 +364,7 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
             autoFocus
             style={{ width: 130, padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontSize: 12.5, fontVariantNumeric: "tabular-nums" }}
           />
-          <span style={{ color: C.textDim, fontSize: 11.5 }}>CZK</span>
+          <span style={{ color: C.textDim, fontSize: 11.5 }}>Kč</span>
           <button onClick={() => void uloz(Number(text) || 0)} disabled={uklada}
             style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 12px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}>
             {uklada ? "Ukladám…" : "Uložiť"}
@@ -548,8 +549,8 @@ function HealthCard({ idx }: { idx: number[] }) {
       </H3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
         <StatCard value={fmtCZK(beAvg)} label={<Info text="Koľko musíte mesačne zarobiť, aby ste pokryli prevádzku aj nároky na výplaty. Pod týmto číslom je mesiac stratový." label="Break-even / mesiac" />} color={C.orange} />
-        <StatCard value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} label={<Info text="O koľko % sú priemerné tržby nad break-even. Malá rezerva = jeden slabý mesiac stačí na stratu." label="Rezerva nad break-even" />} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
-        <StatCard value={`${mzdyPct.toFixed(1)} %`} label={<Info text="Podiel mzdových nákladov (nárok oboch trénerov + zamestnanci) na tržbách. Pri službách je to hlavná nákladová položka — čím vyššie, tým menej zostáva na maržu." label="Mzdy z tržieb" />} color={mzdyPct <= 50 ? C.green : mzdyPct <= 60 ? C.orange : C.red} />
+        <StatCard value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1).replace(".", ",")} %`} label={<Info text="O koľko % sú priemerné tržby nad break-even. Malá rezerva = jeden slabý mesiac stačí na stratu." label="Rezerva nad break-even" />} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
+        <StatCard value={`${mzdyPct.toFixed(1).replace(".", ",")} %`} label={<Info text="Podiel mzdových nákladov (nárok oboch trénerov + zamestnanci) na tržbách. Pri službách je to hlavná nákladová položka — čím vyššie, tým menej zostáva na maržu." label="Mzdy z tržieb" />} color={mzdyPct <= 50 ? C.green : mzdyPct <= 60 ? C.orange : C.red} />
         <StatCard value={`${fmtCZK(volitelne / idx.length)} · ${skrtPct.toFixed(0)} %`} label={<Info text="Koľko z prevádzkových nákladov (bez výplat) je voliteľných — reklama, kreatívne nástroje, vybavenie, pohostenie. To sú peniaze, ktoré vieš v zlom mesiaci prestať míňať bez zastavenia štúdia. Zvyšok sú záväzné: nájom, štát, poistenie a systémy, na ktorých prevádzka stojí." label="Viem škrtnúť / mes." />} color={skrtPct >= 30 ? C.green : skrtPct >= 15 ? C.orange : C.red} />
       </div>
       {open && (<>
@@ -711,7 +712,7 @@ function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
             <table style={{ ...tableStyle, minWidth: 560 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
-                  {["Názov", "Skupina", "Kľúč"].map((h) => (
+                  {["Názov", "Skupina"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "7px 9px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -730,7 +731,6 @@ function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
                       <Select value={x.skupina} onChange={(v) => { if (v !== x.skupina) { presunKategoriu(x.kat, v); void uloz(); } }}
                         options={skupiny.map((g) => ({ value: g.hodnota, label: g.label }))} />
                     </td>
-                    <td style={{ padding: "4px 9px", fontSize: 11, color: C.textDim, fontFamily: "monospace" }}>{x.kat}</td>
                   </tr>
                 ))}
               </tbody>
@@ -819,7 +819,7 @@ function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce
           <StatCard value={fmtCZK(agg(sel.prijmy))} label={`Príjmy · ${suffix}`} color={C.green} />
           <StatCard value={fmtCZK(agg(sel.naklady))} label={`Náklady · ${suffix}`} color={C.red} />
           <StatCard value={fmtCZK(agg(sel.zisk))} label={`Hrubý zisk · ${suffix}`} color={signColor(agg(sel.zisk))} />
-          <StatCard value={`${marza.toFixed(1)} %`} label={<Info text={`Marža za zvolené obdobie. Cieľ 12–15 % (medzikrok), dlhodobo 20 %.`} label="Marža" />} color={marza >= VZAS_TARGETS.marzaPct ? C.green : marza >= 0 ? C.orange : C.red} />
+          <StatCard value={`${marza.toFixed(1).replace(".", ",")} %`} label={<Info text={`Marža za zvolené obdobie. Cieľ 12–15 % (medzikrok), dlhodobo 20 %.`} label="Marža" />} color={marza >= VZAS_TARGETS.marzaPct ? C.green : marza >= 0 ? C.orange : C.red} />
         </div>
       </Card>
 
@@ -893,10 +893,10 @@ function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce
               <tr>
                 <td style={{ padding: "5px 10px", fontSize: 11, color: C.textMuted }}>Marža %</td>
                 {i.map((mi) => (
-                  <td key={mi} style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, fontVariantNumeric: "tabular-nums", color: p.marza[mi] >= VZAS_TARGETS.marzaPct ? C.green : p.marza[mi] >= 0 ? C.orange : C.red }}>{p.marza[mi].toFixed(1)}%</td>
+                  <td key={mi} style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, fontVariantNumeric: "tabular-nums", color: p.marza[mi] >= VZAS_TARGETS.marzaPct ? C.green : p.marza[mi] >= 0 ? C.orange : C.red }}>{p.marza[mi].toFixed(1).replace(".", ",")}%</td>
                 ))}
-                <td style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, color: C.textMuted, borderLeft: `1px solid ${C.border}`, fontVariantNumeric: "tabular-nums" }}>{marza.toFixed(1)}%</td>
-                <td style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{(avg(i.map((mi) => p.marza[mi]))).toFixed(1)}%</td>
+                <td style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, color: C.textMuted, borderLeft: `1px solid ${C.border}`, fontVariantNumeric: "tabular-nums" }}>{marza.toFixed(1).replace(".", ",")}%</td>
+                <td style={{ textAlign: "right", padding: "5px 10px", fontSize: 11, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{(avg(i.map((mi) => p.marza[mi]))).toFixed(1).replace(".", ",")}%</td>
               </tr>
             </tbody>
           </table>
@@ -1008,7 +1008,7 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
         <div style={{ display: "flex", gap: 20 }}>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: C.textMuted }}>Hodín {MONTHS[posledny]}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{s.hours[posledny].toFixed(1)} h</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{s.hours[posledny].toFixed(1).replace(".", ",")} h</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: C.textMuted }}>Výplata {MONTHS[posledny]}</div>
@@ -1234,10 +1234,10 @@ function DebtBox({ p }: { p: DebtPerson }) {
           <div style={{ marginTop: 9, marginLeft: 14, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 60)}` }}>
             <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
               Splatiť do roka: <b style={{ color: nadZonou ? C.orange : C.accentLight }}>{h12.toFixed(0)} h / mes.</b>{" "}
-              <span style={{ color: C.textDim }}>({naTyzden(h12).toFixed(1)} h/týž.)</span>
+              <span style={{ color: C.textDim }}>({naTyzden(h12).toFixed(1).replace(".", ",")} h/týž.)</span>
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3, lineHeight: 1.5 }}>
-              Teraz {p.hodinyTeraz.toFixed(0)} h / mes. ({naTyzden(p.hodinyTeraz).toFixed(1)} h/týž.) ·{" "}
+              Teraz {p.hodinyTeraz.toFixed(0)} h / mes. ({naTyzden(p.hodinyTeraz).toFixed(1).replace(".", ",")} h/týž.) ·{" "}
               {h12 > p.hodinyTeraz
                 ? <>treba <b style={{ color: C.text }}>+{(h12 - p.hodinyTeraz).toFixed(0)} h</b> mesačne</>
                 : <span style={{ color: C.green }}>súčasné tempo stačí</span>}
@@ -1265,7 +1265,7 @@ function DebtBox({ p }: { p: DebtPerson }) {
             <>Pri tomto tempe sa <b style={{ color: C.red }}>nesplatí nikdy</b>. Aby prestal rásť, mesačný výber musí klesnúť
               na <b>{fmtCZK(p.narokAvg)}</b> — teraz je o <b style={{ color: C.red }}>{fmtCZK(p.over)}</b> vyšší.</>
           ) : (
-            <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>
+            <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{Sk.mesiace(p.months)}</b>
               {p.months != null && <> — teda okolo <b style={{ color: C.green }}>{mesiacOdTeraz(p.months)}</b></>}. Výber sa drží
               pod nárokom ({fmtCZK(p.poslaneAvg)} vs {fmtCZK(p.narokAvg)}).</>
           )}
@@ -1339,7 +1339,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                 <td style={{ ...S.td, fontSize: 12.5, color: C.textMuted }}>Teraz odrobí</td>
                 {people.map((p) => (
                   <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>
-                    {avg(pick(SALARY[p.k].hours, modelIdx.length ? modelIdx : idx)).toFixed(1)} h
+                    {avg(pick(SALARY[p.k].hours, modelIdx.length ? modelIdx : idx)).toFixed(1).replace(".", ",")} h
                   </td>
                 ))}
               </tr>
@@ -1367,7 +1367,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                       <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: done ? C.green : nemozne ? C.red : dH <= 10 ? C.orange : C.orange }}>
                         {done ? "✓ už spĺňa" : (
                           <>
-                            {needH.toFixed(0)} h <span style={{ color: C.textDim, fontSize: 11 }}>({naTyzden(needH).toFixed(1)} h/týž.)</span>
+                            {needH.toFixed(0)} h <span style={{ color: C.textDim, fontSize: 11 }}>({naTyzden(needH).toFixed(1).replace(".", ",")} h/týž.)</span>
                             <div style={{ color: C.textDim, fontSize: 11, fontWeight: 400 }}>
                               +{dH.toFixed(0)} h alebo −{fmtCZK(dH * s.hourlyRate)} / mes.
                               {nemozne && <div style={{ color: C.red }}>nad zdravou zónou</div>}
@@ -1423,7 +1423,7 @@ function EraCard() {
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 11, color: C.textMuted }}>Marža pred → po</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums" }}>
-            {pred.marza.toFixed(1)} % → {po.marza.toFixed(1)} %
+            {pred.marza.toFixed(1).replace(".", ",")} % → {po.marza.toFixed(1).replace(".", ",")} %
           </div>
         </div>
       </div>
@@ -1462,8 +1462,8 @@ function EraCard() {
                 ].map((row) => (
                   <tr key={row.l}>
                     <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{row.l}</td>
-                    <td style={{ ...cell, color: C.textMuted }}>{row.money ? money(row.a) : `${row.a.toFixed(1)} %`}</td>
-                    <td style={{ ...cell, color: row.b >= row.a ? C.green : C.orange, fontWeight: 600 }}>{row.money ? money(row.b) : `${row.b.toFixed(1)} %`}</td>
+                    <td style={{ ...cell, color: C.textMuted }}>{row.money ? money(row.a) : `${row.a.toFixed(1).replace(".", ",")} %`}</td>
+                    <td style={{ ...cell, color: row.b >= row.a ? C.green : C.orange, fontWeight: 600 }}>{row.money ? money(row.b) : `${row.b.toFixed(1).replace(".", ",")} %`}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1505,7 +1505,7 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
     return -1;
   })();
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
-  const zdroj = (i: number) => (VZAS_MONTHS[i] >= PRVY_MESIAC_Z_FIO ? `${hod(i).toFixed(1)} h × ${SADZBA_ZASKOK_KC}` : "Excel");
+  const zdroj = (i: number) => (VZAS_MONTHS[i] >= PRVY_MESIAC_Z_FIO ? `${hod(i).toFixed(1).replace(".", ",")} h × ${SADZBA_ZASKOK_KC}` : "Excel");
 
   return (
     <Card>
@@ -1523,7 +1523,7 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
           <div style={{ display: "flex", gap: 20 }}>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 11, color: C.textMuted }}>Hodín {MONTHS[posledny]}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{hod(posledny).toFixed(1)} h</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{hod(posledny).toFixed(1).replace(".", ",")} h</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 11, color: C.textMuted }}>Mzda {MONTHS[posledny]}</div>
@@ -1547,8 +1547,8 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
             <tbody>
               <tr>
                 <td style={{ ...S.td, fontSize: 12, color: C.textMuted, ...sticky() }}>Hodiny</td>
-                {idx.map((i) => <td key={i} style={{ ...cell, color: hod(i) > 0 ? C.text : C.textDim }}>{hod(i) > 0 ? hod(i).toFixed(1) : "—"}</td>)}
-                <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{avg(idx.map(hod)).toFixed(1)}</td>
+                {idx.map((i) => <td key={i} style={{ ...cell, color: hod(i) > 0 ? C.text : C.textDim }}>{hod(i) > 0 ? hod(i).toFixed(1).replace(".", ",") : "—"}</td>)}
+                <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{avg(idx.map(hod)).toFixed(1).replace(".", ",")}</td>
               </tr>
               <tr style={{ borderTop: `1px solid ${C.border}` }}>
                 <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text, ...sticky() }}>Mzda</td>
@@ -2065,7 +2065,7 @@ function ReserveCard({ idx }: { idx: number[] }) {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
             <StatCard value={fmtCZK(czk)} label={<Info text={`${res.sats.toLocaleString("sk-SK")} sats pri kurze ${fmtCZK(res.rateCzkPerBtc ?? 0)} / BTC.`} label="Hodnota rezervy" />} color={C.orange} />
-            <StatCard value={`${mesiace.toFixed(1)} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes. Drž na pamäti, že je v bitcoine — pri poklese kurzu o tretinu je z toho tretina mesiaca menej.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
+            <StatCard value={`${mesiace.toFixed(1).replace(".", ",")} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes. Drž na pamäti, že je v bitcoine — pri poklese kurzu o tretinu je z toho tretina mesiaca menej.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
             {goalPct != null && (
               <StatCard value={`${Math.round(goalPct)} %`} label={<Info text={`Cieľ z BTC appky: ${(res.goalSats ?? 0).toLocaleString("sk-SK")} sats.`} label="Cieľ v satoshi" />} color={C.blue} />
             )}
@@ -2317,12 +2317,12 @@ function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string
               })}
               <tr>
                 <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>Marža</td>
-                <td style={{ ...cell, fontSize: 12, color: h1_25.marza >= 0 ? C.orange : C.red }}>{h1_25.marza.toFixed(1)} %</td>
-                <td style={{ ...cell, fontSize: 12, color: h1_26.marza >= VZAS_TARGETS.marzaPct ? C.green : h1_26.marza >= 0 ? C.orange : C.red }}>{h1_26.marza.toFixed(1)} %</td>
+                <td style={{ ...cell, fontSize: 12, color: h1_25.marza >= 0 ? C.orange : C.red }}>{h1_25.marza.toFixed(1).replace(".", ",")} %</td>
+                <td style={{ ...cell, fontSize: 12, color: h1_26.marza >= VZAS_TARGETS.marzaPct ? C.green : h1_26.marza >= 0 ? C.orange : C.red }}>{h1_26.marza.toFixed(1).replace(".", ",")} %</td>
                 <td style={{ ...cell, fontSize: 12, color: signColor(h1_26.marza - h1_25.marza), borderLeft: `1px solid ${C.border}` }}>
-                  {h1_26.marza > h1_25.marza ? "▲" : "▼"} {Math.abs(h1_26.marza - h1_25.marza).toFixed(1)} b.p.
+                  {h1_26.marza > h1_25.marza ? "▲" : "▼"} {Math.abs(h1_26.marza - h1_25.marza).toFixed(1).replace(".", ",")} b.p.
                 </td>
-                <td style={{ ...cell, fontSize: 12, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{rok25.marza.toFixed(1)} %</td>
+                <td style={{ ...cell, fontSize: 12, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{rok25.marza.toFixed(1).replace(".", ",")} %</td>
               </tr>
             </tbody>
           </table>
@@ -2372,8 +2372,8 @@ function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string
               </tr>
               <tr>
                 <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>Marža</td>
-                {a.map((q) => <td key={q.id} style={{ ...cell, fontSize: 12, color: q.marza >= VZAS_TARGETS.marzaPct ? C.green : q.marza >= 0 ? C.orange : C.red }}>{q.marza.toFixed(1)} %</td>)}
-                <td style={{ ...cell, fontSize: 12, color: signColor(d.marza), borderLeft: `1px solid ${C.border}` }}>{d.marza > 0 ? "▲" : d.marza < 0 ? "▼" : "►"} {Math.abs(d.marza).toFixed(1)} b.p.</td>
+                {a.map((q) => <td key={q.id} style={{ ...cell, fontSize: 12, color: q.marza >= VZAS_TARGETS.marzaPct ? C.green : q.marza >= 0 ? C.orange : C.red }}>{q.marza.toFixed(1).replace(".", ",")} %</td>)}
+                <td style={{ ...cell, fontSize: 12, color: signColor(d.marza), borderLeft: `1px solid ${C.border}` }}>{d.marza > 0 ? "▲" : d.marza < 0 ? "▼" : "►"} {Math.abs(d.marza).toFixed(1).replace(".", ",")} b.p.</td>
               </tr>
             </tbody>
           </table>
@@ -2733,7 +2733,7 @@ function EnergyTrendCard() {
             data={rows.map((r) => ({ label: r.label, values: [r.jerry ?? 0, r.terezka ?? 0] }))}
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
             height={200}
-            fmt={(n) => n.toFixed(1)}
+            fmt={(n) => n.toFixed(1).replace(".", ",")}
             zone={{ lo: 1, hi: 6, unit: "" }}
             alignEnd
           />
@@ -2777,8 +2777,8 @@ function Vyhlad({ data, clients }: { data: PSBData; clients: Record<string, Clie
           <div style={{ fontSize: 11.5, color: C.textMuted }}>odhad tržieb · {v.odhad.month.slice(5, 7)}/{v.odhad.month.slice(0, 4)}</div>
         </div>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.accentLight, fontVariantNumeric: "tabular-nums" }}>{(v.odislo + 3).toFixed(1)}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted }}>nových klientov na rast +3 (odíde ~{v.odislo.toFixed(1)})</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.accentLight, fontVariantNumeric: "tabular-nums" }}>{(v.odislo + 3).toFixed(1).replace(".", ",")}</div>
+          <div style={{ fontSize: 11.5, color: C.textMuted }}>nových klientov na rast +3 (odíde ~{v.odislo.toFixed(1).replace(".", ",")})</div>
         </div>
       </div>
     </Card>
@@ -2819,7 +2819,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
   const vals = seriesFor(metric);
   const sel = idx.map((i) => ({ i, label: MONTHS[i], v: vals[i] }));
   const isPct = metric === "marza";
-  const fmtV = (n: number) => (isPct ? `${n.toFixed(1)} %` : money(n));
+  const fmtV = (n: number) => (isPct ? `${n.toFixed(1).replace(".", ",")} %` : money(n));
   // "higher is better" for everything except náklady
   const better = metric !== "naklady";
   const sorted = [...sel].sort((a, b) => b.v - a.v);
@@ -2859,7 +2859,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
             <SignedBars
               data={sel.map((s) => ({ label: s.label, value: s.v }))}
               posColor={metric === "zisk" ? C.accent : C.green}
-              fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
+              fmt={(n) => (isPct ? `${n.toFixed(1).replace(".", ",")}%` : `${Math.round(n / 1000)}k`)}
               height={220}
             />
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
@@ -2920,7 +2920,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
                     <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>
                     <td style={{ ...cell, color: C.red }}>{money(p.celkoveNaklady[i])}</td>
                     <td style={{ ...cell, color: signColor(p.hrubyZisk[i]), fontWeight: 600 }}>{money(p.hrubyZisk[i])}</td>
-                    <td style={{ ...cell, color: p.marza[i] >= VZAS_TARGETS.marzaPct ? C.green : p.marza[i] >= 0 ? C.orange : C.red }}>{p.marza[i].toFixed(1)}%</td>
+                    <td style={{ ...cell, color: p.marza[i] >= VZAS_TARGETS.marzaPct ? C.green : p.marza[i] >= 0 ? C.orange : C.red }}>{p.marza[i].toFixed(1).replace(".", ",")}%</td>
                     <td style={{ ...cell, color: prev == null ? C.textDim : signColor(p.hrubyZisk[i] - prev), borderLeft: `1px solid ${C.border}` }}>{prev == null ? "—" : pctStr(pct(p.hrubyZisk[i], prev))}</td>
                   </tr>
                   {openNote === i && (
@@ -2935,7 +2935,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
                 <td style={{ ...cell, color: C.green, fontWeight: 700, borderBottom: "none" }}>{money(avg(pick(p.prijmy, idx)))}</td>
                 <td style={{ ...cell, color: C.red, fontWeight: 700, borderBottom: "none" }}>{money(avg(pick(p.celkoveNaklady, idx)))}</td>
                 <td style={{ ...cell, color: signColor(avg(pick(p.hrubyZisk, idx))), fontWeight: 700, borderBottom: "none" }}>{money(avg(pick(p.hrubyZisk, idx)))}</td>
-                <td style={{ ...cell, color: C.textMuted, fontWeight: 700, borderBottom: "none" }}>{avg(pick(p.marza, idx)).toFixed(1)}%</td>
+                <td style={{ ...cell, color: C.textMuted, fontWeight: 700, borderBottom: "none" }}>{avg(pick(p.marza, idx)).toFixed(1).replace(".", ",")}%</td>
                 <td style={{ ...cell, borderBottom: "none", borderLeft: `1px solid ${C.border}` }} />
               </tr>
             </tbody>
@@ -2949,7 +2949,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
 
 // ── KPI ──────────────────────────────────────────────────────────────────────
 export const kpiFmt = (v: number, unit: string) =>
-  unit === "czk" ? fmtCZK(v) : unit === "pct" ? `${v.toFixed(1)} %` : unit === "h" ? `${Math.round(v)} h` : v.toFixed(1);
+  unit === "czk" ? fmtCZK(v) : unit === "pct" ? `${v.toFixed(1).replace(".", ",")} %` : unit === "h" ? `${Math.round(v)} h` : v.toFixed(1).replace(".", ",");
 
 function KpiRow({ k, onTarget }: { k: KpiActual; onTarget: (id: string, lo: number | null) => void }) {
   const [open, setOpen] = useState(false);
@@ -3272,7 +3272,7 @@ function CieleTab({ data }: { data: PSBData }) {
               {pct != null && (
                 <div style={{ textAlign: "right", minWidth: 90 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: pct >= 100 ? C.green : C.orange, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(0)} %</div>
-                  <div style={{ fontSize: 10.5, color: C.textDim }}>{hodnota?.toFixed(1)} z {g.cielovaHodnota}</div>
+                  <div style={{ fontSize: 10.5, color: C.textDim }}>{hodnota?.toFixed(1).replace(".", ",")} z {g.cielovaHodnota}</div>
                 </div>
               )}
               <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 999, border: `1px solid ${mix(stavFarba(g.stav), 45)}`, color: stavFarba(g.stav), whiteSpace: "nowrap" }}>
@@ -3582,7 +3582,7 @@ export function OtazkyMesiaca({ mesiac, ja }: { mesiac: string; ja?: PersonKey }
   const [notes, setNotes] = useState<Record<string, MonthNote> | null>(null);
   useEffect(() => { fetchMonthNotes().then(setNotes); }, []);
   const mi = VZAS_MONTHS.indexOf(mesiac);
-  if (mi < 0) return <div style={{ fontSize: 12, color: C.textDim }}>Mesiac {mesiac} vo VZAS nie je.</div>;
+  if (mi < 0) return <div style={{ fontSize: 12, color: C.textDim }}>Mesiac {mesiacCely(mesiac)} vo VZAS nie je.</div>;
   // Formulár sa kreslí AŽ s načítanými odpoveďami: `useState` v riadku berie
   // hodnotu len pri prvom vykreslení a prázdny formulár by po uložení
   // prepísal, čo tam už bolo (pravidlo z 29. 8. 2026).

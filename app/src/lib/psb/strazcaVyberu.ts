@@ -66,7 +66,7 @@ export function rozhodni(
     poslat: true,
     prah,
     titulok: "Výber nad nárok",
-    text: `Tento mesiac si z firmy vybral ${kc(cerpanie)}, ${ako} — o ${kc(nad)} viac.`,
+    text: `Tento mesiac je z firmy vybraných ${kc(cerpanie)}, ${ako} — o ${kc(nad)} viac.`,
   };
 }
 
@@ -115,7 +115,7 @@ export function rozhodniZalohu(
     prah,
     titulok: "Záloha nad dohodu",
     text: strop > 0
-      ? `Počas mesiaca si si vybral ${kc(zalohy)}, dohodnutý strop zálohy je ${kc(strop)} — o ${kc(nad)} viac. Zvyšok výplaty príde 3.`
-      : `Počas mesiaca si si vybral ${kc(zalohy)} mimo výplaty 3. Podľa dohody sa výber nad nárok robí len po dohode s Terezkou.`,
+      ? `Počas mesiaca je vybraných ${kc(zalohy)}, dohodnutý strop zálohy je ${kc(strop)} — o ${kc(nad)} viac. Zvyšok výplaty príde 3.`
+      : `Počas mesiaca je vybraných ${kc(zalohy)} mimo výplaty 3. Podľa dohody sa výber nad nárok robí len po dohode s Terezkou.`,
   };
 }

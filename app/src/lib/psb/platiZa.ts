@@ -24,7 +24,7 @@
  *    ktorú dávka 28. 9. 2026 spravila Danovi a Monike).
  */
 import { cenaPoZlave, katalogovaCena } from "./lightning";
-import { normName } from "./format";
+import { fmtCZK, normName } from "./format";
 
 /** Mená sa v stĺpci oddeľujú zvislicou — v mene sa nevyskytuje. */
 export const ODDELOVAC = "|";
@@ -172,6 +172,6 @@ export function chybaDielov(
   }
   const spolu = diely.reduce((a, d) => a + Math.round(d.suma), 0);
   const cela = Math.round(suma);
-  if (Math.abs(spolu - cela) > 1) return `Diely dávajú ${spolu} Kč, platba je ${cela} Kč.`;
+  if (Math.abs(spolu - cela) > 1) return `Diely dávajú ${fmtCZK(spolu)}, platba je ${fmtCZK(cela)}.`;
   return null;
 }

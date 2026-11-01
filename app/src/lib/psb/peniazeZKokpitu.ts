@@ -76,7 +76,7 @@ export function mozePrepnut(
   }
   const cakaju = nepriradene.filter((p) => String(p.datum).slice(0, 7) >= od);
   if (cakaju.length) {
-    dovody.push(`${cakaju.length} príjmov z banky od ${od} čaká na priradenie (${Math.round(cakaju.reduce((a, p) => a + p.suma, 0))} Kč)`);
+    dovody.push(`Príjmy z banky od ${od} čakajú na priradenie: ${cakaju.length} (${Math.round(cakaju.reduce((a, p) => a + p.suma, 0))} Kč)`);
   }
   return { ok: dovody.length === 0, dovody };
 }

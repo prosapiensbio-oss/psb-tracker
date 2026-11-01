@@ -7,6 +7,7 @@ import { kategorieZoznam } from "./Banka";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { VyberKategorie } from "./VyberKategorie";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Zošit hotovostných platieb.
 //
@@ -128,7 +129,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
       // zapísať sa to nemá; nový výdavok má kategóriu navrhnutú z pravidiel.
       setRiadky((p) => [...(p || []), ...j.riadky!.map((x) => ({ ...x, kategoria: x.kategoria || "", vypnuty: !!(x.uzMame || x.zamknuty) }))]);
       const uz = j.riadky.filter((x) => x.uzMame).length;
-      setStav(`Prečítaných ${j.riadky.length} riadkov${j.zahodenych ? ` (${j.zahodenych} sa nedalo prečítať)` : ""}`
+      setStav(`Prečítané: ${Sk.riadky(j.riadky.length)}${j.zahodenych ? ` (${j.zahodenych} sa nedalo prečítať)` : ""}`
         + (uz ? `, z toho ${uz} už v Kokpite je — sú vypnuté` : "")
         + `. Skontroluj nové, potom zapíš.`);
     } catch (e) {
@@ -266,7 +267,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
               disabled={busy}
               style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 8, padding: "7px 16px", color: C.accentLight, fontSize: 12.5, cursor: busy ? "default" : "pointer" }}
             >
-              Zapísať {riadky.filter((r) => !r.vypnuty).length} riadkov
+              Zapísať {Sk.riadky(riadky.filter((r) => !r.vypnuty).length)}
             </button>
             <button
               onClick={() => { setRiadky(null); setDenMesiac({}); setStav(""); }}

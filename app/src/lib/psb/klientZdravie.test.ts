@@ -105,7 +105,7 @@ describe("priemery sú priemery klientely, nie odvodenina od jedného klienta", 
     const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8, dochadzka: 0.8, vztah: 12, hodinovka: 1000 } }));
     const s = z.signaly.find((x) => x.id === "tempo")!;
     expect(s.podiel).toBeGreaterThan(s.priemer);
-    expect(s.priemerHodnota).toBe("2.0 / mes.");
+    expect(s.priemerHodnota).toBe("2,0 / mes.");
   });
 
 });

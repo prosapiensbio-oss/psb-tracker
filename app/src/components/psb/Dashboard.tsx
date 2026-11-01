@@ -54,6 +54,7 @@ import type { AssistantChat } from "./Assistant";
 import { ReklamaRozhodnutie } from "./ReklamaDozor";
 import { Card, Donut, Empty, H3, Info, Select, ValueBars, ZoneBars } from "./ui";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";  // „Zmena" padá do orange — je to výstraha, nie informácia
@@ -833,7 +834,7 @@ export function Dashboard({
       id: "klienti",
       label: "Aktívni klienti",
       hodnota: String(stats.active),
-      podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1)} / mes. · Ø ${toky.prisloMes.toFixed(1)} nových`,
+      podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1).replace(".", ",")} / mes. · Ø ${toky.prisloMes.toFixed(1).replace(".", ",")} nových`,
       pasmo: cisty < -0.5 ? "zle" : cisty < 0 ? "pozor" : "ok",
       poznamka: cisty < 0 ? "odchádza viac, než prichádza" : undefined,
       vysvetlenie: "Počet aktívnych klientov a priemerný čistý rast za mesiac (prišlo mínus odišlo). Samotný počet je márnivé číslo — dôležitý je smer. Klesajúci čistý rast sa v tržbách prejaví až o dva-tri mesiace neskôr.",
@@ -997,7 +998,7 @@ export function Dashboard({
       // 200 % konverzia.
       podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} nových klientov`,
       pasmo: priemDopyty === null ? "nevie" : lievikMes.dopyty < priemDopyty * 0.5 ? "zle" : lievikMes.dopyty < priemDopyty * 0.8 ? "pozor" : "ok",
-      poznamka: priemDopyty === null ? undefined : `Ø ${priemDopyty.toFixed(1)} / mes.`,
+      poznamka: priemDopyty === null ? undefined : `Ø ${priemDopyty.toFixed(1).replace(".", ",")} / mes.`,
       vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a vedľa toho počet nových klientov toho istého mesiaca — POZOR, nie je to podmnožina dopytov: klient z referencie často žiadny zapísaný dopyt nemá, takže nových môže byť viac než dopytov. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
       seria: dopytyRad,
       kam: () => onNavigate("marketing", "lievik"),
@@ -1023,7 +1024,7 @@ export function Dashboard({
     varovne.push({
       id: "rezerva",
       label: "Rezerva",
-      hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1)} mes.`,
+      hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1).replace(".", ",")} mes.`,
       // Vek ručného stavu patrí na dlaždicu: BTC je živé, ale účet
       // a hotovosť sú z ručného zápisu — 27. 8. 2026 tam ticho sedel stav
       // z 8. 8. a číslo sa tvárilo ako dnešné. Prístroj kŕmený starým
@@ -1510,7 +1511,7 @@ export function Dashboard({
         </H3>
         {weeklyHours.data.length ? (
           <div onClick={() => onNavigate("treningy", "prehled")} style={{ cursor: "pointer" }} title="Otvoriť Tréningy → Prehľad">
-            <Zbalitelny telefon={telefon} popis={`${weeklyHours.data.length} týždňov`}>
+            <Zbalitelny telefon={telefon} popis={`${Sk.tyzdne(weeklyHours.data.length)}`}>
               <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
             </Zbalitelny>
           </div>
@@ -1536,11 +1537,11 @@ export function Dashboard({
           // lebo vtedy je to jeho vlastný najťažší a najľahší týždeň.
           <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
-            <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1)}h`} onClick={() => onNavigate("treningy", "prehled")} />
+            <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1).replace(".", ",")}h`} onClick={() => onNavigate("treningy", "prehled")} />
             {trainer === "all" ? (
               <>
-                <MiniStat label="Jerry · Ø / týždeň" value={`${podlaTrenera.Jerry.toFixed(1)}h`} color={C.accent} onClick={() => setTrainerLocal("Jerry")} />
-                <MiniStat label="Terezka · Ø / týždeň" value={`${podlaTrenera.Terezka.toFixed(1)}h`} color={C.accentLight} onClick={() => setTrainerLocal("Terezka")} />
+                <MiniStat label="Jerry · Ø / týždeň" value={`${podlaTrenera.Jerry.toFixed(1).replace(".", ",")}h`} color={C.accent} onClick={() => setTrainerLocal("Jerry")} />
+                <MiniStat label="Terezka · Ø / týždeň" value={`${podlaTrenera.Terezka.toFixed(1).replace(".", ",")}h`} color={C.accentLight} onClick={() => setTrainerLocal("Terezka")} />
               </>
             ) : (
               <>
@@ -1629,7 +1630,7 @@ export function Dashboard({
           // Mierilo na Financie → Cashflow — podzáložku, ktorá nikdy
           // neexistovala; klik prepol obrazovku a nechal prázdny obsah.
           <div onClick={() => onNavigate("vzas", "trzby")} style={{ cursor: "pointer" }} title="Otvoriť Peniaze → Tržby">
-            <Zbalitelny telefon={telefon} popis={`${earnings.length} mesiacov`}>
+            <Zbalitelny telefon={telefon} popis={`${Sk.mesiace(earnings.length)}`}>
               <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd />
             </Zbalitelny>
           </div>
@@ -1653,11 +1654,11 @@ export function Dashboard({
         </H3>
         <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("klienti", "rast")} title="Otvoriť Klienti → Fluktuácia">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Prišlo Ø / mes." value={`+${toky.prisloMes.toFixed(1)}`} color={C.green} />
-            <MiniStat label="Odišlo Ø / mes." value={`−${toky.odisloMes.toFixed(1)}`} color={C.red} />
+            <MiniStat label="Prišlo Ø / mes." value={`+${toky.prisloMes.toFixed(1).replace(".", ",")}`} color={C.green} />
+            <MiniStat label="Odišlo Ø / mes." value={`−${toky.odisloMes.toFixed(1).replace(".", ",")}`} color={C.red} />
             <MiniStat
               label="Čistý rast / mes."
-              value={`${toky.prisloMes - toky.odisloMes >= 0 ? "+" : ""}${(toky.prisloMes - toky.odisloMes).toFixed(1)}`}
+              value={`${toky.prisloMes - toky.odisloMes >= 0 ? "+" : ""}${(toky.prisloMes - toky.odisloMes).toFixed(1).replace(".", ",")}`}
               color={toky.prisloMes - toky.odisloMes >= 0 ? C.green : C.red}
             />
           </div>
@@ -1699,7 +1700,7 @@ export function Dashboard({
               nech sa nepletie s uzavretým číslom nad ním. */}
           {lievikMes.priebeh && (
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-              Zatiaľ v {monthLabel(lievikMes.priebeh.mes)}: {lievikMes.priebeh.dopyty} dopytov ·{" "}
+              Zatiaľ v {monthLabel(lievikMes.priebeh.mes)}: {Sk.dopyty(lievikMes.priebeh.dopyty)} ·{" "}
               {lievikMes.priebeh.uvodne} úvodných · {lievikMes.priebeh.novi} nových — mesiac ešte beží.
             </div>
           )}
@@ -1760,15 +1761,15 @@ export function Dashboard({
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
-                    title={`${c.name} — ${nazovProduktu(c.membership) || "—"} · ${c.primaryTrainer} · chodí ${frekvencia.toFixed(1)}× týždenne`}
+                    title={`${c.name} — ${nazovProduktu(c.membership) || "—"} · ${c.primaryTrainer} · chodí ${frekvencia.toFixed(1).replace(".", ",")}× týždenne`}
                     style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", lineHeight: 1.35 }}>
                       {doKonca === null ? `${zostava}/${c.packageTotal} hodín`
                         : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                         : doKonca === 0 ? "platnosť končí dnes"
-                        : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`}
+                        : `platnosť do ${fmtDMY(c.packageValidTo)} · ${Sk.dni(doKonca)} · hodiny sa nestihnú minúť`}
                     </span>
                   </button>
                   {/* Odložiť, nie zmazať: keď si kúpi ďalšie členstvo, karta sa mu vráti sama. */}
@@ -1820,7 +1821,7 @@ export function Dashboard({
   const registerPanel = showAcked ? (
     <Card style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <H3><Info text="Položky, ktoré si skryl. Vrátiť sa dajú tlačidlom pri každej." label={`Skryté (${acked.length})`} /></H3>
+        <H3><Info text="Skryté položky. Vrátiť sa dajú tlačidlom pri každej." label={`Skryté (${acked.length})`} /></H3>
         <button onClick={() => setShowAcked(false)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>← Späť na aktívne</button>
       </div>
       {acked.length
@@ -2184,7 +2185,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
             <strong style={{ color: C.text }}>{avg.toFixed(0)}h / {busy.toFixed(0)}h</strong>
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, color: util >= 100 ? C.orange : C.accentLight }}>
-            {util >= 100 ? "Na strope kapacity" : `Zvládne ešte ~${canTake} klientov`}
+            {util >= 100 ? "Na strope kapacity" : `Zvládne ešte ~${Sk.klienti(canTake)}`}
           </div>
         </div>
       </div>
@@ -2533,7 +2534,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       .then((ok) => {
         setOzyvamSa(false);
         if (!ok) return;
-        actions.ackAnomaly(item.key, "ozval som sa", true);
+        actions.ackAnomaly(item.key, "ozvané", true);
         // Rýchlosť odpovede počíta obrazovka Dopyty z `data.leads` — bez
         // obnovenia by tam číslo zostalo staré.
         void actions.refresh();
@@ -2905,7 +2906,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
 
       {dovodOtvoreny && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: C.textMuted }}>Prečo neprišiel:</span>
+          <span style={{ fontSize: 12, color: C.textMuted }}>Dôvod:</span>
           {DOVODY_ODCHODU.map((d) => (
             <button key={d} onClick={() => zapisDovod(d)}
               style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.accentLight, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
@@ -2914,7 +2915,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           ))}
           {/* „Nevieme" je plnohodnotná odpoveď — je rozdiel medzi tým, že sme
               sa nepýtali, a tým, že to nechcel povedať. */}
-          <button onClick={() => zapisDovod("nevieme — dôvod neuviedol")}
+          <button onClick={() => zapisDovod("nevieme — dôvod neznámy")}
             style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
             nevieme
           </button>
@@ -2923,7 +2924,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
 
       {dopytOtvoreny && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: C.textMuted }}>Odkiaľ prišla/prišiel:</span>
+          <span style={{ fontSize: 12, color: C.textMuted }}>Zdroj:</span>
           {SOURCES.map((z) => (
             <button key={z.value} onClick={() => setDopytZdroj(z.value)}
               style={{ background: dopytZdroj === z.value ? mix(C.accent, 16) : "none", border: `1px solid ${dopytZdroj === z.value ? C.accent : C.border}`, borderRadius: 7, padding: "4px 11px", color: dopytZdroj === z.value ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>

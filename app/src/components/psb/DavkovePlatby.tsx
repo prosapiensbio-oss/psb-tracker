@@ -4,6 +4,7 @@ import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * DÁVKOVÉ PRIRADENIE BANKOVÝCH PRÍJMOV.
@@ -119,7 +120,7 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!j?.ok) { setChyba(j?.error || "Nepodarilo sa priradiť."); return; }
-    setHlaska(`Priradených ${j.hotovo} platieb${j.naucenych ? `, z toho ${j.naucenych} pravidiel si appka zapamätala` : ""}.`);
+    setHlaska(`Priradené: ${Sk.platby(j.hotovo)}${j.naucenych ? `, nové pravidlá v pamäti: ${j.naucenych}` : ""}.`);
     if (j.chyby?.length) setChyba(j.chyby.join(" · "));
     setVyber({});
     setRozdelit({});
@@ -273,7 +274,7 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
 
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
         Príjmy, ku ktorým appka nevie navrhnúť nikoho, tu nie sú — tie sa dopisujú ručne vo
-        Workspace na karte „Platby z banky". Pri potvrdení si appka zapamätá pravidlo len vtedy,
+        Workspace v kroku „3 · Platby a balíčky". Pri potvrdení si appka zapamätá pravidlo len vtedy,
         keď je meno klienta priamo v odosielateľovi; zo sprostredkovaného prevodu sa neučí.
       </div>
     </Card>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchWishlist, ulozWish, type WishPolozka } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Nákupný zoznam — prenesený z hárku vo VZAS.
 //
@@ -99,17 +100,17 @@ export function Nakupy() {
         <div>
           <div style={{ fontSize: 11, color: C.textMuted }}>Ešte treba</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{kc(suma.chceme)}</div>
-          <div style={{ fontSize: 11, color: C.textDim }}>{polozky.filter((p) => !p.kupene).length} položiek</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{Sk.polozky(polozky.filter((p) => !p.kupene).length)}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, color: C.textMuted }}>Už kúpené</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums" }}>{kc(suma.kupene)}</div>
-          <div style={{ fontSize: 11, color: C.textDim }}>{polozky.filter((p) => p.kupene).length} položiek</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{Sk.polozky(polozky.filter((p) => p.kupene).length)}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, color: C.textMuted }}>Celý zoznam</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{kc(suma.spolu)}</div>
-          <div style={{ fontSize: 11, color: C.textDim }}>{polozky.length} položiek</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{Sk.polozky(polozky.length)}</div>
         </div>
       </div>
 

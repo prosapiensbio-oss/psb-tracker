@@ -12,7 +12,7 @@
 // stále, prestane byť pripomienkou a stane sa tapetou; presne tak zomrel
 // pôvodný zámer týždenných zápisov.
 
-import { weekKey, weekLabel } from "./format";
+import { mesiacCely, weekKey, weekLabel } from "./format";
 import { denVTyzdniPraha, dnesPraha, mesiacPraha } from "./cas";
 
 export type Ritual = {
@@ -235,10 +235,10 @@ export function ritualy(
     druh: "mesiac",
     nadpis: "Mesačná uzávierka",
     detail: maMesiac
-      ? `Mesiac ${mk} je zapísaný.`
+      ? `Mesiac ${mesiacCely(mk)} je zapísaný.`
       : mozeZapisovat
-        ? `Mesiac ${mk} má nahraté všetky doklady, ale nie sú zodpovedané otázky mesiaca. Klik otvorí rovno ne.`
-        : `Mesiac ${mk} ešte nemá zápis. Najprv treba doplniť: ${chybaju.join(", ")}.`,
+        ? `${mesiacCely(mk)}: výpis z Fio, Metricool aj zošit sú nahraté, chýbajú odpovede na otázky mesiaca. Klik otvorí rovno ne. Zvyšok (napríklad bitcoin bez faktúry) ukáže Uzávierka.`
+        : `Mesiac ${mesiacCely(mk)} ešte nemá zápis. Najprv treba doplniť: ${chybaju.join(", ")}.`,
     // Uzávierka sa od 5. 10. 2026 robí vo Workspace — karta Uzávierka mesiaca.
     ciel: { tab: "workspace", sub: "uzavierka" },
     // Pýta sa až od prvého víkendu — predtým sa uzávierka nedá spraviť, lebo
@@ -265,8 +265,8 @@ export function ritualy(
     trener: "Jerry",
     nadpis: "Zapíš stav hotovosti",
     detail: hotovostHotova
-      ? `Stav hotovosti ku koncu ${mk} je zapísaný.`
-      : `Spočítaj obálku a zapíš stav hotovosti ku koncu ${mk} — treba to na uzávierku (účet aj bitcoin appka doplní sama).`,
+      ? `Stav hotovosti ku koncu ${mesiacCely(mk)} je zapísaný.`
+      : `Spočítaj obálku a zapíš stav hotovosti ku koncu ${mesiacCely(mk)} — treba to na uzávierku (účet aj bitcoin appka doplní sama).`,
     ciel: { tab: "workspace", sub: "uzavierka" },
     splatne: nacitane && !hotovostHotova && dD >= prvyVikendMesiaca(rokP, mesP - 1).toISOString().slice(0, 10),
     hotove: hotovostHotova,

@@ -14,6 +14,7 @@ import { SmsKlientovi } from "./SmsKlientovi";
 import { dlhyNaFakturu } from "../../lib/psb/fakturaDlhy";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
+import { fmtCZK } from "../../lib/psb/format";
 
 /**
  * VYDANÉ FAKTÚRY.
@@ -441,7 +442,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
             </div>
           </div>
 
-          <span style={popisStyl}>Popis — vyber z toho, čo už si fakturoval, alebo napíš vlastný</span>
+          <span style={popisStyl}>Popis — vyber z toho, čo už bolo fakturované, alebo napíš vlastný</span>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
             {POPISY.map((p) => (
               <button
@@ -449,8 +450,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 type="button"
                 onClick={() => setF((s) => ({ ...s, popis: p.text, cena: cenaBalicka != null ? s.cena : String(p.cena) }))}
                 title={cenaBalicka != null
-                  ? `${p.text} — prepíše len text, suma zostane ${cenaBalicka} Kč podľa balíčka`
-                  : `${p.text} — ${p.cena} Kč`}
+                  ? `${p.text} — prepíše len text, suma zostane ${fmtCZK(cenaBalicka)} podľa balíčka`
+                  : `${p.text} — ${fmtCZK(p.cena)}`}
                 style={{
                   padding: "5px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer",
                   border: `1px solid ${f.popis === p.text ? C.accent : C.border}`,
@@ -530,7 +531,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                       key={p.id}
                       type="button"
                       onClick={() => nastav({ popis: p.text, cena: d.cena || String(p.cena) })}
-                      title={`${p.text} — ${p.cena} Kč`}
+                      title={`${p.text} — ${fmtCZK(p.cena)}`}
                       style={{
                         padding: "5px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer",
                         border: `1px solid ${d.popis === p.text ? C.accent : C.border}`,

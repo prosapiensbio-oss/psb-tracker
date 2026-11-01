@@ -342,7 +342,7 @@ function CoSomRobil({ chat }: { chat?: AssistantChat }) {
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-        <H3><Info text="Koľko obsahu si za mesiac vypustil, aký mal dosah a koľko stála reklama. Stories sa nerátajú do „príspevkov“ — sú v tabuľke nižšie, lebo majú úplne inú životnosť. Východzie okno sú 3 mesiace: pri 2–7 reels mesačne je rozdiel medzi jedným a druhým mesiacom náhoda, nie trend." label="Čo som robil" /></H3>
+        <H3><Info text="Koľko obsahu za mesiac vyšlo, aký mal dosah a koľko stála reklama. Stories sa nerátajú do „príspevkov“ — sú v tabuľke nižšie, lebo majú úplne inú životnosť. Východzie okno sú 3 mesiace: pri 2–7 reels mesačne je rozdiel medzi jedným a druhým mesiacom náhoda, nie trend." label="Čo som robil" /></H3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
           <Vysvetli chat={chat} titul="Čo som robil" filter={obdobieLabel(obdobie)} vyrez={vyrez} />
@@ -847,14 +847,14 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
             <Vysvetli chat={chat} titul="Vyhľadávanie (Search Console)" filter={obdobieLabel(obdobie)}
-              vyrez={() => [`Spolu: ${kliky} klikov, ${zobrazenia} zobrazení, MP ${ctr.toFixed(2)} %, z mobilu ${mobilPct.toFixed(0)} %`,
+              vyrez={() => [`Spolu: ${kliky} klikov, ${zobrazenia} zobrazení, MP ${ctr.toFixed(2).replace(".", ",")} %, z mobilu ${mobilPct.toFixed(0)} %`,
                 tsv(["mesiac", "kliky", "zobrazenia"], data.map((r) => [label(r.m), r.kliky, r.zobrazenia]))].join("\n")} />
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
           <StatCard value={num(kliky)} label="Kliky z Googlu" color={C.green} />
           <StatCard value={num(zobrazenia)} label="Zobrazenia" color={C.accent} />
-          <StatCard value={`${ctr.toFixed(2)} %`} label={<Info text="Priemerná miera prekliku. Pri prevažne informačných dopytoch je 2–3 % normál; pri dopytoch so zámerom kúpiť býva mnohonásobne vyššia." label="Miera prekliku" />} color={C.blue} />
+          <StatCard value={`${ctr.toFixed(2).replace(".", ",")} %`} label={<Info text="Priemerná miera prekliku. Pri prevažne informačných dopytoch je 2–3 % normál; pri dopytoch so zámerom kúpiť býva mnohonásobne vyššia." label="Miera prekliku" />} color={C.blue} />
           <StatCard value={`${mobilPct.toFixed(0)} %`} label={<Info text="Podiel klikov z mobilu za celé obdobie. Podľa toho sa dá posúdiť, či má web zmysel ladiť najprv pre telefón." label="Z mobilu" />} color={C.orange} />
         </div>
         <ValueBars
