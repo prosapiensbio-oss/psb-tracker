@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "./kalendarMena";
+import { menoZNazvuUvodneho } from "./kalendar";
+import { bezDovetkuMena, casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "./kalendarMena";
 
 const m = (nazov: string, cas: string, klient: string): Mapa => ({ nazov, trener: "Terezka", cas, klient, typ: "trening" });
 
@@ -77,5 +78,30 @@ describe("klient z pravidla dostane tvar známeho klienta (28. 10. 2026)", () =>
     expect(tvarZnamehoKlienta("Jan Novák", znami)).toBe("Jan Novák");
     expect(tvarZnamehoKlienta("Marketa", znami)).toBe("Marketa");
     expect(tvarZnamehoKlienta(null, znami)).toBeNull();
+  });
+});
+
+describe("dovetok z názvu udalosti nie je meno", () => {
+  it("odreže diagnostiku a úvodný", () => {
+    expect(bezDovetkuMena("Romana Prochádzková- diagnostika")).toBe("Romana Prochádzková");
+    expect(bezDovetkuMena("Romana Prochádzková-uvodná diagnostika")).toBe("Romana Prochádzková");
+    expect(bezDovetkuMena("Linda Muth-uvodny trening")).toBe("Linda Muth");
+    expect(bezDovetkuMena("Petr Baťa -uvodný tréning")).toBe("Petr Baťa");
+    expect(bezDovetkuMena("Veronika Stoklásková-online")).toBe("Veronika Stoklásková");
+    expect(bezDovetkuMena("Šiková Dita-uvodny lekce")).toBe("Šiková Dita");
+  });
+  it("meno bez dovetku ostane, aj dvojité priezvisko", () => {
+    for (const m of ["Roman Pavlik", "Radka Kovaříková", "Jana Nováková-Svobodová", "Anna-Marie Dvořáková", "Michaela J Dumbrovska"]) {
+      expect(bezDovetkuMena(m)).toBe(m);
+    }
+  });
+});
+
+describe("meno z názvu úvodného bez nálepky", () => {
+  it("diagnostika a lekce nie sú súčasť mena", () => {
+    expect(menoZNazvuUvodneho("Romana Prochádzková-uvodná diagnostika")).toBe("Romana Prochádzková");
+    expect(menoZNazvuUvodneho("Šiková Dita-uvodny lekce")).toBe("Šiková Dita");
+    expect(menoZNazvuUvodneho("Jitka Heinrichova-uvodna diagnostika")).toBe("Jitka Heinrichova");
+    expect(menoZNazvuUvodneho("Linda Muth-uvodny trening")).toBe("Linda Muth");
   });
 });

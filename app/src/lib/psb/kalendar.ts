@@ -83,6 +83,9 @@ export function menoZNazvuUvodneho(nazov: string): string | null {
   s = s
     .replace(/(?<!\p{L})[úu]vodn\S*/giu, " ")
     .replace(/(?<!\p{L})tr[éeě]n\S*/giu, " ")
+    // „Romana Prochádzková-uvodná diagnostika": „diagnostika" a „lekce" sú
+    // tá istá nálepka. Bez nich vznikla klientka „Romana Prochádzková- diagnostika".
+    .replace(/(?<!\p{L})(?:diagnostik|lekc)\S*/giu, " ")
     .replace(/^[\s\p{Pd}:,–—-]+|[\s\p{Pd}:,–—-]+$/gu, "")
     .replace(/\s+/g, " ")
     .trim();

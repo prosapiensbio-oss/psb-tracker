@@ -112,3 +112,16 @@ export function tvarZnamehoKlienta(klient: string | null, menaKlientov: string[]
   if (!klient) return klient;
   return klientPodlaCelehoMena(klient, menaKlientov) ?? klient;
 }
+
+/**
+ * DOVETOK Z NÁZVU UDALOSTI NIE JE ČASŤ MENA (rozbor Kokpitu, 1. 11. 2026).
+ *
+ * „Romana Prochádzková- diagnostika" je zvyšok názvu „Romana Prochádzková-
+ * uvodná diagnostika", ktorý prešiel ako meno klienta. Odrezáva len známe
+ * slová na konci, takže dvojité priezvisko („Nováková-Svobodová") ostáva.
+ */
+const DOVETOK_MENA = /[\s\p{Pd}]+(?:[úu]vodn\S*\s*)?(?:diagnostik\S*|tr[éeě]n[ií]\S*|lekc\S*|konzultac\S*|on-?line|off-?line)(?:\s+\S+)?\s*$|[\s\p{Pd}]+[úu]vodn\S*\s*$/iu;
+
+export function bezDovetkuMena(meno: string): string {
+  return (meno || "").replace(DOVETOK_MENA, "").trim();
+}
