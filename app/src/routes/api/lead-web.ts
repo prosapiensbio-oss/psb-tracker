@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { posliLead } from "../../lib/psb/capi";
 import { bindings } from "../../lib/bindings.server";
 import { dnesPraha } from "../../lib/psb/cas";
+import { zapisDopytZWebu } from "../../lib/psb/dopytWeb";
 
 /**
  * Dopyt z webového formulára (Contact Form 7 na prosapiens.cz).
@@ -179,23 +180,13 @@ export const Route = createFileRoute("/api/lead-web")({
         const useky = lokal.split(".");
         const jeRobot = useky.length >= 4 && useky.filter((u) => u.length === 1).length >= 2;
 
-        await DB.prepare(
-          `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,kampan,utm,stranka,druh)
-           VALUES (?1,?2,?3,?4,'',?5,?6,?7,?8,?9,?10,?11,?12,?13)
-           ON CONFLICT(id) DO UPDATE SET name=excluded.name, email=excluded.email, telefon=excluded.telefon,
-             note=excluded.note, kampan=excluded.kampan, utm=excluded.utm, stranka=excluded.stranka,
-             druh=excluded.druh`,
-        )
-          .bind(
-            kluc, dnes, meno || email || telefon,
-            zdrojZUtm(utmSource, utmMedium, referer),
-            "novy",
-            poznamka,
-            new Date().toISOString(),
-            email, telefon, utmCampaign, utm, stranka,
-            jeKontrola ? "kontrola" : jeMagnet ? "magnet" : "dopyt",
-          )
-          .run();
+        await zapisDopytZWebu(DB, {
+          id: kluc, date: dnes, name: meno || email || telefon, menoZFormulara: meno,
+          source: zdrojZUtm(utmSource, utmMedium, referer),
+          note: poznamka, createdAt: new Date().toISOString(),
+          email, telefon, kampan: utmCampaign, utm, stranka,
+          druh: jeKontrola ? "kontrola" : jeMagnet ? "magnet" : "dopyt",
+        });
 
         // ── ohlásenie Mete ────────────────────────────────────────────────
         //
