@@ -42,7 +42,10 @@ describe("pohyby z Fio API", () => {
     // „2026-09-27+0200" cez new Date() vyjde v UTC ako 26. 9. — a pohyb by
     // spadol do predošlého dňa aj do predošlého mesiaca v P&L.
     expect(datumPohybu(st("2026-09-27+0200"))).toBe("2026-09-27");
-    expect(datumPohybu(st(1340661600000))).toBe("2012-06-25");
+    // Polnoc v Prahe: v UTC je to ešte 25. 6. 22:00, deň je ale 26. 6.
+    expect(datumPohybu(st(1340661600000))).toBe("2012-06-26");
+    // Zimný čas: 1. 11. 2026 00:00 SEČ = 31. 10. 23:00 UTC.
+    expect(datumPohybu(st(Date.parse("2026-10-31T23:00:00Z")))).toBe("2026-11-01");
     expect(datumPohybu(st(null))).toBe("");
   });
 

@@ -22,6 +22,7 @@
  * v databáze ani v odpovedi API. Preto sa v tomto súbore ani raz nelogu je.
  */
 
+import { dnesPraha } from "./cas";
 import { odhadniKategoriu, protistranaZPopisu, REZERVA_FIRMY, type FioRiadok } from "./fio";
 import { jeUcetRezervy, REZERVA_PROTISTRANA } from "./rezervaOdlozenie";
 
@@ -54,13 +55,15 @@ const cislo = (s: Stlpec): number => (s && s.value != null ? Number(s.value) : 0
 
 /**
  * Dátum z API chodí ako „2026-09-27+0200" (a v starších príkladoch ako
- * milisekundy). Berie sa prvých desať znakov, nie `new Date` — prevod cez
- * časovú zónu by pohyb spred polnoci presunul na predošlý deň.
+ * milisekundy). Text sa reže na prvých desať znakov, nie cez `new Date` —
+ * prevod cez časovú zónu by pohyb spred polnoci presunul na predošlý deň.
+ * Milisekundy sú polnoc v Prahe (1340661600000 = 26. 6. 2012 00:00 SELČ),
+ * takže deň z nich vyjde len podľa Prahy; podľa UTC to bol predošlý deň.
  */
 export function datumPohybu(s: Stlpec): string {
   const v = s?.value;
   if (v == null) return "";
-  if (typeof v === "number") return new Date(v).toISOString().slice(0, 10);
+  if (typeof v === "number") return dnesPraha(new Date(v));
   const t = String(v);
   return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : "";
 }
