@@ -629,7 +629,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       <div onClick={() => setOknoPravidla(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
         <div role="dialog" aria-modal="true" aria-label="Potvrdiť výdavky so známym pravidlom" onClick={(e) => e.stopPropagation()}
           style={{ background: C.surface, color: C.text, borderRadius: 12, border: `1px solid ${C.border}`, padding: 16, width: "min(560px, 100%)", maxHeight: "86vh", display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 15, fontWeight: 800 }}>Potvrdiť {vybranePravidlom.length} výdavkov so známym pravidlom?</div>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>Potvrdiť {vybranePravidlom.length} {vybranePravidlom.length === 1 ? "výdavok" : vybranePravidlom.length < 5 ? "výdavky" : "výdavkov"} so známym pravidlom?</div>
           <div style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 10px", lineHeight: 1.5 }}>
             Kategóriu im dalo pravidlo, ktoré si už raz potvrdil. Kategóriu, ktorá nesedí, odškrtni — ostane na ručné. Výdavky bez pravidla sa nepotvrdia. ⌘Z vráti.
           </div>

@@ -845,7 +845,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 </span>
                 {/* Pevná šírka a zarovnanie vpravo: sumy pod sebou sa dajú porovnať očami. */}
                 <span style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums", minWidth: 78, textAlign: "right" }}>{suma(r.celkom_czk)} Kč</span>
-                <span style={{ fontSize: 11.5, color: mesk ? C.red : C.textDim, flex: "1 1 170px" }}>
+                <span style={{ fontSize: 11.5, color: mesk ? C.red : C.textDim, flex: "0 1 290px" }}>
                   {r.storno_at ? `storno — ${r.storno_dovod}`
                     : r.uhradene_at ? `uhradená ${den(r.uhradene_at.slice(0, 10))}`
                       : mesk ? `po splatnosti od ${den(r.splatnost)}` : `splatná ${den(r.splatnost)}`}
@@ -859,6 +859,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     : null}
                   {r.sms_at && !r.storno_at ? ` · SMS ${den(r.sms_at.slice(0, 10))}` : ""}
                 </span>
+                {/* Pevná šírka akcií drží sumy pod sebou, aj keď ich má riadok menej. */}
+                <span style={{ display: "inline-flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", justifyContent: "flex-end", flex: "0 0 auto", minWidth: 230, marginLeft: "auto" }}>
                 <button type="button" onClick={() => void stiahniPdf(r)} disabled={pdfBezi === r.id} style={odkazStyl}>{pdfBezi === r.id ? "pripravujem PDF…" : "PDF"}</button>
                 {!r.storno_at && (
                   <button
@@ -916,6 +918,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                     </button>
                   </span>
                 )}
+                </span>
               </div>
               {vyberPoslania === r.id && !r.storno_at && (
                 <div style={{ margin: "4px 0 2px 12px", padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>

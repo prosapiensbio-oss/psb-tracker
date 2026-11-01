@@ -824,14 +824,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const zapisPresuny = async (polozky: PresunNaOdpoved[]) => {
     const mena = polozky.map((x) => `• ${x.meno}: ${x.poznamka}`).join("\n");
     if (!window.confirm(`Zapísať ${polozky.length}× „presunuli sme"?\n\n${mena}`)) return;
-    setPracujem("presuny"); setChyba(""); setVysledokPresunov(null);
+    setPracujem("presuny"); setChyba("");
     const v = await zapisPoJednom(polozky, async (x) => {
-      const j = await posli("/api/kalendar", { akcia: "vysvetli", id: x.id, poznamka: x.poznamka });
+      const j = await posli("/api/kalendar", { akcia: "vysvetli", id: x.id, poznamka: x.poznamka })
+        .catch((e) => ({ ok: false, error: e instanceof Error ? e.message : "spojenie" }));
       if (!j.ok) throw new Error(j.error || "neuložilo sa");
       setHotove((s) => new Set([...s, x.kluc]));
     });
     setPracujem("");
-    setVysledokPresunov(v);
+    // Druhé tlačidlo nesmie zmazať chybu z prvého: výsledky sa sčítajú.
+    setVysledokPresunov((pred) => ({
+      hotovo: (pred?.hotovo || 0) + v.hotovo,
+      chyby: [...(pred?.chyby || []).filter((c) => !polozky.some((x) => x.id === c.polozka.id)), ...v.chyby],
+    }));
     if (v.hotovo) oznam("kalendar");
   };
 
