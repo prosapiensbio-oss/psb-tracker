@@ -256,6 +256,15 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     return m;
   }, [all]);
 
+  // Ø cena sedenia v riadku klienta: tá istá definícia ako dlaždica nad tabuľkou
+  // (prijaté ÷ sedenia). Bol tu `paidAvg`, priemer ceny zapísanej pri sedení bez núl.
+  const prijatePodlaKlienta = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of data.payments) if (p.client) m.set(normName(p.client), (m.get(normName(p.client)) || 0) + p.amount);
+    return m;
+  }, [data.payments]);
+  const cenaSedeniaKlienta = (c: ClientAgg) => (c.sessionCount ? (prijatePodlaKlienta.get(normName(c.name)) || 0) / c.sessionCount : 0);
+
   // Everything except the package-donut filter — the donut is built from this,
   // so its slices stay visible/clickable even after you pick one.
   const baseList = useMemo(() => {
@@ -318,13 +327,13 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       pkg: (c) => c.packageRemaining,
       sessions: (c) => c.sessionCount,
       attendance: (c) => c.attendance,
-      avg: (c) => c.paidAvg,
+      avg: (c) => cenaSedeniaKlienta(c),
       // Kto ešte nebol (objednaný úvodný), má `lastSession` prázdne — na koniec.
       last: (c) => Date.parse(c.lastSession) || 0,
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });
-  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, lenPauza, nameSearch, sorted, focusClient, all, skupina]);
+  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, lenPauza, nameSearch, sorted, focusClient, all, skupina, prijatePodlaKlienta]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -685,7 +694,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                   {c.packageTotal ? textZostatku({ zostava: c.packageRemaining, spolu: c.packageTotal, odvodene: c.packageOdvodeny }) : "—"}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>
+                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(cenaSedeniaKlienta(c))}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtDate(c.lastSession)}</td>
                 <td style={S.td}>
                   <select

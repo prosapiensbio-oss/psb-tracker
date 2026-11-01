@@ -2705,7 +2705,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{sMenomTucne(item)}</span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", whiteSpace: "nowrap" }}>
           {(jeOtazkaDovodu || jeOtazkaDuch) && !item.acked && (
             <button onClick={() => setDovodOtvoreny((o) => !o)} style={{ ...linkBtn, color: dovodOtvoreny ? C.accentLight : C.accent }}>
               {dovodOtvoreny ? "Zavrieť" : "Prečo?"}
@@ -2820,7 +2820,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
             </button>
           )}
           {!item.acked && pytaSaAko && (item.akcie || []).length > 0 && (
-            <div style={{ flexBasis: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 9, border: `1px solid ${mix(C.green, 45)}`, background: C.surface, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ flexBasis: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 9, border: `1px solid ${mix(C.green, 45)}`, background: C.surface, display: "flex", flexDirection: "column", gap: 8, whiteSpace: "normal" }}>
               <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Ako je to vybavené?</div>
               <div style={{ fontSize: 11.5, color: C.textMuted }}>Bez výberu by o hodinách nebolo rozhodnuté nič — appka by ich ďalej počítala, akoby platili.</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2889,7 +2889,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
                   style={{ ...linkBtn, display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", padding: "6px 0", textAlign: "left", color: C.text, borderBottom: `1px solid ${mix(C.border, 40)}` }}
                 >
                   <span style={{ fontWeight: 600, minWidth: 70 }}>{m.popis}</span>
-                  <span style={{ color: C.textMuted, fontWeight: 400, flex: "1 1 200px" }}>{m.co}</span>
+                  <span style={{ color: C.textMuted, fontWeight: 400, flex: "1 1 200px", whiteSpace: "normal" }}>{m.co}</span>
                 </button>
               ))}
             </div>

@@ -127,6 +127,29 @@ describe("kotva dát v kontexte", () => {
 // ale kontext posielal ďalej `paidAvg` — priemer z ceny ZAPÍSANEJ pri sedení.
 // Pri 19 % sedení je tá cena nulová (platba visí na balíčku), takže Jarvis
 // hovoril o vyše dvesto korún nižšie číslo než obrazovka hneď vedľa neho.
+describe("jedna otázka, jedno číslo v kontexte", () => {
+  test("zostatok znie ako na obrazovke: 2 h nad rámec, nie −2/6", () => {
+    const { data, clients } = vzorka();
+    clients["Anna Nova"] = { ...clients["Anna Nova"], packageRemaining: -2, packageTotal: 6 };
+    const c = buildAiContext(data, clients, [], [], []);
+    expect(c.klientiDetail[0].zostatokSedeni).toBe("2 h nad rámec");
+    expect(c.klientiDetail[0].zostatokNadRamec).toBe(2);
+  });
+
+  test("Ø cena sedenia nesie obdobie a menovateľ a sedí s obrazovkou", () => {
+    const c = ctx();
+    expect(c.kpi.cenaSedenia?.poslednyPlnyMesiac).toEqual({ mesiac: c.kpi.zarobkyPoslednyPlnyMesiac?.mesiac ?? "", czk: 1000, sedeni: 20 });
+    expect(c.kpi.cenaSedenia?.rokDoPoslednehoPlneho).toEqual({ rok: "2026", czk: 1000, sedeni: 40 });
+  });
+
+  test("kto nemá sedenie, je v „čakajú“, nie medzi aktívnymi", () => {
+    const { data, clients } = vzorka();
+    const c = buildAiContext({ ...data, clientOverrides: { "Nový Dopyt": {} as never } }, clients, [], [], []);
+    expect(c.kpi.aktivnychKlientov).toBe(1);
+    expect(c.kpi.cakajuNaPrvyTrening).toBe(1);
+  });
+});
+
 describe("cena za sedenie v kontexte", () => {
   test("sedí s kanonickou cenaZaSedenie do koruny", () => {
     const { data, clients } = vzorka();

@@ -1876,7 +1876,7 @@ export function useExtraGrafy({
           </div>
           <div style={{ borderLeft: `1px solid ${mix(C.border, 70)}`, paddingLeft: 14 }}>
             <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginBottom: 6 }}>
-              Odhad · {predM ? monthLabel(predM.mesiac) : "ďalší mesiac"}
+              Odhad · {predikcia.months[0] ? monthLabel(predikcia.months[0].month) : "ďalší mesiac"}
             </div>
             <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
               {!predM ? <Empty>Na odhad zatiaľ nie je dosť dát.</Empty> : (
