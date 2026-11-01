@@ -91,7 +91,6 @@ describe("Terezka (tréner)", () => {
       { login: "jerry", password: NOVE },
       { login: "JERRY", password: NOVE },
       { login: " jerry ", password: NOVE, name: "Jerry" },
-      { login: "jerry", password: NOVE, akcia: "zachrana" },
     ]) {
       const r = await post(telo, c);
       expect(r.status).toBe(403);
@@ -182,57 +181,34 @@ describe("Jerry (správca)", () => {
   });
 });
 
-describe("záchrana (session app zo spoločného hesla)", () => {
-  it("nastaví nové heslo Jerrymu aj Terezke, s auditom bez hodnôt, a staré cookies padnú", async () => {
-    const db = await zaklad();
-    const app = await cookieV0("app");
-    for (const [login, meno] of [["jerry", "Jerry"], ["terezka", "Terezka"]]) {
-      const stara = await cookieV0(meno);
-      const r = await post({ login, password: NOVE, akcia: "zachrana" }, app);
-      expect(r.status).toBe(200);
-      expect(novaCookie(r)).toBeNull();
-      expect(await heslaPlati(db, login, NOVE)).toBe(true);
-      expect(riadok(db, login)!.name).toBe(meno);
-      zabudniKonta();
-      expect(await kto(stara)).toBeNull();
-    }
-    const a = audity(db);
-    expect(a.map((x) => [x.actor, x.action, x.payment_id])).toEqual([["app", "zachrana-hesla", "jerry"], ["app", "zachrana-hesla", "terezka"]]);
-    expect(JSON.stringify(a)).not.toContain(NOVE);
-    expect(await kto(app)).toBe("app");
-  });
-  it("najstarší tvar cookie bez mena je tá istá záchrana", async () => {
-    const db = await zaklad();
-    expect((await post({ login: "jerry", password: NOVE, akcia: "zachrana" }, await cookieV0())).status).toBe(200);
-    expect(await heslaPlati(db, "jerry", NOVE)).toBe(true);
-  });
-  it("bez výslovnej záchrany heslo nemení a nič iné nesmie", async () => {
+describe("záchrana cez spoločné heslo je zrušená", () => {
+  it("cookie app a cookie bez mena: neprihlásené, ani GET, ani POST", async () => {
     const db = await zaklad();
     const pred = hash(db, "jerry");
-    const app = await cookieV0("app");
-    expect((await post({ login: "jerry", password: NOVE }, app)).status).toBe(403);
-    expect((await post({ login: "novy", password: NOVE }, app)).status).toBe(403);
-    expect((await post({ login: "jerry", active: false }, app)).status).toBe(403);
-    expect((await post({ login: "jerry", akcia: "odhlas-vsade" }, app)).status).toBe(403);
+    for (const c of [await cookieV0("app"), await cookieV0()]) {
+      expect(await kto(c)).toBeNull();
+      expect((await kontaGet(new Request("https://k/api/users", { headers: hlavicky(c) }))).status).toBe(401);
+      expect((await post({ login: "jerry", password: NOVE }, c)).status).toBe(401);
+      expect((await post({ login: "jerry", password: NOVE, akcia: "zachrana" }, c)).status).toBe(401);
+    }
     expect(hash(db, "jerry")).toBe(pred);
-    expect(riadok(db, "jerry")!.active).toBe(1);
+    expect(audity(db)).toEqual([]);
   });
-  it("nezaloží konto, nezapne vypnuté a nepremenuje", async () => {
+  it("akcia zachrana už neexistuje ani pre správcu", async () => {
     const db = await zaklad();
-    const app = await cookieV0("app");
-    expect((await post({ login: "novy", password: NOVE, akcia: "zachrana" }, app)).status).toBe(404);
-    expect((await post({ login: "test-zmazat", password: NOVE, akcia: "zachrana" }, app)).status).toBe(404);
-    expect(riadok(db, "novy")).toBeNull();
-    expect(riadok(db, "test-zmazat")!.active).toBe(0);
-    await post({ login: "jerry", name: "Ktosi", password: NOVE, akcia: "zachrana" }, app);
-    expect(riadok(db, "jerry")!.name).toBe("Jerry");
+    const pred = hash(db, "terezka");
+    const r = await post({ login: "terezka", password: NOVE, akcia: "zachrana" }, await cookieV0("Jerry"));
+    expect(r.status).toBe(400);
+    expect(hash(db, "terezka")).toBe(pred);
+  });
+  it("identita app nemá rolu, keby sa k obrazovke predsa dostala", () => {
+    expect(rolaKonta("app", null)).toBe("cudzi");
   });
 });
 
 describe("cudzí: token Strižne, cookie btc, bez prihlásenia", () => {
   const POKUSY = [
     { login: "jerry", password: NOVE },
-    { login: "jerry", password: NOVE, akcia: "zachrana" },
     { login: "novy", password: NOVE },
     { login: "jerry", active: false },
     { login: "jerry", akcia: "odhlas-vsade" },
@@ -277,7 +253,6 @@ describe("GET: obrazovka vie, čo ukázať", () => {
     await zaklad();
     expect(await get(await cookieV0("Jerry"))).toMatchObject({ rola: "spravca", jaLogin: "jerry" });
     expect(await get(await cookieV0("Terezka"))).toMatchObject({ rola: "trener", jaLogin: "terezka" });
-    expect(await get(await cookieV0("app"))).toMatchObject({ rola: "zachrana", jaLogin: null });
     expect(await get(await cookieV0("btc"))).toMatchObject({ rola: "cudzi", jaLogin: null });
     expect(await get(undefined, { "x-strizna-token": STRIZNA })).toMatchObject({ rola: "cudzi", jaLogin: null });
   });
@@ -290,8 +265,7 @@ describe("kontaPrava", () => {
     expect(rolaKonta("Niekto", null)).toBe("cudzi");
     expect(rolaKonta(null, null)).toBe("cudzi");
   });
-  it("správca nepotrebuje záchranu, tréner bez konta nemá vlastné heslo", () => {
-    expect(smieKonta("spravca", "jerry", "zachrana", "terezka")).toBe(false);
+  it("tréner bez konta nemá vlastné heslo", () => {
     expect(smieKonta("trener", null, "heslo", "")).toBe(false);
   });
 });

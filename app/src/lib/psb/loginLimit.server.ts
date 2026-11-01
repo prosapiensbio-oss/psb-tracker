@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 /**
  * Limit pokusov o prihlásenie. Dva počty v jednom okne:
  *   IP + meno → 10 (hádanie hesla jedného konta)
- *   IP samotná → 30 (zdieľané heslo nezávisí od mena, menením mena by sa limit obišiel)
+ *   IP samotná → 30 (menením mena by sa limit obišiel)
  *
  * V tabuľke je len hash kľúča: do poľa s menom sa občas omylom napíše heslo.
  * Každá chyba databázy tu znamená „neblokuj" — výpadok limitu nesmie nikoho

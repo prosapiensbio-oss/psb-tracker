@@ -8,8 +8,8 @@ export const Route = createFileRoute("/api/session")({
     handlers: {
       GET: async ({ request }) => {
         const user = await currentUser(request);
-        // Koľko kont existuje — podľa toho vie prihlasovacia obrazovka, či má
-        // ponúkať mená, alebo ešte len zdieľané heslo.
+        // Mená na prihlasovaciu obrazovku. Keď sa nenačítajú, obrazovka ponúkne
+        // pole na meno, takže výpadok tu nikoho nenechá bez cesty dnu.
         let pouzivatelia: { login: string; name: string }[] = [];
         try {
           const { DB } = bindings();

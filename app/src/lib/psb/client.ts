@@ -50,7 +50,7 @@ export async function fetchKonta(): Promise<{ ja: string | null; jaLogin: string
   }
 }
 
-export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean; akcia?: "zachrana" }): Promise<{ ok: boolean; error?: string }> {
+export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean }): Promise<{ ok: boolean; error?: string }> {
   const r = await post("/api/users", k);
   const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
   return { ok: !!j.ok, error: j.error };

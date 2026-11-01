@@ -80,7 +80,7 @@
   // z nej v noci berie BTC výplaty (28. 10. 2026).
   "services": [{ "binding": "BTC", "service": "btc" }],
 
-  // Tajomstvá (PSB_PASSWORD, PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
+  // Tajomstvá (PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
   // BTC_RESERVE_TOKEN) tu nie sú a nikdy tu byť nesmú — nastavujú sa cez
   // `wrangler secret put` a žijú len na Cloudflare.
   "vars": { "HF_ENV": "prod", "APP_SLUG": "kokpit" }

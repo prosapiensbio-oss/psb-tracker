@@ -2248,7 +2248,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
         </div>
         {!automat && ktoreVeci === "auto" && (
           <div style={{ fontSize: 11, color: C.orange, whiteSpace: "nowrap" }}>
-            Appka nevie, kto si — ukazuje všetko. Prihlás sa menom, nie spoločným heslom.
+            Appka nevie, kto si — ukazuje všetko. Prihlás sa svojím kontom.
           </div>
         )}
       </div>

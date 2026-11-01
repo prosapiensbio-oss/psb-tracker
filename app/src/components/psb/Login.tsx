@@ -9,18 +9,21 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
   const [meno, setMeno] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Mená sa ponúkajú, len keď nejaké kontá existujú. Kým ich niet, obrazovka
-  // vyzerá presne ako predtým a zdieľané heslo funguje ďalej.
+  // Mená ako tlačidlá. Keď zoznam nepríde (`checkSession` pri zlyhaní vráti prázdny),
+  // ostáva pole na meno: prihlásenie ide cez iný dopyt a môže prejsť.
   const [kontá, setKontá] = useState<{ login: string; name: string }[]>([]);
+  const [nacitane, setNacitane] = useState(false);
   useEffect(() => {
     void checkSession().then((s) => {
       setKontá(s.pouzivatelia);
       if (s.pouzivatelia.length) setMeno(s.pouzivatelia[0].login);
+      setNacitane(true);
     });
   }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!meno.trim()) { setError("Napíš prihlasovacie meno."); return; }
     setBusy(true);
     setError("");
     const r = await login(password, meno).catch(() => ({ ok: false, sprava: "Server neodpovedá. Skús to o chvíľu." }));
@@ -65,16 +68,22 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
                 );
               })}
             </div>
-            {/* Záchrana pri zabudnutom hesle: zdieľané heslo už neotvorí meno
-                s vlastným kontom, prihlási ako „app" a heslo sa dá zmeniť v Uzávierke. */}
-            {meno !== "" ? (
-              <button type="button" onClick={() => setMeno("")}
-                style={{ background: "none", border: "none", padding: 0, marginBottom: 14, cursor: "pointer", fontSize: 11.5, color: C.textDim, textDecoration: "underline" }}>
-                Zabudnuté heslo? Prihlásiť sa spoločným heslom
-              </button>
-            ) : (
-              <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 14 }}>Prihlásenie spoločným heslom, v audite ako „app“.</div>
-            )}
+          </>
+        )}
+        {nacitane && kontá.length === 0 && (
+          <>
+            <label htmlFor="login-meno" style={{ fontSize: 12, color: C.textMuted, display: "block", marginBottom: 6 }}>Prihlasovacie meno</label>
+            <input
+              id="login-meno"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={meno}
+              onChange={(e) => setMeno(e.target.value)}
+              style={{ ...S.input, marginBottom: 14 }}
+              placeholder="napr. jerry"
+            />
           </>
         )}
         <label style={{ fontSize: 12, color: C.textMuted, display: "block", marginBottom: 6 }}>Heslo</label>
@@ -84,12 +93,13 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={{ ...S.input, marginBottom: 12, borderColor: error ? C.red : C.border }}
-          placeholder={kontá.length && meno ? "Tvoje heslo" : "Spoločné heslo"}
+          placeholder="Tvoje heslo"
         />
         {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 12 }}>{error}</div>}
         <button type="submit" disabled={busy} style={{ ...btn("accent"), width: "100%", opacity: busy ? 0.6 : 1 }}>
           {busy ? "Prihlasujem…" : "Prihlásiť sa"}
         </button>
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 12 }}>Zabudnuté heslo: napíš Jerrymu.</div>
       </form>
     </div>
   );

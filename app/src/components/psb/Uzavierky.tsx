@@ -61,8 +61,8 @@ const CHYBY: Record<string, string> = {
 // Kontá — kto sa prihlasuje pod svojím menom.
 //
 // Nejde o oprávnenia: Jerry aj Terezka vidia všetko. Ide o to, aby sa v audite
-// nižšie dalo prečítať, KTO zmenu spravil. Kým konto nemá nikto, appka beží na
-// zdieľanom hesle a v audite je pri všetkom „app".
+// nižšie dalo prečítať, KTO zmenu spravil. „app" v audite sú staré riadky a
+// serverové zápisy bez človeka.
 function Konta() {
   const [users, setUsers] = useState<Konto[]>([]);
   const [jaLogin, setJaLogin] = useState<string | null>(null);
@@ -79,23 +79,20 @@ function Konta() {
   const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users.filter((u) => u.active)); setJaLogin(r.jaLogin); setRola(r.rola); }); };
   useEffect(nacitaj, []);
 
-  // Tréner a záchrana menia len heslo: bez polí na meno, cieľ je riadok v zozname.
+  // Tréner mení len svoje heslo: bez polí na meno, cieľ je riadok v zozname.
   const spravca = rola === "spravca";
-  const akciaHesla = rola === "zachrana" ? "zachrana" as const : "heslo" as const;
 
   const uloz = async (e: React.FormEvent) => {
     e.preventDefault();
     setChyba(""); setHotovo(""); setBusy(true);
     const r = await ulozKonto(spravca
       ? { login, name: meno || undefined, password: heslo }
-      : { login, password: heslo, akcia: rola === "zachrana" ? "zachrana" : undefined });
+      : { login, password: heslo });
     setBusy(false);
     if (!r.ok) { setChyba(CHYBY[r.error || ""] || "Nepodarilo sa uložiť."); return; }
     setHotovo(spravca
       ? `Konto ${meno || login} uložené. Pri zmene hesla sa ostatné zariadenia odhlásia.`
-      : rola === "zachrana"
-        ? "Heslo nastavené, konto je odhlásené na všetkých zariadeniach. Teraz sa odhlás a prihlás sa ním."
-        : "Heslo zmenené. Ostatné zariadenia sa odhlásili.");
+      : "Heslo zmenené. Ostatné zariadenia sa odhlásili.");
     setLogin(""); setMeno(""); setHeslo("");
     nacitaj();
   };
@@ -111,10 +108,10 @@ function Konta() {
 
   return (
     <Card>
-      <H3><Info text="Kým konto nemá nikto, appka beží na zdieľanom hesle a v audite je pri každej zmene „app“. Keď má každý vlastné konto, v audite je vidieť meno. K dátam majú obaja prístup rovnaký; kontá spravuje Jerry, tréner si mení len svoje heslo. Zdieľané heslo zostáva ako núdzová brzda: vie nastaviť nové heslo zabudnutému kontu a zapíše sa to do auditu." label="Kontá" /></H3>
+      <H3><Info text="Každý sa prihlasuje vlastným kontom, preto je v audite vidieť meno. K dátam majú obaja prístup rovnaký; kontá spravuje Jerry, tréner si mení len svoje heslo. Zabudnuté heslo: Terezke ho nastaví Jerry tu, Jerrymu ho obnoví správca cez databázu." label="Kontá" /></H3>
       {users.length === 0 ? (
         <div style={{ fontSize: 12, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.55 }}>
-          Zatiaľ žiadne kontá — appka beží na zdieľanom hesle a v audite je pri všetkom „app“.
+          Zoznam kont sa nenačítal.
         </div>
       ) : (
         <div style={{ margin: "8px 0 14px" }}>
@@ -132,10 +129,10 @@ function Konta() {
                   odhlásiť všade
                 </button>
               )}
-              {!spravca && smieKonta(rola, jaLogin, akciaHesla, u.login) && (
+              {!spravca && smieKonta(rola, jaLogin, "heslo", u.login) && (
                 <button type="button" onClick={() => { setLogin(u.login); setHeslo(""); setChyba(""); setHotovo(""); }}
                   style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: C.textMuted, textDecoration: "underline" }}>
-                  {rola === "zachrana" ? "nastaviť nové heslo" : "zmeniť heslo"}
+                  zmeniť heslo
                 </button>
               )}
             </div>
@@ -143,11 +140,6 @@ function Konta() {
         </div>
       )}
 
-      {rola === "zachrana" && (
-        <div style={{ fontSize: 12, color: C.textMuted, margin: "0 0 10px", lineHeight: 1.55 }}>
-          Si prihlásený spoločným heslom. Môžeš len nastaviť nové heslo zabudnutému kontu: zapíše sa to do auditu a konto sa odhlási na všetkých zariadeniach.
-        </div>
-      )}
       {(spravca || login) && (<>
       <form onSubmit={uloz} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
         {spravca ? (<>

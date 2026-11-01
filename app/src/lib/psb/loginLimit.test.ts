@@ -38,7 +38,7 @@ describe("limit pokusov", () => {
     expect(await zostavaBlok(DB, "2.2.2.2", "jerry", T0)).toBe(0);
     expect(await zostavaBlok(DB, "1.1.1.1", "terezka", T0)).toBe(0);
   });
-  it("menenie mena limit neobíde (zdieľané heslo od mena nezávisí)", async () => {
+  it("menenie mena limit neobíde", async () => {
     const DB = d1(zaklad());
     for (let i = 0; i < LIMIT_IP; i++) await zapisZlyhanie(DB, "1.1.1.1", `m${i}`, T0);
     expect(await zostavaBlok(DB, "1.1.1.1", "ine-meno", T0)).toBeGreaterThan(0);

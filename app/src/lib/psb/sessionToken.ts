@@ -12,11 +12,18 @@
  * Verzia je v cookie, aby sa podpis dal overiť aj bez databázy. PODPIS PLATÍ
  * VŽDY. Databáza len dopĺňa, či konto ešte žije; keď neodpovedá, nikoho
  * nevyhadzuje — no bez platného podpisu sa nedostane nikto.
+ *
+ * Výnimka z „podpis platí vždy" sú identity zo zrušeného spoločného hesla: tie
+ * neprejdú ani s platným podpisom (`sessionPlati`).
  */
 const enc = new TextEncoder();
 const MESSAGE = "psb-authed-v1";
 // Iná predpona než verzia 0: meno „X|v1" by inak dalo ten istý podpis ako konto „X" vo verzii 1.
 const MESSAGE_V = "psb-authed-v2";
+/** Identita zrušeného spoločného hesla. V audite sa „app" ďalej píše pri serverových zápisoch, prihlásenie to nie je. */
+const IDENTITA_SPOLOCNEHO = "app";
+/** Prechod z bitcoinovej knihy (`/api/sso`). Jediné meno, ktoré nemá a nemusí mať konto. */
+export const IDENTITA_BTC = "btc";
 
 export async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -34,21 +41,21 @@ export function timingSafeEqual(a: string, b: string): boolean {
 /** Token do cookie. Verzia 0 je zámerne pôvodný výpočet. */
 export async function tokenSession(secret: string, user: string, verzia = 0): Promise<string> {
   if (verzia > 0) return `v${verzia}.${await hmacHex(secret, `${MESSAGE_V}|${verzia}|${user}`)}`;
-  return hmacHex(secret, user ? `${MESSAGE}|${user}` : MESSAGE);
+  return hmacHex(secret, `${MESSAGE}|${user}`);
 }
 
 export function hodnotaCookie(user: string, token: string): string {
-  return user ? `${user}|${token}` : token;
+  return `${user}|${token}`;
 }
 
-/** Overí podpis cookie. Null = neplatný. Prázdne meno = starý tvar bez mena (identita „app"). */
+/** Overí podpis cookie. Null = neplatný. Najstarší tvar bez mena už neplatí, podpísať sa ním nedá nič. */
 export async function overPodpisCookie(secret: string, raw: string): Promise<{ meno: string; verzia: number } | null> {
   const i = raw.lastIndexOf("|");
-  const meno = i < 0 ? "" : raw.slice(0, i);
-  const token = i < 0 ? raw : raw.slice(i + 1);
+  if (i <= 0) return null;
+  const meno = raw.slice(0, i);
+  const token = raw.slice(i + 1);
   const m = /^v([1-9]\d{0,8})\./.exec(token);
   const verzia = m ? Number(m[1]) : 0;
-  if (m && !meno) return null;
   return timingSafeEqual(token, await tokenSession(secret, meno, verzia)) ? { meno, verzia } : null;
 }
 
@@ -56,18 +63,17 @@ export type RiadokKonta = { active?: number | null; session_ver?: number | null 
 
 /**
  * Platí session s platným podpisom podľa stavu konta?
+ *   „app"     = zrušené spoločné heslo → nikdy, ani pri výpadku databázy
  *   undefined = databáza neodpovedala → podpis stačí
- *   null      = meno nemá konto („btc", staré cookies zo zdieľaného hesla) → len verzia 0
+ *   null      = meno nemá konto → len prechod z bitcoinovej knihy. Spoločné heslo
+ *               do 1. 11. 2026 podpísalo akékoľvek meno, ktoré človek napísal, a
+ *               token nemá koniec platnosti; bez tohto by také cookie platili ďalej.
  */
-export function sessionPlati(verzia: number, konto: RiadokKonta | null | undefined): boolean {
+export function sessionPlati(meno: string, verzia: number, konto: RiadokKonta | null | undefined): boolean {
+  if (meno === IDENTITA_SPOLOCNEHO) return false;
   if (konto === undefined) return true;
-  if (konto === null) return verzia === 0;
+  if (konto === null) return meno === IDENTITA_BTC && verzia === 0;
   if (konto.active === 0) return false;
   // Kým migrácia 0129 nebeží, stĺpec chýba a všetci sú na verzii 0.
   return verzia === Number(konto.session_ver ?? 0);
-}
-
-/** Identita po zadaní zdieľaného hesla. Null = meno patrí kontu, zdieľané heslo ho neotvorí. */
-export function identitaZdielaneho(konto: "existuje" | "nie" | "neznamo"): string | null {
-  return konto === "existuje" ? null : "app";
 }

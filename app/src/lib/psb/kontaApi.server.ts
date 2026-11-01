@@ -69,7 +69,7 @@ export async function kontaPost(request: Request): Promise<Response> {
 
   const login = String(b.login || "").trim().toLowerCase().slice(0, 40);
   if (!/^[a-z0-9._-]{2,40}$/.test(login)) return Response.json({ ok: false, error: "bad_login" }, { status: 400 });
-  if (b.akcia !== undefined && b.akcia !== "odhlas-vsade" && b.akcia !== "zachrana") {
+  if (b.akcia !== undefined && b.akcia !== "odhlas-vsade") {
     return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
   }
   const password = String(b.password || "");
@@ -84,7 +84,7 @@ export async function kontaPost(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "no_db" }, { status: 500 });
   }
 
-  const akcia: AkciaKonta = b.akcia === "odhlas-vsade" || b.akcia === "zachrana"
+  const akcia: AkciaKonta = b.akcia === "odhlas-vsade"
     ? b.akcia
     : !ciel ? "nove" : password ? "heslo" : "uprava";
   if (!smieKonta(rolaKonta(ja, moje), moje?.login ?? null, akcia, login)) {
@@ -106,9 +106,7 @@ export async function kontaPost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  // Záchrana nezakladá kontá a nezapína vypnuté: tie vracia správca.
-  if (akcia === "zachrana" && (!ciel || !ciel.active)) return Response.json({ ok: false, error: "no_user" }, { status: 404 });
-  if ((akcia === "nove" || akcia === "zachrana") && !password) return Response.json({ ok: false, error: "need_password" }, { status: 400 });
+  if (akcia === "nove" && !password) return Response.json({ ok: false, error: "need_password" }, { status: 400 });
   // Osem znakov je dosť na appku za jedným zámkom a málo na to, aby si
   // niekto vymýšľal heslo, ktoré si nezapamätá a prestane appku otvárať.
   if (password && password.length < 8) return Response.json({ ok: false, error: "short_password" }, { status: 400 });
@@ -139,7 +137,7 @@ export async function kontaPost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  // Heslo: vlastné, cudzie od správcu, alebo záchrana.
+  // Heslo: vlastné alebo cudzie od správcu.
   let r: { name: string; session_ver: number } | null;
   try {
     r = await zapisHeslo(DB, login, password, noveMeno || ciel!.name);
@@ -148,9 +146,7 @@ export async function kontaPost(request: Request): Promise<Response> {
   }
   if (!r) return Response.json({ ok: false, error: "no_user" }, { status: 404 });
   zabudniKonta();
-  await audit(DB, akcia === "zachrana"
-    ? { action: "zachrana-hesla", predmet: login, neu: "nové heslo cez záchranu, zariadenia odhlásené", actor: ja }
-    : { action: "uprava-konta", predmet: login, neu: "zmenené heslo, zariadenia odhlásené", actor: ja });
+  await audit(DB, { action: "uprava-konta", predmet: login, neu: "zmenené heslo, zariadenia odhlásené", actor: ja });
 
   // Vlastné heslo: nová cookie v novej verzii, aby sa človek neodhlásil sám sebe.
   if (moje?.login === login) {
