@@ -3251,8 +3251,7 @@ b76aef4). Čo z toho musí vedieť ďalšia session:
   appka prvá. `nasad.sh` ho nenasadí. Token plánovača sa porovnáva len cez
   `jeOdPlanovaca` (`cronToken.server.ts`), stráži test.
 - Session: `users.session_ver`; verzia 0 = pôvodný tvar cookie, nikoho to neodhlási.
-  „Odhlásiť všade“ je v Uzávierke → Kontá. Zdieľané heslo s menom konta neprejde;
-  záchrana je „Zabudnuté heslo“ (prihlási ako `app`). `PSB_SESSION_SECRET` sa nemení
+  „Odhlásiť všade“ je v Uzávierke → Kontá. Spoločné heslo je zrušené (1. 11. 2026): bez konta platí len `btc` z `/api/sso`; cookie bez mena, `app` a meno bez konta neprejdú (`sessionPlati`). Výpadok D1 pri logine = 503. Heslo Terezke nastaví Jerry; Jerrymu cez databázu (`hashPassword` z `auth.server.ts`, nové `pass_hash`, `pass_salt`, `session_ver`+1). `PSB_SESSION_SECRET` sa nemení
   bezhlavo: zhodí aj odkazy `/v/fa…` na poslaných faktúrach.
 
 **Plánovač a notifikácie**
