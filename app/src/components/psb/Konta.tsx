@@ -102,8 +102,6 @@ export function Konta() {
 
   const noveKonto = upravovany === null;
   const spravca = rola === "spravca";
-  const zachrana = rola === "zachrana";
-  const akciaHesla = zachrana ? "zachrana" as const : "heslo" as const;
   const platny = noveKonto
     ? /^[a-z0-9._-]{2,40}$/.test(login.trim()) && heslo.length >= 8
     : heslo.length >= 8;
@@ -112,10 +110,8 @@ export function Konta() {
     <div>
       <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
         {kontá.length === 0
-          ? "Zatiaľ nemá vlastné prihlásenie nikto — appka preto pri každej odpovedi na notifikáciu zapíše len „app“ a nedá sa zistiť, kto ju napísal. Založ konto sebe aj Terezke; na prihlasovacej obrazovke sa potom ukážu ako tlačidlá."
-          : zachrana
-            ? "Si prihlásený spoločným heslom. Môžeš len nastaviť nové heslo zabudnutému kontu: zapíše sa to do auditu a konto sa odhlási na všetkých zariadeniach."
-            : `Prihlásený si ako ${ja}. Heslo sa nikam nevracia — server ho ukladá zahashované so soľou, takže sa nedá prečítať ani z databázy.${spravca ? "" : " Kontá spravuje Jerry, ty si meníš len svoje heslo."}`}
+          ? "Zoznam kont sa nenačítal."
+          : `Prihlásený si ako ${ja}. Heslo sa nikam nevracia — server ho ukladá zahashované so soľou, takže sa nedá prečítať ani z databázy.${spravca ? "" : " Kontá spravuje Jerry, ty si meníš len svoje heslo."}`}
       </div>
 
       {kontá.length > 0 && (
@@ -133,12 +129,11 @@ export function Konta() {
               <span style={{ fontSize: 11, color: C.textDim, flex: "0 0 auto" }}>
                 {k.active ? (k.lastLogin ? `naposledy ${fmtDMY(k.lastLogin)}` : "ešte sa neprihlásil") : "vypnuté"}
               </span>
-              {/* Vypnuté konto záchrana nevracia, to je vec správcu. */}
-              {smieKonta(rola, jaLogin, akciaHesla, k.login) && (!zachrana || k.active) && (
+              {smieKonta(rola, jaLogin, "heslo", k.login) && (
                 <button
                   onClick={() => { setUpravovany(k.login); setLogin(k.login); setMeno(k.name); setHeslo(""); setSprava(""); setChyba(""); }}
                   disabled={busy} style={{ ...tlacidlo(false), padding: "4px 9px", fontSize: 11.5 }}>
-                  {zachrana ? "nastaviť nové heslo" : "zmeniť heslo"}
+                  zmeniť heslo
                 </button>
               )}
               {/* Vlastné konto sa vypnúť nedá — kto by sa potom prihlásil. */}
@@ -178,14 +173,10 @@ export function Konta() {
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button
             onClick={() => void posli(
-              zachrana
-                ? { login: upravovany!.trim(), password: heslo, akcia: "zachrana" }
-                : { login: (noveKonto ? login : upravovany)!.trim(), ...(spravca ? { name: (meno || login).trim() } : {}), password: heslo },
+              { login: (noveKonto ? login : upravovany)!.trim(), ...(spravca ? { name: (meno || login).trim() } : {}), password: heslo },
               noveKonto
                 ? `Konto ${meno || login} je založené — nech sa ním prihlási.`
-                : zachrana
-                  ? "Heslo nastavené, konto je odhlásené na všetkých zariadeniach. Teraz sa odhlás a prihlás sa ním."
-                  : upravovany === jaLogin ? "Heslo zmenené. Ostatné zariadenia sa odhlásili." : "Heslo zmenené. Konto je odhlásené na všetkých zariadeniach.",
+                : upravovany === jaLogin ? "Heslo zmenené. Ostatné zariadenia sa odhlásili." : "Heslo zmenené. Konto je odhlásené na všetkých zariadeniach.",
             )}
             disabled={busy || !platny}
             style={{ ...tlacidlo(true), opacity: busy || !platny ? 0.5 : 1 }}>
@@ -213,7 +204,7 @@ export function KontaNadpis() {
   return (
     <Info
       label="Kto sa prihlasuje"
-      text="Kým sa všetci hlásia jedným heslom, appka pri odpovedi na notifikáciu zapíše „app“ a nedá sa zistiť, kto ju napísal. S vlastnými kontami sa na prihlasovacej obrazovke ukážu mená ako tlačidlá a pri každej odpovedi bude vidieť autor. Heslá appka neukladá v čitateľnej podobe a späť ich nikdy nezobrazí."
+      text="Každý sa prihlasuje vlastným kontom, preto je pri každej odpovedi na notifikáciu vidieť autora. Mená sú na prihlasovacej obrazovke ako tlačidlá. Zabudnuté heslo: Terezke ho nastaví Jerry tu, Jerrymu ho obnoví správca cez databázu. Heslá appka neukladá v čitateľnej podobe a späť ich nikdy nezobrazí."
     />
   );
 }
