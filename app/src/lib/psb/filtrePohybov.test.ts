@@ -24,6 +24,9 @@ describe("filtre zapísaných pohybov", () => {
     expect([alza, claude, vyplata, wolt].map((p) => patriDoFiltra(p, "naklady"))).toEqual([true, true, false, false]);
     expect(patriDoFiltra(vyplata, "vyplaty")).toBe(true);
     expect(patriDoFiltra(wolt, "sukromne")).toBe(true);
+    // Presun peňazí nie je náklad (prevod z 27. 10. 2026 s kategóriou „presun").
+    expect(patriDoFiltra({ suma: -4741, kategoria: "presun" }, "naklady")).toBe(false);
+    expect(patriDoFiltra({ suma: -4741, kategoria: "rezerva" }, "naklady")).toBe(false);
     // Telefón 50/50 (náklad + výplata) je rozdelený — patrí k nákladom.
     expect(patriDoFiltra({ suma: -8999, kategoria: "" }, "naklady", true)).toBe(true);
   });
