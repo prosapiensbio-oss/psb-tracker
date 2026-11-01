@@ -80,24 +80,58 @@ const PASMO = "Europe/Prague";
 
 const PLATNY_CAS = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/;
 
-/** "20260803T090000" / "20260803T070000Z" / "20260803" → "2026-08-03T09:00" */
-function naMiestny(hodnota: string): { s: string; celodenna: boolean } | null {
+/** Okamih (UTC ms) → nástenný čas v pásme, "2026-08-03T09:00". */
+function utcNaNastenny(utc: number, pasmo: string): string {
+  return new Date(utc + posunMinut(new Date(utc), pasmo) * 60000).toISOString().slice(0, 16);
+}
+
+/**
+ * Nástenný čas v cudzom pásme → pražský. Null = pásmo nepoznáme (Intl ho
+ * odmietne) a hodnota ostáva, ako stojí — radšej hodina vedľa než žiadna.
+ */
+function zPasmaNaPrahu(nastenny: string, pasmo: string): string | null {
+  try {
+    const ako = Date.parse(`${nastenny}:00Z`);
+    const prvy = posunMinut(new Date(ako), pasmo);
+    // Druhý krok rieši udalosť tesne pri prelome času v tom pásme.
+    const druhy = posunMinut(new Date(ako - prvy * 60000), pasmo);
+    return utcNaNastenny(ako - druhy * 60000, PASMO);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * "20260803T090000" / "20260803T070000Z" / "20260803" → "2026-08-03T09:00"
+ *
+ * `pasmo` je TZID z riadku, keď nie je pražské (Jerryho kalendár má pár
+ * udalostí v Europe/Kaliningrad a Brussels — založené na cestách).
+ */
+function naMiestny(hodnota: string, pasmo?: string): { s: string; celodenna: boolean } | null {
   const m = PLATNY_CAS.exec(hodnota.trim());
   if (!m) return null;
   const [, r, mes, d, h, min, , z] = m;
   if (!h) return { s: `${r}-${mes}-${d}T00:00`, celodenna: true };
-  if (z) {
-    const utc = Date.UTC(+r, +mes - 1, +d, +h, +min);
-    const posun = posunMinut(new Date(utc), PASMO);
-    const l = new Date(utc + posun * 60000);
-    const p2 = (n: number) => String(n).padStart(2, "0");
-    return {
-      s: `${l.getUTCFullYear()}-${p2(l.getUTCMonth() + 1)}-${p2(l.getUTCDate())}T${p2(l.getUTCHours())}:${p2(l.getUTCMinutes())}`,
-      celodenna: false,
-    };
-  }
-  // Bez Z je hodnota už miestna (TZID) — berieme ju tak, ako stojí.
-  return { s: `${r}-${mes}-${d}T${h}:${min}`, celodenna: false };
+  if (z) return { s: utcNaNastenny(Date.UTC(+r, +mes - 1, +d, +h, +min), PASMO), celodenna: false };
+  const nastenny = `${r}-${mes}-${d}T${h}:${min}`;
+  // Bez Z je hodnota miestna v pásme z TZID; pražská (a bez pásma) ostáva, ako stojí.
+  return { s: (pasmo && zPasmaNaPrahu(nastenny, pasmo)) || nastenny, celodenna: false };
+}
+
+/** Hodnota z RRULE (UNTIL) ako nástenný čas v pásme série. */
+function vPasme(hodnota: string, pasmo: string): string | null {
+  const m = PLATNY_CAS.exec(hodnota.trim());
+  if (!m) return null;
+  const [, r, mes, d, h, min, , z] = m;
+  if (!h) return `${r}-${mes}-${d}T00:00`;
+  return z ? utcNaNastenny(Date.UTC(+r, +mes - 1, +d, +h, +min), pasmo) : `${r}-${mes}-${d}T${h}:${min}`;
+}
+
+/** TZID z ľavej strany riadku, keď nie je pražské. Drahé to nie je: väčšina riadkov ho nemá. */
+function cudziePasmo(kluc: string): string | undefined {
+  if (!kluc.includes("TZID=")) return undefined;
+  const p = /;TZID="?([^";:]+)"?/i.exec(kluc)?.[1];
+  return p && p !== PASMO ? p : undefined;
 }
 
 const naMs = (s: string) => Date.parse(`${s}:00Z`);
@@ -106,6 +140,8 @@ const zMs = (ms: number) => new Date(ms).toISOString().slice(0, 16);
 type SurovaUdalost = {
   uid: string; zaciatok: string; koniec: string; nazov: string; celodenna: boolean;
   rrule?: string; exdate: string[]; recurrenceId?: string; zruseny: boolean;
+  /** Séria v cudzom pásme: rozvíja sa v ňom (deň v týždni platí tam), von ide Praha. */
+  pasmo?: string; zaciatokVPasme?: string;
 };
 
 /**
@@ -118,6 +154,7 @@ type SurovaUdalost = {
 type Rozrobena = {
   uid: string; nazov: string; zruseny: boolean; rrule?: string;
   start?: string; end?: string; recId?: string; exdate: string[];
+  startPasmo?: string; endPasmo?: string; recPasmo?: string; exdatePasmo?: string;
 };
 
 /**
@@ -129,7 +166,8 @@ type Rozrobena = {
  * tichý polovičný výsledok je horší než žiadny.
  */
 function rozvin(u: SurovaUdalost, odMs: number, doMs: number): string[] {
-  const zac = naMs(u.zaciatok);
+  const zaklad = u.zaciatokVPasme ?? u.zaciatok;
+  const zac = naMs(zaklad);
   if (!u.rrule) return zac >= odMs && zac <= doMs ? [u.zaciatok] : [];
 
   const p: Record<string, string> = {};
@@ -141,7 +179,7 @@ function rozvin(u: SurovaUdalost, odMs: number, doMs: number): string[] {
   if (freq !== "WEEKLY" && freq !== "DAILY") return [];
 
   const krok = Math.max(1, Number(p.INTERVAL || 1));
-  const doKedy = p.UNTIL ? naMs(naMiestny(p.UNTIL)?.s || u.zaciatok) : Infinity;
+  const doKedy = p.UNTIL ? naMs((u.pasmo ? vPasme(p.UNTIL, u.pasmo) : naMiestny(p.UNTIL)?.s) || zaklad) : Infinity;
   const maxPocet = p.COUNT ? Number(p.COUNT) : Infinity;
   const DNI = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
   const byday = (p.BYDAY || "").split(",").filter(Boolean).map((x) => DNI.indexOf(x.slice(-2)));
@@ -149,22 +187,31 @@ function rozvin(u: SurovaUdalost, odMs: number, doMs: number): string[] {
   const out: string[] = [];
   const den = 86400000;
   const zaciatokDna = new Date(zac);
+  // Týždne INTERVALU sa rátajú od začiatku týždňa (WKST, predvolený pondelok),
+  // nie od DTSTART: „každé 2 týždne Po a St" so začiatkom v stredu má ďalší
+  // pondelok až o 12 dní, nie o 5.
+  const wkst = DNI.indexOf((p.WKST || "MO").toUpperCase());
+  const zaciatokTyzdna = zac - ((zaciatokDna.getUTCDay() - (wkst < 0 ? 1 : wkst) + 7) % 7) * den;
+  // Cudzie pásmo sa od pražského líši o pár hodín: deň rezervy, presne až po prevode.
+  const rezerva = u.pasmo ? den : 0;
   let pocet = 0;
   // Rátame po dňoch od pôvodného začiatku; poistka proti nekonečnu je okno.
-  for (let t = zac; t <= Math.min(doMs, doKedy) && pocet < maxPocet; t += den) {
+  for (let t = zac; t <= Math.min(doMs + rezerva, doKedy) && pocet < maxPocet; t += den) {
     const d = new Date(t);
     let sedi: boolean;
     if (freq === "DAILY") {
       sedi = Math.round((t - zac) / den) % krok === 0;
     } else {
-      const tyzdnov = Math.floor((t - zac) / (7 * den));
+      const tyzdnov = Math.floor((t - zaciatokTyzdna) / (7 * den));
       const vTomTyzdni = tyzdnov % krok === 0;
       sedi = vTomTyzdni && (byday.length ? byday.includes(d.getUTCDay()) : d.getUTCDay() === zaciatokDna.getUTCDay());
     }
     if (!sedi) continue;
     pocet++;
-    if (t < odMs) continue;
-    out.push(zMs(t));
+    if (t < odMs - rezerva) continue;
+    if (!u.pasmo) { out.push(zMs(t)); continue; }
+    const vPraze = zPasmaNaPrahu(zMs(t), u.pasmo) ?? zMs(t);
+    if (naMs(vPraze) >= odMs && naMs(vPraze) <= doMs) out.push(vPraze);
   }
   return out.filter((s) => !u.exdate.includes(s));
 }
@@ -204,15 +251,20 @@ function dokonci(a: Rozrobena, odMs: number, doMs: number): SurovaUdalost | null
   // Série a presunuté výskyty sa držia vždy (séria z 2023 môže mať výskyt
   // budúci týždeň); jednorazové len keď ich surový dátum pripúšťa okno.
   if (!(a.rrule || a.recId || mozeDoOkna(a.start, odMs, doMs))) return null;
-  const s = naMiestny(a.start);
+  const s = naMiestny(a.start, a.startPasmo);
   if (!s) return null;
   const u: SurovaUdalost = {
     uid: a.uid, zaciatok: s.s, celodenna: s.celodenna, koniec: "", nazov: a.nazov,
     rrule: a.rrule, exdate: [], zruseny: a.zruseny,
   };
-  if (a.end) { const e = naMiestny(a.end); if (e) u.koniec = e.s; }
-  if (a.recId) { const v = naMiestny(a.recId); if (v) u.recurrenceId = v.s; }
-  for (const x of a.exdate) { const v = naMiestny(x); if (v) u.exdate.push(v.s); }
+  if (a.rrule && a.startPasmo && !s.celodenna) {
+    const nastenny = vPasme(a.start, a.startPasmo);
+    // Séria z neznámeho pásma (prevod nevyšiel) sa rozvíja ako doteraz, v stojacom čase.
+    if (nastenny && nastenny !== s.s) { u.pasmo = a.startPasmo; u.zaciatokVPasme = nastenny; }
+  }
+  if (a.end) { const e = naMiestny(a.end, a.endPasmo); if (e) u.koniec = e.s; }
+  if (a.recId) { const v = naMiestny(a.recId, a.recPasmo); if (v) u.recurrenceId = v.s; }
+  for (const x of a.exdate) { const v = naMiestny(x, a.exdatePasmo); if (v) u.exdate.push(v.s); }
   return u.rrule || u.recurrenceId || vOkne(u.zaciatok, odMs, doMs) ? u : null;
 }
 function vOkne(zaciatok: string, odMs: number, doMs: number): boolean {
@@ -261,10 +313,11 @@ export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost
     else if (meno === "RRULE") akt.rrule = hodnota.trim();
     // Časy sa len odložia surové (a len platné — neplatný riadok nesmie
     // prepísať skorší platný, presne ako predtým); prevod až v `dokonci`.
-    else if (meno === "DTSTART") { if (PLATNY_CAS.test(hodnota.trim())) akt.start = hodnota; }
-    else if (meno === "DTEND") { if (PLATNY_CAS.test(hodnota.trim())) akt.end = hodnota; }
-    else if (meno === "RECURRENCE-ID") { if (PLATNY_CAS.test(hodnota.trim())) akt.recId = hodnota; }
+    else if (meno === "DTSTART") { if (PLATNY_CAS.test(hodnota.trim())) { akt.start = hodnota; akt.startPasmo = cudziePasmo(kluc); } }
+    else if (meno === "DTEND") { if (PLATNY_CAS.test(hodnota.trim())) { akt.end = hodnota; akt.endPasmo = cudziePasmo(kluc); } }
+    else if (meno === "RECURRENCE-ID") { if (PLATNY_CAS.test(hodnota.trim())) { akt.recId = hodnota; akt.recPasmo = cudziePasmo(kluc); } }
     else if (meno === "EXDATE") {
+      akt.exdatePasmo = cudziePasmo(kluc) ?? akt.exdatePasmo;
       for (const kus of hodnota.split(",")) if (PLATNY_CAS.test(kus.trim())) akt.exdate.push(kus);
     }
   }
