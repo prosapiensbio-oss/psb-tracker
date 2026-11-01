@@ -20,7 +20,7 @@ import { terazPraha } from "./cas";
 import { normName } from "./format";
 import { balicekPreOs, osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
-import { cenyBalickovKlienta, navrhNovehoBalicka, type NavrhNovehoBalicka } from "./workspaceKroky";
+import { cenyBalickovKlienta, navrhNovehoBalicka, zruseneAutomaty, type NavrhNovehoBalicka } from "./workspaceKroky";
 import { sBtcZlavou } from "./btcZlavaBalicka";
 import { pokracovaniePredplatneho, type PokracovaniePredplatneho } from "./pokracovaniePredplatneho";
 import type { PSBData } from "./types";
@@ -49,7 +49,8 @@ export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: strin
   const bal = await DB.prepare(
     "SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at, poznamka FROM balicky",
   ).all();
-  const balicky = ((bal.results || []) as any[]).map((r) => ({
+  const surove = (bal.results || []) as any[];
+  const balicky = surove.map((r) => ({
     klient: String(r.klient), nazov: String(r.nazov || ""), hodiny: r.hodiny == null ? null : Number(r.hodiny),
     platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
     zruseneAt: r.zrusene_at || null, kotva: /^\s*zostatok prevzatý/i.test(String(r.poznamka || "")), ukonceny: jeUkonceny(r),
@@ -64,7 +65,8 @@ export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: strin
     const historia = (data.historiaBalickov || []).filter((h) => normName(h.client) === k)
       .map((h) => ({ nazov: h.package, od: String(h.validFrom || "").slice(0, 10), do: String(h.validTo || "").slice(0, 10) }));
     const p = pokracovaniePredplatneho(c.name, balicky, historia,
-      c.sessions.map((s) => ({ client: c.name, date: s.date, duration: s.duration })), dnes, zadarmo, nezaplatene);
+      c.sessions.map((s) => ({ client: c.name, date: s.date, duration: s.duration })), dnes, zadarmo, nezaplatene,
+      zruseneAutomaty(c.name, surove).dni);
     if (p) out.push(sBtcZlavou(p, data.clientOverrides?.[c.name]));
   }
   return out;
@@ -111,7 +113,7 @@ export async function navrhyNovychBalickov(DB: D1Database, dnes: string, zaklad?
     const os = osCasuKlienta(c.name, zdroj, terazPraha());
     const { stavy } = priebehBalickov(os, c.packageTotal > 0 ? c.packageRemaining : null, dnes);
     const ceny = cenyBalickovKlienta(c.name, balicky, data.historiaBalickov || []);
-    const n = navrhNovehoBalicka(c.name, os, stavy, ceny);
+    const n = navrhNovehoBalicka(c.name, os, stavy, ceny, zruseneAutomaty(c.name, balicky));
     if (n) out.push(sBtcZlavou(n, data.clientOverrides?.[c.name]));
   }
   return out;

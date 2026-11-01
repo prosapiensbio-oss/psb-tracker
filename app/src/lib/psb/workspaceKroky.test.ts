@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { Udalost } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
-import { kandidatiPlatby, klucOtazkyPlatby, navrhNovehoBalicka, otazkyPlatieb, zoznamSms } from "./workspaceKroky";
+import { kandidatiPlatby, klucOtazkyPlatby, navrhNovehoBalicka, otazkyPlatieb, samostatnaHodina, ZNACKA_POSUNU_ZA_DOPLNENIE, zoznamSms, zruseneAutomaty } from "./workspaceKroky";
 import { dlhyKlientov } from "./zaplatene";
 
 const trening = (den: string): Udalost => ({ druh: "trening", den, cas: "11:00" });
@@ -332,5 +332,70 @@ describe("doplatí zvyšok — odpoveď sa nevráti (Branislav Široký, 29. 10.
   });
   it("iná čiastočná platba je nová otázka", () => {
     expect(otazkyPlatieb([{ ...dlh[0], doplatit: 50 }], { [klucOtazkyPlatby({ balicekId: "u1", zaplatene: 1000 })]: { ack: true } })).toHaveLength(1);
+  });
+});
+
+describe("zrušený automatický balíček si Kokpit pamätá (Jerry, 1. 11. 2026)", () => {
+  const riadok = (klient: string, od: string, poznamka: string | null, zrusene: string | null = "2026-10-19T14:36:45Z", nazov = "6h Balíček") =>
+    ({ klient, nazov, platnost_od: od, poznamka, zrusene_at: zrusene });
+  const AUTO = "automaticky — vznikol prvým tréningom";
+
+  // Balíček 6 h do 26. 9., potom tri tréningy bez hodín: ten istý tvar ako Knapčok.
+  const os = zorad([
+    balicek("2026-09-01", 6, "6h Balíček", "2026-10-26"),
+    ...["2026-09-02", "2026-09-07", "2026-09-10", "2026-09-14", "2026-09-17", "2026-09-21", "2026-10-19", "2026-10-21", "2026-10-23"].map(trening),
+  ]);
+  const { stavy } = priebehBalickov(os, -3, "2026-10-24");
+  const ceny = [{ den: "2026-09-01", cena: 7790 }];
+
+  it("klient bez zrušeného: prázdna množina nič nemení — ten istý návrh ako bez parametra", () => {
+    const zrusene = zruseneAutomaty("Michal Knapčok", [riadok("Iný Klient", "2026-10-19", AUTO), riadok("Michal Knapčok", "2026-10-19", AUTO, null)]);
+    expect(zrusene.dni.size).toBe(0);
+    expect(navrhNovehoBalicka("Michal Knapčok", os, stavy, ceny, zrusene)).toEqual(navrhNovehoBalicka("Michal Knapčok", os, stavy, ceny));
+    expect(navrhNovehoBalicka("Michal Knapčok", os, stavy, ceny)?.odDna).toBe("2026-10-19");
+  });
+
+  it("zrušený na 19. 10. sa na ten deň nevráti; založí ho až ďalší tréning", () => {
+    const zrusene = zruseneAutomaty("Michal Knapčok", [riadok("Michal Knapčok", "2026-10-19", AUTO)]);
+    const n = navrhNovehoBalicka("Michal Knapčok", os, stavy, ceny, zrusene);
+    expect(n?.odDna).toBe("2026-10-21");
+    expect(n?.nazov).toBe("6h Balíček");
+  });
+
+  it("všetky nekryté dni zrušené = nič", () => {
+    const zrusene = zruseneAutomaty("X", ["2026-10-19", "2026-10-21", "2026-10-23"].map((d) => riadok("X", d, AUTO)));
+    expect(navrhNovehoBalicka("X", os, stavy, ceny, zrusene)).toBeNull();
+  });
+
+  it("zrušený ručný balíček automat nebrzdí", () => {
+    const zrusene = zruseneAutomaty("X", [riadok("X", "2026-10-19", "dohodnuté s klientom"), riadok("X", "2026-10-19", null)]);
+    expect(zrusene.dni.size).toBe(0);
+  });
+
+  it("meno sa porovnáva bez diakritiky — zápis pod iným tvarom sa nestratí", () => {
+    expect(zruseneAutomaty("Michal Knapcok", [riadok("Michal Knapčok", "2026-10-19", AUTO)]).dni.has("2026-10-19")).toBe(true);
+  });
+
+  it("posun za doplnenie rozhodol kód: ten deň ostáva voľný", () => {
+    const zrusene = zruseneAutomaty("X", [riadok("X", "2026-10-19", `${AUTO} · ${ZNACKA_POSUNU_ZA_DOPLNENIE}`)]);
+    expect(zrusene.dni.size).toBe(0);
+    expect(navrhNovehoBalicka("X", os, stavy, ceny, zrusene)?.odDna).toBe("2026-10-19");
+  });
+
+  it("zrušený 6 h nebrzdí úvodný na ten deň, zrušený úvodný áno", () => {
+    const u = [{ druh: "trening", den: "2026-10-05", cas: "17:00", uvodny: true }] as never[];
+    const st = new Map(u.map((x) => [x, { zostatok: null, dlh: 1, usek: "" }])) as never;
+    const po6h = zruseneAutomaty("X", [riadok("X", "2026-10-05", AUTO)]);
+    expect(navrhNovehoBalicka("X", u, st, [], po6h)?.nazov).toBe("Úvodní trénink");
+    const poUvodnom = zruseneAutomaty("X", [riadok("X", "2026-10-05", AUTO, "2026-10-06T10:00:00Z", "Úvodní trénink")]);
+    expect(navrhNovehoBalicka("X", u, st, [], poUvodnom)).toBeNull();
+  });
+
+  it("samostatná hodina iného druhu: zrušený deň preskočí na ďalší tréning", () => {
+    const off = (den: string) => ({ druh: "trening", den, cas: "18:00", nazov: "OFFLINE - 60min" }) as Udalost;
+    const hodina = zorad([balicek("2026-10-06", 6, "6h Balíček online", "2026-11-30"), off("2026-10-20"), off("2026-10-27")]);
+    expect(samostatnaHodina("X", hodina)?.odDna).toBe("2026-10-20");
+    const zrusene = zruseneAutomaty("X", [riadok("X", "2026-10-20", AUTO, "2026-10-21T10:00:00Z", "1h Balíček")]);
+    expect(samostatnaHodina("X", hodina, zrusene)?.odDna).toBe("2026-10-27");
   });
 });

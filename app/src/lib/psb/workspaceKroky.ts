@@ -92,6 +92,40 @@ export const smieVzniknutAutomaticky = (n: { nazov: string; cena: number; hodiny
   !/^\s*(doplnenie|prenesen)/i.test(n.nazov) && n.cena > 0 && n.hodiny > 0;
 
 /**
+ * ZRUŠENÝ AUTOMATICKÝ BALÍČEK SA NEVRACIA (Jerry, 1. 11. 2026).
+ *
+ * Do toho dňa vznikol zrušený balíček pri ďalšom behu znova: Knapčok 19. 10.
+ * zrušený 14:36, znova 14:59. Človek ho zrušil, automat to nevidel. Teraz si
+ * Kokpit pamätá deň začiatku: na ten deň automat nezakladá, tréning po ňom na
+ * inom dátume založí podľa normálneho pravidla. Ručný zápis to nebrzdí a
+ * vrátenie zrušeného („vrat") riadok zo zoznamu vyberie samo.
+ *
+ * Úvodný je vlastný balíček, nie „ten istý" — prepnutie tréningu na úvodný po
+ * zrušenom 6 h ho musí vedieť založiť (Luky Kríž). Opačne to neplatí: zrušený
+ * úvodný zablokuje aj bežný balíček na ten deň, lebo ten tréning človek práve
+ * riešil a na bežný sa z neho automat nemá prepnúť sám.
+ *
+ * Posun za doplnenie (`api/balicky`, akcia `pridaj`) rozhodol kód, nie človek —
+ * ten balíček „vznikne znova za ním" aj vtedy, keď doplnenie deň nepokryje.
+ * Preto nesie značku a nepočíta sa.
+ */
+export const ZNACKA_POSUNU_ZA_DOPLNENIE = "posunutý za doplnenie";
+export type ZruseneAutomaty = { dni: ReadonlySet<string>; uvodne: ReadonlySet<string> };
+const ZIADNE_ZRUSENE: ZruseneAutomaty = { dni: new Set(), uvodne: new Set() };
+
+export function zruseneAutomaty(
+  klient: string,
+  riadky: { klient: string; nazov: string; platnost_od: string; poznamka: string | null; zrusene_at: string | null }[],
+): ZruseneAutomaty {
+  const k = normName(klient);
+  const moje = riadky.filter((r) => normName(r.klient) === k && r.zrusene_at
+    && /^automaticky/i.test(String(r.poznamka || "")) && !String(r.poznamka).includes(ZNACKA_POSUNU_ZA_DOPLNENIE));
+  if (!moje.length) return ZIADNE_ZRUSENE;
+  const den = (r: { platnost_od: string }) => String(r.platnost_od).slice(0, 10);
+  return { dni: new Set(moje.map(den)), uvodne: new Set(moje.filter((r) => r.nazov === NAZOV_UVODNEHO).map(den)) };
+}
+
+/**
  * VEĽKOSŤ A CENA ĎALŠIEHO BALÍČKA — jedna cesta pre automat aj QR na odkaze.
  * `null` = appka nemá z čoho vychádzať (klient mal len úvodný, doplnenie…).
  */
@@ -191,6 +225,8 @@ function navrhNovehoBalickaBezStraze(
   stavy: Map<Udalost, StavRiadku>,
   /** Ceny balíčkov klienta podľa dňa začiatku — z Kokpitu aj z histórie PTmindera. */
   ceny: { den: string; cena: number | null }[] = [],
+  /** Dni, na ktoré človek automatický balíček zrušil (`zruseneAutomaty`). */
+  zrusene: ZruseneAutomaty = ZIADNE_ZRUSENE,
 ): NavrhNovehoBalicka | null {
   /**
    * Tréning na NEZAPLATENOM balíčku nie je nekrytý — balíček má, len čaká na
@@ -213,6 +249,7 @@ function navrhNovehoBalickaBezStraze(
   const posledneObdobie = najnovsi ? stavy.get(najnovsi)?.usek ?? "" : "";
   const nekryte = os.filter((u) => {
     if (u.druh !== "trening") return false;
+    if (zrusene.dni.has(u.den)) return false;
     const st = stavy.get(u);
     if (!st || st.usek !== posledneObdobie) return false;
     // Tréning s odpočtom (`zostatok`) je krytý, aj keď má mínus — ten tam
@@ -241,7 +278,7 @@ function navrhNovehoBalickaBezStraze(
    */
   const maUvodnyBalicek = (d: string) => os.some((u) => u.druh === "balicekOd" && u.den === d && u.nazov === NAZOV_UVODNEHO);
   const uvodny = os.find((u) => u.druh === "trening" && u.uvodny
-    && stavy.get(u)?.usek === posledneObdobie && !maUvodnyBalicek(u.den));
+    && stavy.get(u)?.usek === posledneObdobie && !maUvodnyBalicek(u.den) && !zrusene.uvodne.has(u.den));
   if (uvodny) {
     return {
       klient,
@@ -258,7 +295,7 @@ function navrhNovehoBalickaBezStraze(
     };
   }
 
-  const offline = samostatnaHodina(klient, os);
+  const offline = samostatnaHodina(klient, os, zrusene);
   if (offline) return offline;
 
   if (!nekryte.length) return null;
@@ -300,13 +337,14 @@ function navrhNovehoBalickaBezStraze(
  * slova sú online. Os už vie, že hodina iného druhu pokryje svoj tréning
  * a členstvo beží ďalej. Len od 1. 10. 2026: minulosť appka sama nepíše.
  */
-export function samostatnaHodina(klient: string, os: Udalost[]): NavrhNovehoBalicka | null {
+export function samostatnaHodina(klient: string, os: Udalost[], zrusene: ZruseneAutomaty = ZIADNE_ZRUSENE): NavrhNovehoBalicka | null {
   const balicky = os.filter((u): u is Extract<Udalost, { druh: "balicekOd" }> => u.druh === "balicekOd" && !u.doplnenie);
   const plati = (b: { den: string; doDna?: string }, d: string) => b.den <= d && (!b.doDna || b.doDna >= d);
   const treningy = os
     .filter((u): u is Extract<Udalost, { druh: "trening" }> => u.druh === "trening" && !u.uvodny && u.zdarma === undefined && u.den >= KOKPIT_OD)
     .sort((a, b) => a.den.localeCompare(b.den));
   for (const t of treningy) {
+    if (zrusene.dni.has(t.den)) continue;
     const druh = kanalTreningu(t);
     if (!druh) continue;
     const jeHodina = (b: { hodin: number; nazov: string }) => b.hodin === 1 && kanalBalicka(b.nazov) === druh && b.nazov !== NAZOV_UVODNEHO;

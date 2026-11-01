@@ -3,7 +3,7 @@ import { KOKPIT_OD } from "../../lib/psb/sedeniaZKalendara";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { nacitajZakladBalickov, navrhyNovychBalickov, navrhyPokracovaniaPredplatneho } from "../../lib/psb/automatickeBalicky.server";
-import { smieVzniknutAutomaticky } from "../../lib/psb/workspaceKroky";
+import { smieVzniknutAutomaticky, ZNACKA_POSUNU_ZA_DOPLNENIE } from "../../lib/psb/workspaceKroky";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
@@ -315,8 +315,9 @@ export const Route = createFileRoute("/api/balicky")({
           let posunute = 0;
           if (/doplnenie/i.test(nazov)) {
             const r = await DB.prepare(
-              "UPDATE balicky SET zrusene_at = ?1 WHERE klient = ?2 AND zrusene_at IS NULL AND platnost_od > ?3 AND id <> ?4 AND poznamka LIKE 'automaticky%'",
-            ).bind(teraz(), klient, od, id).run();
+              // Značka: toto zrušil kód, nie človek — `zruseneAutomaty` ho nesmie zablokovať.
+              "UPDATE balicky SET zrusene_at = ?1, poznamka = poznamka || ?5 WHERE klient = ?2 AND zrusene_at IS NULL AND platnost_od > ?3 AND id <> ?4 AND poznamka LIKE 'automaticky%'",
+            ).bind(teraz(), klient, od, id, ` · ${ZNACKA_POSUNU_ZA_DOPLNENIE}`).run();
             posunute = r.meta?.changes || 0;
             if (posunute) await audit(DB, { action: "balicek-zruseny", predmet: klient, neu: `${posunute}× automatický balíček po ${od} — prednosť má doplnenie, vznikne znova za ním`, actor: kto });
           }
