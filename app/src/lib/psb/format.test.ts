@@ -1,6 +1,17 @@
 import { describe, expect, it } from "bun:test";
 
-import { jeMesiac, kedyStrucne } from "./format";
+import { fmtCZK, jeMesiac, kedyStrucne, mesiacCely } from "./format";
+
+describe("peniaze a mesiac pre človeka", () => {
+  it("koruny sú Kč s medzerou v tisícoch", () => {
+    expect(fmtCZK(7790)).toBe("7\u00a0790 Kč");
+    expect(fmtCZK(null)).toBe("—");
+  });
+  it("celý mesiac namiesto ISO tvaru", () => {
+    expect(mesiacCely("2026-10")).toBe("október 2026");
+    expect(mesiacCely("nezmysel")).toBe("nezmysel");
+  });
+});
 
 describe("platný mesiac", () => {
   it("pustí len 01 až 12", () => {
