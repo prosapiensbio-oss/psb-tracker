@@ -174,6 +174,12 @@ export const Route = createFileRoute("/a/$token")({
         const a = await podlaTokenu(DB, token, ANAMNEZA_KLUC);
         if (!a) return odkaz("Tento odkaz neplatí.", 404);
 
+        // Po odoslaní vždy presmerovanie (303): obnovenie ďakovnej stránky je
+        // GET a formulár znova neodíde. Kto pošle už vyplnený formulár zo starého
+        // tabu, nezapíše nič — ani kontakt, ani odpovede.
+        const hotovo = () => new Response(null, { status: 303, headers: { location: `/a/${encodeURIComponent(token)}`, "cache-control": "no-store" } });
+        if (a.klientVyplnilAt) return hotovo();
+
         const fd = await request.formData();
         const pole = (n: string) => fd.getAll(n).map((x) => String(x).slice(0, 2000)).filter((x) => x.trim());
         const jedno = (n: string) => (pole(n)[0] || "");
@@ -229,14 +235,14 @@ export const Route = createFileRoute("/a/$token")({
           });
         } catch { /* ticho — odpovede sú dôležitejšie */ }
 
+        // `false` = iný tab odoslal medzitým (token sme práve našli) — jeho odpovede platia.
         const ok = await ulozKlienta(DB, token, odpovede, suhlasy, ANAMNEZA_KLUC);
-        if (!ok) return odkaz("Odeslání se nepodařilo. Zkuste to prosím znovu.", 500);
+        if (!ok) return hotovo();
 
         // Do auditu ide LEN meno a čas — nikdy obsah odpovedí.
         await audit(DB, { action: "anamneza-klient", predmet: a.klient, actor: "klient" });
 
-        const k = await kontext(DB, a.klient);
-        return new Response(strankaHtml({ formular: FORMULAR, klient: a.klient, ...k, hotovo: true }), { headers: hlavicky });
+        return hotovo();
       },
     },
   },

@@ -47,3 +47,16 @@ describe("údaje o klientovi na anamnéze", () => {
     expect(h).toContain("Máme to");
   });
 });
+
+describe("bez JavaScriptu", () => {
+  it("otázky sú rozbalené a stránka to povie", () => {
+    const h = strankaHtml(z);
+    expect(h).toContain("<noscript><style>[hidden]{display:block!important}</style></noscript>");
+    expect(h).toContain("vypnutý JavaScript");
+    // Záložný štýl musí stáť ZA základným `[hidden]{display:none!important}`.
+    expect(h.indexOf("<noscript><style>")).toBeGreaterThan(h.indexOf("[hidden]{display:none!important}"));
+  });
+  it("ďakovná stránka žiadny záložný štýl nepotrebuje", () => {
+    expect(strankaHtml({ ...z, hotovo: true })).not.toContain("<noscript>");
+  });
+});

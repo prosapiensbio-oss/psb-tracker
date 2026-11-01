@@ -89,13 +89,19 @@ export async function zalozAleboNajdi(DB: D1Database, klient: string, kluc: stri
   };
 }
 
-/** Zápis odpovedí klienta z verejnej stránky. Súhlasy sa NEŠIFRUJÚ. */
+/**
+ * Zápis odpovedí klienta z verejnej stránky. Súhlasy sa NEŠIFRUJÚ.
+ *
+ * LEN RAZ: `klient_vyplnil_at IS NULL`. Obnovenie stránky alebo starý tab
+ * posielali formulár znova a prepísali pôvodné odpovede, z ktorých berie
+ * začiatok pocitovka. `false` = nič sa nezapísalo (už vyplnené alebo token nie je).
+ */
 export async function ulozKlienta(
   DB: D1Database, token: string, odpovede: Record<string, unknown>, suhlasy: Record<string, unknown>, kluc: string,
 ): Promise<boolean> {
   const sifra = await zasifruj(JSON.stringify(odpovede), kluc);
   const v = await DB.prepare(
-    "UPDATE anamnezy SET klient_json = ?1, suhlasy_json = ?2, klient_vyplnil_at = ?3, stav = CASE WHEN stav = 'hotova' THEN 'hotova' ELSE 'klient_vyplnil' END WHERE token = ?4",
+    "UPDATE anamnezy SET klient_json = ?1, suhlasy_json = ?2, klient_vyplnil_at = ?3, stav = CASE WHEN stav = 'hotova' THEN 'hotova' ELSE 'klient_vyplnil' END WHERE token = ?4 AND klient_vyplnil_at IS NULL",
   ).bind(sifra, JSON.stringify(suhlasy), new Date().toISOString(), token).run();
   return (v.meta?.changes || 0) > 0;
 }
