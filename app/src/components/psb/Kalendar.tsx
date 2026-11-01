@@ -10,6 +10,7 @@ import { SmsKlientovi } from "./SmsKlientovi";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { navrhniKlientaKandidati, vyzeraNaMeno, type ClientAgg } from "../../lib/psb/compute";
+import { textZostatku } from "../../lib/psb/zostatokText";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
@@ -2392,7 +2393,12 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
   /** Prepínač trénera na Kokpite — týka sa klientov bez termínu v kalendári. */
   matchTrener?: (t: string) => boolean;
   /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
-  children?: React.ReactNode;
+  /**
+   * Sekcia POD zoznamom. Ako funkcia dostane mená, ktoré zoznam už ukazuje —
+   * klient má byť na karte raz, s dôvodom v riadku (Hanus, Kral boli 1. 11. 2026
+   * v „Balíček dojde" aj v „Končí platnosť").
+   */
+  children?: React.ReactNode | ((uzVZozname: Set<string>) => React.ReactNode);
   /** Sekcia NAD zoznamom — v bete nezaplatené (Jerry, 4. 10. 2026). */
   hore?: React.ReactNode;
   /** Posledný import balíčkov — pri pohľade „PTminder" hovorí, k akej chvíli
@@ -2500,6 +2506,9 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
         // balíčka v PTminderi (0 z 0) — tam sa nedá povedať nič, tak sa mlčí.
         if (c.lenDoplnky) return null;
         if (!c.packageTotal && !c.membership) return null;
+        // Skončil a dostal peniaze späť — nula hodín nie je „treba mu predať
+        // ďalší balíček" (Radek Baláž, ukončený 13. 10. 2026).
+        if (c.ukonceny) return null;
         const uz = odtrenovane[meno] || 0;
         /**
          * KEDY DÔJDE — deň hodiny, ktorá balíček vyčerpá.
@@ -2679,11 +2688,11 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   Je to doslovný opis reportu, aby sa dalo porovnať s PTminderom
                   riadok po riadku bez rátania v hlave. */}
               <span style={{
-                fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
+                fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0, whiteSpace: "nowrap",
                 color: (zdroj === "karta" ? r.zostava : r.po) <= 0 ? C.red : C.orange,
                 background: mix((zdroj === "karta" ? r.zostava : r.po) <= 0 ? C.red : C.orange, 12),
               }}>
-                {zdroj === "karta" ? r.zostava : Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
+                {textZostatku({ zostava: zdroj === "karta" ? r.zostava : r.teraz, spolu: r.spolu })}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {onKlient ? (
@@ -2706,7 +2715,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                 {/* Pri PTminderi sa kalendárové veci (odtrénované, objednané)
                     zámerne nepíšu — to je práve to, čo v tom čísle NIE JE.
                     Zostáva platnosť, ktorá je z toho istého reportu. */}
-                <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 11, color: C.textDim, display: "block", lineHeight: 1.35 }}>
                   {zdroj === "karta" ? (
                     <>
                       {r.platnostDo ? `platnosť do ${fmtDMY(r.platnostDo)}` : "bez zapísanej platnosti"}
@@ -2723,7 +2732,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                       </span>
                       {r.uz ? ` · ${r.uz} h odtrénovaná, na karte ešte nie` : null}
                       {r.kusov ? ` · obj. ${r.kusov}` : null}
-                      {r.platnostDo ? `${r.poPlatnosti ? " · členstvo v appke platilo do " : " · do "}${fmtDMY(r.platnostDo)}` : ""}
+                      {r.platnostDo ? `${r.poPlatnosti ? " · členstvo v appke platilo do " : " · platnosť do "}${fmtDMY(r.platnostDo)}` : ""}
                     </>
                   )}
                 </span>
@@ -2746,7 +2755,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
           ))}
         </div>
       )}
-      {children}
+      {typeof children === "function" ? children(new Set(riadky.map((r) => r.meno))) : children}
     </Card>
   );
 }

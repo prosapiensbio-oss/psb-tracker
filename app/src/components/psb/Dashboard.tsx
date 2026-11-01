@@ -5,8 +5,12 @@ import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
+import { dlznici } from "../../lib/psb/dlznici";
+import { platiteliaZOverridov } from "../../lib/psb/platiZa";
+import { textZostatku } from "../../lib/psb/zostatokText";
 import { objednaneVerzia,
   doPlnehoMesiaca,
+  priemerZUplnychObdobi,
   kotvaDat,
   monthlyFinance,
   predictCash,
@@ -831,7 +835,9 @@ export function Dashboard({
     const cisty = toky.prisloMes - toky.odisloMes;
     vysledok.push({
       id: "klienti",
-      label: "Aktívni klienti",
+      // Pri filtri trénera je to počet JEHO klientov — bez mena sa 32 čítalo
+      // ako rozpor so zoznamom všetkých.
+      label: trainer === "all" ? "Aktívni klienti" : `Aktívni klienti · ${trainer}`,
       hodnota: String(stats.active),
       podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1)} / mes. · Ø ${toky.prisloMes.toFixed(1)} nových`,
       pasmo: cisty < -0.5 ? "zle" : cisty < 0 ? "pozor" : "ok",
@@ -1196,21 +1202,20 @@ export function Dashboard({
    */
   const weekStats = useMemo(() => {
     const zdroj = poslednyTyzdenNeuplny ? oknoTyzdnov.slice(0, -1) : oknoTyzdnov;
+    const hodiny = ([, v]: (typeof oknoTyzdnov)[number]) =>
+      trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka;
     const pts = zdroj
-      .map(([k, v]) => ({
-        label: weekLabel(k),
-        h: trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka,
-      }))
+      .map((r) => ({ label: weekLabel(r[0]), h: hodiny(r) }))
       .filter((p) => p.h > 0);
     if (!pts.length) return null;
     let max = pts[0], min = pts[0];
-    let sum = 0;
     for (const p of pts) {
-      sum += p.h;
       if (p.h > max.h) max = p;
       if (p.h < min.h) min = p;
     }
-    return { avg: sum / pts.length, max, min, n: pts.length };
+    // Priemer z tej istej funkcie ako Tréningy → Prehľad.
+    const { avg, n } = priemerZUplnychObdobi(oknoTyzdnov.map(hodiny), poslednyTyzdenNeuplny);
+    return { avg, max, min, n };
   }, [oknoTyzdnov, trainer, poslednyTyzdenNeuplny]);
 
   // Priemerné týždenné hodiny každého trénera zvlášť — počíta sa len z týždňov,
@@ -1354,16 +1359,15 @@ export function Dashboard({
    * dlžníkov (±3). Filtruje sa podľa prepínača trénera rovnako ako zvyšok
    * karty — inak by Terezka videla Jerryho dlžníkov a naopak.
    */
-  const nezaplateneNaKarte = useMemo(
-    () => (data.dlhy || [])
-      .filter((d) => { const c = clients[d.klient]; return !c || matchT(c.primaryTrainer); })
-      .map((d, i) => ({
-        id: `${d.zdroj}|${d.klient}|${d.den}|${i}`, klient: d.klient, datum: d.den,
-        popis: d.zdroj === "kokpit" ? `${d.nazov} · z Kokpitu` : d.nazov, suma: d.doplatit,
-      }))
-      .sort((a, b) => b.suma - a.suma),
-    [data.dlhy, clients, matchT],
-  );
+  const nezaplateneNaKarte = useMemo(() => {
+    // TÁ ISTÁ funkcia ako krok 3 vo Workspace a Jarvisov `dlznici`: jeden klient,
+    // jeden riadok. Do 1. 11. 2026 tu boli položky — Branislav Široký stál
+    // dvakrát (7 790 + 100) a Dnes hlásil 7 tam, kde krok 3 šesť dlžníkov.
+    const treneri: Record<string, string> = {};
+    for (const [meno, c] of Object.entries(clients)) treneri[meno] = c.primaryTrainer || "";
+    return dlznici(data.dlhy, treneri, undefined, platiteliaZOverridov(data.clientOverrides))
+      .filter((d) => !clients[d.meno] || matchT(d.trener));
+  }, [data.dlhy, data.clientOverrides, clients, matchT]);
 
   const platnostKonci = useMemo(() => {
     const dnes = dnesPraha();
@@ -1375,6 +1379,7 @@ export function Dashboard({
     const odtren = odtrenovaneMimoExportu(kalendar, data.sessions);
     return Object.values(clients)
       .filter((c) => c.status !== "Neaktívny" && c.status !== "Pauza" && matchT(c.primaryTrainer))
+      .filter((c) => !c.ukonceny)
       .filter((c) => !ack[`balicek|${c.name}`])
       // Klient, ktorý má v exporte len doplnky k paušálnemu členstvu, tu nemá
       // čo robiť — jeho „0 z 3" nie je dochodený balíček, ale dokúpená hodina
@@ -1398,7 +1403,8 @@ export function Dashboard({
         // Posledný týždeň sa hlási vždy: koniec členstva je sám o sebe moment,
         // kedy sa rieši ďalší balíček.
         const tyzdnovDoKonca = doKonca !== null ? doKonca / 7 : 0;
-        const zostava = Math.max(0, c.packageRemaining - (odtren[c.name] || 0));
+        // Bez orezania: mínus je pravda o tom, koľko tréningov nemá krytie.
+        const zostava = c.packageRemaining - (odtren[c.name] || 0);
         const stihneMinut = frekvencia > 0
           ? frekvencia * tyzdnovDoKonca >= zostava - 1
           : false;
@@ -1467,21 +1473,25 @@ export function Dashboard({
                    pod ním ako niečo iné. Nie je to pilulka, len text: pilulka
                    vo veľkosti H3 by nadpis roztiahla a prebila by odznaky,
                    ktoré nesú konkrétne čísla. */
-                label={<>Nezaplatené ({nezaplateneNaKarte.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneNaKarte.reduce((a, p) => a + p.suma, 0))}</span></>}
+                label={<>Nezaplatené ({nezaplateneNaKarte.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneNaKarte.reduce((a, p) => a + p.spolu, 0))}</span></>}
               />
             </H3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
               {nezaplateneNaKarte.map((p) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
-                  <span style={{ ...badge("red"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>{fmtCZK(p.suma)}</span>
+                <div key={p.meno} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
+                  <span style={{ ...badge("red"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>{fmtCZK(p.spolu)}</span>
                   <button
-                    onClick={() => onNavigate("klienti", undefined, { client: p.klient, nonce: Date.now() })}
-                    title={p.popis}
+                    onClick={() => onNavigate("klienti", undefined, { client: p.meno, nonce: Date.now() })}
+                    title={p.polozky.map((x) => `${fmtDMY(x.datum)} · ${x.popis} · ${fmtCZK(x.suma)}`).join("\n")}
                     style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
                   >
-                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.klient}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {fmtDMY(p.datum)} · {p.popis.split(" - from ")[0] || "poplatok"}
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.meno}</span>
+                    {/* Viac nezaplatených = rozpis v riadku, nie druhý riadok s tým istým menom. */}
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", lineHeight: 1.35 }}>
+                      {p.polozky.length === 1
+                        ? `${fmtDMY(p.polozky[0].datum)} · ${p.polozky[0].popis.split(" - from ")[0] || "poplatok"}`
+                        : `${p.polozky.map((x) => fmtCZK(x.suma)).join(" + ")} · od ${fmtDMY(p.najstarsi)}`}
+                      {p.platiZaNeho ? ` · platí ${p.platiZaNeho}` : ""}
                     </span>
                   </button>
                   {/* Jerry, 1. 10. 2026: „Danielka je v mínuse 9 400, ale
@@ -1737,11 +1747,15 @@ export function Dashboard({
         // otvorí profil (Jerry, 4. 10. 2026).
         hore={nezaplateneBlok}
       >
-        {platnostKonci.length > 0 && (
+        {(uzVZozname) => {
+        // Klient je na karte raz: kto je v zozname vyššie, ten tam má platnosť
+        // napísanú v riadku a druhý raz sa neopakuje.
+        const lenPlatnost = platnostKonci.filter((x) => !uzVZozname.has(x.c.name));
+        return (lenPlatnost.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim, margin: "2px 0 6px" }}>
-                <Info text="Členstvo má vlastnú platnosť a tá vyprší nezávisle od toho, koľko hodín zostalo. Klient s piatimi hodinami a desiatimi dňami ich nestihne minúť a o tri príde — o tom treba vedieť. Posledný týždeň sa hlási vždy, dlhšie okno len vtedy, keď hodiny podľa tempa nestihne minúť." label={`Končí platnosť členstva (${platnostKonci.length})`} />
+                <Info text="Členstvo má vlastnú platnosť a tá vyprší nezávisle od toho, koľko hodín zostalo. Klient s piatimi hodinami a desiatimi dňami ich nestihne minúť a o tri príde — o tom treba vedieť. Posledný týždeň sa hlási vždy, dlhšie okno len vtedy, keď hodiny podľa tempa nestihne minúť." label={`Končí platnosť členstva (${lenPlatnost.length})`} />
               </div>
               {odlozene.length > 0 && (
                 <button
@@ -1753,10 +1767,10 @@ export function Dashboard({
               )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-              {platnostKonci.map(({ c, doKonca, frekvencia, zostava }) => (
+              {lenPlatnost.map(({ c, doKonca, frekvencia, zostava }) => (
                 <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
-                  <span style={{ ...badge(doKonca !== null && doKonca <= 7 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
-                    {c.packageTotal > 0 ? `${c.packageOdvodeny ? "≈" : ""}${zostava}/${c.packageTotal}` : "—"}
+                  <span style={{ ...badge(doKonca !== null && doKonca <= 7 ? "red" : "orange"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+                    {c.packageTotal > 0 ? textZostatku({ zostava, spolu: c.packageTotal, odvodene: c.packageOdvodeny }) : "—"}
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
@@ -1764,8 +1778,8 @@ export function Dashboard({
                     style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {doKonca === null ? `${zostava}/${c.packageTotal} hodín`
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", lineHeight: 1.35 }}>
+                      {doKonca === null ? `${textZostatku({ zostava, spolu: c.packageTotal })} hodín`
                         : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                         : doKonca === 0 ? "platnosť končí dnes"
                         : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`}
@@ -1783,7 +1797,8 @@ export function Dashboard({
               ))}
             </div>
           </div>
-        )}
+        ));
+        }}
 
         {/* „Hodiny bez balíčka" tu od 5. 10. 2026 nie sú: balíček vzniká sám
             prvým tréningom, takže hodina bez balíčka nevznikne — je nanajvýš
@@ -2221,6 +2236,8 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
   const [odpoved, setOdpoved] = useState(false);
   const [text, setText] = useState("");
   const [odlozit, setOdlozit] = useState(false);
+  /** Menu „⋯" — menej časté možnosti s vetou, čo spravia. Len vzhľad, ack ostáva ten istý. */
+  const [viac, setViac] = useState(false);
 
   const odloz = (dni: number) => {
     const d = dnesPraha(new Date(Date.now() + dni * 86400000));
@@ -2821,17 +2838,18 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               </div>
             </div>
           )}
-          {chat && !item.acked && (
-            <button onClick={() => setOdpoved((o) => !o)} style={{ ...linkBtn, color: odpoved ? C.accentLight : C.accent }}>
-              {odpoved ? "Zavrieť" : "Odpovedať"}
-            </button>
-          )}
-          {/* „Skryť" znamenalo navždy — jediná možnosť, ako sa zbaviť veci,
-              ktorá práve nie je na rade, bola zabudnúť na ňu. Odloženie ju
-              vráti samo. */}
+          {/* Odpovedať, Odložiť, Skryť a Nehlásiť sú pod „⋯" (1. 11. 2026): šesť
+              rovnocenných slov v riadku sa nedalo prečítať a rozdiel medzi Skryť,
+              Odložiť a Nehlásiť z nápisu nebolo poznať. Každá možnosť robí presne
+              to isté čo predtým, len hovorí, čo spraví. */}
           {!item.acked && (
-            <button onClick={() => setOdlozit((o) => !o)} style={{ ...linkBtn, color: odlozit ? C.accentLight : C.textMuted }}>
-              {odlozit ? "Zavrieť" : "Odložiť"}
+            <button
+              onClick={() => setViac((o) => !o)}
+              aria-expanded={viac}
+              title="Ďalšie možnosti: odpovedať, odložiť, skryť, nehlásiť"
+              style={{ ...linkBtn, color: viac ? C.accentLight : C.textMuted, fontWeight: 700, padding: "0 4px" }}
+            >
+              ⋯
             </button>
           )}
           {/* „Nehlásiť" umlčí CELÝ druh upozornenia, nie jeden dátum.
@@ -2842,19 +2860,39 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               v Skrytých. Od 10. 8. ho majú VŠETKY položky (Jerry: „nehlásiť
               mi daj na všetky udalosti") — položka bez rodiny sa umlčí podľa
               vlastného kľúča. */}
-          {item.acked ? (
+          {item.acked && (
             <button onClick={() => { actions.ackAnomaly(item.key, "", false); if (item.rodina) actions.ackAnomaly(`mute|${item.rodina}`, "", false); }} style={linkBtn}>Vrátiť</button>
-          ) : (
-            <>
-              <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
-              <button
-                onClick={() => actions.ackAnomaly(`mute|${item.rodina || item.key}`, "nehlásiť tento druh")}
-                title="Už mi tento druh upozornenia nehlás — ani zajtra, ani o mesiac"
-                style={{ ...linkBtn, color: C.textDim }}
-              >
-                Nehlásiť
-              </button>
-            </>
+          )}
+          {!item.acked && viac && (
+            <div style={{ flexBasis: "100%", marginTop: 6, padding: "4px 10px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column" }}>
+              {[
+                ...(chat ? [{
+                  popis: odpoved ? "Zavrieť odpoveď" : "Odpovedať", co: "Napíšeš vetu; zapíše sa k tejto položke a dostane ju aj Jarvis.",
+                  klik: () => setOdpoved((o) => !o),
+                }] : []),
+                {
+                  popis: odlozit ? "Zavrieť odloženie" : "Odložiť", co: "Zmizne a sama sa vráti v deň, ktorý vyberieš.",
+                  klik: () => setOdlozit((o) => !o),
+                },
+                {
+                  popis: "Skryť", co: "Schová len túto položku, nevybavenú. Nájdeš ju v Skrytých.",
+                  klik: () => actions.ackAnomaly(item.key, "skryté"),
+                },
+                {
+                  popis: "Nehlásiť", co: "Tento druh upozornenia už nehlási vôbec. Vrátiť sa dá v Skrytých.",
+                  klik: () => actions.ackAnomaly(`mute|${item.rodina || item.key}`, "nehlásiť tento druh"),
+                },
+              ].map((m) => (
+                <button
+                  key={m.popis}
+                  onClick={() => { setViac(false); m.klik(); }}
+                  style={{ ...linkBtn, display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", padding: "6px 0", textAlign: "left", color: C.text, borderBottom: `1px solid ${mix(C.border, 40)}` }}
+                >
+                  <span style={{ fontWeight: 600, minWidth: 70 }}>{m.popis}</span>
+                  <span style={{ color: C.textMuted, fontWeight: 400, flex: "1 1 200px" }}>{m.co}</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

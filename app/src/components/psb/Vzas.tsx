@@ -15,7 +15,7 @@ import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlHodnotaOpravy, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
-import { SADZBA_ZASKOK_KC, ZASKOK, ZASKOK_OD } from "../../lib/psb/zaskok";
+import { SADZBA_ZASKOK_KC, ZASKOK, ZASKOK_DO, ZASKOK_OD } from "../../lib/psb/zaskok";
 import { breakEvenRad } from "../../lib/psb/rezerva";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -1516,17 +1516,20 @@ function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessi
             Matyáš
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>
-            Záskok od {fmtDMY(ZASKOK_OD)} · DPP · {SADZBA_ZASKOK_KC} Kč za odtrénovanú hodinu. Mzdový náklad — žiadny nárok ani dlh. Od júla 2026 sa mzda počíta sama z jeho sedení.
+            {/* Do 1. 11. 2026 tu stálo „Záskok od 1.9.2026" a vedľa „mar 26 · 10 h": dátum
+                bol rozhodnutie o budúcnosti, ktoré sa nenaplnilo (20. 9. skončil, od apríla
+                nemá sedenie), a mesiac vpravo nebol pomenovaný ako posledný. */}
+            Skončil {fmtDMY(ZASKOK_DO)} · záskok {fmtDMY(ZASKOK_OD)} – {fmtDMY(ZASKOK_DO)} bez odtrénovanej hodiny · DPP · {SADZBA_ZASKOK_KC} Kč/h. Mzdový náklad — žiadny nárok ani dlh.
           </div>
         </div>
         {posledny >= 0 ? (
           <div style={{ display: "flex", gap: 20 }}>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Hodín {MONTHS[posledny]}</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Naposledy trénoval {MONTHS[posledny]}</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{hod(posledny).toFixed(1)} h</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Mzda {MONTHS[posledny]}</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Mzda za {MONTHS[posledny]}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(MATYAS[posledny])}</div>
             </div>
           </div>

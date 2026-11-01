@@ -1544,7 +1544,12 @@ export function useExtraGrafy({
     // pomerov. Nevážene mal mesiac s piatimi sedeniami rovnakú váhu ako mesiac
     // so stopäťdesiatimi — a práve to bol jeden z dôvodov, prečo tá istá vec
     // vychádzala na štyroch obrazovkách štyrikrát inak.
-    const cenaPriem = cenaZaSedenie(data, vMes).czk;
+    // Spolu ÷ spolu cez mesiace, ktoré graf naozaj kreslí — rozrobený mesiac
+    // (predplatby hore, sedenia ešte nie) do priemeru nepatrí.
+    const cenaObdobie = cenaZaSedenie(data, (mk) => vMes(mk) && (!kotva.plny || mk <= kotva.plny));
+    const cenaPriem = cenaObdobie.czk;
+    const cenaOd = cenaRad[0]?.mk;
+    const cenaDo = cenaRad[cenaRad.length - 1]?.mk;
     /**
      * Ideálna hodinovka ako čiara v grafe (Terezka, 22. 8. 2026).
      *
@@ -1573,7 +1578,7 @@ export function useExtraGrafy({
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             <MiniStat label={cenaTeraz ? `Teraz · ${monthLabel(cenaTeraz.mk)}` : "Teraz"} value={cenaTeraz ? fmtCZK(cenaTeraz.v) : "—"} color={C.accent} />
-            <MiniStat label="Ø za obdobie" value={cenaPriem ? fmtCZK(cenaPriem) : "—"} />
+            <MiniStat label={cenaOd ? `Ø ${monthLabel(cenaOd)} – ${monthLabel(cenaDo || cenaOd)} · ÷ ${cenaObdobie.sedeni} sed.` : "Ø za obdobie"} value={cenaPriem ? fmtCZK(cenaPriem) : "—"} />
             <MiniStat label={cenaMax ? `Max · ${monthLabel(cenaMax.mk)}` : "Max"} value={cenaMax ? fmtCZK(cenaMax.v) : "—"} color={C.green} />
             <MiniStat label={cenaMin ? `Min · ${monthLabel(cenaMin.mk)}` : "Min"} value={cenaMin ? fmtCZK(cenaMin.v) : "—"} color={C.red} />
           </div>
@@ -1832,13 +1837,6 @@ export function useExtraGrafy({
     // v knižnici; zmizli len z východzieho zobrazenia.
     //
     // Tvar je Jerryho: graf na jednej strane, čísla na druhej.
-
-    // Ø cena sedenia za posledné tri mesiace — používa ju karta cenaSedenia.
-    const cenaSedeniaTeraz = (() => {
-      const m = finMes.filter((x) => x.sessions > 0).slice(-3);
-      if (!m.length) return null;
-      return m.reduce((a, x) => a + x.cash / x.sessions, 0) / m.length;
-    })();
 
     // 3 · ZISKY A NÁKLADY — skutočnosť a odhad vedľa seba (Jerryho návrh).
     // Oddelené opticky aj slovom: odhad má zmysel len oproti skutočnosti, ale

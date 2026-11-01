@@ -2,7 +2,8 @@ import { useMemo } from "react";
 
 import { najdiKlienta, poslednyTrening, type ClientAgg } from "../../lib/psb/compute";
 import { daysBetween, fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
-import { dochadzkaPorovnatelna, mesiacovVztahu, priemerOstatnych, tempoMesacne, zaplateneMesacne } from "../../lib/psb/profil";
+import { dochadzkaPorovnatelna, mesiacovVztahu, priemerDochadzky, priemerOstatnych, tempoMesacne, zaplateneMesacne } from "../../lib/psb/profil";
+import { textZostatku } from "../../lib/psb/zostatokText";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Dennik } from "./Dennik";
@@ -114,9 +115,8 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
       data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0);
     const priemery = {
       tempo: avg((x) => tempoMesacne(x)),
-      // Priemer sa ráta len z klientov, ktorých dochádzka už niečo znamená —
-      // inak by ho ťahali nadol tí, čo chodia dva týždne a majú strop 33 %.
-      dochadzka: avg((x) => (dochadzkaPorovnatelna(x) ? x.attendance * 100 : 0)),
+      // Jedna funkcia so stolom klienta a Firmou → Klienti.
+      dochadzka: priemerDochadzky(Object.values(clients)).podiel * 100,
       cena: avg((x) => (x.totalHours > 0 ? zaplatilKlient(x) / x.totalHours : 0)),
       zaplateneMes: avg((x) => zaplateneMesacne(zaplatilKlient(x), x)),
     };
@@ -245,7 +245,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           "Podiel týždňov z posledných 18, v ktorých klient reálne trénoval.")}
         {stat("Zaplatené spolu", fmtCZK(p.zaplatene), C.green)}
         {stat("Ø cena hodiny", fmtCZK(Math.round(p.cenaHodiny)), undefined, "Zaplatené spolu delené odtrénovanými hodinami — koľko klienta hodina naozaj stojí, vrátane zliav a bonusov.")}
-        {stat("Balíček", c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
+        {stat("Balíček", c.packageTotal ? textZostatku({ zostava: c.packageRemaining, spolu: c.packageTotal, odvodene: c.packageOdvodeny }) : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
           [
             c.membership,
             c.packageValidTo ? `platí do ${fmtDMY(c.packageValidTo)}` : "",

@@ -2,7 +2,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { fetchWeekEntries, type WeekEntry } from "../../lib/psb/client";
-import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
+import { cenaZaSedenieVDnoch, groupTrainings, periodInfo, priemerZUplnychObdobi, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData, SessionRow } from "../../lib/psb/types";
@@ -176,7 +176,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
         total: (g) => g.total.hours,
         sessions: (g) => g.total.sessions,
         revenue: (g) => g.total.revenue,
-        czk: (g) => (g.total.sessions ? g.total.revenue / g.total.sessions : 0),
         score: (g) => g.score,
       }),
     [rows, sorted, selectedKey],
@@ -187,22 +186,29 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     // Umelý riadok bežiaceho týždňa (pridaný vyššie, aby sa dal zapísať) do
     // priemerov nepatrí — jeho nula je vymyslená appkou, nie odtrénovaná.
     const realne = rows.filter((g) => g.total.sessions > 0 || g.score > 0);
-    const zdroj = realne.length ? realne : rows;
+    const zdroj = [...(realne.length ? realne : rows)].sort((a, b) => a.ts - b.ts);
     const n = zdroj.length;
+    // Rozrobené posledné obdobie do priemeru nepatrí — to isté pravidlo a tá
+    // istá funkcia ako na Dnes. Historické okno (2025) nemá čo vyhadzovať:
+    // posledný riadok musí byť naozaj to obdobie, v ktorom končia dáta.
+    const den = kotvaDat({ sessions: data.sessions }).den;
+    const rozrobeny = posledneNeuplne && !!den && period !== "custom" && zdroj[n - 1]?.key === periodInfo(den, period).label;
+    const hodiny = priemerZUplnychObdobi(zdroj.map((g) => g.total.hours), rozrobeny);
     return {
-      avgH: zdroj.reduce((a, g) => a + g.total.hours, 0) / n,
+      avgH: hodiny.avg,
+      nH: hodiny.n,
       avgScore: zdroj.reduce((a, g) => a + g.score, 0) / n,
-      // Súčet ÷ súčet, nie priemer pomerov po riadkoch: týždeň s dvomi
-      // sedeniami nemá vážiť ako týždeň s tridsiatimi. Pozor, je to cena
-      // ZAPÍSANÁ PRI SEDENÍ — pri 19 % sedení je nulová (platba visí na
-      // balíčku), takže je nižšia než „Ø cena sedenia" z prijatých peňazí.
-      // Preto sa aj volá inak; obe čísla sú správne, len na inú otázku.
-      avgCzk: (() => {
-        const sed = zdroj.reduce((a, g) => a + g.total.sessions, 0);
-        return sed ? zdroj.reduce((a, g) => a + g.total.revenue, 0) / sed : 0;
-      })(),
     };
-  }, [rows]);
+  }, [rows, posledneNeuplne, data.sessions, period]);
+
+  // Cena sedenia za zvolené okno — z prijatých peňazí, tá istá funkcia ako Dnes.
+  // „Ø zapísané / sedenie" (964 Kč) je preč: nebola na ňu otázka ani akcia, cena
+  // zapísaná pri sedení je pri pätine sedení nula a číslo sa len plietlo s touto.
+  const cenaOkna = useMemo(
+    () => cenaZaSedenieVDnoch(data, (datum) =>
+      (!range?.from || datum >= range.from) && (!range?.to || datum <= `${range.to}T23:59:59.999Z`)).czk,
+    [data, range],
+  );
 
   // Súčet odrobených hodín podľa trénera za zvolené obdobie. Priemer na týždeň
   // nestačí na otázku „koľko kto odrobil minulý mesiac" — a to je otázka, ktorá
@@ -279,9 +285,8 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
 
       {summary && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
+          <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"} · z ${summary.nH}`} />
           <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
-          <StatCard value={fmtCZK(summary.avgCzk)} label={<Info text="Cena ZAPÍSANÁ pri sedení, sčítaná a delená počtom sedení. Je nižšia než „Ø cena sedenia“ na Kokpite a v Peniazoch — tá ráta z prijatých peňazí. Rozdiel je v tom, že pri časti sedení je zapísaná cena nulová, lebo platba visí na balíčku; tu tie nuly priemer stláčajú, tam sa platba za balíček započíta. Toto číslo hovorí „koľko je odtrénované ocenené“, to druhé „koľko peňazí prišlo na hodinu“." label="Ø zapísané / sedenie" />} />
         </div>
       )}
 
@@ -330,8 +335,8 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           </div>
           {logged.zrusene > 0 && (
             <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 9 }}>
-              Zrušené tréningy sú stratená kapacita — pri Ø {fmtCZK(summary?.avgCzk ?? 0)} za sedenie to je zhruba{" "}
-              <b style={{ color: C.red }}>{fmtCZK(logged.zrusene * (summary?.avgCzk ?? 0))}</b> nezarobených za zvolené obdobie.
+              Zrušené tréningy sú stratená kapacita — pri Ø {fmtCZK(cenaOkna)} za sedenie to je zhruba{" "}
+              <b style={{ color: C.red }}>{fmtCZK(logged.zrusene * cenaOkna)}</b> nezarobených za zvolené obdobie.
             </div>
           )}
         </div>
@@ -381,7 +386,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Zárobky" sortKey="revenue" sort={sort} onSort={toggle} align="right" />
-            <SortTh label="Zapísané/sed." sortKey="czk" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Skóre" sortKey="score" sort={sort} onSort={toggle} align="right" info="Blízkosť k stredu zdravej zóny (29h/týž) na trénera. 10 = ideál." />
           </tr>
         </thead>
@@ -389,7 +393,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           {sortedRows.map((g) => {
             const jerry = g.byTrainer["Jerry"];
             const terezka = g.byTrainer["Terezka"];
-            const czk = g.total.sessions ? g.total.revenue / g.total.sessions : 0;
             const wk = weekly ? weekKey(new Date(g.ts).toISOString()) : null;
             const entry = wk ? (weeks[wk] ?? {}) : {};
             const energyCell = (person: string) => {
@@ -414,7 +417,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: zoneColor(g.total.hours) }}>{g.total.hours.toFixed(0)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{g.total.sessions}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(g.total.revenue)}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(czk)}</td>
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: g.score >= 7 ? C.green : g.score >= 4 ? C.orange : C.red }}>{g.score}</td>
               </tr>
               </Fragment>
