@@ -23,10 +23,13 @@ import { terazPraha } from "./cas";
 import type { ClientAgg } from "./compute";
 import { dlhJednehoKlienta } from "./dlznici";
 import { normName } from "./format";
-import { historiaPreMail } from "./historiaMail";
+import { sBtcZlavou } from "./btcZlavaBalicka";
+import { historiaPreMail, zostatokNaOdkaze } from "./historiaMail";
+import type { Udalost } from "./klientOsCasu";
+import { cenyBalickovKlienta, ponukaNovehoBalicka } from "./workspaceKroky";
 import type { VypisKlienta } from "./mailKlientovi";
 import { nazovProduktu } from "./nazvyProduktov";
-import { osKlientaZoServera } from "./osKlienta.server";
+import { osKlientaZoServera, type BalicekServer } from "./osKlienta.server";
 import { menaPlatiZa, platiteliaZOverridov, type PolozkaPlatby } from "./platiZa";
 import { DODAVATEL } from "./vydanaFaktura";
 import { fakturyUhradeneRozdelenim } from "./fakturaUhradena";
@@ -45,6 +48,22 @@ export function popisPoplatku(popis: string): string {
   if (!m) return nazovProduktu(popis) || popis;
   const [, nazov, d1, m1, , d2, m2, r2] = m;
   return `${nazovProduktu(nazov)} · ${Number(d1)}. ${Number(m1)}. – ${Number(d2)}. ${Number(m2)}. ${r2}`;
+}
+
+/**
+ * Ponuka nového balíčka tak, ako ju pýta odkaz: cenník (`ponukaNovehoBalicka`,
+ * tá istá cesta ako automat) a zľava za bitcoin. Číta to aj delenie spoločnej
+ * BTC platby, lebo má čakať presne to, čo pýtala stránka.
+ */
+export function ponukaVOdkaze(
+  meno: string,
+  os: Udalost[],
+  balicky: BalicekServer[],
+  data: Pick<PSBData, "historiaBalickov" | "clientOverrides">,
+  dnes: string,
+) {
+  const n = ponukaNovehoBalicka(os, cenyBalickovKlienta(meno, balicky, data.historiaBalickov || []), dnes);
+  return n && sBtcZlavou(n, data.clientOverrides?.[meno]);
 }
 
 export type ObsahOdkazu = {
@@ -140,20 +159,7 @@ export async function obsahOdkazu(
 
   const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
 
-  /**
-   * TRÉNINGY BEZ HODINY NA KONCI = HODINY NAD RÁMEC, aj keď číslo hovorí nulu.
-   * (Lukáš Hanus 3. 10. 2026: stránka tvrdila „Poslední hodina", hoci odvtedy
-   * trénoval trikrát.) Od 3. 10. má koniec osi znamienko, takže toto chytá
-   * už len prípad, keď zostatok zostal na nule.
-   */
-  let nadRamec = 0;
-  for (let i = vypis.os.length - 1; i >= 0; i--) {
-    const b = vypis.os[i];
-    if (b.druh !== "trening") continue;
-    if (b.zostatok != null || !b.dlh) break;
-    nadRamec += 1;
-  }
-  if ((vypis.zostatok ?? 0) === 0 && nadRamec > 0) vypis.zostatok = -nadRamec;
+  vypis.zostatok = zostatokNaOdkaze(vypis);
 
   // „Koľkou hodinou sa tréning stane po zaplatení" (−1 · 8 h) počíta os
   // sama (`StavRiadku.buduca`) — to isté vidí profil v Kokpite.
@@ -161,17 +167,16 @@ export async function obsahOdkazu(
   /**
    * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ (Jerry, 2. 10. 2026):
    *  1. otvorený dlh — suma je, čo dlží;
-   *  2. dochodený balíček alebo nad rámec bez dlhu — cena jeho posledného
-   *     balíčka (appka si ju nevymýšľa, je to to, čo si naposledy kúpil).
+   *  2. dochodený balíček alebo nad rámec bez dlhu — ďalší balíček z cenníka
+   *     so zľavou za bitcoin, rovnako ako ho založí automat. Kto mal len
+   *     úvodný, ponuku nedostane (`ponukaNovehoBalicka`).
    */
-  const poslednyBal = balicky
-    .filter((b) => !b.zrusene_at && (b.cena_czk || 0) > 0)
-    .sort((a, b) => b.platnost_od.localeCompare(a.platnost_od))[0];
   const nadramec = (vypis.zostatok ?? 1) <= 0;
-  const vlastna = !sPlatbou || zaNehoPlati ? 0 : dlh.dlzi > 0 ? dlh.dlzi : (nadramec ? Math.round(poslednyBal?.cena_czk || 0) : 0);
+  const ponuka = sPlatbou && !zaNehoPlati && dlh.dlzi <= 0 && nadramec ? ponukaVOdkaze(c.name, os, balicky, data, dnes) : null;
+  const vlastna = !sPlatbou || zaNehoPlati ? 0 : dlh.dlzi > 0 ? dlh.dlzi : Math.round(ponuka?.cena || 0);
   const vlastnyNazov = dlh.dlzi > 0
     ? ((data.dlhy || []).filter((x) => normName(x.klient) === normName(c.name))[0]?.nazov || dlh.popis)
-    : (poslednyBal?.nazov || "");
+    : (ponuka?.nazov || "");
   /**
    * ROZPIS — aj keď je položka jedna. Stránka a faktúra tak majú jednu cestu
    * a nemôže sa stať, že spoločná platba ide inou vetvou než bežná.
@@ -183,7 +188,7 @@ export async function obsahOdkazu(
   if (sPlatbou && zaNehoPlati) vypis.platiZaNeho = zaNehoPlati;
   if (suma > 0) {
     const vlastnyPopis = vlastna > 0
-      ? (dlh.dlzi > 0 ? popisPoplatku(dlh.popis) : nazovProduktu(poslednyBal?.nazov || "") || "Nový balíček")
+      ? (dlh.dlzi > 0 ? popisPoplatku(dlh.popis) : nazovProduktu(ponuka?.nazov || "") || "Nový balíček")
       : "";
     vypis.platba = {
       // Keď platiteľ sám nič nedlží, popis hovorí, za koho to je — inak by

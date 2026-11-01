@@ -15,6 +15,9 @@ import { dnesPraha } from "../../lib/psb/cas";
 import { btcEsteNezapisane, btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
 import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
 import { najdiKlienta } from "../../lib/psb/compute";
+import { loadData } from "../../lib/psb/db.server";
+import { ponukaVOdkaze } from "../../lib/psb/obsahOdkazu.server";
+import { osKlientaZoServera } from "../../lib/psb/osKlienta.server";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -999,10 +1002,11 @@ export const Route = createFileRoute("/api/platby")({
                */
               let ocakavaneOdNeho = dlhy.get(normName(z.klient)) || 0;
               if (!ocakavaneOdNeho) {
-                const b = await DB.prepare(
-                  "SELECT cena_czk c FROM balicky WHERE klient = ?1 AND zrusene_at IS NULL AND cena_czk > 0 ORDER BY platnost_od DESC LIMIT 1",
-                ).bind(z.klient).first<{ c: number }>().catch(() => null);
-                ocakavaneOdNeho = Math.round(Number(b?.c) || 0);
+                // Tá istá ponuka, akú ukazuje jeho odkaz. Drahšie čítanie, ale
+                // stane sa to len pri novej platbe platiteľa, ktorý nič nedlží.
+                const data = await loadData(DB);
+                const { os, balicky } = await osKlientaZoServera(DB, data, z.klient);
+                ocakavaneOdNeho = Math.round(ponukaVOdkaze(z.klient, os, balicky, data, dnesPraha())?.cena || 0);
               }
               const r = rozdelPodlaDlhov(z.suma, [
                 { klient: z.klient, dlzi: ocakavaneOdNeho },
