@@ -113,7 +113,8 @@ export const Route = createFileRoute("/api/push-beh")({
           if (v.mrtvy) await DB.prepare("DELETE FROM push_odbery WHERE endpoint = ?1").bind(o.endpoint).run();
           else await DB.prepare("UPDATE push_odbery SET posledne_ok = ?2, chyba = ?3 WHERE endpoint = ?1")
             .bind(o.endpoint, v.ok ? new Date().toISOString() : null, v.ok ? null : (v.chyba || "chyba")).run();
-          if (v.ok) poslanych++; else chyby.push(`${v.status}: ${v.chyba || ""}`.slice(0, 120));
+          // Mŕtvy odber sa práve zmazal — upratanie starého telefónu, nie chyba behu.
+          if (v.ok) poslanych++; else if (!v.mrtvy) chyby.push(`${v.status}: ${v.chyba || ""}`.slice(0, 120));
         }
 
         // Zapíše sa VŽDY, aj keď odoslanie zlyhalo. Inak by sa pri trvalej
