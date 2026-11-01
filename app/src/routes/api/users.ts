@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
-import { currentUser, hashPassword, novaSol, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, hashPassword, novaSol, unauthorized, zabudniKonta } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 // Správa kont. Obaja majú plný prístup, takže ktokoľvek prihlásený môže konto
@@ -33,12 +33,28 @@ export const Route = createFileRoute("/api/users")({
         if (!ja) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { login?: string; name?: string; password?: string; active?: boolean };
+        let b: { login?: string; name?: string; password?: string; active?: boolean; akcia?: string };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
         const login = String(b.login || "").trim().toLowerCase().slice(0, 40);
         if (!/^[a-z0-9._-]{2,40}$/.test(login)) return Response.json({ ok: false, error: "bad_login" }, { status: 400 });
+
+        // Odhlásiť všade: vyššia verzia zneplatní všetky cookies konta, aj tejto
+        // obrazovky, ak ide o vlastné konto. Stratený telefón sa rieši týmto.
+        if (b.akcia === "odhlas-vsade") {
+          try {
+            const r = await DB.prepare("UPDATE users SET session_ver = COALESCE(session_ver, 0) + 1 WHERE login = ?1").bind(login).run();
+            if (!r.meta.changes) return Response.json({ ok: false, error: "no_user" }, { status: 404 });
+          } catch (e) {
+            // Migrácia 0129 ešte nebeží — povedať to, nie tváriť sa, že sa niekto odhlásil.
+            return Response.json({ ok: false, error: "no_migration", detail: String(e).slice(0, 200) }, { status: 500 });
+          }
+          zabudniKonta();
+          await audit(DB, { action: "odhlasenie-vsade", predmet: login, actor: ja });
+          return Response.json({ ok: true });
+        }
+
         const name = String(b.name || login).trim().slice(0, 60) || login;
         const password = String(b.password || "");
         // Osem znakov je dosť na appku za jedným zámkom a málo na to, aby si
@@ -61,6 +77,7 @@ export const Route = createFileRoute("/api/users")({
             .bind(login, name, b.active === false ? 0 : 1).run();
         }
 
+        zabudniKonta();
         await audit(DB, {
           action: uz ? "uprava-konta" : "nove-konto",
           predmet: login,

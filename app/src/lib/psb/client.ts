@@ -25,9 +25,12 @@ export async function checkSession(): Promise<Session> {
   }
 }
 
-export async function login(password: string, meno = ""): Promise<boolean> {
+/** `sprava` nesie dôvod, keď nejde o zlé heslo (limit pokusov, výpadok). */
+export async function login(password: string, meno = ""): Promise<{ ok: boolean; sprava?: string }> {
   const r = await post("/api/login", { password, login: meno });
-  return r.ok;
+  if (r.ok) return { ok: true };
+  const j = (await r.json().catch(() => ({}))) as { sprava?: string };
+  return { ok: false, sprava: j.sprava };
 }
 
 export type Konto = { login: string; name: string; active: boolean; lastLogin?: string };
@@ -44,6 +47,12 @@ export async function fetchKonta(): Promise<{ ja: string | null; users: Konto[] 
 
 export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean }): Promise<{ ok: boolean; error?: string }> {
   const r = await post("/api/users", k);
+  const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  return { ok: !!j.ok, error: j.error };
+}
+
+export async function odhlasVsade(login: string): Promise<{ ok: boolean; error?: string }> {
+  const r = await post("/api/users", { login, akcia: "odhlas-vsade" });
   const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
   return { ok: !!j.ok, error: j.error };
 }
@@ -165,6 +174,18 @@ export async function fetchVzasSettings(): Promise<Record<string, unknown>> {
     return j.settings ?? {};
   } catch {
     return {};
+  }
+}
+
+/** Ktoré tajomstvá sú uložené. Hodnoty sa do prehliadača neposielajú. Null = nepodarilo sa zistiť. */
+export async function fetchVzasNastavene(): Promise<Record<string, boolean> | null> {
+  try {
+    const r = await fetch("/api/vzas-settings");
+    if (!r.ok) return null;
+    const j = (await r.json()) as { ok?: boolean; nastavene?: Record<string, boolean> };
+    return j.ok && j.nastavene ? j.nastavene : null;
+  } catch {
+    return null;
   }
 }
 
