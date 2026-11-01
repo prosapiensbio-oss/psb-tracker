@@ -58,6 +58,8 @@ describe("popisPreKlienta", () => {
       { den: "2026-02-18", druh: "trening", popis: "tréning · 08:30" },
       { den: "2026-09-09", druh: "balicekOd", popis: "8h Balíček", hodin: 8 },
       { den: "2026-09-15", druh: "trening", popis: "tréning · 08:30" },
+      { den: "2026-09-20", druh: "trening", popis: "tréning · 08:30" },
+      { den: "2026-09-25", druh: "trening", popis: "tréning · 08:30" },
     ] as unknown as Udalost[];
     const k = { packageRemaining: 7, packageTotal: 8, firstSession: "2026-02-15", sessions: [], primaryTrainer: "Jerry" };
     const posledny = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, false);
@@ -158,8 +160,8 @@ describe("rozsah balíčkov — prenesené hodiny nie sú balíček (Kalva, 29. 
     const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 2);
     const r = v.os.find((b) => b.druh === "balicekOd" && b.den === "2026-10-16");
     expect(r?.popis).toBe("Prenesené z minulého balíčka: 2 h");
-    const osMenej: Udalost[] = [...osK.slice(0, 5), { druh: "trening" as const, den: "2026-10-12" }, { druh: "trening" as const, den: "2026-10-13" }, { druh: "trening" as const, den: "2026-10-14" }, ...osK.slice(5)]
-      .sort((a, b) => a.den.localeCompare(b.den));
+    const navyse: Udalost[] = ["2026-10-12", "2026-10-13", "2026-10-14"].map((den) => ({ druh: "trening" as const, den }));
+    const osMenej = [...osK.slice(0, 5), ...navyse, ...osK.slice(5)].sort((a, b) => a.den.localeCompare(b.den));
     const v2 = historiaPreMail("Jaroslav Kalva", osMenej, k, "2026-10-29", undefined, false, 2);
     expect(v2.os.find((b) => b.druh === "balicekOd" && b.den === "2026-10-16")?.popis).toBe("Prenesené z minulého balíčka: 1 h");
   });
