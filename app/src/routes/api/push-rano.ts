@@ -11,6 +11,7 @@ import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNo
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
 import { polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "../../lib/psb/guillermo";
 import { terazPraha } from "../../lib/psb/cas";
+import { smieRannaDavka } from "../../lib/psb/tichyCas";
 
 // Ranná dávka notifikácií na telefón.
 //
@@ -79,6 +80,11 @@ export const Route = createFileRoute("/api/push-rano")({
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+        // Plánovač sem chodí o 6:30. Ručné `?push=1` by v noci zazvonilo rovnako,
+        // preto strážca aj tu; `vynutit=1` je vedomá skúška.
+        if (!smieRannaDavka() && new URL(request.url).searchParams.get("vynutit") !== "1") {
+          return Response.json({ ok: true, poslane: 0, preskocene: "tichý čas — ranná dávka ide od 6:00" });
+        }
         try {
 
         const k = await kluce(DB);
@@ -214,7 +220,8 @@ export const Route = createFileRoute("/api/push-rano")({
             .map((n) => ({ text: n.text, druh: n.zdroj })),
         });
 
-        const vysledky: { kto: string; poloziek: number; ok: boolean; status: number }[] = [];
+        const vysledky: { kto: string; poloziek: number; ok: boolean; status: number; mrtvy?: boolean }[] = [];
+        const dorucene = new Set<string>();
         for (const o of odbery) {
           const trener = trenerKonta(o.kto);
           // Konto, ktoré nie je tréner (napr. spoločné „app"), dostane všetko —
@@ -245,7 +252,18 @@ export const Route = createFileRoute("/api/push-rano")({
           if (v.mrtvy) await DB.prepare("DELETE FROM push_odbery WHERE endpoint = ?1").bind(o.endpoint).run();
           else await DB.prepare("UPDATE push_odbery SET posledne_ok = ?2, chyba = ?3 WHERE endpoint = ?1")
             .bind(o.endpoint, v.ok ? new Date().toISOString() : null, v.ok ? null : (v.chyba || "chyba")).run();
-          vysledky.push({ kto: o.kto, poloziek: moje.length, ok: v.ok, status: v.status });
+          // Mŕtvy odber (404/410) sa práve zmazal — bežné upratanie starého
+          // telefónu, nie zlyhanie behu v Zdraví Kokpitu.
+          vysledky.push({ kto: o.kto, poloziek: moje.length, ok: v.ok || v.mrtvy, status: v.status, ...(v.mrtvy ? { mrtvy: true } : {}) });
+          if (v.ok) for (const r of moje) dorucene.add(r.key);
+        }
+
+        // Čo ráno odišlo, o chvíľu nesmie zazvoniť znova: `push-beh` po nočnom
+        // tichu pošle všetko nové a jeho prvý beh je v zime o 7:00, pol hodiny
+        // po tejto správe. Pre nikoho doručené sa nezapisuje — pôjde cez deň.
+        if (dorucene.size) {
+          const kedy = new Date().toISOString();
+          await DB.batch([...dorucene].map((kluc) => DB.prepare("INSERT OR REPLACE INTO push_poslane (kluc, kedy) VALUES (?1, ?2)").bind(kluc, kedy)));
         }
 
         return Response.json({ ok: true, odberov: odbery.length, vysledky });
