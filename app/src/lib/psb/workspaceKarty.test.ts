@@ -331,6 +331,10 @@ describe("hromadné „presunuli sme“", () => {
     expect(v.vyzeraNaPresun[0].poznamka).toBe(odpovedPresunu(presuny.b));
     expect(v.vyzeraNaPresun[0].poznamka).toContain("15:00");
   });
+  it("posun s novým časom nesie termín — do denníka klienta aj bez karty", () => {
+    const v = hromadnePresuny([{ ...z("p", "posunute"), po: "2026-10-29T07:30" }] as never, presuny);
+    expect(v.posuny[0].poznamka).toContain("7:30");
+  });
   it("po jednom: chyba jedného nezhodí ostatné a povie sa", async () => {
     const zapisane: string[] = [];
     const v = await zapisPoJednom(["a", "b", "c"], async (x) => {

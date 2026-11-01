@@ -268,7 +268,7 @@ export const popisZmeny = (x: Zmena): string =>
 
 /**
  * ODPOVEĎ „PRESUNULI SME" — jedna veta pre štítok pri riadku aj hromadné
- * tlačidlo. Zmiznutie samo osebe nie je dôkaz zrušenia ani presunu
+ * tlačidlo aj pre `uzavriZjavnePresuny`. Zmiznutie samo osebe nie je dôkaz zrušenia ani presunu
  * (zmizlo-z-kalendara, presun-nie-zrusenie), preto hromadne ide len to, čo je
  * posun, alebo kde appka našla jediný nový termín tej istej hodiny.
  */
@@ -286,7 +286,7 @@ export function hromadnePresuny(
     meno: z.klient || z.nazov || "(bez mena)",
   });
   return {
-    posuny: zmeny.filter((z) => z.druh === "posunute").map((z) => riadok(z, odpovedPresunu(null))),
+    posuny: zmeny.filter((z) => z.druh === "posunute").map((z) => riadok(z, odpovedPresunu(z.po ? { zaciatok: z.po } : null))),
     // „Zmizlo" bez nájdeného termínu sem nikdy nepatrí. Pri viacerých
     // kandidátoch appka sama hovorí „over, či je to ten" — to je otázka.
     vyzeraNaPresun: zmeny.flatMap((z) => {

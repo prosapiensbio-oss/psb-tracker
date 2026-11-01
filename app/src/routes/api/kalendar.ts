@@ -13,6 +13,7 @@ import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/
 import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from "../../lib/psb/nahodTrening.server";
 import { normName } from "../../lib/psb/format";
 import { citajIcal } from "../../lib/psb/ical";
+import { presunyZmien, uzavriZjavnePresuny } from "../../lib/psb/kalendarPresuny.server";
 import { ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, zmizlaPoKonci } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, odmietnutPokles, POKLES_TEXT, stiahniIcal, textPoklesu, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
@@ -229,6 +230,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
     .bind(udalosti.length, zmien, snimkaId));
 
   await DB.batch(prikazy);
+  // Snímka je zapísaná; keď toto zlyhá, otázka len ostane otvorená ako doteraz.
+  await uzavriZjavnePresuny(DB, kedy).catch((e) => console.error("uzavriZjavnePresuny", e));
   return { ok: true, udalosti: udalosti.length, zmien, prveStiahnutie };
 }
 
@@ -451,27 +454,11 @@ export const Route = createFileRoute("/api/kalendar")({
         }));
 
         /**
-         * NÁVRH PRESUNU K ZMIZNUTEJ HODINE (Jerry, 8. 10. 2026).
-         *
-         * Počíta sa TU, nie v prehliadači: okno udalostí má 21 dní dozadu
-         * a zmena spred mesiaca by svojho náprotivka nemala kde nájsť.
-         * Dopyt je ohraničený dňami zmien, ktoré čakajú na odpoveď.
+         * NÁVRH PRESUNU K ZMIZNUTEJ HODINE (Jerry, 8. 10. 2026) — ostáva pri
+         * zmenách s viacerými kandidátmi; jednoznačné zavrie snímka sama.
          */
         const zmenyRiadky = (zmeny.results || []) as unknown as { id: string; kedy: string; klient: string | null; nazov: string | null; druh: string; pred: string | null }[];
-        const dniZmien = zmenyRiadky.filter((z) => z.druh === "zrusene" && z.pred).map((z) => String(z.pred).slice(0, 10)).sort();
-        let presuny: Record<string, { zaciatok: string; kandidatov: number }> = {};
-        if (dniZmien.length) {
-          const odP = dnesPraha(new Date(Date.parse(`${dniZmien[0]}T00:00:00Z`) - 14 * 86400000));
-          const doP = dnesPraha(new Date(Date.parse(`${dniZmien[dniZmien.length - 1]}T00:00:00Z`) + 14 * 86400000));
-          const kandidati = ((await DB.prepare(
-            "SELECT uid, klient, nazov, zaciatok, prvy_raz FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ?1 AND zaciatok <= ?2",
-          ).bind(`${odP}T00:00`, `${doP}T23:59`).all().catch(() => ({ results: [] }))).results || []) as unknown as { uid: string; klient: string | null; nazov: string; zaciatok: string; prvy_raz: string | null }[];
-          const vTvare = kandidati.map((u) => ({ uid: u.uid, klient: u.klient, nazov: u.nazov, zaciatok: u.zaciatok, prvyRaz: u.prvy_raz }));
-          presuny = Object.fromEntries(zmenyRiadky.flatMap((z) => {
-            const p = najdiPresun(z, vTvare);
-            return p ? [[z.id, { zaciatok: p.zaciatok, kandidatov: p.kandidatov }]] : [];
-          }));
-        }
+        const presuny = await presunyZmien(DB, zmenyRiadky);
 
         return Response.json({
           ok: true,
@@ -1185,8 +1172,10 @@ export const Route = createFileRoute("/api/kalendar")({
           const id = String(b.id || "");
           if (!id) return Response.json({ ok: false, error: "chýba id" }, { status: 400 });
           const r = await DB.prepare(
-            "UPDATE kal_zmeny SET vysvetlene = 0, poznamka = NULL, odpovedane_at = NULL WHERE id = ?1 AND vysvetlene = 1",
-          ).bind(id).run();
+            // `odpovedane_at` ostáva: človek sa k otázke vrátil, stroj ju nesmie
+            // zavrieť znova (`uzavriZjavnePresuny`).
+            "UPDATE kal_zmeny SET vysvetlene = 0, poznamka = NULL, odpovedane_at = ?2 WHERE id = ?1 AND vysvetlene = 1",
+          ).bind(id, teraz()).run();
           // Nula zmenených riadkov znamená, že zmena už otvorená bola — to nie
           // je chyba, ale nesmie sa to tváriť ako úspešné vrátenie.
           return Response.json({ ok: true, vratene: r.meta.changes || 0 });
