@@ -101,6 +101,10 @@ naziveA() {
 }
 
 echo "── Kokpit: celý reťazec ────────────────────────────────"
+# Stráž stromu hneď, nie až po minútach testov: nasad.sh by na nej aj tak skončil.
+if [ "$bez_nasadenia" = "0" ]; then
+  ./scripts/nasad.sh --len-strom || exit 1
+fi
 krok "typy"        bunx tsc --noEmit -p tsconfig.json
 krok "hooky"       bunx eslint -c eslint.hooks.config.js src --quiet
 krok "testy"       bun run test
