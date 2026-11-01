@@ -82,7 +82,7 @@ function fotkyOdkazu(r: RiadokOdkazu): string[] {
 }
 
 /** Celá stránka — z GET aj z POST, keď sa formulár vracia s chybou. */
-async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra: { odpovedPoslana?: boolean; faktura?: BlokFaktury | null }): Promise<string> {
+async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra: { odpovedPoslana?: boolean; odpovedChyba?: string; faktura?: BlokFaktury | null }): Promise<string> {
   const o = new URL(request.url).origin;
   const druh = r.druh === "po" ? "po" : "pred";
   const teraz = terazPraha();
@@ -122,6 +122,7 @@ async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra:
     // Adresa stránky bez dotazu — fotka sa pýta tej istej routy (?foto=).
     fotky: fotkyOdkazu(r).map((id) => `${o}${new URL(request.url).pathname}?foto=${encodeURIComponent(id)}`),
     odpovedPoslana: extra.odpovedPoslana,
+    odpovedChyba: extra.odpovedChyba,
     faktura: druh === "po"
       ? (extra.faktura ?? { klient: r.klient, udaje: await ulozeneUdaje(DB, r.klient) })
       : null,
@@ -336,13 +337,21 @@ export const Route = createFileRoute("/u/$token")({
         if (!text) return spat(false);
 
         const dnes = dnesPraha();
-        await DB.prepare(
-          `INSERT INTO klient_merania (id, klient, datum, poznamka, autor, created_at, zdroj)
-           VALUES (?1, ?2, ?3, ?4, 'klient', ?5, 'klient')
-           ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
-             poznamka = CASE WHEN excluded.poznamka = '' THEN klient_merania.poznamka ELSE excluded.poznamka END`,
-        ).bind(`${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes, text, new Date().toISOString())
-          .run().catch(() => null);
+        try {
+          await DB.prepare(
+            `INSERT INTO klient_merania (id, klient, datum, poznamka, autor, created_at, zdroj)
+             VALUES (?1, ?2, ?3, ?4, 'klient', ?5, 'klient')
+             ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
+               poznamka = CASE WHEN excluded.poznamka = '' THEN klient_merania.poznamka ELSE excluded.poznamka END`,
+          ).bind(`${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes, text, new Date().toISOString()).run();
+        } catch (e) {
+          // Klientovi sa nesmie poďakovať za niečo, čo sa stratilo: dostane
+          // tú istú stránku s hláškou a svojím textom v poli (do adresy nejde).
+          console.error("/u/: odpoveď klienta sa neuložila", e);
+          const riadok = await riadokOdkazu(DB, token).catch(() => null);
+          const html = riadok ? await stranka(DB, request, riadok, { odpovedChyba: text }).catch(() => null) : null;
+          return new Response(html || "<!doctype html><html lang=\"cs\"><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex\"><p style=\"font-family:sans-serif;text-align:center;margin:80px 20px\">Vaši odpověď se nepodařilo uložit. Zkuste to prosím za chvíli znovu.</p></html>", { status: 503, headers: HLAVICKY });
+        }
 
         return spat(true);
       },

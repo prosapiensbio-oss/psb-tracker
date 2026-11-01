@@ -1246,9 +1246,19 @@ export function PSBApp() {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "automaticky" }),
-      }).then((r) => r.json()).then((j: { ok?: boolean; vznikli?: unknown[] }) => {
-        if (j?.ok && j.vznikli?.length) oznam("klienti");
-      }).catch(() => null);
+      }).then(async (r) => {
+        const j = await r.json().catch(() => null) as { ok?: boolean; vznikli?: unknown[]; error?: string } | null;
+        if (!r.ok || !j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+        if (j.vznikli?.length) oznam("klienti");
+      }).catch((e: unknown) => {
+        // Nezhltnúť: balíček, ktorý nevznikol, je klient bez zostatku a dlhu.
+        const sprava = e instanceof Error ? e.message : String(e);
+        setChybaZapisu(`Automatické balíčky sa nezaložili (${sprava.slice(0, 120)}). Skúsi sa to znova pri ďalšom otvorení a v noci.`);
+        void fetch("/api/chyba-prehliadaca", {
+          method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sprava: `automatické balíčky: ${sprava}`.slice(0, 500), adresa: window.location.href.slice(0, 300), sirka: window.innerWidth, ua: navigator.userAgent.slice(0, 200) }),
+        }).catch(() => {});
+      });
     }, 8000);
     return () => clearTimeout(t);
   }, [dataHotove]);

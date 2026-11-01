@@ -934,8 +934,11 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               "SELECT cislo, klient, celkom_czk, odoslane_at FROM vydane_faktury WHERE id = ?1",
             ).bind(id).first<{ cislo: string; klient: string; celkom_czk: number; odoslane_at: string | null }>();
             if (!f) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
-            await DB.prepare("DELETE FROM vydane_faktury WHERE id = ?1").bind(id).run();
-            await DB.prepare("DELETE FROM vydane_faktury_polozky WHERE faktura_id = ?1").bind(id).run().catch(() => null);
+            // Jedna transakcia: faktúra bez položiek ani položky bez faktúry nesmú ostať.
+            await DB.batch([
+              DB.prepare("DELETE FROM vydane_faktury_polozky WHERE faktura_id = ?1").bind(id),
+              DB.prepare("DELETE FROM vydane_faktury WHERE id = ?1").bind(id),
+            ]);
             await audit(DB, {
               action: "faktura-zmazana",
               predmet: `${f.cislo} · ${f.klient}`,
