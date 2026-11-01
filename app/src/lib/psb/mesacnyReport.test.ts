@@ -25,7 +25,7 @@ describe("mesačný report", () => {
     expect(praca.detail.find((d) => d.metrika === "Odtrénované hodiny")?.priemer).toBe("200");
     expect(praca.akcia).toContain("3 aktívni klienti netrénovali");
     expect(r.otazky.map((x) => x.id)).toEqual(["praca", "klienti", "peniaze", "novi", "koncentracia", "osobne"]);
-    expect(peniaze.detail.map((d) => d.metrika)).toContain("Tržba na hodinu");
+    expect(peniaze.detail.map((d) => d.metrika)).toContain("Príjem na hodinu");
     expect(novi.akcia).toContain("Natoč príbeh klienta");
     expect(novi.zoznamy[0].nadpis).toBe("Odkiaľ prišli dopyty");
     // náklady: vyššie je horšie
@@ -66,7 +66,7 @@ describe("break-even, aplikácie a osobné financie", () => {
     ms[ms.length - 1] = { ...ms[ms.length - 1], ...s({ ai: 8723, spolocne: { Nájom: 23000, Potraviny: 25000, Ahsoka: 7300 } }) };
     const r = postavReport(ms, "2026-09", "mesiac", { ...extra, topVydaje: [{ nazov: "Prevádzka · Nájom + energie", suma: 54750 }] });
     const pen = r.otazky.find((x) => x.id === "peniaze")!;
-    expect(pen.detail.map((d) => d.metrika)).toEqual(expect.arrayContaining(["Break-even (tržby, pri ktorých je zisk 0)", "Tržby nad break-even", "Aplikácie spolu", "z toho AI (Claude, ChatGPT, Perplexity…)"]));
+    expect(pen.detail.map((d) => d.metrika)).toEqual(expect.arrayContaining(["Break-even (príjmy, pri ktorých je zisk 0)", "Príjmy nad break-even", "Aplikácie spolu", "z toho AI (Claude, ChatGPT, Perplexity…)"]));
     const osob = r.otazky.find((x) => x.id === "osobne")!;
     expect(osob.otazka).toBe("Koľko si berieme domov?");
     expect(osob.detail.map((d) => d.metrika)).toContain("· Nájom");

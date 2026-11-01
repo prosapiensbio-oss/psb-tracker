@@ -273,7 +273,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
   /** Prevádzkový break-even: náklady bez výplat zakladateľov. */
   const beBezOdmien = (x: MesiacReportu) => (x.naklady !== undefined && x.vyplaty !== undefined ? x.naklady - x.vyplaty : undefined);
   const nadBe = (x: MesiacReportu) => (x.prijmy !== undefined && x.breakEven !== undefined ? x.prijmy - x.breakEven : undefined);
-  /** Koľko hodín treba odtrénovať, aby tržby pokryli break-even (pri tržbe na hodinu obdobia). */
+  /** Koľko hodín treba odtrénovať, aby príjmy pokryli break-even (pri príjme na hodinu obdobia). */
   const hodinNaBe = (x: MesiacReportu) => { const t = naHodinu(x); return t && x.breakEven !== undefined ? x.breakEven / t : undefined; };
 
   // Strop hodín (EOS Life, Company of One): pri kvartáli trojnásobok.
@@ -338,17 +338,17 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     peniaze = {
       id: "peniaze", otazka: "Zarábame?", semafor: sPeniaze,
       odpoved: akt.zisk <= 0
-        ? `Nie. Náklady ${kc(akt.naklady || 0)} Kč prevýšili tržby ${kc(akt.prijmy)} Kč.`
+        ? `Nie. Náklady ${kc(akt.naklady || 0)} Kč prevýšili príjmy ${kc(akt.prijmy)} Kč.`
         : `${sPeniaze === "z" ? "Áno" : "Áno, ale menej než zvyčajne"}. Zisk ${kc(akt.zisk)} Kč${pZisk !== undefined ? ` pri priemere ${kc(pZisk)} Kč` : ""}, marža ${Math.round(m)} %.`,
       hlavne: { hodnota: Math.round(akt.zisk), jednotka: "Kč zisk", ...protiPriemeru(akt.zisk, pZisk), seria: seriaMes.map((x) => x.zisk || 0), popisSerie },
       detail: nn([
-        riadok("Tržby", akt.prijmy, h("prijmy"), kcF),
+        riadok("Príjmy", akt.prijmy, h("prijmy"), kcF),
         riadok("Náklady vrátane výplat", akt.naklady, h("naklady"), kcF, false),
         riadok("Zisk", akt.zisk, h("zisk"), kcF),
         riadok("Marža", marza(akt), historia.map(marza), pct, true, true),
-        riadok("Break-even (tržby, pri ktorých je zisk 0)", akt.breakEven, h("breakEven"), kcF, false),
-        riadok("Tržby nad break-even", nadBe(akt), historia.map(nadBe), kcF),
-        riadok("Tržba na hodinu", naHodinu(akt), historia.map(naHodinu), kcF),
+        riadok("Break-even (príjmy, pri ktorých je zisk 0)", akt.breakEven, h("breakEven"), kcF, false),
+        riadok("Príjmy nad break-even", nadBe(akt), historia.map(nadBe), kcF),
+        riadok("Príjem na hodinu", naHodinu(akt), historia.map(naHodinu), kcF),
         riadok("Hodín na break-even", hodinNaBe(akt), historia.map(hodinNaBe), cele, false),
         riadok("Break-even bez odmien zakladateľov", beBezOdmien(akt), historia.map(beBezOdmien), kcF, false),
         riadok("Aplikácie spolu", akt.apps, h("apps"), kcF, false),
@@ -360,7 +360,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       ]),
       zoznamy: [
         ...(vydajeZoznam.length ? [{ nadpis: "Najväčšie náklady (bez výplat)", polozky: vydajeZoznam }] : []),
-        ...(akt.prijmy ? [{ nadpis: "Kam išli tržby (Profit First: 5 / 50 / – / 30)", polozky: [
+        ...(akt.prijmy ? [{ nadpis: "Kam išli príjmy (Profit First: 5 / 50 / – / 30)", polozky: [
           `Zisk — ${Math.round(((akt.zisk || 0) / akt.prijmy) * 100)} %`,
           `Odmeny zakladateľov — ${Math.round(((akt.vyplaty || 0) / akt.prijmy) * 100)} %`,
           `Daň a odvody (paušál) — ${Math.round(((akt.dan || 0) / akt.prijmy) * 100)} %`,
@@ -372,10 +372,10 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
         : (akt.naklady || 0) > (priem("naklady") || Infinity) * 1.15 && extra.topVydaje?.[0]
           ? `Náklady sú ${protiPriemeru(akt.naklady || 0, priem("naklady")).zmena}. Najväčší: ${extra.topVydaje[0].nazov} (${kc(extra.topVydaje[0].suma)} Kč) — patrí celý do tohto obdobia?`
           : nadBe(akt) !== undefined && (nadBe(akt) as number) < 0
-            ? `Tržby sú ${kc(-(nadBe(akt) as number))} Kč pod break-even — to je ${kc(-(nadBe(akt) as number) / (naHodinu(akt) || 1))} hodín navyše, ktoré chýbali.`
+            ? `Príjmy sú ${kc(-(nadBe(akt) as number))} Kč pod break-even — to je ${kc(-(nadBe(akt) as number) / (naHodinu(akt) || 1))} hodín navyše, ktoré chýbali.`
             : (akt.ai || 0) > (priem("ai") || Infinity) * 1.3
               ? `AI stálo ${kc(akt.ai || 0)} Kč (priemer ${kc(priem("ai") || 0)}) — over, ktoré predplatné je navyše.`
-              : sPeniaze === "z" ? "Držať." : "Tržby sú pod priemerom — pozri, komu končí balíček a kto ešte nekúpil ďalší.",
+              : sPeniaze === "z" ? "Držať." : "Príjmy sú pod priemerom — pozri, komu končí balíček a kto ešte nekúpil ďalší.",
     };
   }
 

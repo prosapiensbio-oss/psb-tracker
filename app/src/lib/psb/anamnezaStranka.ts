@@ -173,7 +173,7 @@ export function strankaHtml(v: VstupStranky): string {
         </div>
         ${v.chyba ? `<div class="chyba">${esc(v.chyba)}</div>` : ""}
         <button type="submit" id="odoslat">Odeslat</button>
-        <div class="pata">ProSapiens Biomechanic<br>Odpovědi vidí jen váš trenér.</div>
+        <div class="pata">ProSapiens Biomechanic<br>Odpovědi vidí jen tým, který vás trénuje.</div>
       </form>`;
 
   return `<!doctype html><html lang="cs"><head>
