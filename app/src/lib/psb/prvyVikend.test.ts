@@ -107,3 +107,38 @@ describe("pripomienka na stav hotovosti", () => {
     expect(r?.hotove).toBe(true);
   });
 });
+
+// Otázky mesiaca má každý svoje (`stalo__jerry`, `stalo__terezka`). Jedna
+// spoločná pripomienka zhasla Terezke v momente, keď odpovedal Jerry.
+describe("mesačná uzávierka je po osobách", () => {
+  const DEN = new Date("2026-09-10T09:00:00Z");
+  const mesiac = (zapis: Parameters<typeof ritualy>[2]) => ritualy(DEN, {}, zapis, { chybaju: [] }).filter((r) => r.druh === "mesiac" && r.nadpis === "Mesačná uzávierka");
+  const komu = (zapis: Parameters<typeof ritualy>[2], kto: string) => mesiac(zapis).find((r) => r.trener === kto)!;
+
+  it("každý má vlastný riadok, id a trénera; Jerryho id ostáva kvôli starým odpovediam", () => {
+    const r = mesiac({});
+    expect(r.map((x) => x.trener)).toEqual(["Jerry", "Terezka"]);
+    expect(r.map((x) => x.id)).toEqual(["mesiac-2026-08", "mesiac-2026-08-terezka"]);
+    expect(r.every((x) => x.splatne)).toBe(true);
+  });
+  it("Jerryho odpoveď nezhasne Terezke", () => {
+    const zapis = { "2026-08": { answers: { stalo__jerry: "dobrý mesiac" } } };
+    expect(komu(zapis, "Jerry").splatne).toBe(false);
+    expect(komu(zapis, "Terezka").splatne).toBe(true);
+  });
+  it("Terezkina odpoveď nezhasne Jerrymu", () => {
+    const zapis = { "2026-08": { answers: { stalo__terezka: "stabilný" } } };
+    expect(komu(zapis, "Terezka").hotove).toBe(true);
+    expect(komu(zapis, "Jerry").splatne).toBe(true);
+  });
+  it("prázdna odpoveď sa nepočíta; poznámka a staré odpovede bez mena patria Jerrymu", () => {
+    expect(komu({ "2026-08": { answers: { stalo__terezka: "  " } } }, "Terezka").splatne).toBe(true);
+    expect(komu({ "2026-08": { note: "hotovo" } }, "Jerry").hotove).toBe(true);
+    expect(komu({ "2026-08": { note: "hotovo" } }, "Terezka").splatne).toBe(true);
+    expect(komu({ "2026-08": { answers: { stalo: "staré" } } }, "Jerry").hotove).toBe(true);
+  });
+  it("oba čakajú na rovnaký deň: pred prvým víkendom ani jeden", () => {
+    const r = ritualy(new Date("2026-09-03T09:00:00Z"), {}, {}, { chybaju: [] }).filter((x) => x.nadpis === "Mesačná uzávierka");
+    expect(r.some((x) => x.splatne)).toBe(false);
+  });
+});

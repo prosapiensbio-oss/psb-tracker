@@ -2,9 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { loadData } from "../../lib/psb/db.server";
 import { capacityByTrainer, deriveClients, deriveRegister, deriveSixM, patriTrenerovi, type RegisterItem } from "../../lib/psb/compute";
 import { posli, type Odber } from "../../lib/psb/push.server";
+import { maIstNaTelefon } from "../../lib/psb/pushVyber";
+import { jeTichyCas } from "../../lib/psb/tichyCas";
 
 // Beh plánovača: pozri, čo je otvorené, a čo je nové, pošli na telefón.
 //
@@ -32,10 +35,13 @@ export const Route = createFileRoute("/api/push-beh")({
       POST: async ({ request }) => {
         const env = bindings() as { DB?: D1Database; KAL_CRON_TOKEN?: string };
         const token = env.KAL_CRON_TOKEN;
-        const dany = request.headers.get("x-cron-token") || "";
-        if (!token || token.length !== dany.length || token !== dany) {
+        if (!jeOdPlanovaca(request, token)) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
+        // V noci sa nezvoní a nič sa nezapisuje (`lib/psb/tichyCas.ts`): položka
+        // zostane nová a odíde v najbližšom dennom behu. Pred načítaním dát —
+        // beh, ktorý nič nepošle, nemá za čo míňať limit CPU.
+        if (jeTichyCas()) return Response.json({ ok: true, poslane: 0, preskocene: "tichý čas — pošle sa ráno" });
         const DB = env.DB;
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const zaciatok = Date.now();
@@ -76,9 +82,11 @@ export const Route = createFileRoute("/api/push-beh")({
         // obrazovke by boli šum.
         const otvorene = register.filter((r) => !r.acked && (r.tone === "red" || r.tone === "orange"));
 
-        const uzPoslaneRs = await DB.prepare("SELECT kluc FROM push_poslane").all();
-        const uzPoslane = new Set((uzPoslaneRs.results as { kluc: string }[]).map((r) => r.kluc));
-        const nove = otvorene.filter((r) => !uzPoslane.has(r.key));
+        // Kľúč a kedy odišiel: položka, ktorá sa medzitým vrátila na obrazovku
+        // (`platneOd`, uplynulé odloženie), ide znova — viď `maIstNaTelefon`.
+        const uzPoslaneRs = await DB.prepare("SELECT kluc, kedy FROM push_poslane").all();
+        const uzPoslane = new Map((uzPoslaneRs.results as { kluc: string; kedy: string }[]).map((r) => [r.kluc, r.kedy]));
+        const nove = otvorene.filter((r) => maIstNaTelefon(r, uzPoslane, data.anomalyAck || {}));
         if (!nove.length) {
           return Response.json({ ok: true, poslane: 0, otvorenych: otvorene.length, dovod: "nič nové", ms: Date.now() - zaciatok });
         }
@@ -105,7 +113,8 @@ export const Route = createFileRoute("/api/push-beh")({
           if (v.mrtvy) await DB.prepare("DELETE FROM push_odbery WHERE endpoint = ?1").bind(o.endpoint).run();
           else await DB.prepare("UPDATE push_odbery SET posledne_ok = ?2, chyba = ?3 WHERE endpoint = ?1")
             .bind(o.endpoint, v.ok ? new Date().toISOString() : null, v.ok ? null : (v.chyba || "chyba")).run();
-          if (v.ok) poslanych++; else chyby.push(`${v.status}: ${v.chyba || ""}`.slice(0, 120));
+          // Mŕtvy odber sa práve zmazal — upratanie starého telefónu, nie chyba behu.
+          if (v.ok) poslanych++; else if (!v.mrtvy) chyby.push(`${v.status}: ${v.chyba || ""}`.slice(0, 120));
         }
 
         // Zapíše sa VŽDY, aj keď odoslanie zlyhalo. Inak by sa pri trvalej
@@ -116,7 +125,9 @@ export const Route = createFileRoute("/api/push-beh")({
         // ďaleko za životnosťou ktorejkoľvek položky registra.
         await DB.prepare("DELETE FROM push_poslane WHERE kedy < datetime('now','-60 days')").run();
 
-        return Response.json({ ok: true, poslane: poslanych, nove: nove.length, otvorenych: otvorene.length, chyby, ms: Date.now() - zaciatok });
+        // Neprešlo ani jedno odoslanie = beh zlyhal, nie „0 poslaných". Plánovač
+        // to zapíše do Zdravia Kokpitu (`vyhodnotBeh`).
+        return Response.json({ ok: !(chyby.length && !poslanych), poslane: poslanych, nove: nove.length, otvorenych: otvorene.length, chyby, chyba: chyby.length && !poslanych ? chyby[0] : undefined, ms: Date.now() - zaciatok });
       },
     },
   },

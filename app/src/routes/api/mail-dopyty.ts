@@ -7,6 +7,7 @@ import { jeCasCitat, najblizsieOkno } from "../../lib/psb/mailOkno";
 import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { stiahniSpravy, testSpojenia } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
 import { adresyMailu } from "../../lib/psb/mime";
@@ -192,8 +193,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
         // istým zdieľaným tajomstvom ako kalendár a sťahovanie webu.
         if (url.searchParams.get("cron") === "1") {
           const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
-          const dany = request.headers.get("x-cron-token") || "";
-          if (!token || token.length !== dany.length || token !== dany) {
+          if (!jeOdPlanovaca(request, token)) {
             return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
           }
         } else if (!(await isAuthed(request))) {

@@ -14,9 +14,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "bun:test";
 
-import { patriTrenerovi, pripomienkaDovodu, pripomienkySlubov } from "./compute";
+import { deriveAnomalies, deriveClients, deriveRegister, deriveSixM, capacityByTrainer, patriTrenerovi, pripomienkaDovodu, pripomienkySlubov } from "./compute";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "./penazneNotifikacie";
 import { ritualy } from "./rituals";
+import { EMPTY_DATA, type PSBData, type SessionRow } from "./types";
 
 const KLIENTI = {
   // Úvodný viedol Jerry, takže by mu podľa primárneho trénera pripadli aj
@@ -116,5 +117,77 @@ describe("SMS po úvodnom je výnimka — patrí tomu, kto úvodný viedol", () 
     expect(bez).toBeTruthy();
     expect(bez!.trener).toBe("Terezka");
     expect(komu(bez!)).toEqual(["Terezka"]);
+  });
+});
+
+/**
+ * Položky bez vlastníka chodili obom (1. 11. 2026). Rozhoduje agenda:
+ * peniaze a technické kontroly sú Jerryho, záver o klientovi jeho trénera.
+ */
+describe("položky bez klienta majú vlastníka", () => {
+  const data = (extra: Record<string, unknown>) => ({ ...EMPTY_DATA, ...extra }) as PSBData;
+  const register = (d: PSBData) => {
+    const clients = deriveClients(d);
+    const sixM = deriveSixM(d, clients);
+    return { clients, polozky: deriveRegister(d, clients, sixM, capacityByTrainer(clients, d.sessions)) };
+  };
+  const u = (over: Partial<SessionRow> & { client: string; sessionTrainer: string }) => ({
+    date: "2026-10-20", time: "10:00", sessionName: "Trénink", sessionType: "TRENING", duration: 60, price: 0, ...over,
+  }) as SessionRow;
+
+  it("web-kontrola ide Jerrymu", () => {
+    const d = data({ webKontroly: [{ kluc: "formular:/x/", nazov: "Formulár", stav: "chyba", detail: "padlo" }] });
+    const { clients, polozky } = register(d);
+    const p = polozky.find((x) => x.key.startsWith("web-kontrola|"));
+    expect(p?.trener).toBe("Jerry");
+    expect(patriTrenerovi(p!, clients, "Terezka")).toBe(false);
+  });
+
+  it("vedomost ide Jerrymu", () => {
+    const d = data({ vedomosti: [{ id: "v1", nazov: "Benchmarky", oCom: "Reklama.", overeneAt: "2025-01-01", obnovovatPoDnoch: 30 }] });
+    const { clients, polozky } = register(d);
+    const p = polozky.find((x) => x.key.startsWith("vedomost|"));
+    expect(p?.trener).toBe("Jerry");
+    expect(patriTrenerovi(p!, clients, "Terezka")).toBe(false);
+  });
+
+  it("záver bez klienta (prevádzka) ide Jerrymu", () => {
+    const d = data({ zavery: [{ id: "z1", datum: "2026-01-01", tema: "prevadzka", zaver: "Skontrolovať nájom.", overit: "Sedí nájom?", overitDo: "2026-01-02" }] });
+    const { clients, polozky } = register(d);
+    const p = polozky.find((x) => x.key === "zaver|z1");
+    expect(p?.trener).toBe("Jerry");
+    expect(patriTrenerovi(p!, clients, "Terezka")).toBe(false);
+    expect(p?.category).toBe("Rozhodnutie");
+  });
+
+  it("záver o klientovi ide jeho trénerovi — Terezkin Robin nie je Jerryho", () => {
+    const d = data({
+      sessions: [u({ client: "Robin Martinek", sessionTrainer: "Terezka" })],
+      zavery: [{ id: "z2", datum: "2026-01-01", tema: "klienti", zaver: "Robin Martinek — trénovať hodovú mechaniku.", overit: "Pripomeň", overitDo: "2026-01-02" }],
+    });
+    const { clients, polozky } = register(d);
+    const p = polozky.find((x) => x.key === "zaver|z2");
+    expect(p?.trener).toBeUndefined();
+    expect(p?.oKom).toBe("Robin Martinek");
+    expect(patriTrenerovi(p!, clients, "Terezka")).toBe(true);
+    expect(patriTrenerovi(p!, clients, "Jerry")).toBe(false);
+  });
+
+  it("anomália s klientom ostáva, kde bola — prenos trénera ju nezmenil", () => {
+    const d = data({ payments: [{ client: "Nikto Neznamy", amount: 1000, date: "2026-10-01" }] });
+    const a = deriveAnomalies(d, deriveClients(d)).find((x) => x.key === "orphan|Nikto Neznamy");
+    expect(a?.client).toBe("Nikto Neznamy");
+    expect(a?.trener).toBeUndefined();
+  });
+
+  it("barter ide Jerrymu aj keď je klient Terezkin — Jarkov dlh sú peniaze", () => {
+    const d = data({
+      sessions: [u({ client: "Sofia Resnerová", sessionTrainer: "Terezka" })],
+      balickyKokpit: [{ id: "b1", klient: "Sofia Resnerová", platnostOd: "2026-10-05", cena: 7790, hodiny: 6, zruseneAt: null, kotva: false }],
+    });
+    const { clients, polozky } = register(d);
+    const p = polozky.find((x) => x.key.startsWith("barter|"));
+    expect(p?.trener).toBe("Jerry");
+    expect(patriTrenerovi(p!, clients, "Terezka")).toBe(false);
   });
 });

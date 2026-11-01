@@ -9,11 +9,15 @@
  * volajúci `*.workers.dev` iného workera dostane 404 — subrequest sa dovnútra
  * Cloudflare siete takto nedostane. Prepojenie ide priamo, bez cesty von.
  */
+import { rovnakyToken } from "../../app/src/lib/psb/cronToken.server";
+import { jeCasRannejDavky } from "../../app/src/lib/psb/tichyCas";
+import { vyhodnotBeh } from "../../app/src/lib/psb/vysledokBehu";
+
 type Env = { KOKPIT: Fetcher; KAL_CRON_TOKEN: string };
 
-const rannePush = (env: Env) =>
+const rannePush = (env: Env, vynutit = false) =>
   env.KOKPIT.fetch(
-    new Request("https://kokpit.prosapiensbio.workers.dev/api/push-rano", {
+    new Request(`https://kokpit.prosapiensbio.workers.dev/api/push-rano${vynutit ? "?vynutit=1" : ""}`, {
       headers: { "x-cron-token": env.KAL_CRON_TOKEN },
     }),
   );
@@ -138,6 +142,7 @@ const mailDopyty = (env: Env) =>
   );
 
 // Strážca výberov pre Peniaze manažér — po stiahnutí banky (4:10) a rannej dávke.
+// O 6:45 UTC (7:45 v zime, 8:45 v lete): môže poslať notifikáciu a nesmie budiť.
 const strazcaVyberu = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/strazca-vyberu", {
@@ -263,13 +268,21 @@ const zapisBeh = async (env: Env, automat: string, ok: boolean, detail: string, 
   } catch { /* stav behu nie je dôležitejší než samotný beh */ }
 };
 
-/** Obalí volanie automatu: zapíše výsledok a nechá správu aj v konzole. */
+/**
+ * Obalí volanie automatu: zapíše výsledok a nechá správu aj v konzole.
+ *
+ * Úspech nie je len HTTP 200 — rozhoduje `vyhodnotBeh` (čistá funkcia
+ * s testami v appke). Zámerne preskočený beh (mimo okna, tichý čas) sa
+ * nezapisuje: ako ok=1 by do hodín zakryl chybu z ostrého behu.
+ */
 const ohlas = (env: Env, automat: string, p: Promise<Response>): Promise<void> =>
   p.then(
     async (r) => {
-      const t = (await r.text()).slice(0, 300);
-      await zapisBeh(env, automat, r.ok, t, r.ok ? undefined : `HTTP ${r.status}: ${t}`);
-      console.log(`${automat}: HTTP ${r.status} ${t}`);
+      const celok = await r.text();
+      const t = celok.slice(0, 300);
+      const v = vyhodnotBeh(r.status, celok);
+      if (!v.preskocene) await zapisBeh(env, automat, v.ok, t, v.chyba);
+      console.log(`${automat}: HTTP ${r.status}${v.ok ? "" : " ZLYHAL"}${v.preskocene ? " (preskočené)" : ""} ${t}`);
     },
     async (e) => {
       await zapisBeh(env, automat, false, "", String(e).slice(0, 200));
@@ -281,11 +294,14 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     // Dobeh kalendára: každú hodinu znova len ten, čo naposledy zlyhal —
     // Google odmieta adresy Cloudflaru aj hodiny (HTTP 429, 20. 10. 2026).
-    if (event.cron === "30 * * * *") {
+    // Nočná práca (3:30–5:30 UTC) má minúty obsadené, a dva behy v tej istej
+    // minúte sú presne to, čo 29. 8. 2026 zhodilo workera. Dobeh tam preto ide
+    // v dvoch voľných oknách — 3:15 a 5:00 — namiesto xx:30.
+    if (event.cron === "30 0-2,6-23 * * *" || event.cron === "15 3 * * *" || event.cron === "0 5 * * *") {
       ctx.waitUntil(ohlas(env, "kalendar", zavolaj(env, "/api/kalendar?cron=1&dobeh=1")));
       return;
     }
-    if (event.cron === "40 4 * * *") {  // 06:40 lokál v lete — po kontrole webu a reklamách
+    if (event.cron === "40 4 * * *") {  // 06:40 v lete, 05:40 v zime — po kontrole webu a reklamách
       ctx.waitUntil((async () => {
         const mesiace = denPraha() <= 7 ? [mesiacPraha(-1), mesiacPraha()] : [mesiacPraha()];
         for (const m of mesiace) {
@@ -298,22 +314,22 @@ export default {
       })());
       return;
     }
-    // Ranná dávka notifikácií na telefón. 5:10 UTC = 7:10 u nás v lete,
-    // 6:10 v zime — teda vtedy, keď človek berie telefón do ruky, nie keď
-    // ešte spí. Beží PRED snímkou kalendára z toho istého behu by sa nezmestila
-    // do jednej požiadavky (limit CPU, 29. 8.), preto vlastný plán.
-    // Banka PRED rannou dávkou (4:30), aby notifikácie ráno nehlásili
-    // „výdavky chýbajú" nad stavom zo včera. Vlastný spúšťač — ťažká práca
-    // patrí do vlastnej požiadavky (limit CPU, 29. 8. 2026).
-    if (event.cron === "10 4 * * *") {  // 06:10 lokál v lete
+    // Banka PRED rannou dávkou, aby notifikácie ráno nehlásili „výdavky
+    // chýbajú" nad stavom zo včera. Vlastný spúšťač — ťažká práca patrí do
+    // vlastnej požiadavky (limit CPU, 29. 8. 2026).
+    if (event.cron === "10 4 * * *") {  // 06:10 v lete, 05:10 v zime
       ctx.waitUntil(ohlas(env, "fio-banka", fioBanka(env)));
       return;
     }
-    if (event.cron === "45 4 * * *") {  // 06:45 lokál — po banke a rannej dávke
+    if (event.cron === "45 6 * * *") {  // 08:45 v lete, 07:45 v zime — po banke a rannej dávke
       ctx.waitUntil(ohlas(env, "strazca-vyberu", strazcaVyberu(env)));
       return;
     }
-    if (event.cron === "30 4 * * *") {  // 06:30 lokál — ranná dávka
+    // Ranná dávka: 6:30 v Prahe celý rok. Cron pásmo nepozná, tak sú spúšťače
+    // dva (4:30 = 6:30 v lete, 5:30 = 6:30 v zime) a pustí sa ten, čo padol do
+    // pražskej hodiny 6. Oba sú po banke (4:10) a reklamách (4:20).
+    if (event.cron === "30 4 * * *" || event.cron === "30 5 * * *") {
+      if (!jeCasRannejDavky(new Date(event.scheduledTime))) return;
       ctx.waitUntil(
         ohlas(env, "ranne-push", rannePush(env)),
       );
@@ -396,7 +412,14 @@ export default {
   },
   // Ručné spustenie na overenie, že plánovač na Kokpit naozaj dosiahne.
   // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
+  //
+  // Každá vetva tu niečo spúšťa (banka, syntetický dopyt, notifikácie), preto
+  // bez tokenu nič: do 1. 11. 2026 to vedel ktokoľvek s adresou. Verejná adresa
+  // je navyše vypnutá (`workers_dev: false`), toto je druhá poistka.
   async fetch(req: Request, env: Env) {
+    if (!env.KAL_CRON_TOKEN || !rovnakyToken(env.KAL_CRON_TOKEN, req.headers.get("x-cron-token") || "")) {
+      return new Response("unauthorized", { status: 401 });
+    }
     const q = new URL(req.url).searchParams;
     // `?kontrola=1` pustí všetky štyri časti za sebou (na overenie po zásahu),
     // `?kontrola=stranky` len jednu. Za sebou, nie naraz — dôvod je ten istý,
@@ -420,6 +443,8 @@ export default {
     }
     // `?web=1` skúša načítanie textu webu bez čakania na 3:30 ráno.
     // `?push=1` pošle rannú dávku hneď — inak by sa overovalo až zajtra ráno.
+    // V tichom čase ju Kokpit odmietne; `&vynutit=1` je vedomá skúška.
+    // `?pushbeh=1` spustí bežné notifikácie z trojhodinového plánu.
     // `?meta=1` spustí sťahovanie reklám hneď — na overenie bez čakania na ráno.
     if (q.get("meta") === "1") {
       const out: string[] = [];
@@ -440,7 +465,7 @@ export default {
       return new Response(`Fio: ${text}`, { status: 200 });
     }
     if (q.get("push") === "1") {
-      const r = await rannePush(env);
+      const r = await rannePush(env, q.get("vynutit") === "1");
       return new Response(`Push: ${r.status} ${(await r.text()).slice(0, 400)}`, { status: r.ok ? 200 : 502 });
     }
     if (q.get("web") === "1") {
@@ -449,8 +474,7 @@ export default {
         ? `text webu ZLYHAL po ${v.kol} kolách (načítaných ${v.nacitane}): ${v.chyba}`
         : `text webu: ${v.nacitane} stránok v ${v.kol} kolách`, { status: v.chyba ? 502 : 200 });
     }
-    // `?push=1` skúša notifikácie bez čakania na celú hodinu.
-    if (q.get("push") === "1") {
+    if (q.get("pushbeh") === "1") {
       const r = await push(env);
       return new Response(`push: ${r.status} ${(await r.text()).slice(0, 400)}`, { status: r.ok ? 200 : 502 });
     }

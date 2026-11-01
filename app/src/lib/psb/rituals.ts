@@ -223,7 +223,15 @@ export function ritualy(
     .filter((r) => !/\(zapísal Jarvis \d{4}-\d{2}-\d{2}\)\s*$/.test(r.trim()))
     .join("")
     .trim();
-  const maMesiac = !!(zapis && (ludskaPoznamka || Object.values(zapis.answers || {}).some((v) => String(v).trim())));
+  //
+  // PO OSOBÁCH (1. 11. 2026), tá istá chyba ako pri týždennej únave: otázky
+  // mesiaca má každý svoje (`stalo__jerry`, `stalo__terezka`) a Terezka na ne
+  // odpovedala za august aj september, ale pripomienka bola jedna spoločná —
+  // Jerryho odpoveď ju zhasla aj jej. Poznámka nemá autora a uzávierku vedie
+  // Jerry, preto ide k nemu; rovnako staré odpovede bez prípony mena.
+  const odpovede = Object.entries(zapis?.answers || {}).filter(([, v]) => String(v).trim());
+  const maMesiac = !!(zapis && (ludskaPoznamka || odpovede.some(([k]) => !k.endsWith("__terezka"))));
+  const maMesiacTerezka = odpovede.some(([k]) => k.endsWith("__terezka"));
   // Odpovedať na otázky mesiaca má zmysel až nad úplnými číslami. Kým chýba
   // banka alebo PTminder, odpoveď by sa písala k neúplnému mesiacu a musela by
   // sa prepisovať — pripomienka preto čaká, kým sú doklady nahraté, a dovtedy
@@ -239,6 +247,7 @@ export function ritualy(
       : mozeZapisovat
         ? `Mesiac ${mk} má nahraté všetky doklady, ale nie sú zodpovedané otázky mesiaca. Klik otvorí rovno ne.`
         : `Mesiac ${mk} ešte nemá zápis. Najprv treba doplniť: ${chybaju.join(", ")}.`,
+    trener: "Jerry",
     // Uzávierka sa od 5. 10. 2026 robí vo Workspace — karta Uzávierka mesiaca.
     ciel: { tab: "workspace", sub: "uzavierka" },
     // Pýta sa až od prvého víkendu — predtým sa uzávierka nedá spraviť, lebo
@@ -249,6 +258,20 @@ export function ritualy(
     // zliala do jedného a chýbajúci júl tak zmizol z obrazovky 4. augusta.
     splatne: nacitane && !maMesiac && dD >= prvyVikendMesiaca(rokP, mesP - 1).toISOString().slice(0, 10),
     hotove: maMesiac,
+  });
+  // Terezka v uzávierke odpovedá na svoje otázky a na doklady nečaká — tie sú
+  // Jerryho. Rovnaký nadpis a cieľ: `zlucRitualy` z dvoch spraví jeden riadok.
+  out.push({
+    id: `mesiac-${mk}-terezka`,
+    druh: "mesiac",
+    trener: "Terezka",
+    nadpis: "Mesačná uzávierka",
+    detail: maMesiacTerezka
+      ? `Mesiac ${mk} máš zapísaný.`
+      : `Terezka: mesiac ${mk} čaká na tvoje odpovede na otázky mesiaca. Klik otvorí rovno ne.`,
+    ciel: { tab: "workspace", sub: "uzavierka" },
+    splatne: nacitane && !maMesiacTerezka && dD >= prvyVikendMesiaca(rokP, mesP - 1).toISOString().slice(0, 10),
+    hotove: maMesiacTerezka,
   });
 
   // ── Stav hotovosti ku koncu mesiaca ─────────────────────────────────────

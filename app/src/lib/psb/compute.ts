@@ -1472,6 +1472,10 @@ export type Anomaly = {
   akcie?: RegisterItem["akcie"];
   /** Odpoveď staršia než tento čas sa nepočíta — viď `stavPolozkyRegistra`. */
   platneOd?: string;
+  /** Komu patrí, keď to z klienta nevyplýva — viď `RegisterItem["trener"]`. */
+  trener?: string;
+  /** O koho ide — viď `RegisterItem["oKom"]`. */
+  oKom?: string;
 };
 
 // Odpoveď na otázku „je toto duch?" sa ukladá s dátumom ("ano|2026-08-03").
@@ -2054,6 +2058,12 @@ function nazovSediNaMeno(nazov: string, meno: string): boolean {
   return kusy.every((k) => casti.some((c) => c.startsWith(k)));
 }
 
+/** O ktorom klientovi záver hovorí. Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov. */
+function klientVZavere(z: { zaver?: string | null; tema?: string | null }, menaKlientov: string[]): string | undefined {
+  const text = normName(`${z.zaver || ""} ${z.tema || ""}`);
+  return menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
+}
+
 export function zaverUzMaTermin(
   z: { zaver?: string | null; tema?: string | null; overit?: string | null; preco?: string | null },
   menaKlientov: string[],
@@ -2066,9 +2076,7 @@ export function zaverUzMaTermin(
   // a dám mu nejaký deň a dátum"). Kalendár ju neumlčí.
   if (/pripom/i.test(`${z.zaver || ""} ${z.preco || ""} ${z.overit || ""}`)) return null;
   if (ZAVER_PRE_INEHO.test(`${z.zaver || ""} ${z.overit || ""}`)) return null;
-  const text = normName(`${z.zaver || ""} ${z.tema || ""}`);
-  // Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov.
-  const meno = menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
+  const meno = klientVZavere(z, menaKlientov);
   if (!meno) return null;
   const od = dnesPraha(dnes);
   // Termín sa počíta, aj keď udalosť ešte NIE JE zmapovaná: budúci tréning
@@ -2143,8 +2151,8 @@ export function deriveAnomalies(
 ): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
-  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"], platneOd?: string) =>
-    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie, platneOd });
+  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"], platneOd?: string, kto?: { trener?: string; oKom?: string }) =>
+    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie, platneOd, trener: kto?.trener, oKom: kto?.oKom });
 
   // ── Kontrola webu ────────────────────────────────────────────────────────
   //
@@ -2186,6 +2194,8 @@ export function deriveAnomalies(
         chyby.length ? "red" : "orange",
         chyby.length ? "Web nefunguje" : "Web — upozornenie",
         `${(chyby.length ? chyby : zle).map((k) => `${k.nazov}: ${k.detail}`).join(" · ")}`,
+        // Technická kontrola je Jerryho (komu-patri-notifikacia): Terezka s tým nič nespraví.
+        undefined, undefined, undefined, { trener: "Jerry" },
       );
     }
   }
@@ -2468,6 +2478,11 @@ export function deriveAnomalies(
       // Bodku dopĺňame len keď tam nie je — `overit` ju často už má a dve
       // za sebou vyzerajú ako preklep.
       `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit.replace(/\.\s*$/, "")}` : ""}. Zabralo to?`,
+      // Záver o klientovi patrí jeho trénerovi („Robin — trénovať hodovú
+      // mechaniku" vybavila Terezka 23. 10.). Bez klienta je to prevádzka,
+      // reklama, peniaze — Jerryho. Autora záver nenesie (`chat_id` je prázdne).
+      undefined, undefined, undefined,
+      ((meno) => (meno ? { oKom: meno } : { trener: "Jerry" }))(klientVZavere(z, menaKlientov)),
     );
   }
 
@@ -2551,6 +2566,8 @@ export function deriveAnomalies(
       "Rešerš treba obnoviť",
       `„${v.nazov}" má ${dni} dní a mala sa obnovovať po ${v.obnovovatPoDnoch}. ${v.oCom} `
       + `Povedz Claudovi, nech ju prejde znova — čísla a odporúčania sa v tomto obore menia rýchlo.`,
+      // Rešerše sú podklad pre Jarvisa a reklamu — Jerryho, nie práca s klientom.
+      undefined, undefined, undefined, { trener: "Jerry" },
     );
   }
 
@@ -2679,7 +2696,7 @@ export function stavPolozkyRegistra(
 }
 
 /** Čas na porovnanie — `2026-10-09T05:06:55Z` aj `2026-10-09 05:06` aj holý deň. */
-const casOdpovede = (t?: string | null) => String(t || "").replace(" ", "T").slice(0, 19);
+export const casOdpovede = (t?: string | null) => String(t || "").replace(" ", "T").slice(0, 19);
 
 /** Z kľúča na ľudskú vetu — čoho sa odpoveď týkala. */
 const DRUH_KLUCA: Record<string, string> = {
@@ -3310,6 +3327,8 @@ export function deriveRegister(
       `${p.client}: nové členstvo za ${Math.round(p.payment).toLocaleString("sk-SK")} Kč`,
       `Členstvo začalo ${fmtDMY(p.validFrom)} a nie je zaplatené — appka ho započítala ako vzdanú tržbu, teda splátku Jarkovho dlhu. Skontroluj sumu vo VZAS → Jarek dlh.`,
       30,
+      // Peniaze: Jarkov dlh je Jerryho, aj keď je klient Terezkin.
+      undefined, undefined, { trener: "Jerry" },
     );
   }
 
@@ -3543,7 +3562,7 @@ export function deriveRegister(
   for (const a of deriveAnomalies(data, clients, kal)) {
     // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
     add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client,
-      undefined, a.akcie || a.platneOd ? { akcie: a.akcie, platneOd: a.platneOd } : undefined);
+      undefined, a.akcie || a.platneOd || a.trener || a.oKom ? { akcie: a.akcie, platneOd: a.platneOd, trener: a.trener, oKom: a.oKom } : undefined);
   }
 
   /**

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { jeMesiac } from "../../lib/psb/format";
 import {
   BRAND_PSB, jeInaZnacka, mesacneInstagram, mesacneSiete, POLIA_POSTS, POLIA_REELS, POLIA_STORIES, POLIA_VYVOJ,
@@ -36,8 +37,7 @@ export const Route = createFileRoute("/api/metricool")({
         // Nočný sťah (Jerry, 8. 10. 2026: „áno, nastav to každú noc") ide
         // z plánovača kokpit-cron s tokenom — a smie LEN sťahovať.
         const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
-        const dany = request.headers.get("x-cron-token") || "";
-        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        const odPlanovaca = jeOdPlanovaca(request, cronToken);
         if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
