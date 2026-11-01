@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { historiaPreMail, popisPreKlienta } from "./historiaMail";
+import { historiaPreMail, popisPreKlienta, zostatokNaOdkaze } from "./historiaMail";
 import type { Udalost } from "./klientOsCasu";
 import { mailKlientovi } from "./mailKlientovi";
 
@@ -142,5 +142,18 @@ describe("rozsah balíčkov — prenesené hodiny nie sú balíček (Kalva, 29. 
     const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 1);
     expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(["2026-10-19", "2026-10-29"]);
     expect(v.os.some((b) => b.druh === "balicekOd" && b.den === "2026-10-16")).toBe(true);
+  });
+});
+
+describe("číslo v nadpise odkazu", () => {
+  const riadok = { den: "2026-10-05", popis: "tréning", druh: "trening" as const, zostatok: null, dlh: 1 };
+  it("tréningy bez hodiny na nule sú nad rámec", () => {
+    expect(zostatokNaOdkaze({ os: [riadok, { ...riadok, dlh: 2 }], zostatok: 0 })).toBe(-2);
+  });
+  it("po konci platnosti mínus ostáva len na riadku (Petr Baťa)", () => {
+    expect(zostatokNaOdkaze({ os: [riadok], zostatok: 0, platnostSkoncila: true })).toBe(0);
+  });
+  it("kladný zostatok sa nemení", () => {
+    expect(zostatokNaOdkaze({ os: [riadok], zostatok: 3 })).toBe(3);
   });
 });

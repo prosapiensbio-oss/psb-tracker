@@ -1,7 +1,7 @@
 // Os času klienta — odpoveď na „nevychádzajú mu tréningy".
 import { describe, expect, it } from "bun:test";
 
-import { druhyPodlaDna, osCasuKlienta, treningovVBalicku } from "./klientOsCasu";
+import { balicekPreOs, druhyPodlaDna, osCasuKlienta, treningovVBalicku } from "./klientOsCasu";
 
 const DNES = "2026-09-23";
 const zdroj = {
@@ -312,5 +312,30 @@ describe("ručne určený druh — iný tvar mena v kľúči (21. 10. 2026)", ()
       "Lukáš Kríž|2026-09-28": "trening",
     }, "Luky Križ");
     expect([...m]).toEqual([["2026-09-28", "uvodny"]]);
+  });
+});
+
+describe("balicekPreOs — jedno mapovanie riadku balíčka", () => {
+  const riadok = {
+    klient: "Milan Bařina", nazov: "Doplnenie členstva", hodiny: 1, platnost_od: "2026-09-20", platnost_do: null,
+    cena_czk: null, zdroj: "ptminder", zrusene_at: null, poznamka: "zostatok prevzatý z PTmindera k 2026-09-20",
+  };
+
+  it("z poznámky vyčíta prevzatý zostatok aj ukončenie", () => {
+    expect(balicekPreOs(riadok)).toMatchObject({ platnostOd: "2026-09-20", platnostDo: null, kotva: true, ukonceny: false, poznamka: riadok.poznamka });
+    expect(balicekPreOs({ ...riadok, poznamka: "ukončené 13. 10. 2026 — vrátené 15 275 Kč" })).toMatchObject({ kotva: false, ukonceny: true });
+  });
+
+  it("berie aj tvar z /api/data a nestratí príznaky", () => {
+    expect(balicekPreOs({ klient: "X", nazov: "Y", platnostOd: "2026-09-20", platnostDo: "2026-10-01", kotva: true, ukonceny: true, cena: 700 }))
+      .toMatchObject({ platnostOd: "2026-09-20", platnostDo: "2026-10-01", kotva: true, ukonceny: true, cenaCzk: 700 });
+  });
+
+  it("profil (surový riadok) a automat (mapovaný) dostanú tú istú os — Bařina 1 h, nie 4", () => {
+    const zdroj = { sessions: [], payments: [], packages: [] };
+    const zProfilu = osCasuKlienta("Milan Bařina", { ...zdroj, balicky: [riadok] } as never, "2026-10-01");
+    const zAutomatu = osCasuKlienta("Milan Bařina", { ...zdroj, balicky: [riadok].map(balicekPreOs) } as never, "2026-10-01");
+    expect(zAutomatu).toEqual(zProfilu);
+    expect(zProfilu.some((u) => u.druh === "balicekOd" && u.zostatokZPtmindera)).toBe(true);
   });
 });

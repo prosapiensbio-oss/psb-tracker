@@ -85,6 +85,8 @@ const cesky = (t: string) =>
 function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: boolean } {
   if (v.zostatok == null) return { velke: "Tvoje tréninky", pod: "Přehled posledního balíčku." };
   if (v.zostatok > 0) return { velke: `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
+  // Skončený balíček nemusí byť dochozený: hodiny mohly propadnout (Tomáš Dvořák).
+  if (v.zostatok === 0 && v.platnostSkoncila) return { velke: "Bez aktivního balíčku", pod: "poslední balíček už skončil" };
   if (v.zostatok === 0) return { velke: "Poslední hodina", pod: "balíček máš dochozený" };
   /**
    * „NEZAPLACENO", NIE „NAD RÁMEC" (Jerry, 8. 10. 2026).

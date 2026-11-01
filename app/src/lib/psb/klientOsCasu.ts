@@ -25,6 +25,7 @@
 import { normName } from "./format";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { dnesPraha, terazPraha } from "./cas";
+import { jeUkonceny } from "./ukoncenieBalicka";
 
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string; zKokpitu?: boolean }
@@ -47,6 +48,8 @@ export type Udalost =
       uvodny?: boolean;
     }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean;
+      /** Ukončený s vrátením peňazí — jeho znížená cena nie je vzor pre ďalší predaj (Radek Baláž). */
+      ukonceny?: boolean;
       /** Zostatok prevzatý z PTmindera pri štarte Kokpitu (snímka, nie predaj) — viď `priebehBalickov`. */
       zostatokZPtmindera?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean; prepadlo?: number };
@@ -147,7 +150,39 @@ type BalicekKokpitu = {
   poznamka?: string | null;
   /** `balickyKokpit` z `/api/data` nesie namiesto poznámky hotový príznak. */
   kotva?: boolean;
+  ukonceny?: boolean;
 };
+
+/**
+ * RIADOK Z TABUĽKY `balicky` PRE OS ČASU — jedno mapovanie pre všetky miesta.
+ *
+ * Commit 81d143a (29. 10. 2026) naučil os čítať poznámku „zostatok prevzatý",
+ * lenže automat balíčkov, fronty v App a Workspace si riadok prepisovali každý
+ * sám a poznámku zahodili. Milan Bařina mal v profile 1 h a v automate 4 h.
+ * Berie oba tvary riadku (API `platnost_od`, `/api/data` `platnostOd`) a nesie
+ * príznaky, ktoré z poznámky vyplývajú — výsledok číta os aj karta „Bez balíčka".
+ */
+export function balicekPreOs(r: {
+  klient: string; nazov: string; hodiny?: number | null; zdroj?: string | null;
+  platnost_od?: string | null; platnostOd?: string | null;
+  platnost_do?: string | null; platnostDo?: string | null;
+  cena_czk?: number | null; cenaCzk?: number | null; cena?: number | null;
+  zrusene_at?: string | null; zruseneAt?: string | null;
+  poznamka?: string | null; kotva?: boolean; ukonceny?: boolean;
+}) {
+  const poznamka = r.poznamka ?? null;
+  return {
+    id: "", klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
+    platnostOd: den(r.platnost_od ?? r.platnostOd ?? ""),
+    platnostDo: den(r.platnost_do ?? r.platnostDo ?? "") || null,
+    cenaCzk: r.cena_czk ?? r.cenaCzk ?? r.cena ?? null,
+    zdroj: r.zdroj ?? "",
+    zruseneAt: r.zrusene_at ?? r.zruseneAt ?? null,
+    poznamka,
+    kotva: !!r.kotva || /zostatok prevzat/i.test(String(poznamka || "")),
+    ukonceny: !!r.ukonceny || jeUkonceny({ poznamka }),
+  };
+}
 
 const den = (s: string) => (s || "").slice(0, 10);
 
@@ -399,13 +434,13 @@ export function osCasuKlienta(
    * balíčky na tých osiach chýbali (nález 5. 10. 2026). Berú sa oba tvary.
    */
   const riadky = (zdroj.balicky || []).map((x) => {
-    const r = x as BalicekKokpitu & { platnostOd?: string; platnostDo?: string | null; cenaCzk?: number | null; zruseneAt?: string | null };
+    const r = balicekPreOs(x);
     return {
-      ...r,
-      platnost_od: r.platnost_od ?? r.platnostOd ?? "",
-      platnost_do: r.platnost_do ?? r.platnostDo ?? null,
-      cena_czk: r.cena_czk ?? r.cenaCzk ?? null,
-      zrusene_at: r.zrusene_at ?? r.zruseneAt ?? null,
+      ...x, ...r,
+      platnost_od: r.platnostOd,
+      platnost_do: r.platnostDo,
+      cena_czk: r.cenaCzk,
+      zrusene_at: r.zruseneAt,
     };
   });
   /**
@@ -454,8 +489,10 @@ export function osCasuKlienta(
      * predošlé členstvo už skončilo (inak je to tá istá hodina dvakrát).
      */
     if (b.zdroj !== "rucne" && !oprava && d < KOKPIT_OD) {
-      if (jeDoplnenie(b.nazov) && (b.kotva || /zostatok prevzat/i.test(String(b.poznamka || ""))) && Number(b.hodiny) > 0) {
-        out.push({ druh: "balicekOd", den: d, nazov: b.nazov, hodin: Number(b.hodiny), zKokpitu: true, zostatokZPtmindera: true });
+      // Ukončená snímka nedáva nič, ani keď ešte platí — tak ju berie aj karta
+      // (Petra Bambúšková: „v PTminderi už nie je", odkaz 1 h, karta nič).
+      if (jeDoplnenie(b.nazov) && b.kotva && !b.ukonceny && Number(b.hodiny) > 0) {
+        out.push({ druh: "balicekOd", den: d, nazov: b.nazov, hodin: Number(b.hodiny), doDna: den(b.platnost_do || "") || undefined, zKokpitu: true, zostatokZPtmindera: true });
       }
       continue;
     }
@@ -492,6 +529,7 @@ export function osCasuKlienta(
       zaplatene: b.cena_czk || undefined,
       nezaplatene: nezaplateneDniKokpit.has(d) || undefined,
       zKokpitu: true,
+      ukonceny: b.ukonceny || undefined,
     });
   }
 

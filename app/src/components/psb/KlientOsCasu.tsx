@@ -35,13 +35,20 @@ export function KlientOsCasu({ meno, data, kalUdalosti }: {
       sessions: data.sessions as never,
       payments: data.payments as never,
       packages: (data.packages || []) as never,
+      services: (data.services || []) as never,
       historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
       bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit,
+      // Tie isté vstupy ako profil (`KlientStol`) — bez nich os ukazovala iné riadky.
+      treningyZdarma: (data.treningyZdarma || []) as never,
+      doplneniaHodiny: data.doplneniaHodiny || {},
+      druhyTreningov: data.druhyTreningov || {},
+      acks: data.anomalyAck,
+      balicky: (data.balickyKokpit || []) as never,
       kalUdalosti,
     }, terazPraha()),
-    [meno, data.sessions, data.payments, data.packages, data.historiaBalickov, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.historiaBalickov, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, data.doplneniaHodiny, data.druhyTreningov, data.anomalyAck, data.balickyKokpit, kalUdalosti],
   );
 
   if (!os.length) return null;

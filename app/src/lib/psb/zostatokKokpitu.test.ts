@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { klucNezaplateneho, zostatokKokpitu, type BalicekPreZostatok } from "./zostatokKokpitu";
+import { klucNezaplateneho, treningyBezBalicka, zostatokKokpitu, type BalicekPreZostatok } from "./zostatokKokpitu";
 
 const b = (od: string, doDna: string | null, hodiny: number | null, nazov = "OFF - 6h", extra: Partial<BalicekPreZostatok> = {}): BalicekPreZostatok =>
   ({ klient: "Vitezslav Papiež", nazov, hodiny, platnostOd: od, platnostDo: doDna, ...extra });
@@ -156,5 +156,62 @@ describe("prenesené hodiny nie sú viac, než zostalo (Jaroslav Kalva, 23. 10. 
   it("doplnenie sa nestrihá — môže byť aj hodina navyše", () => {
     const d = b.map((x) => (x.nazov === "Prenesené hodiny" ? { ...x, nazov: "Doplnenie členstva" } : x));
     expect(zostatokKokpitu(d, "Jaroslav Kalva", tr, "2026-10-23")?.zostatok).toBe(7);
+  });
+});
+
+describe("ukončený balíček a tréning po ňom (Radek Baláž)", () => {
+  const u = b("2026-09-15", "2026-10-13", 5, "OFF - 18 hodín offline", { ukonceny: true });
+  const stary = b("2026-04-21", "2026-10-20", 18, "OFF - 18 hodín offline");
+  const pred = [s("2026-09-15"), s("2026-09-17"), s("2026-10-01"), s("2026-10-06")];
+
+  it("po ukončení je nula, nech hovorí starší balíček čokoľvek", () => {
+    expect(zostatokKokpitu([u, stary], "Vitezslav Papiež", pred, "2026-10-15")).toMatchObject({ zostatok: 0, nadRamec: 0 });
+  });
+
+  it("tréning po ukončení je mínus — len dni za koncom, nie −5 zo starého", () => {
+    const z = zostatokKokpitu([u, stary], "Vitezslav Papiež", [...pred, s("2026-11-17"), s("2026-11-19")], "2026-11-20");
+    expect(z).toMatchObject({ zostatok: -2, nadRamec: 2, spolu: 5, minute: 7 });
+  });
+
+  it("tréning zadarmo mínus nerobí", () => {
+    const z = zostatokKokpitu([u], "Vitezslav Papiež", [s("2026-11-17")], "2026-11-20", new Set(["vitezslav papiez|2026-11-17"]));
+    expect(z?.zostatok).toBe(0);
+  });
+});
+
+describe("vyčerpané doplnenie bez konca nedrží členstvo", () => {
+  const doplnenie = b("2026-09-20", null, 1, "Doplnenie členstva", { kotva: true });
+  const riadny = b("2026-09-21", "2026-10-20", 6, "6h Předplatné");
+  const sedem = ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27"].map((d) => s(d));
+
+  it("po skončení riadneho a minutí doplnenia je to „žiadny balíček“ (Vaško)", () => {
+    expect(zostatokKokpitu([doplnenie, riadny], "Vitezslav Papiež", sedem, "2026-11-01")).toBeNull();
+  });
+
+  it("kým má doplnenie hodiny, členstvo drží", () => {
+    const neskorsie = b("2026-10-19", null, 1, "Doplnenie členstva");
+    expect(zostatokKokpitu([riadny, neskorsie], "Vitezslav Papiež", sedem.slice(0, 6), "2026-11-01")).toMatchObject({ zostatok: 1, nazov: "Doplnenie členstva" });
+  });
+
+  it("popri platnom riadnom balíčku sa nič nemení — ani veľkosť", () => {
+    expect(zostatokKokpitu([doplnenie, riadny], "Vitezslav Papiež", sedem, "2026-10-01")).toMatchObject({ zostatok: 0, spolu: 7, nazov: "6h Předplatné" });
+  });
+
+  it("prevzatý zostatok pod menom produktu ostáva členstvom (Josef Šnirych, SPECIAL 3)", () => {
+    const special = b("2026-09-20", null, 2, "SPECIAL 3", { kotva: true });
+    expect(zostatokKokpitu([special], "Vitezslav Papiež", [s("2026-09-21"), s("2026-09-22")], "2026-11-01")).toMatchObject({ zostatok: 0, spolu: 2 });
+  });
+
+  it("tréning, na ktorý doplnenie nestačilo, je bez balíčka; ten, čo pokrylo, nie", () => {
+    const dni = treningyBezBalicka([b("2026-10-02", null, 1, "Doplnenie členstva")], "Vitezslav Papiež", [s("2026-10-05"), s("2026-10-12")], "2026-10-01", "2026-11-01");
+    expect(dni).toEqual(["2026-10-12"]);
+  });
+
+  it("doplnenie začínajúce v deň tréningu ho kryje", () => {
+    expect(treningyBezBalicka([b("2026-10-05", null, 1, "Doplnenie členstva")], "Vitezslav Papiež", [s("2026-10-05")], "2026-10-01", "2026-11-01")).toEqual([]);
+  });
+
+  it("riadny balíček kryje aj vyčerpaný — mínus hlási notifikácia hodín", () => {
+    expect(treningyBezBalicka([b("2026-10-01", "2026-10-20", 1)], "Vitezslav Papiež", [s("2026-10-02"), s("2026-10-03")], "2026-10-01", "2026-11-01")).toEqual([]);
   });
 });

@@ -16,6 +16,13 @@ const zaklad: VypisKlienta = {
 };
 
 describe("mailKlientovi", () => {
+  it("skončený balíček nie je dochodený — hodiny mohli prepadnúť", () => {
+    const v = mailKlientovi({ ...zaklad, platnostSkoncila: true, dnes: "2026-11-15" });
+    expect(v.predmet).toContain("skončil");
+    expect(v.text).toContain("posledný balíček už skončil");
+    expect(v.text).not.toContain("dochodený");
+  });
+
   it("keď balíček došiel, povie to hneď v predmete aj v prvej vete", () => {
     const v = mailKlientovi({ ...zaklad, dnes: "2026-09-28" });
     expect(v.predmet).toContain("dochodený");

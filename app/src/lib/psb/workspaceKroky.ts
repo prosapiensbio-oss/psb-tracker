@@ -89,6 +89,100 @@ export const NAZOV_UVODNEHO = "Úvodní trénink";
 export const smieVzniknutAutomaticky = (n: { nazov: string; cena: number; hodiny: number }): boolean =>
   !/^\s*(doplnenie|prenesen)/i.test(n.nazov) && n.cena > 0 && n.hodiny > 0;
 
+/**
+ * VEĽKOSŤ A CENA ĎALŠIEHO BALÍČKA — jedna cesta pre automat aj QR na odkaze.
+ * `null` = appka nemá z čoho vychádzať (klient mal len úvodný, doplnenie…).
+ */
+function vzorNovehoBalicka(os: Udalost[], ceny: { den: string; cena: number | null }[], odDna: string) {
+  /**
+   * ÚVODNÝ NIE JE VZOR PRE ĎALŠÍ BALÍČEK (Lenka Divinová, 16. 10. 2026).
+   * Po úvodnom z 28. 8. prišiel prvý riadny tréning a appka založila
+   * „podľa posledného" — teda znova úvodný za 1 100 Kč. Klient, ktorý mal
+   * len úvodný, je nový: prvý balíček zakladá tréner (Jerry, 14. 10. 2026),
+   * appka ho len pripomenie, že trénoval bez balíčka.
+   */
+  const jeVzor = (u: Udalost): u is Extract<Udalost, { druh: "balicekOd" }> =>
+    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO
+    // Prenesené hodiny nie sú predaj (Natália Krivdová, 19. 10. 2026: nový
+    // balíček vznikol ako „Prenesené hodiny" za 0 Kč namiesto předplatného).
+    && u.nazov !== NAZOV_PRENESENYCH
+    // Doplnenie zapísané v Kokpite nemá na osi príznak `doplnenie` (je to
+    // riadok z `balicky`) — Jakub Kaňovský dostal 21. 10. automaticky
+    // „Doplnenie členstva" za 0 Kč. Doplnenie nie je predaj.
+    && !/^\s*doplnenie/i.test(u.nazov)
+    // Ukončený balíček má cenu stiahnutú o vrátenie (Radek Baláž 5 875 Kč) a
+    // snímka zostatku z PTmindera predaj nie je.
+    && !u.ukonceny && !u.zostatokZPtmindera;
+  /**
+   * SAMOSTATNÁ HODINA NIE JE VZOR, KEĎ MÁ KLIENT ČLENSTVO (Marcela Hrůzová,
+   * 22. 10. 2026). Jej posledný balíček bola offline hodina z 18. 9. popri
+   * online členstve; po konci členstva vznikol z online tréningu „1h Balíček"
+   * za 1 450 Kč namiesto online 6 h. Hodinový balíček je vzor len pre toho,
+   * kto si nikdy nič väčšie nekupoval.
+   */
+  const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> => jeVzor(u) && u.hodin > 1) ?? os.find(jeVzor);
+  if (!posledny) return null;
+
+  const nazovPekny = nazovProduktu(posledny.nazov);
+  const sablona: Sablona | undefined = CENNIK.find((s) => s.nazov === nazovPekny && (s.hodiny || 0) > 0);
+  const hodiny = sablona?.hodiny ?? posledny.hodin;
+
+  const cenaDna = (d: string) => ceny.find((c) => den(c.den) === den(d))?.cena ?? null;
+  const cenaPoslednych = os
+    .filter((u) => jeVzor(u) && (posledny.hodin === 1 || u.hodin > 1))
+    .slice(0, 2)
+    .map((u) => cenaDna(u.den));
+  const katalog = sablona?.cena ?? null;
+  const posl = cenaPoslednych[0] ?? null;
+  const stalaInaCena = cenaPoslednych.length === 2 && posl != null && cenaPoslednych[1] === posl && posl !== katalog;
+  const cena = Math.round(stalaInaCena ? posl : (katalog ?? posl ?? 0));
+  const cenaPoznamka = stalaInaCena
+    ? `platí stále ${posl} Kč, cenník je ${katalog ?? "—"}`
+    : posl != null && katalog != null && Math.round(posl) !== katalog
+      ? `posledný stál ${Math.round(posl)} Kč, navrhujem cenník`
+      : undefined;
+
+  const doDna = sablona
+    ? platnostDo(odDna, sablona.tyzdnov, sablona.mesiacov)
+    : posledny.doDna
+      ? new Date(Date.parse(`${odDna}T00:00:00Z`) + dniMedzi(posledny.den, posledny.doDna) * 86400000).toISOString().slice(0, 10)
+      : "";
+
+  return { posledny, hodiny, nazov: sablona?.nazov ?? nazovPekny, cena, cenaPoznamka, posl, doDna, vCenniku: !!sablona };
+}
+
+/**
+ * ČO PONÚKNUŤ KLIENTOVI, KTORÝ DOŠIEL NA NULU — QR „nový balíček" na odkaze.
+ *
+ * Do 1. 11. 2026 brala stránka cenu posledného riadku s cenou: Radek Baláž by
+ * dostal 5 875 Kč (ukončený balíček po vrátení), Hana Hrdinová úvodný za 1 100
+ * ako nový balíček. Teraz tá istá cesta ako automat — a kto mal len úvodný,
+ * ponuku nedostane: prvý balíček zakladá tréner (Jerry, 14. 10. 2026). Starý
+ * produkt mimo cenníka (GOLD, SILVER, BRONZ) sa už nepredáva, takže ani ten.
+ */
+export function ponukaNovehoBalicka(
+  os: Udalost[],
+  ceny: { den: string; cena: number | null }[],
+  dnes: string,
+): { nazov: string; hodiny: number; cena: number; cenaPoznamka?: string } | null {
+  const v = vzorNovehoBalicka(os, ceny, dnes);
+  if (!v || !v.vCenniku || !smieVzniknutAutomaticky(v)) return null;
+  return { nazov: v.nazov, hodiny: v.hodiny, cena: v.cena, cenaPoznamka: v.cenaPoznamka };
+}
+
+/** Ceny balíčkov klienta podľa dňa začiatku — z Kokpitu aj z histórie PTmindera. */
+export function cenyBalickovKlienta(
+  klient: string,
+  balicky: { klient: string; platnost_od: string; cena_czk: number | null; zrusene_at?: string | null }[],
+  historia: { client: string; validFrom?: string; payment?: number | null }[],
+): { den: string; cena: number | null }[] {
+  const k = normName(klient);
+  return [
+    ...balicky.filter((b) => normName(b.klient) === k && !b.zrusene_at).map((b) => ({ den: b.platnost_od, cena: b.cena_czk })),
+    ...historia.filter((h) => normName(h.client) === k).map((h) => ({ den: h.validFrom || "", cena: h.payment ?? null })),
+  ];
+}
+
 function navrhNovehoBalickaBezStraze(
   klient: string,
   os: Udalost[],
@@ -168,65 +262,18 @@ function navrhNovehoBalickaBezStraze(
   if (!nekryte.length) return null;
   const odDna = nekryte.reduce((m, u) => (u.den < m ? u.den : m), nekryte[0].den);
 
-  /**
-   * ÚVODNÝ NIE JE VZOR PRE ĎALŠÍ BALÍČEK (Lenka Divinová, 16. 10. 2026).
-   * Po úvodnom z 28. 8. prišiel prvý riadny tréning a appka založila
-   * „podľa posledného" — teda znova úvodný za 1 100 Kč. Klient, ktorý mal
-   * len úvodný, je nový: prvý balíček zakladá tréner (Jerry, 14. 10. 2026),
-   * appka ho len pripomenie, že trénoval bez balíčka.
-   */
-  const jeVzor = (u: Udalost): u is Extract<Udalost, { druh: "balicekOd" }> =>
-    u.druh === "balicekOd" && !u.doplnenie && u.hodin > 0 && u.den <= odDna && u.nazov !== NAZOV_UVODNEHO
-    // Prenesené hodiny nie sú predaj (Natália Krivdová, 19. 10. 2026: nový
-    // balíček vznikol ako „Prenesené hodiny" za 0 Kč namiesto předplatného).
-    && u.nazov !== NAZOV_PRENESENYCH
-    // Doplnenie zapísané v Kokpite nemá na osi príznak `doplnenie` (je to
-    // riadok z `balicky`) — Jakub Kaňovský dostal 21. 10. automaticky
-    // „Doplnenie členstva" za 0 Kč. Doplnenie nie je predaj.
-    && !/^\s*doplnenie/i.test(u.nazov);
-  /**
-   * SAMOSTATNÁ HODINA NIE JE VZOR, KEĎ MÁ KLIENT ČLENSTVO (Marcela Hrůzová,
-   * 22. 10. 2026). Jej posledný balíček bola offline hodina z 18. 9. popri
-   * online členstve; po konci členstva vznikol z online tréningu „1h Balíček"
-   * za 1 450 Kč namiesto online 6 h. Hodinový balíček je vzor len pre toho,
-   * kto si nikdy nič väčšie nekupoval.
-   */
-  const posledny = os.find((u): u is Extract<Udalost, { druh: "balicekOd" }> => jeVzor(u) && u.hodin > 1) ?? os.find(jeVzor);
-  if (!posledny) return null;
+  const vzor = vzorNovehoBalicka(os, ceny, odDna);
+  if (!vzor) return null;
+  const { posledny, hodiny, nazov, cena, cenaPoznamka, posl, doDna } = vzor;
 
   const predtym = os.find((u) => u.druh === "trening" && u.den < odDna && stavy.get(u)?.buduca == null);
   const pauzaDni = predtym ? dniMedzi(predtym.den, odDna) : -1;
-
-  const nazovPekny = nazovProduktu(posledny.nazov);
-  const sablona: Sablona | undefined = CENNIK.find((s) => s.nazov === nazovPekny && (s.hodiny || 0) > 0);
-  const hodiny = sablona?.hodiny ?? posledny.hodin;
-
-  const cenaDna = (d: string) => ceny.find((c) => den(c.den) === den(d))?.cena ?? null;
-  const cenaPoslednych = os
-    .filter((u) => jeVzor(u) && (posledny.hodin === 1 || u.hodin > 1))
-    .slice(0, 2)
-    .map((u) => cenaDna(u.den));
-  const katalog = sablona?.cena ?? null;
-  const posl = cenaPoslednych[0] ?? null;
-  const stalaInaCena = cenaPoslednych.length === 2 && posl != null && cenaPoslednych[1] === posl && posl !== katalog;
-  const cena = Math.round(stalaInaCena ? posl : (katalog ?? posl ?? 0));
-  const cenaPoznamka = stalaInaCena
-    ? `platí stále ${posl} Kč, cenník je ${katalog ?? "—"}`
-    : posl != null && katalog != null && Math.round(posl) !== katalog
-      ? `posledný stál ${Math.round(posl)} Kč, navrhujem cenník`
-      : undefined;
-
-  const doDna = sablona
-    ? platnostDo(odDna, sablona.tyzdnov, sablona.mesiacov)
-    : posledny.doDna
-      ? new Date(Date.parse(`${odDna}T00:00:00Z`) + dniMedzi(posledny.den, posledny.doDna) * 86400000).toISOString().slice(0, 10)
-      : "";
 
   return {
     klient,
     odDna,
     nekrytych: nekryte.length,
-    nazov: sablona?.nazov ?? nazovPekny,
+    nazov,
     hodiny,
     cena,
     platnostDo: doDna,

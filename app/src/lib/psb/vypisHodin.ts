@@ -83,6 +83,8 @@ export type Vypis = {
   kotva: string;
   /** Koľko tréningov v období padlo na nezaplatené členstvo. */
   naDlh: number;
+  /** Koniec sa zmenil, lebo posledné členstvo skončilo (`priebehBalickov`). */
+  platnostSkoncila?: boolean;
 };
 
 /**
@@ -287,6 +289,19 @@ export type StavRiadku = {
  * v exporte, ani jedno nehovorí koľko hodín) a zrušené hodiny. Rad zostáva
  * taký, aký bol (6, 5, 4, 3, 2, 1 sú pevné), len KONIEC sa dorovná na číslo
  * z karty — od 1. 10. 2026 je to číslo z Kokpitu, nie z exportu PTmindera.
+ *
+ * PO KONCI PLATNOSTI POSLEDNÉHO ČLENSTVA PLATÍ TO ISTÉ, ČO NA KARTE (rozbor
+ * 05, 1. 11. 2026). Karta skončený balíček nepočíta; os držala jeho zvyšok aj
+ * mínus, kým neprišiel ďalší tréning — Petra Bambúšková 1 h proti ničomu, od
+ * 15. 11. Tomáš Dvořák odkaz 4 h, karta 0. Koniec je teda doplnenie zapísané
+ * od konca platnosti, inak nula (Jerry, 6. 10. 2026: „po konci zvyšok neplatí,
+ * kým nepadne rozhodnutie"). Tréning PO konci je iná vec: to je prvá hodina
+ * ďalšieho členstva a ide do mínusu, počítaného len od neho.
+ *
+ * Mínus z nezaplateného úvodného (Petr Baťa, Radka Kovaříková: 1 100 Kč, po
+ * jeho dni odkaz −1) tým zmizne z HODÍN, nie z peňazí: dlh a QR idú z `data.dlhy`
+ * a riadok tréningu si −1 nechá. `platnostSkoncila` hovorí, že nula nie je
+ * „dochodený balíček", a stránka to povie inak.
  */
 /** Druh balíčka z názvu: „ON - …"/„… online" → on, „OFF - …"/offline z cenníka → off; inak neznámy. */
 export function kanalBalicka(nazov: string): "on" | "off" | null {
@@ -303,7 +318,7 @@ export function priebehBalickov(
   os: Udalost[],
   zostatokTeraz: number | null = null,
   dnes = dnesPraha(),
-): { stavy: Map<Udalost, StavRiadku>; koniec: number | null } {
+): { stavy: Map<Udalost, StavRiadku>; koniec: number | null; platnostSkoncila: boolean } {
   const rad = vCase(os).filter((u) => u.den <= dnes);
   const stavy = new Map<Udalost, StavRiadku>();
 
@@ -350,8 +365,10 @@ export function priebehBalickov(
    * Obdobia, ktorých zvyšok NAHRADIL prenos alebo doplnenie zapísané v deň
    * konca platnosti či neskôr (Katarína Tchuřová: 1 h zvyšku + doplnenie 1 h
    * = odkaz 2, karta 1). Karta také balíčky vynuluje — hodiny sú v prenose.
+   * Hodnota je deň náhrady: tréning po ňom, na ktorý prenos nestačil, je mínus
+   * (Svetopluk Stoklasko: doplnenie 2 h a tretí tréning; zvyšok by ho kryl).
    */
-  const nahradeneUseky = new Set<unknown>();
+  const nahradeneUseky = new Map<unknown, string>();
   /** Deň posledného riadneho balíčka (nie prenos, doplnenie, snímka ani úvodný). */
   const posledneRiadneOd = rad.reduce((a, x) => (x.druh === "balicekOd" && x.hodin > 0 && !x.doplnenie && !x.zostatokZPtmindera
     && !/prenesen|doplnen|úvodn|uvodn/i.test(x.nazov) && x.den > a ? x.den : a), "");
@@ -449,7 +466,7 @@ export function priebehBalickov(
       // tréningy) — snímka by tie isté hodiny započítala druhýkrát (Jitka Heinrichová).
       prenosy.add(u);
       if (!platiEste && !(posledneRiadneOd > u.den)) {
-        nahradeneUseky.add(posl);
+        nahradeneUseky.set(posl, u.den);
         for (let h = u.hodin; h >= 1; h--) {
           const kopia = { ...u, hodin: h, nezaplatene: undefined };
           kopiePrenosu.add(kopia);
@@ -461,7 +478,7 @@ export function priebehBalickov(
     if (u.druh === "balicekOd" && u.zKokpitu && !u.doplnenie && /prenesen|doplnen/i.test(u.nazov)) {
       const posl = useky[useky.length - 1];
       const zvysok = /prenesen/i.test(u.nazov) && posl.balicek ? zvysokUseku(posl) : u.hodin;
-      if (posl.balicek?.doDna && u.den >= posl.balicek.doDna) nahradeneUseky.add(posl);
+      if (posl.balicek?.doDna && u.den >= posl.balicek.doDna) nahradeneUseky.set(posl, u.den);
       for (let h = Math.min(u.hodin, zvysok); h >= 1; h--) {
         // Prenos aj doplnenie sú 0 Kč — „nezaplatené" by zdedili len od dňa
         // (nezaplatený poplatok v ten istý deň, Štigut a Stoklasko).
@@ -637,6 +654,7 @@ export function priebehBalickov(
 
   let koniec: number | null = null;
   let koniecUkotveny = false;
+  let platnostSkoncila = false;
 
   for (const usek of useky) {
     const b = usek.balicek;
@@ -706,6 +724,12 @@ export function priebehBalickov(
       let zDoplnenia = false;
       if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)
         && !(koniecVKokpite && u.den >= b!.doDna!)) bezi = (bezi || 0) + u.hodin;
+      // „Prepadlo" pri členstve, ktorého koniec os nepozná. Keď koniec pozná,
+      // rieši to koniec platnosti nižšie; keď karta hlási hodiny, platí karta.
+      // V deň konca hodiny ešte platia — ako na karte.
+      if (u.druh === "balicekDo" && u.prepadlo && u.den < dnes && !b?.doDna && zostatokTeraz == null && bezi !== null) {
+        bezi = Math.max(0, bezi - u.prepadlo);
+      }
       /**
        * MÍNUS SA PLATBOU VYNULUJE.
        *
@@ -737,7 +761,11 @@ export function priebehBalickov(
         if (koniecVKokpite && u.den > b!.doDna! && !poKonci) {
           poKonci = true;
           if (bezi !== null) bezi = poKonciHodin;
+          // Mínus skončeného členstva sa neprenáša (6. 10. 2026) — ďalší ide od nuly.
+          nekryte = 0;
         }
+        const nahradeneOd = nahradeneUseky.get(usek);
+        if (nahradeneOd && u.den > nahradeneOd && !poKonci && bezi !== null) bezi = 0;
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null && !vycerpane) zostatok = bezi;
         if (koniecVKokpite && u.den > b!.doDna! && !vycerpane) zDoplnenia = true;
@@ -832,6 +860,18 @@ export function priebehBalickov(
     } else if (nahradeneUseky.has(usek) && koniecUseku !== null && koniecUseku > 0) koniecUseku = 0;
 
     if (b === posledny) {
+      // Skončené členstvo: to isté číslo ako karta (viď hlavička funkcie).
+      // Členstvo spred Kokpitu len keď karta nič nehlási a odvtedy klient
+      // netrénoval: stav pred 1. 10. karta z týchto balíčkov nepočítala a tréning
+      // od 1. 10. je mínus (`treningyBezBalicka`), aj keď os také staré obdobie nesúdi.
+      if (b?.doDna && b.doDna < dnes && !ukotvene && koniecUseku !== null && !poKonci) {
+        const uzavrete = dnes >= KOKPIT_OD && zostatokTeraz == null && !usek.riadky.some((r) => r.druh === "trening" && r.den >= KOKPIT_OD);
+        const poKonciPlatnosti = koniecVKokpite ? poKonciHodin : uzavrete ? 0 : koniecUseku;
+        if (poKonciPlatnosti !== koniecUseku) {
+          koniecUseku = poKonciPlatnosti;
+          platnostSkoncila = true;
+        }
+      }
       koniec = koniecUseku;
       // Tréningy bez hodiny na KONCI balíčka dostanú hodiny ďalšieho
       // (rovnako veľkého) balíčka: najstarší z nich je jeho prvá hodina.
@@ -853,7 +893,7 @@ export function priebehBalickov(
   const nevyuzityPrenos = cakajuce.filter((x) => kopiePrenosu.has(x) && (x.druh !== "balicekOd" || !x.doDna || x.doDna >= dnes)).length;
   if (koniec !== null && nevyuzityPrenos && !koniecUkotveny) koniec += nevyuzityPrenos;
 
-  return { stavy, koniec };
+  return { stavy, koniec, platnostSkoncila };
 }
 
 /**
@@ -865,7 +905,7 @@ export function priebehBalickov(
  */
 export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: number | null = null): Vypis {
   const dnes = doDna || dnesPraha();
-  const { stavy, koniec: konecnyZostatok } = priebehBalickov(os, zostatokTeraz, dnes);
+  const { stavy, koniec: konecnyZostatok, platnostSkoncila } = priebehBalickov(os, zostatokTeraz, dnes);
   const vsetko = vCase(os);
 
   let zaciatok: number | null = null;
@@ -919,6 +959,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
     zaplatene,
     kotva: poslednyBalicek(os, dnes)?.den || "",
     naDlh,
+    platnostSkoncila: platnostSkoncila || undefined,
   };
 }
 
@@ -977,6 +1018,8 @@ export function vypisAkoText(v: Vypis, klient: string): string {
 export function stavPreSpravu(v: Vypis, dnes: string): { zostatok: number | null; dnesnyTrening: boolean } {
   const posledny = v.riadky.find((r) => r.druh === "trening");
   const dnesnyTrening = !!posledny && posledny.den.slice(0, 10) === dnes;
+  // Mínus skončeného členstva už neplatí — riadok si ho nechal len ako fakt o tom dni.
+  if (v.platnostSkoncila) return { zostatok: v.koniec, dnesnyTrening };
   if (posledny && posledny.zostatok == null && posledny.dlh) return { zostatok: -posledny.dlh, dnesnyTrening };
   return { zostatok: v.koniec, dnesnyTrening };
 }

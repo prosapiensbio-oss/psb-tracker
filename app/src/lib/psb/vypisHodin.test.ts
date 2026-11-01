@@ -868,3 +868,98 @@ describe("zostatok prevzatý z PTmindera (Regina, Jitka, 29. 10. 2026)", () => {
     expect(stavy.get(tren(os, "2026-09-23"))?.zostatok).not.toBe(4);
   });
 });
+
+describe("po konci platnosti posledného členstva platí to isté, čo na karte", () => {
+  const cl = (den: string, hodin: number, doDna: string, extra: Partial<Extract<Udalost, { druh: "balicekOd" }>> = {}) =>
+    bal(den, hodin, { doDna, zKokpitu: true, ...extra });
+
+  it("nevyčerpané hodiny prepadnú aj bez ďalšieho tréningu (Tomáš Dvořák: odkaz 4, karta 0)", () => {
+    const os = [cl("2026-09-16", 6, "2026-11-10"), tre("2026-09-16"), tre("2026-10-20")];
+    expect(priebehBalickov(os, 4, "2026-11-10").koniec).toBe(4);
+    const r = priebehBalickov(os, null, "2026-11-15");
+    expect(r.koniec).toBe(0);
+    expect(r.platnostSkoncila).toBe(true);
+  });
+
+  it("v posledný deň platnosti hodiny ešte platia", () => {
+    expect(priebehBalickov([cl("2026-10-01", 6, "2026-10-20"), tre("2026-10-02")], null, "2026-10-20").koniec).toBe(5);
+  });
+
+  it("nezaplatený úvodný po svojom dni: hodiny 0, riadok si −1 nechá (Petr Baťa)", () => {
+    const t = tre("2026-10-05");
+    const os = [cl("2026-10-05", 1, "2026-10-05", { nazov: "Úvodní trénink", nezaplatene: true }), t];
+    expect(priebehBalickov(os, null, "2026-10-05").koniec).toBe(-1);
+    const r = priebehBalickov(os, null, "2026-10-06");
+    expect(r.koniec).toBe(0);
+    expect(r.platnostSkoncila).toBe(true);
+    expect(r.stavy.get(t)?.dlh).toBe(1);
+    const v = vypisHodin(os, "", "2026-10-06", null);
+    expect(v.platnostSkoncila).toBe(true);
+    expect(stavPreSpravu(v, "2026-10-06").zostatok).toBe(0);
+  });
+
+  it("riadne dochodený balíček nie je „skončil“ — číslo sa nemení, príznak nie je", () => {
+    const r = priebehBalickov([cl("2026-10-01", 1, "2026-10-02"), tre("2026-10-01")], null, "2026-10-10");
+    expect(r.koniec).toBe(0);
+    expect(r.platnostSkoncila).toBe(false);
+  });
+
+  it("doplnenie zapísané od konca platnosti zostáva, zvyšok nie", () => {
+    const os = [bal("2026-10-01", 6, { doDna: "2026-10-20" }), tre("2026-10-02"), bal("2026-10-20", 2, { doplnenie: true })];
+    expect(priebehBalickov(os, null, "2026-10-25").koniec).toBe(2);
+  });
+
+  it("tréning po konci je mínus od nuly — starý mínus sa neprenáša (Jerry, 6. 10. 2026)", () => {
+    const os = [cl("2026-10-01", 1, "2026-10-20"), tre("2026-10-02"), tre("2026-10-05"), tre("2026-10-25")];
+    expect(priebehBalickov(os, null, "2026-10-20").koniec).toBe(-1);
+    expect(priebehBalickov(os, null, "2026-10-26").koniec).toBe(-1);
+    expect(priebehBalickov([...os, tre("2026-10-26")], null, "2026-10-27").koniec).toBe(-2);
+  });
+
+  it("členstvo spred Kokpitu: nula len keď karta nič nehlási a odvtedy netrénoval", () => {
+    const stare = [bal("2026-08-01", 6, { doDna: "2026-09-01" }), tre("2026-08-02")];
+    expect(priebehBalickov(stare, null, "2026-11-01").koniec).toBe(0);
+    expect(priebehBalickov(stare, null, "2026-09-20").koniec).toBe(5);
+    expect(priebehBalickov(stare, 2, "2026-11-01").koniec).toBe(2);
+    expect(priebehBalickov([...stare, tre("2026-10-02")], null, "2026-11-01").koniec).toBe(4);
+  });
+
+  it("„prepadlo“ zníži členstvo, ktorého koniec os nepozná, až po tom dni", () => {
+    const os: Udalost[] = [bal("2026-10-01", 6), tre("2026-10-02"), { druh: "balicekDo", den: "2026-10-20", nazov: "prepadnuté hodiny", hodin: 3, prepadlo: 3 }];
+    expect(priebehBalickov(os, null, "2026-10-20").koniec).toBe(5);
+    expect(priebehBalickov(os, null, "2026-10-21").koniec).toBe(2);
+    // Karta hlási hodiny → platí karta, prepadlo sa neodpočíta druhýkrát.
+    expect(priebehBalickov(os, 5, "2026-10-21").koniec).toBe(5);
+  });
+
+  it("zvyšok z prenosu nekryje tréning, na ktorý prenos nestačil (Svetopluk Stoklasko)", () => {
+    const os: Udalost[] = [
+      bal("2026-08-01", 6, { doDna: "2026-09-19" }), tre("2026-08-02"),
+      { druh: "balicekOd", den: "2026-09-20", nazov: "Doplnenie členstva", hodin: 2, zKokpitu: true, zostatokZPtmindera: true },
+      tre("2026-10-02"), tre("2026-10-09"), tre("2026-11-12"),
+    ];
+    expect(priebehBalickov(os, null, "2026-11-16").koniec).toBe(-1);
+  });
+});
+
+describe("zostatok prevzatý z PTmindera s koncom platnosti", () => {
+  const riadok = (poznamka: string, doDna: string | null) => ({
+    klient: "Petra", nazov: "Doplnenie členstva", hodiny: 1, platnost_od: "2026-09-20", platnost_do: doDna, zdroj: "ptminder", cena_czk: null, zrusene_at: null, poznamka,
+  });
+  const os = (r: ReturnType<typeof riadok>, dnes: string) => osCasuKlienta("Petra", {
+    sessions: [], payments: [], balicky: [r],
+    packages: [{ client: "Petra", package: "OFF - 6h BEZ viazanosti", total: 6, remaining: 0, validFrom: "2026-03-12", validTo: "2026-05-07" }],
+  } as never, dnes);
+
+  it("ukončená snímka nedáva nič (Petra Bambúšková: odkaz 1 h, karta nič)", () => {
+    const u = os(riadok("zostatok prevzatý z PTmindera k 2026-09-20 · ukončené 29. 9. 2026 — v PTminderi už nie je (Jerry)", "2026-09-29"), "2026-11-01");
+    expect(u.some((x) => x.druh === "balicekOd" && x.zostatokZPtmindera)).toBe(false);
+  });
+
+  it("kópie snímky nesú koniec platnosti — po ňom zvyšok neplatí", () => {
+    const r = riadok("zostatok prevzatý z PTmindera k 2026-09-20", "2026-10-15");
+    expect(os(r, "2026-10-10").find((x) => x.druh === "balicekOd" && x.zostatokZPtmindera)).toMatchObject({ doDna: "2026-10-15" });
+    expect(priebehBalickov(os(r, "2026-11-01"), null, "2026-11-01").koniec).toBe(0);
+    expect(priebehBalickov(os(r, "2026-10-10"), null, "2026-10-10").koniec).toBe(1);
+  });
+});
