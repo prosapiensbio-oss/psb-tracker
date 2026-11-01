@@ -1044,7 +1044,7 @@ export function buildAiContext(
         klient: x.meno, trener: x.trener, dovod: x.dovod, clenstvo: x.membership,
         vMinuseHodin: x.vMinuse, objednanychTerminov: x.objednanych, dniOdTreningu: x.dni,
       })),
-      poznamka: "Aktívni klienti, ktorým nezostala ani hodina — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z balíčkov v Kokpite, takže kto má platný balíček s hodinami, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail.",
+      poznamka: "Klienti, ktorým nezostala ani hodina — aktívni, sporadickí do mesiaca po tréningu, každý s termínom v kalendári a ukončený, ktorý po ukončení trénoval — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z balíčkov v Kokpite, takže kto má platný balíček s hodinami, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail.",
     },
     // Predaje z PTmindera od 1. 10., ktoré Kokpit nemá v rovnakej podobe
     // (notifikácia „PTminder a Kokpit: iný balíček", 21. 10. 2026).

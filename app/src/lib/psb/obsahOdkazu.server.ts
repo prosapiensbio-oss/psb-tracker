@@ -160,6 +160,7 @@ export async function obsahOdkazu(
   const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
 
   vypis.zostatok = zostatokNaOdkaze(vypis);
+  vypis.ukonceny = !!c.ukonceny;
 
   // „Koľkou hodinou sa tréning stane po zaplatení" (−1 · 8 h) počíta os
   // sama (`StavRiadku.buduca`) — to isté vidí profil v Kokpite.
@@ -172,7 +173,10 @@ export async function obsahOdkazu(
    *     úvodný, ponuku nedostane (`ponukaNovehoBalicka`).
    */
   const nadramec = (vypis.zostatok ?? 1) <= 0;
-  const ponuka = sPlatbou && !zaNehoPlati && dlh.dlzi <= 0 && nadramec ? ponukaVOdkaze(c.name, os, balicky, data, dnes) : null;
+  // Ukončený dostal peniaze späť: nový balíček sa mu ponúka, len keď má termín
+  // alebo po ukončení trénoval — inak QR na 21 150 Kč nemá s čím súvisieť.
+  const ponukatUkoncenemu = !c.ukonceny || !!dalsi || (vypis.zostatok ?? 0) < 0;
+  const ponuka = sPlatbou && !zaNehoPlati && dlh.dlzi <= 0 && nadramec && ponukatUkoncenemu ? ponukaVOdkaze(c.name, os, balicky, data, dnes) : null;
   const vlastna = !sPlatbou || zaNehoPlati ? 0 : dlh.dlzi > 0 ? dlh.dlzi : Math.round(ponuka?.cena || 0);
   const vlastnyNazov = dlh.dlzi > 0
     ? ((data.dlhy || []).filter((x) => normName(x.klient) === normName(c.name))[0]?.nazov || dlh.popis)

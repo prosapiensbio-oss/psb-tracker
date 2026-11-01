@@ -135,12 +135,14 @@ const pamatKopy: {
   platby: PlatbaRiadok[];
 } = { zdroje: null, balicky: [], platby: [] };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTreningy, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
   data: PSBData;
   kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null; uid?: string; trener?: string; koniec?: string; nazov?: string }[];
+  /** Termíny ďaleko dopredu — hlavné okno kalendára končí o 14 dní. */
+  buduceTreningy?: { klient: string | null; zaciatok: string }[];
   btcSats?: Record<string, number>;
   /** Bitcoinová kniha a kurz — profil klienta z nej sádže záložku ₿. */
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
@@ -376,13 +378,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return bezAktivnehoBalicka(
       Object.values(clients),
       evidencia,
-      treningyZObochZdrojov(data.sessions, kalUdalosti || []),
+      treningyZObochZdrojov(data.sessions, kalUdalosti || [], buduceTreningy),
       undefined,
       // Mínus berie tá istá funkcia, ktorá kreslí čísla na osi v profile.
       (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
     );
     },
-    [clients, balicky, kalUdalosti, data],
+    [clients, balicky, kalUdalosti, buduceTreningy, data],
   );
 
   /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */

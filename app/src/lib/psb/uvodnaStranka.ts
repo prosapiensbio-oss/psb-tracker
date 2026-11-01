@@ -401,7 +401,7 @@ ${predUvodnym ? "" : fotkyHtml(v.fotky)}
 
 <div style="margin-top:36px;padding-top:26px;border-top:1px solid #DCE3DD">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
-<div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : "váš trenér")}</div>
+<div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : t === "Terezka" ? "vaše trenérka" : "váš trenér")}</div>
 <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
 <a href="${esc(profilUrl || ODKAZY.profil)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">Profil trenéra</a>
 <a href="tel:${esc(tel)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${esc(tr.telefon)}</a>

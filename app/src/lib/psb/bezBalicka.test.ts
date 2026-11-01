@@ -130,4 +130,70 @@ describe("poradie podľa mínusu", () => {
   it("bez funkcie na mínus je všade nula a nič nespadne", () => {
     expect(bezAktivnehoBalicka([kl({ name: "A" })], [], [], DNES)[0].vMinuse).toBe(0);
   });
+
+  describe("kontrola po nasadení, 1. 11. 2026", () => {
+    const D = "2026-11-01";
+    const prazdny = { membership: "", packageTotal: 0, packageRemaining: 0, packageValidTo: "" };
+    const dopl = (klient: string): Balicek => bal({ klient, nazov: "Doplnenie členstva", hodiny: 1, platnostOd: "2026-10-13", platnostDo: null, cenaCzk: 0, zdroj: "rucne" });
+
+    it("Štigut: minuté doplnenie je „hodiny minuté“, nie „žiadne členstvo“", () => {
+      const v = bezAktivnehoBalicka([kl({ name: "Jakub Štigut", ...prazdny, lastSession: "2026-10-20" })], [{ ...dopl("Jakub Štigut"), hodiny: 1 }], [{ klient: "Jakub Štigut", zaciatok: "2026-10-20", typ: "trening" }], D);
+      expect(v[0]).toMatchObject({ dovod: "hodiny minuté", platnostDo: "" });
+    });
+
+    it("kto nikdy nič nemal, je „žiadne členstvo“; zrušený balíček sa neráta", () => {
+      const v = bezAktivnehoBalicka([kl({ name: "A", ...prazdny })], [bal({ klient: "A", zruseneAt: "2026-10-01", platnostDo: "2026-10-01" })], [], D);
+      expect(v[0].dovod).toBe("žiadne členstvo");
+    });
+
+    it("skončený balíček bez členstva na karte: platnosť skončila s dátumom", () => {
+      const v = bezAktivnehoBalicka([kl({ name: "A", ...prazdny })], [bal({ klient: "A", platnostOd: "2026-08-01", platnostDo: "2026-10-05", zdroj: "ptminder" })], [], D);
+      expect(v[0]).toMatchObject({ dovod: "platnosť skončila", platnostDo: "2026-10-05" });
+    });
+
+    it("Stoklasko: Sporadický s termínom je v zozname aj Stoklásková bez termínu do mesiaca", () => {
+      const l = [
+        kl({ name: "Svetopluk Stoklasko", status: "Sporadický", ...prazdny, lastSession: "2026-09-10" }),
+        kl({ name: "Kateřina Stoklásková", status: "Sporadický", ...prazdny, lastSession: "2026-10-20" }),
+        kl({ name: "Dávno Sporadický", status: "Sporadický", ...prazdny, lastSession: "2026-09-03" }),
+      ];
+      const v = bezAktivnehoBalicka(l, [], [{ klient: "Svetopluk Stoklasko", zaciatok: "2026-11-12T10:00", typ: "trening" }], D);
+      expect(v.map((x) => x.meno).sort()).toEqual(["Kateřina Stoklásková", "Svetopluk Stoklasko"]);
+      expect(v.find((x) => x.meno === "Svetopluk Stoklasko")?.objednanych).toBe(1);
+    });
+
+    it("Sporadický, ktorý mal len úvodný, bez termínu v zozname nie je; s termínom áno", () => {
+      const u = bal({ klient: "Linda", nazov: "Úvodní trénink", hodiny: 1, platnostOd: "2026-10-26", platnostDo: "2026-10-26" });
+      const l = [kl({ name: "Linda", status: "Sporadický", ...prazdny, lastSession: "2026-10-26" })];
+      expect(bezAktivnehoBalicka(l, [u], [], D)).toHaveLength(0);
+      const v = bezAktivnehoBalicka(l, [u], [{ klient: "Linda", zaciatok: "2026-11-05T10:00", typ: "trening" }], D);
+      expect(v[0]).toMatchObject({ meno: "Linda", dovod: "hodiny minuté" });
+    });
+
+    it("Neaktívny a Pauza s termínom patria do zoznamu; kto ešte netrénoval, nie (čaká ho úvodný)", () => {
+      const t = (klient: string) => ({ klient, zaciatok: "2026-11-08T10:00", typ: "uvodny" });
+      const l = [
+        kl({ name: "Neaktívny", status: "Neaktívny", ...prazdny, lastSession: "2026-05-01" }),
+        kl({ name: "Na pauze", status: "Pauza", ...prazdny, lastSession: "2026-05-01" }),
+        kl({ name: "Nový", status: "Neaktívny", ...prazdny, lastSession: "" }),
+      ];
+      const v = bezAktivnehoBalicka(l, [], [t("Neaktívny"), t("Na pauze"), t("Nový")], D);
+      expect(v.map((x) => x.meno).sort()).toEqual(["Na pauze", "Neaktívny"]);
+    });
+
+    it("Radek: ukončený s termínom v zozname nie je, kým netrénoval; potom áno, s vlastným dôvodom", () => {
+      const r = { name: "Radek Balaž", status: "Neaktívny", ukonceny: true, membership: "OFF - 18 hodín offline", packageTotal: 5, packageValidTo: "2026-10-13", lastSession: "2026-10-08" };
+      const termin = [{ klient: "Radek Balaž", zaciatok: "2026-11-17T10:00", typ: "trening" }];
+      expect(bezAktivnehoBalicka([kl({ ...r, packageRemaining: 0 })], [], termin, D)).toHaveLength(0);
+      const v = bezAktivnehoBalicka([kl({ ...r, packageRemaining: -1 })], [], termin, "2026-11-18");
+      expect(v[0]).toMatchObject({ meno: "Radek Balaž", dovod: "balíček ukončený" });
+    });
+
+    it("termín ďaleko dopredu počíta aj za oknom kalendára, deň sa neráta dvakrát", () => {
+      const u = treningyZObochZdrojov([], [{ klient: "A", zaciatok: "2026-11-05T10:00", typ: "trening" }], [
+        { klient: "A", zaciatok: "2026-11-05T10:00" }, { klient: "A", zaciatok: "2026-12-05T10:00" }, { klient: null, zaciatok: "2026-12-06T10:00" },
+      ]);
+      expect(u.map((x) => x.zaciatok)).toEqual(["2026-11-05T10:00", "2026-12-05T10:00"]);
+    });
+  });
 });

@@ -85,6 +85,9 @@ const cesky = (t: string) =>
 function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: boolean } {
   if (v.zostatok == null) return { velke: "Tvoje tréninky", pod: "Přehled posledního balíčku." };
   if (v.zostatok > 0) return { velke: `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
+  // Ukončil a dostal peniaze späť: „Poslední hodina, balíček máš dochozený“ by
+  // bola nepravda (Radek Baláž, 1. 11. 2026). Mínus po ukončení je ďalej mínus.
+  if (v.zostatok === 0 && v.ukonceny) return { velke: "Balíček ukončen", pod: "je uzavřený, žádné hodiny na něm nezbývají" };
   // Skončený balíček nemusí byť dochozený: hodiny mohly propadnout (Tomáš Dvořák).
   if (v.zostatok === 0 && v.platnostSkoncila) return { velke: "Bez aktivního balíčku", pod: "poslední balíček už skončil" };
   if (v.zostatok === 0) return { velke: "Poslední hodina", pod: "balíček máš dochozený" };
@@ -321,7 +324,7 @@ ${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
     : "";
 
   return `<div id="platba" style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
-<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.novy ? "Nový balíček" : "K úhradě"}</div>
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.novy ? (v.ukonceny ? "Když budeš pokračovat" : "Nový balíček") : "K úhradě"}</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}${v.platba.odpocet ? ` · ${esc(hod(v.platba.odpocet))} se hned odečte` : ""}</div>
 ${rozpisPlatby(v)}
@@ -511,6 +514,10 @@ function nazovRozsahu(balickov: number | undefined): string {
  * bez druhého rozbaľovania. `osVodorovna` ostáva v kóde nepoužitá zámerne:
  * je to jedna z troch podôb v návrhoch a môže sa vrátiť.
  */
+/** „a další 3 řádky“, „a dalších 5 řádků“ — 2.–4. je v češtine 1. pád množného čísla. */
+export const aDalsichRadku = (n: number): string =>
+  n === 1 ? "a další 1 řádek" : n >= 2 && n <= 4 ? `a další ${n} řádky` : `a dalších ${n} řádků`;
+
 function blokOsi(vstup: VypisKlienta, zlozena: boolean): string {
   const s = SADZBA;
   if (!vstup.os.length) return "";
@@ -546,7 +553,7 @@ function blokOsi(vstup: VypisKlienta, zlozena: boolean): string {
 <div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">${esc(nazov)}</div>
 ${osZvisla(v.os.slice(0, PRVYCH))}
 <details style="margin-top:4px">
-<summary style="font-size:13.5px;color:${s.zelena};padding:8px 0"><span class="psb-sip">▸</span>…a dalších ${zvysok} ${zvysok < 5 ? "řádky" : "řádků"}</summary>
+<summary style="font-size:13.5px;color:${s.zelena};padding:8px 0"><span class="psb-sip">▸</span>…${aDalsichRadku(zvysok)}</summary>
 <div style="margin-top:6px">${osZvisla(v.os.slice(PRVYCH))}</div></details></div>`;
   }
   return `<div style="margin-top:30px">
@@ -569,6 +576,8 @@ function ctaNaPlatbu(v: VypisKlienta): string {
   const s = SADZBA;
   const suma = v.lightning ? v.lightning.czk : v.platba?.suma;
   if (!suma || suma <= 0) return "";
+  // Kto ukončil, tomu sa prvá vec na stránke nepýta peniaze za nový balíček.
+  if (v.ukonceny && v.platba?.novy) return "";
   // Jerry, 12. 10. 2026: „to CTA platby nemusí byť také veľké." Pilulka so
   // šírkou podľa textu — zostáva prvá vec pod nadpisom, len nekričí.
   return `<a href="#platba" style="display:inline-flex;align-items:center;gap:9px;margin-top:16px;text-decoration:none;background:${s.zelena};border-radius:999px;padding:9px 18px">
