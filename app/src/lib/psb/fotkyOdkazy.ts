@@ -26,9 +26,9 @@ export function polozkyFotiek(f: FotkyKlientov | undefined): PolozkaFotiek[] {
   for (const o of f.odpovede) {
     von.push({
       key: `fotky|odpoved|${o.id}`, tone: "orange", klient: o.klient, trener: o.trener,
-      title: `${o.klient} odpísal na fotky`,
+      title: `${o.klient}: odpoveď na fotky`,
       // Riadok registra kreslí DETAIL, nie titulok — meno musí byť v ňom.
-      detail: `${o.klient} odpísal na fotky: „${ukazka(o.text)}“ — celé je v profile → fotky. Odpovedz mu sám (telefón, tréning); stránka odpoveď neposiela.`,
+      detail: `${o.klient}: odpoveď na fotky „${ukazka(o.text)}“ — celé je v profile → fotky. Odpovedz osobne (telefón, tréning); stránka odpoveď neposiela.`,
     });
   }
   for (const s of f.suhlasy) {

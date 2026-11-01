@@ -63,7 +63,7 @@ function Riadok({ s, onAck, minuly }: { s: StavPlatby; onAck: (key: string, note
       <span style={{ width: 18, textAlign: "center", color: farba, fontWeight: 800 }}>{s.zaplatene ? "✓" : "○"}</span>
       <div style={{ flex: "1 1 180px", minWidth: 0 }}>
         <div style={{ fontWeight: 700, color: C.text, textDecoration: s.zaplatene ? "line-through" : undefined, opacity: s.zaplatene ? 0.7 : 1 }}>
-          {s.platba.nazov} <span style={{ fontWeight: 500, color: C.textMuted }}>{s.platba.suma}</span>
+          {s.platba.nazov} <span style={{ fontWeight: 500, color: C.textMuted, whiteSpace: "nowrap" }}>{s.platba.suma}</span>
         </div>
         <div style={{ fontSize: 12, color: farba }}>
           {stavText}

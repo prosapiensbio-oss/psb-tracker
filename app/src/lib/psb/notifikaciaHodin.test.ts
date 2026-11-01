@@ -21,7 +21,7 @@ describe("posledná hodina / mínus", () => {
   it("hlási poslednú hodinu, nulu aj mínus — plný balíček nie", () => {
     const p = polozkyHodin(clients, vsetciDnes, [], [], {}, {}, DNES);
     expect(p.map((x) => x.key).sort()).toEqual(["hodiny|Eva A|posledna", "hodiny|Ian C|minus", "hodiny|Ola B|minus"]);
-    expect(p.find((x) => x.key === "hodiny|Ian C|minus")?.title).toContain("v mínuse -2 h");
+    expect(p.find((x) => x.key === "hodiny|Ian C|minus")?.title).toContain("2 h nad rámec");
     expect(p.find((x) => x.key === "hodiny|Eva A|posledna")?.title).toContain("posledná hodina");
     expect(p.every((x) => x.sms?.meno)).toBe(true);
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { menoDoBloku, rozlozUdalosti } from "./kalendarRozlozenie";
+import { menoDoBloku, rezimBloku, riadkyMena, rozlozUdalosti } from "./kalendarRozlozenie";
 
 const m = (x: { stlpec: number; zo: number }) => `${x.stlpec}/${x.zo}`;
 
@@ -66,5 +66,19 @@ describe("meno do úzkeho bloku", () => {
 
   it("prázdny názov nespadne", () => {
     expect(menoDoBloku("", true, 2)).toBe("");
+  });
+});
+
+describe("blok na telefóne podľa miesta", () => {
+  it("týždeň je tesný, 3 dni a deň majú bežných 12 px", () => {
+    expect(rezimBloku(true, 7)).toEqual({ tesne: true, skratene: true });
+    expect(rezimBloku(true, 3)).toEqual({ tesne: false, skratene: true });
+    expect(rezimBloku(true, 1)).toEqual({ tesne: false, skratene: false });
+    expect(rezimBloku(false, 7).tesne).toBe(false);
+  });
+  it("meno sa delí len na medzerách, nikdy v slove", () => {
+    expect(riadkyMena("Vitezslav P.")).toEqual(["Vitezslav", "P."]);
+    expect(riadkyMena("  Panagiotis  ")).toEqual(["Panagiotis"]);
+    expect(riadkyMena("")).toEqual([]);
   });
 });

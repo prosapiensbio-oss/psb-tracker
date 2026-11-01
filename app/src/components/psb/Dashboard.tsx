@@ -1002,7 +1002,7 @@ export function Dashboard({
       // referencia bez zapísaného dopytu je nový klient s nulou v dopytoch.
       // Revízia 19. 8.: 02/2026 malo 2 dopyty a 4 nových a čítalo sa to ako
       // 200 % konverzia.
-      podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} nových klientov`,
+      podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} ${Sk.tvar(lievikMes.novi, "nový klient", "noví klienti", "nových klientov")}`,
       pasmo: priemDopyty === null ? "nevie" : lievikMes.dopyty < priemDopyty * 0.5 ? "zle" : lievikMes.dopyty < priemDopyty * 0.8 ? "pozor" : "ok",
       poznamka: priemDopyty === null ? undefined : `Ø ${priemDopyty.toFixed(1).replace(".", ",")} / mes.`,
       vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a vedľa toho počet nových klientov toho istého mesiaca — POZOR, nie je to podmnožina dopytov: klient z referencie často žiadny zapísaný dopyt nemá, takže nových môže byť viac než dopytov. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
@@ -1711,7 +1711,7 @@ export function Dashboard({
           {lievikMes.priebeh && (
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
               Zatiaľ v {monthLabel(lievikMes.priebeh.mes)}: {Sk.dopyty(lievikMes.priebeh.dopyty)} ·{" "}
-              {lievikMes.priebeh.uvodne} úvodných · {lievikMes.priebeh.novi} nových — mesiac ešte beží.
+              {Sk.uvodne(lievikMes.priebeh.uvodne)} · {Sk.novi(lievikMes.priebeh.novi)} — mesiac ešte beží.
             </div>
           )}
           {lievikMes.zdroje.length > 0 && (
@@ -1780,7 +1780,7 @@ export function Dashboard({
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     <span style={{ fontSize: 11, color: C.textDim, display: "block", lineHeight: 1.35 }}>
-                      {doKonca === null ? `${textZostatku({ zostava, spolu: c.packageTotal })} hodín`
+                      {doKonca === null ? (zostava < 0 ? textZostatku({ zostava }) : `${textZostatku({ zostava, spolu: c.packageTotal })} hodín`)
                         : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                         : doKonca === 0 ? "platnosť končí dnes"
                         : `platnosť do ${fmtDMY(c.packageValidTo)} · ${Sk.dni(doKonca)} · hodiny sa nestihnú minúť`}
@@ -2706,7 +2706,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{sMenomTucne(item)}</span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", whiteSpace: "nowrap" }}>
+        <div className="psb-akcie-polozky" style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", whiteSpace: "nowrap" }}>
           {(jeOtazkaDovodu || jeOtazkaDuch) && !item.acked && (
             <button onClick={() => setDovodOtvoreny((o) => !o)} style={{ ...linkBtn, color: dovodOtvoreny ? C.accentLight : C.accent }}>
               {dovodOtvoreny ? "Zavrieť" : "Prečo?"}
@@ -2719,7 +2719,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
           )}
           {jeOzvatSa && !item.acked && (
             <button onClick={zapisOzvanie} disabled={ozyvamSa} style={{ ...linkBtn, color: C.green }}>
-              {ozyvamSa ? "zapisujem…" : "Ozval som sa"}
+              {ozyvamSa ? "zapisujem…" : "Ozvali sme sa"}
             </button>
           )}
           {item.sms && !item.acked && (

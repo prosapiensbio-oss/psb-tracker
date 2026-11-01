@@ -101,7 +101,7 @@ describe("notifikácia: klient vyplnil fakturačné údaje", () => {
   it("kľúč nesie čas zápisu — nová zmena = nová notifikácia", () => {
     const [n] = notifikacieFaktur([riadok], "2026-10-28");
     expect(n.key).toBe("faktura-od-klienta|Branislav Široký|2026-10-28T09:15:00.000Z");
-    expect(n.title).toBe("Branislav Široký vyplnil(a) fakturačné údaje");
+    expect(n.title).toBe("Branislav Široký vyplnil fakturačné údaje");
     expect(n.detail).toContain("Asseco Central Europe, a.s., IČO 27074358, DIČ CZ27074358");
     expect(n.detail).toContain("Budějovická 778/3a, 140 00 Praha 4");
     expect(n.detail).toContain("b@firma.cz");

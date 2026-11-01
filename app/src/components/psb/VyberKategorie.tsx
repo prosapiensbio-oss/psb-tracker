@@ -1,3 +1,4 @@
+import { useUzke } from "./useUzke";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -31,6 +32,8 @@ export function VyberKategorie({
   pocetOznacenych?: number;
 }) {
   const KAT = useMemo(kategorieZoznam, []);
+  // Na telefóne sa názov zalomí: v úzkom stĺpci bol orezaný aj so šípkou.
+  const uzke = useUzke();
   const [otvorene, setOtvorene] = useState(false);
   const [hladat, setHladat] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -86,7 +89,7 @@ export function VyberKategorie({
           color: hodnota ? C.text : C.text,
           border: `1px solid ${hodnota ? C.border : mix(C.orange, 40)}`,
           borderRadius: 6, fontSize: 11.5, padding: "4px 7px", maxWidth: sirka,
-          cursor: "pointer", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          cursor: "pointer", textAlign: "left", ...(uzke ? {} : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }),
         }}
       >
         {aktualna?.label || "— nezaradené —"} <span style={{ color: C.textDim }}>▾</span>

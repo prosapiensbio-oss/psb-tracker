@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
-import { ZDROJE } from "./Klienti";
+import { klucZdroja, popisZdroja } from "../../lib/psb/zdroje";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { GA4_MESACNE, GSC_DOPYTY, WEB_STRANKY, marketingVerzia } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -39,7 +39,7 @@ const fmtDen = (d: string) => {
   return m ? `${Number(m[3])}. ${Number(m[2])}.` : d || "—";
 };
 
-const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
+const zdrojLabel = popisZdroja;
 
 /** Mesiace v okne, od najstaršieho. Kotva je posledný mesiac s dátami, nie dnešok. */
 export function oknoMesiacov(data: PSBData, okno: string): string[] {
@@ -437,7 +437,7 @@ export function Lievik({ data, clients, onPoznamka }: {
     // a zdroj, ktorý sám presiahol k.klienti, vypísal prázdnu bunku.
     const menaVObdobi = Object.values(clients).filter((c) => !c.vratenie && c.firstSession && mesiace.includes(monthKey(c.firstSession)) && jeKlient(c, data.payments));
     for (const c of menaVObdobi) {
-      const z = c.zdroj || "";
+      const z = klucZdroja(c.zdroj);
       const e = m.get(z) || { klientov: 0, trzba: 0 };
       e.klientov++;
       e.trzba += data.payments

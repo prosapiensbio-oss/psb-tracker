@@ -18,7 +18,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
-import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
+import { menoDoBloku, rezimBloku, riadkyMena, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { rozmerKalendara } from "../../lib/psb/kalendarRozmer";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { VyberMena } from "./VyberMena";
@@ -100,8 +100,8 @@ export const den = (s: string) => {
 const cas = (s: string) => s.slice(11, 16);
 
 /** Vodorovné rolovanie pre mriežku — na telefóne sa sedem dní inak nezmestí. */
-const ScrollX = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ overflowX: "auto", paddingBottom: 4 }}>{children}</div>
+const ScrollX = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ overflowX: "auto", paddingBottom: 4, ...style }}>{children}</div>
 );
 
 async function posli(telo: Record<string, unknown>) {
@@ -1208,6 +1208,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   const zaciatok = Math.max(0, Math.min(6, zac));
   const viditelne = rozsah === 7 ? dni : dni.slice(zaciatok, zaciatok + rozsah);
   const POCET = viditelne.length;
+  const blok = rezimBloku(uzke, rozsah);
   /** Čísla nad mriežkou aj výška mriežky hovoria o TOM, ČO JE VIDNO — nie o týždni. */
   const vZobrazeni = vTyzdni.filter((u) => viditelne.includes(u.zaciatok.slice(0, 10)));
   /** Pás hodín a medzery — na telefóne užšie, aby na stĺpce zostalo viac. */
@@ -1535,8 +1536,10 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
         </div>
       )}
 
-      <ScrollX>
-        <div style={{ minWidth: uzke ? 0 : 620, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
+      {/* Okraj -12 px patrí na rolovací obal: vnútri neho predlžoval obsah o 12 px
+          za pravý okraj (321 px v 309 px) a posledný stĺpec bol orezaný. */}
+      <ScrollX style={uzke ? { marginLeft: -12, marginRight: -12 } : undefined}>
+        <div style={{ minWidth: uzke ? 0 : 620 }}>
           {/* Hlavička dní */}
           <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP }}>
             <div />
@@ -1594,11 +1597,15 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                   const f = farba(u);
                   const { stlpec, zo } = miesta[poz];
                   /** Iniciály sa lámať NESMÚ — „JK" na dva riadky sú zase schody. */
-                  const iniciala = uzke && zo > 1;
+                  const iniciala = blok.skratene && zo > 1;
+                  const menoBloku = menoDoBloku(u.klient || u.nazov, blok.skratene, zo);
+                  const bezKlienta = !u.klient && u.typ !== "sukromne" && u.typ !== "netrening";
+                  /** Riadok na slovo: lámať sa smie len na medzere, dlhé slovo sa oreže „…". */
+                  const riadky = blok.tesne && !iniciala ? riadkyMena(menoBloku) : [menoBloku];
                   return (
                     <button
                       key={`${u.uid}|${u.trener}`}
-                      data-tesne={uzke ? "" : undefined}
+                      data-tesne={blok.tesne ? "" : undefined}
                       onPointerDown={(e) => zacniTah(e, u, u.zaciatok.slice(0, 10), u.zaciatok.slice(11, 16), trvanieMin(u))}
                       onClick={(e) => e.stopPropagation()}
                       title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, podrž a ťahaj: presunúť`}
@@ -1609,22 +1616,20 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                         borderRadius: 5, padding: iniciala ? "2px 0" : uzke ? "2px 2px" : "2px 4px", overflow: "hidden",
                         background: mix(f, 16), borderLeft: `${uzke ? 2 : 3}px solid ${f}`,
                         border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "grab",
-                        fontSize: uzke ? 9.5 : 10.5, lineHeight: uzke ? 1.1 : 1.25, color: C.text, fontFamily: "inherit",
+                        fontSize: blok.tesne ? 9.5 : 10.5, lineHeight: blok.tesne ? 1.1 : 1.25, color: C.text, fontFamily: "inherit",
                         // Prst po udalosti roluje; presun až po podržaní (`zacniTah`).
                         touchAction: "manipulation", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
                         ...(drzana === `${u.uid}|${u.trener}` ? { boxShadow: `0 0 0 2px ${f}, 0 4px 12px rgba(0,0,0,.35)`, transform: "scale(1.04)", zIndex: 4, cursor: "grabbing" } : {}),
                       }}
                     >
-                      <div style={{
-                        fontWeight: 600,
-                        whiteSpace: uzke && !iniciala ? "normal" : "nowrap",
-                        overflow: "hidden",
-                        textOverflow: uzke && !iniciala ? undefined : "ellipsis",
-                        overflowWrap: uzke && !iniciala ? "anywhere" : undefined,
-                        textAlign: iniciala ? "center" : undefined,
-                      }}>
-                        {menoDoBloku(u.klient || u.nazov, uzke, zo)}{!u.klient && u.typ !== "sukromne" && u.typ !== "netrening" && <span style={{ color: C.orange }}> ?</span>}
-                      </div>
+                      {riadky.map((r, ri) => (
+                        <div key={ri} style={{
+                          fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          textAlign: iniciala ? "center" : undefined,
+                        }}>
+                          {r}{ri === riadky.length - 1 && bezKlienta && <span style={{ color: C.orange }}> ?</span>}
+                        </div>
+                      ))}
                       {!uzke && vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
                     </button>
                   );

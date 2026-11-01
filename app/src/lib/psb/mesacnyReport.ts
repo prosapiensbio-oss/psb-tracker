@@ -503,7 +503,7 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
     ]),
     zoznamy: [],
     akcia: top && top.podiel > 15
-      ? `${top.klient} tvorí ${Math.round(top.podiel)} % tržieb — keby odišiel, chýba to hneď.`
+      ? `${top.klient} tvorí ${Math.round(top.podiel)} % tržieb — pri odchode to chýba hneď.`
       : nadStropom.length ? "Nových klientov dávať trénerovi, ktorý je pod stropom." : "Bez zmeny.",
   };
 

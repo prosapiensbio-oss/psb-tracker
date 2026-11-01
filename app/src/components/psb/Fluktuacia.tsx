@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { kotvaDat, tokyKlientov, type ClientAgg, type KlientTok } from "../../lib/psb/compute";
 import { fetchMonthNotes, saveMonthNote } from "../../lib/psb/client";
 import { fmtCZK, fmtDMY, monthKey, monthLabel } from "../../lib/psb/format";
-import { ZDROJE } from "./Klienti";
+import { klucZdroja, popisZdroja } from "../../lib/psb/zdroje";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
@@ -31,7 +31,7 @@ const HRANICE = [
   { value: "120", label: "120 dní ticha" },
 ];
 
-const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
+const zdrojLabel = popisZdroja;
 
 // `pripravKlientov` a `tokyKlientov` sa 11. 8. presťahovali do compute.ts:
 // potrebuje ich aj kontext Jarvisa a knižnica nesmie závisieť od komponentu.
@@ -319,7 +319,7 @@ function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label:
 function HodnotaPodlaZdroja({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label: string, mena: string[]) => void }) {
   const riadky = useMemo(() => {
     const m = new Map<string, Klient[]>();
-    for (const c of zoznam) m.set(c.zdroj || "", [...(m.get(c.zdroj || "") || []), c]);
+    for (const c of zoznam) m.set(klucZdroja(c.zdroj), [...(m.get(klucZdroja(c.zdroj)) || []), c]);
     return [...m.entries()]
       .map(([z, cs]) => ({
         z,

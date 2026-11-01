@@ -21,6 +21,7 @@ import { nazovProduktu } from "./nazvyProduktov";
 import { NAZOV_PRENESENYCH } from "./platnostZostatok";
 import { kanalBalicka, kanalTreningu, type StavRiadku } from "./vypisHodin";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
+import { hodinyKratko } from "./zostatokText";
 
 const den = (s: string) => String(s || "").slice(0, 10);
 const dniMedzi = (a: string, b: string) =>
@@ -475,7 +476,7 @@ export function zoznamSms(
       // Bez slovesa v minulom čase — „mal/mala" by sa pri mene pomýlilo
       // (to isté pravidlo ako text SMS od 2. 10. 2026).
       veta: stav === "minus"
-        ? `${zostatok} h nad rámec${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
+        ? `trénuje bez krytia${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
         : stav === "nula"
           ? `na nule — balíček minutý${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
           : `dlh ${fmtCZK(dlh)}`,
@@ -590,8 +591,8 @@ export function upozorneniaHodin(
 export function vetaHodin(u: UpozornenieHodin): { title: string; detail: string } {
   if (u.stav === "minus") {
     return {
-      title: `${u.meno}: v mínuse ${u.zostatok} h`,
-      detail: `${u.meno} trénuje nad rámec balíčka (${u.zostatok} h). Pošli SMS s odkazom — stránka za ním ukáže stav hodín aj QR na platbu.`,
+      title: `${u.meno}: ${hodinyKratko(u.zostatok)}`,
+      detail: `${u.meno} trénuje bez krytia (${hodinyKratko(u.zostatok)}). Pošli SMS s odkazom — stránka za ním ukáže stav hodín aj QR na platbu.`,
     };
   }
   if (u.stav === "nula") {

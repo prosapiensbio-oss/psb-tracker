@@ -29,6 +29,7 @@ import { klucOtazkyPlatby, otazkyPlatieb, zoznamSms, type OtazkaPlatby } from ".
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { podlaRodu } from "../../lib/psb/rodKlienta";
+import { hodinyKratko } from "../../lib/psb/zostatokText";
 
 export type BalicekRiadokKroku = {
   id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
@@ -395,7 +396,7 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
             >
               <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170 }}>{r.meno}</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: r.stav === "minus" || r.dlh ? C.orange : C.textMuted, minWidth: 70 }}>
-                {r.stav === "minus" ? `${r.zostatok} h` : r.stav === "nula" ? "0 h" : fmtCZK(r.dlh)}
+                {r.stav === "minus" ? hodinyKratko(r.zostatok) : r.stav === "nula" ? "0 h" : fmtCZK(r.dlh)}
               </span>
               <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 200px" }}>{r.veta}</span>
               <span style={{ fontSize: 11, color: C.textDim }}>{r.trener}</span>
@@ -983,7 +984,7 @@ export function ZdrojeKlientov({ mena, zdroje, onOverride }: {
             {hodnota === "referencia" && (
               <input
                 defaultValue=""
-                placeholder="kto ho poslal (nepovinné)"
+                placeholder="od koho odporúčanie (nepovinné)"
                 onBlur={(e) => e.target.value.trim() && onOverride?.(m, "zdrojKto", e.target.value.trim())}
                 style={{ background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12.5, padding: "5px 8px", fontFamily: "inherit", minWidth: 180 }}
               />

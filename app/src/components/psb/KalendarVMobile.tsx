@@ -73,7 +73,7 @@ export function KalendarVMobile({ meno, trener }: { meno: string; trener: string
     : kde === "odobera"
       ? { text: "● odoberá", farba: C.green, veta: `od ${dm(odkaz.createdAt)}${odkaz.platforma ? ` · ${odkaz.platforma}` : ""}${odkaz.posledne ? ` · obnovené ${predKolko(odkaz.posledne)}` : ""}` }
       : kde === "prestal" && odkaz.posledne
-        ? { text: "prestal odoberať?", farba: C.orange, veta: `naposledy ${predKolko(odkaz.posledne)}${odkaz.platforma ? ` · ${odkaz.platforma}` : ""}` }
+        ? { text: "už neodoberá?", farba: C.orange, veta: `naposledy ${predKolko(odkaz.posledne)}${odkaz.platforma ? ` · ${odkaz.platforma}` : ""}` }
         : kde === "otvoril" && odkaz.otvorene
           ? {
             text: "otvoril, nepridal", farba: C.orange,

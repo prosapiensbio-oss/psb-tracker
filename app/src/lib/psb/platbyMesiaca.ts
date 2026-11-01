@@ -38,26 +38,26 @@ const t = (p: PohybPlatby) => p.text.normalize("NFD").replace(/[̀-ͯ]/g, "").to
 
 export const PRAVIDELNE_PLATBY: PravidelnaPlatba[] = [
   {
-    id: "stat-jerry", nazov: "Štát Jerry", suma: "9 761 Kč", den: 15,
+    id: "stat-jerry", nazov: "Štát Jerry", suma: "9\u00A0761\u00A0Kč", den: 15,
     je: (p) => p.kategoria === "fixne.prevadzka.statJerry",
   },
   {
-    id: "stat-terezka", nazov: "Štát Terezka", suma: "3 024 + 1 595 Kč", den: 18, pocet: 2,
+    id: "stat-terezka", nazov: "Štát Terezka", suma: "3\u00A0024 + 1\u00A0595\u00A0Kč", den: 18, pocet: 2,
     je: (p) => p.kategoria === "fixne.prevadzka.statTerezka",
   },
   {
-    id: "najom-pradlacka", nazov: "Nájom Přadlácká", suma: "23 000 Kč", den: 23,
+    id: "najom-pradlacka", nazov: "Nájom Přadlácká", suma: "23\u00A0000\u00A0Kč", den: 23,
     je: (p) => p.kategoria === "spolocne.Nájom" || /pradl/.test(t(p)) && /najom|najem/.test(t(p)),
   },
   {
     // Kaucia (25 000, 3. 9.) aj upratovanie (2 750) nesú meno ulice — nájom nie sú.
-    id: "najom-fanderlikova", nazov: "Nájom Fanderlíková", suma: "29 750 Kč", den: 24,
+    id: "najom-fanderlikova", nazov: "Nájom Fanderlíková", suma: "29\u00A0750\u00A0Kč", den: 24,
     je: (p) => !/kauc|uprat/.test(t(p))
       && (p.kategoria === "fixne.prevadzka.najom" || /fanderl/.test(t(p)) && /najom|najem/.test(t(p))),
   },
   {
     // „pripomenúť do 25." — zaplatiť do 25., preto pripomienka o päť dní skôr.
-    id: "splatka-jarek", nazov: "Splátka Jarek", suma: "5 000–6 000 Kč", den: 20, termin: "do 25.",
+    id: "splatka-jarek", nazov: "Splátka Jarek", suma: "5\u00A0000–6\u00A0000\u00A0Kč", den: 20, termin: "do 25.",
     je: (p) => p.kategoria === "fixne.prevadzka.splatkaJarek",
   },
 ];

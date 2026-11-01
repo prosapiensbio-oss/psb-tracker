@@ -16,7 +16,7 @@ import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { balicekPreOs } from "../../lib/psb/klientOsCasu";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { anamnezyPodlaStavu, BEZ_FRONTY, hromadnePresuny, klucPolozky, krokyBety, odpovedPresunu, popisZmeny, postavKarty, prijmyUInehoTrenera, terminSK, rozdelAnamnezy, trenerZPrihlasenia, zapisPoJednom, type AnamnezaRiadok, type PresunNaOdpoved, type VysledokPoJednom, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena, indexKartyPoZmene } from "../../lib/psb/workspaceKarty";
+import { anamnezyPodlaStavu, BEZ_FRONTY, hromadnePresuny, klucPolozky, krokyBety, odpovedPresunu, dniZmeny, popisZmeny, postavKarty, prijmyUInehoTrenera, terminSK, rozdelAnamnezy, trenerZPrihlasenia, zapisPoJednom, type AnamnezaRiadok, type PresunNaOdpoved, type VysledokPoJednom, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena, indexKartyPoZmene } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
 import { BankaUlozene } from "./BankaUlozene";
 import { BtcParovanie } from "./BtcParovanie";
@@ -44,7 +44,7 @@ import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, klucVybaveniaBezBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
-import { textNadRamec } from "../../lib/psb/zostatokText";
+import { hodinyKratko, textNadRamec } from "../../lib/psb/zostatokText";
 import { menaPlatiZa, platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
@@ -1312,7 +1312,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       ) : (
                         <div style={{ fontSize: 12.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
                       )}
-                      <div style={{ fontSize: 11, color: C.textDim }}>{popisZmeny(z)} · {z.trener}</div>
+                      <div style={{ fontSize: 11, color: C.textDim }}>{[popisZmeny(z), z.trener].filter(Boolean).join(" · ")}</div>
                       {/* Čo appka našla, má byť vidieť BEZ kliknutia — inak
                           je návrh len skryté tlačidlo. Pri viacerých
                           kandidátoch sa to povie: je to otázka, nie dôkaz. */}
@@ -1327,7 +1327,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         pod tlačidlá) — Jerry, 4. 10. 2026. */}
                     {poKrokoch && denOtvoreny === kluc && (
                       <div style={{ flexBasis: "100%", order: 99 }}>
-                        {[...new Set([z.pred, z.po].filter(Boolean).map((x) => tyzdenOd(String(x))))].map((t) => (
+                        {[...new Set(dniZmeny(z).map(tyzdenOd))].map((t) => (
                           <TyzdenKalendara
                             key={t} den={t} trener={z.trener}
                             zvyraznenia={([
@@ -1776,7 +1776,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     {poKrokoch && (
                       <div style={{ minWidth: uzke ? 0 : 46, fontSize: 13, fontWeight: 700, textAlign: "right", color: (clients[x.meno]?.packageRemaining ?? 0) < 0 ? C.orange : C.textDim }}>
                         {clients[x.meno] && clients[x.meno].packageTotal > 0
-                          ? `${clients[x.meno].packageRemaining < 0 ? "−" : ""}${Math.abs(Math.round(clients[x.meno].packageRemaining * 100) / 100)} h`
+                          ? hodinyKratko(clients[x.meno].packageRemaining)
                           : ""}
                       </div>
                     )}
@@ -2249,7 +2249,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               position: "absolute",
               top: (j + 1) * 9,
               left: (j + 1) * 9,
-              right: -((j + 1) * 11),
+              // Najviac 20 px: toľko má Workspace bočný okraj; ďalej by plátok pridal
+              // stránke vodorovné rolovanie (1442 px v 1440 px okne).
+              right: -Math.min((j + 1) * 11, 20),
               bottom: -((j + 1) * 9),
               borderRadius: 14,
               background: mix(C.border, 90),

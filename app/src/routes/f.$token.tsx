@@ -154,7 +154,7 @@ export const Route = createFileRoute("/f/$token")({
           // Hneď aj na mobil trénerovi; notifikácia v Kokpite vznikne z registra.
           if (o.trener) {
             await pushTrenerovi(DB, o.trener, {
-              titulok: `${o.klient} odpísal na fotky`,
+              titulok: `${o.klient}: odpoveď na fotky`,
               // Bez obsahu správy — notifikácia je vidno aj na zamknutom telefóne.
               text: "Odpoveď si prečítaj v Kokpite (notifikácie alebo profil → fotky).",
               url: "/#workspace",

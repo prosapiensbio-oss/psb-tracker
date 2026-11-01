@@ -125,6 +125,7 @@ export function PlatobneKanaly({
           size={168}
           data={kanaly.map((x) => ({ label: x.label, value: x.czk, color: x.farba }))}
           centerLabel={fmtCZK(spolu)}
+          fmtHodnota={fmtCZK}
           onSlice={otvor}
         />
         <div style={{ flex: 1, minWidth: 230 }}>

@@ -1,3 +1,4 @@
+import { cas24 } from "../../lib/psb/vypisHodin";
 import { useMemo, useState } from "react";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 
@@ -136,7 +137,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
       <span style={denStyl}>{fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>
         tréning
-        {u.cas ? ` ${u.cas}` : ""}
+        {u.cas ? ` ${cas24(u.cas)}` : ""}
         {u.trener ? ` · ${u.trener}` : ""}
         {u.nazov ? <span style={{ color: C.textDim }}> · {nazovProduktu(u.nazov)}</span> : null}
       </span>

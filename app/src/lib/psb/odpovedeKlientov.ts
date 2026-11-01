@@ -1,4 +1,5 @@
 import { POSUN } from "./pocitovka";
+import { podlaRodu } from "./rodKlienta";
 import type { MeranieRow } from "./types";
 
 /**
@@ -33,7 +34,9 @@ export function odpovedeKlientov(merania: MeranieRow[], dnes: string): OdpovedKl
         key: `odpoved-klienta|${m.klient}|${m.datum}`,
         klient: m.klient,
         datum: m.datum,
-        title: text ? `${m.klient} napísal(a), ako sa cíti` : `${m.klient} vyplnil(a), ako sa cíti`,
+        title: text
+          ? `${m.klient} ${podlaRodu(m.klient, { m: "napísal", z: "napísala", neutralne: "poslal(a) odpoveď" })}, ako sa cíti`
+          : `${m.klient} ${podlaRodu(m.klient, { m: "vyplnil", z: "vyplnila", neutralne: "vyplnil(a)" })}, ako sa cíti`,
         detail: `${m.klient} (${dd}. ${mm}.): ${casti.join(" — ") || "odpoveď bez textu"}`,
       };
     })

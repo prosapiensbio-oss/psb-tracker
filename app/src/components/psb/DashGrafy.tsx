@@ -219,7 +219,7 @@ export function MiniStat({ label, value, pod, color, onClick }: {
       }}
     >
       <div style={{ fontSize: 20, fontWeight: 800, color: color ?? C.accentLight, lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 3, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 3, display: "flex", alignItems: "center", gap: 3, lineHeight: 1.3, overflowWrap: "break-word" }}>
         {label}
         {onClick && <span style={{ color: C.textDim }}>→</span>}
       </div>

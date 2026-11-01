@@ -2284,7 +2284,7 @@ function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, fontSize: 11.5, color: C.textMuted }}>
           <span>Bežiaci kvartál: <b style={{ color: C.text }}>{Math.round(cur.hodiny)} h</b> (Jerry {Math.round(cur.hodinyJ)} · Terezka {Math.round(cur.hodinyT)})</span>
           <span><b style={{ color: C.text }}>{cur.sedenia}</b> sedení</span>
-          <span><b style={{ color: C.text }}>{cur.novi}</b> nových klientov</span>
+          <span><b style={{ color: C.text }}>{cur.novi}</b> {Sk.tvar(cur.novi, "nový klient", "noví klienti", "nových klientov")}</span>
           <span>tržba na hodinu: <b style={{ color: C.text }}>{cur.hodiny > 0 ? fmtCZK(Math.round(cur.prijmy / cur.hodiny)) : "—"}</b></span>
         </div>
       </Card>
@@ -2536,7 +2536,7 @@ function CoBoloIne({ devs }: { devs: ReturnType<typeof monthDeviations> }) {
           return (
             <div key={d.label} style={{ background: C.surface, border: `1px solid ${mix(f, 30)}`, borderRadius: 10, padding: "9px 11px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.label}>{d.label}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, minWidth: 0, overflowWrap: "anywhere" }} title={d.label}>{d.label.replace(/\//g, "/\u200B")}</span>
                 <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{d.group}</span>
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "4px 0 6px" }}>

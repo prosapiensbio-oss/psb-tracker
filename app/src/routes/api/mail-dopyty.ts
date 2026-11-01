@@ -289,7 +289,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
                */
               const auto = await posliHistoriu(DB, v.historia.meno, n);
               if (auto.ok) {
-                preskocene.push({ predmet: `${v.historia.meno} si pýtal celú históriu`, preco: `odoslaná automaticky na ${auto.komu}` });
+                preskocene.push({ predmet: `${v.historia.meno}: žiadosť o celú históriu`, preco: `odoslaná automaticky na ${auto.komu}` });
                 continue;
               }
               preskocene.push({ predmet: `${v.historia.meno} si pýta celú históriu`, preco: `automat sa stiahol (${auto.preco}) — poslaná notifikácia` });
@@ -302,7 +302,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
                     if ((o.kto || "").trim().toLowerCase() !== "jerry") continue;
                     await posliPush(o, {
                       titulok: "Žiadosť o históriu",
-                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb (${auto.preco}). Pošleš mu ju zo stola klienta — voľba „celá história + platby".`,
+                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb (${auto.preco}). Pošleš ju zo stola klienta — voľba „celá história + platby".`,
                       url: "/#workspace", znacka: `historia-${v.historia.email}`,
                     }, k);
                   }

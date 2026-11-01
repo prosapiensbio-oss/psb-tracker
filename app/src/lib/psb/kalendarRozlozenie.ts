@@ -56,6 +56,25 @@ export function rozlozUdalosti(useky: Usek[]): Miesto[] {
  *
  * Na monitore sa nič neskracuje — tam je miesta dosť.
  */
+/**
+ * Riadky mena v úzkom bloku: lámu sa len na medzerách, každý sa oreže sám
+ * (`nowrap` + `…`). „overflow-wrap: anywhere" z toho robil „Vitezsl / av P.".
+ * Znak „?" (nepriradené) ostáva za posledným slovom, kreslí ho volajúci.
+ */
+export function riadkyMena(meno: string): string[] {
+  return String(meno || "").trim().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Písmo a tvar bloku podľa toho, koľko je naozaj miesta. Na telefóne má týždeň
+ * stĺpec ~46 px (9,5 px, výnimka `data-tesne`), ale 3 dni ~97 px a deň celú
+ * šírku: tam platí bežných 12 px.
+ */
+export function rezimBloku(uzke: boolean, rozsah: number): { tesne: boolean; skratene: boolean } {
+  if (!uzke) return { tesne: false, skratene: false };
+  return { tesne: rozsah >= 7, skratene: rozsah > 1 };
+}
+
 export function menoDoBloku(nazov: string, uzke: boolean, zo: number): string {
   const cele = String(nazov || "").trim();
   if (!uzke || !cele) return cele;

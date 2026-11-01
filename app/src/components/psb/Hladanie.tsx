@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientAgg } from "../../lib/psb/compute";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import type { Lead } from "../../lib/psb/types";
+import { STATUSES } from "./Klienti";
 import { najdiKlienta } from "../../lib/psb/compute";
 import { normName, fmtDMY} from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
@@ -148,7 +149,7 @@ export function HladanieKlienta({
               style={{ display: "block", width: "100%", textAlign: "left", cursor: "pointer", padding: "7px 10px", border: "none", background: "transparent" }}
             >
               <span style={{ fontSize: 12.5, color: C.text, display: "block" }}>{l.name}</span>
-              <span style={{ fontSize: 10.5, color: C.accentLight }}>dopyt · {l.status === "novy" ? "ozval sa" : l.status}</span>
+              <span style={{ fontSize: 10.5, color: C.accentLight }}>dopyt · {STATUSES.find((s) => s.value === l.status)?.label || l.status}</span>
             </button>
           ))}
           {najdene.map((c, idx) => (

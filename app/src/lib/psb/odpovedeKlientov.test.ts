@@ -14,7 +14,7 @@ describe("notifikácia: klient napísal, ako sa cíti (27. 10. 2026)", () => {
     ], "2026-10-28");
     expect(r).toHaveLength(1);
     expect(r[0].key).toBe("odpoved-klienta|Branislav Široký|2026-10-28");
-    expect(r[0].title).toContain("napísal(a)");
+    expect(r[0].title).toContain("napísal,");
     expect(r[0].detail).toContain("„Bolí ma trochu kríž“");
     expect(r[0].detail).toContain("bedra 4/10");
     expect(r[0].detail).toContain("trochu");

@@ -6,6 +6,18 @@ const koren = join(import.meta.dir, "..", "..");
 const css = readFileSync(join(koren, "styles.css"), "utf8");
 
 describe("najmenšie písmo obsahu je 12 px", () => {
+  test("veľkosť v em pod 1 sa CSS pravidlu vyhne, preto v komponentoch nie je", () => {
+    // Odznak na karte mal „0.85em" = 10,6 px a selektor `font-size: 10.6px` nemá.
+    const zlozka = join(koren, "components", "psb");
+    const nalezy: string[] = [];
+    for (const f of readdirSync(zlozka)) {
+      if (!f.endsWith(".tsx")) continue;
+      const t = readFileSync(join(zlozka, f), "utf8");
+      for (const m of t.matchAll(/fontSize:\s*"0?\.\d+(?:em|rem)"/g)) nalezy.push(`${f}: ${m[0]}`);
+    }
+    expect(nalezy).toEqual([]);
+  });
+
   test("každá inline veľkosť pod 12 px v komponentoch má pravidlo v styles.css", () => {
     const zlozka = join(koren, "components", "psb");
     const velkosti = new Set<string>();

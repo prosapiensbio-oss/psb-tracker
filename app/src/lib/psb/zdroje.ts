@@ -20,7 +20,14 @@ const NAZVY: Record<string, string> = {
   ine: "Iné",
 };
 
+/** Kľúč na zlúčenie: „Referencia" a „referencia" sú jeden riadok, nie dva. */
+export const klucZdroja = (zdroj: string | null | undefined): string => (zdroj || "").trim().toLowerCase();
+
 export const nazovZdroja = (zdroj: string | null | undefined): string => {
   const z = (zdroj || "").trim();
   return NAZVY[z.toLowerCase()] || z;
 };
+
+/** Do tabuľky: aj prázdny zdroj má názov, inak by rebríček tvrdil, že ho nikto nemá. */
+export const popisZdroja = (zdroj: string | null | undefined): string =>
+  klucZdroja(zdroj) ? nazovZdroja(zdroj) : "Zdroj nezapísaný";

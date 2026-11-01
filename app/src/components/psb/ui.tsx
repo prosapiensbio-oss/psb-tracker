@@ -782,6 +782,7 @@ export function Donut({
   centerLabel,
   onSlice,
   bezLegendy,
+  fmtHodnota,
 }: {
   data: { label: string; value: number; color: string }[];
   size?: number;
@@ -791,6 +792,8 @@ export function Donut({
   /** Vlastnú legendu vypni tam, kde je vedľa seba viac koláčov nad tými istými
    *  kategóriami — tri rovnaké legendy vedľa seba nič nepridajú. */
   bezLegendy?: boolean;
+  /** Ako vypísať hodnotu v legende. Peniaze: `fmtCZK`, inak „394059.5". */
+  fmtHodnota?: (v: number) => string;
 }) {
   const total = data.reduce((a, d) => a + d.value, 0);
   const r = (size - thickness) / 2;
@@ -838,7 +841,7 @@ export function Donut({
           >
             <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: "inline-block" }} />
             {d.label}
-            <span style={{ color: C.text, fontWeight: 600, marginLeft: 4 }}>{d.value}</span>
+            <span style={{ color: C.text, fontWeight: 600, marginLeft: 4, whiteSpace: "nowrap" }}>{fmtHodnota ? fmtHodnota(d.value) : d.value}</span>
             {total > 0 && <span style={{ color: C.textDim }}>({((d.value / total) * 100).toFixed(0)}%)</span>}
             {onSlice && <span style={{ color: C.textDim, fontSize: 10 }}>→</span>}
           </div>

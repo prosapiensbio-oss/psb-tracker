@@ -1,3 +1,5 @@
+import { podlaRodu } from "./rodKlienta";
+
 /**
  * „CHCETE PLATIT FAKTUROU?" — FAKTURAČNÉ ÚDAJE VYPĹŇA KLIENT SÁM.
  *
@@ -333,7 +335,7 @@ export function notifikacieFaktur(rows: FakturaOdKlienta[], dnes: string): Notif
       return {
         key: `faktura-od-klienta|${r.klient}|${r.at}`,
         klient: r.klient,
-        title: `${r.klient} vyplnil(a) fakturačné údaje`,
+        title: `${r.klient} ${podlaRodu(r.klient, { m: "vyplnil", z: "vyplnila", neutralne: "vyplnil(a)" })} fakturačné údaje`,
         detail: `${dd}. ${mm}. cez odkaz po úvodnom. Faktúra na: ${[komu, adresa, r.email].filter(Boolean).join(" · ")}. Údaje sú uložené pri klientovi — pri vystavení faktúry sa predvyplnia.`,
       };
     })

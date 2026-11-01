@@ -18,7 +18,7 @@ describe("pripomienka pri dnešnom tréningu hovorí stav PRED ním", () => {
     expect(dnesneTreningy(klient(0), [], kal, {}, poObede)[0].title).toContain("dnes má poslednú hodinu z balíčka");
   });
   it("ráno s −1 → hodiny minuté, dnešný je nad rámec (−2)", () => {
-    expect(dnesneTreningy(klient(-1), [], kal, {}, rano)[0].title).toContain("hodiny má minuté — dnešný tréning je nad rámec (−2)");
+    expect(dnesneTreningy(klient(-1), [], kal, {}, rano)[0].title).toContain("hodiny má minuté — s dnešným tréningom 2 h nad rámec");
   });
   it("s hodinami navyše nehlási nič", () => {
     expect(dnesneTreningy(klient(4), [], kal, {}, rano)).toEqual([]);

@@ -251,6 +251,14 @@ const denACas = (iso: string): string => {
   return `${denSK(iso)}${h ? ` ${h}` : ""}`;
 };
 
+/**
+ * Dni zmeny na týždenný náhľad. Pri premenovaní nesú `pred` a `po` NÁZVY, nie
+ * čas — `new Date("Svatopluk…")` vo výpočte týždňa vyhodilo RangeError a klik
+ * na taký riadok zhasol celý Kokpit (nájdené v náhľade 1. 11. 2026).
+ */
+export const dniZmeny = (x: Pick<Zmena, "pred" | "po">): string[] =>
+  [x.pred, x.po].map((v) => String(v || "")).filter((v) => /^\d{4}-\d{2}-\d{2}/.test(v));
+
 export const popisZmeny = (x: Zmena): string =>
   x.druh === "zrusene" ? `zmizol tréning z ${denSK(x.pred || x.kedy)}`
     : x.druh === "posunute" ? `presun z ${denACas(x.pred || "")} na ${denACas(x.po || "")}`

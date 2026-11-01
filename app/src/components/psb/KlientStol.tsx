@@ -25,7 +25,8 @@ import { SmsKlientovi } from "./SmsKlientovi";
 import { VyberMena } from "./VyberMena";
 import { chybaDielov, menaPlatiZa } from "../../lib/psb/platiZa";
 import { dlhJednehoKlienta } from "../../lib/psb/dlznici";
-import { textZostatku, vetaZostatku } from "../../lib/psb/zostatokText";
+import { hodinyKratko, textZostatku, vetaZostatku } from "../../lib/psb/zostatokText";
+import { PosuvnyRad } from "./PosuvnyRad";
 import { jeZrusenieKlientom } from "../../lib/psb/kalendarZmeny";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -778,7 +779,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     // Appka na to má cestu — netreba posielať človeka obnovovať stránku.
     oznam("klienti"); oznam("kalendar"); oznam("peniaze");
     setChybaJeDobra(!!kolko);
-    setChyba(`${meno} zmazaný — ${kolko || "NIČ sa nezmazalo, riadky tam neboli"}.`);
+    setChyba(`${meno}: zmazané — ${kolko || "NIČ sa nezmazalo, riadky tam neboli"}.`);
   };
 
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
@@ -1313,7 +1314,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )}
             {mimoExportu > 0 && (
               <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
-                Zostatok {c.packageRemaining} h ešte nezahŕňa {mimoExportu} {mimoExportu === 1 ? "tréning" : mimoExportu < 5 ? "tréningy" : "tréningov"} z kalendára, ktoré sa práve odtrénovali.
+                Zostatok {hodinyKratko(c.packageRemaining)} ešte nezahŕňa {mimoExportu} {mimoExportu === 1 ? "tréning" : mimoExportu < 5 ? "tréningy" : "tréningov"} z kalendára, ktoré sa práve odtrénovali.
               </div>
             )}
             {/* SMS O HODINÁCH — aj odtiaľto, nielen z Kalendára.
@@ -1534,16 +1535,17 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0, borderTop: uzke ? `1px solid ${mix(C.border, 60)}` : undefined, paddingTop: uzke ? 12 : undefined }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
-          <div style={{ flexGrow: 1 }} />
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          {!uzke && <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>}
+          {!uzke && <div style={{ flexGrow: 1 }} />}
+          {/* Na telefóne jeden riadok, ktorý sa roluje: dva riadky zaberali 48 px nad osou času. */}
+          <PrepinacFiltra uzke={uzke} zmena={filter}>
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
             {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
-              <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
+              <button key={id} data-aktivna={filter === id ? "1" : undefined} onClick={() => setFilter(id)} style={{ ...prepinac(filter === id), flex: "none" }}>{l}</button>
             ))}
-          </div>
+          </PrepinacFiltra>
         </div>
 
         {/* Pridávanie patrí k svojej záložke (Jerry, 23. 9. 2026). Tlačidlo
@@ -2416,7 +2418,7 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
     <div style={{ ...riadok, flexWrap: "wrap" }}>
       <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>
-        {u.uvodny ? <b style={{ color: C.text }}>úvodný tréning</b> : "tréning"}{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}
+        {u.uvodny ? <b style={{ color: C.text }}>úvodný tréning</b> : "tréning"}{u.cas ? ` ${cas24(u.cas)}` : ""}{u.trener ? ` · ${u.trener}` : ""}
         {zdarma && (
           <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: C.green }}>
             zdarma{u.zdarma ? ` · ${u.zdarma}` : ""}
@@ -3318,6 +3320,11 @@ const Upravit = ({ naUpravu, naZrusenie, pracujem, comu = "toto", slovom = "" }:
 };
 
 const TON: Record<string, string> = { dobre: C.green, vsimnut: C.orange, zle: C.red, nevieme: C.textDim };
+
+function PrepinacFiltra({ uzke, zmena, children }: { uzke: boolean; zmena: string; children: React.ReactNode }) {
+  if (uzke) return <PosuvnyRad gap={5} zmena={zmena} style={{ flex: "1 1 100%" }}>{children}</PosuvnyRad>;
+  return <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{children}</div>;
+}
 
 const prepinac = (on: boolean) => ({
   padding: "6px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",

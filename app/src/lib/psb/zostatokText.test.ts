@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { textZostatku, vetaZostatku } from "./zostatokText";
+import { hodinyKratko, textZostatku, vetaZostatku } from "./zostatokText";
 
 describe("zostatok hodín — jeden text pre všetky obrazovky", () => {
+  test("krátky tvar do riadku nemá znamienko ani dvojitý zápor", () => {
+    expect(hodinyKratko(-2)).toBe("2 h nad rámec");
+    expect(hodinyKratko(0)).toBe("0 h");
+    expect(hodinyKratko(3)).toBe("3 h");
+    expect(hodinyKratko(1.5)).toBe("1,5 h");
+  });
   test("mínus sa neoreže: Monika 2 h nad rámec, nie 0/6", () => {
     expect(textZostatku({ zostava: -2, spolu: 6 })).toBe("2 h nad rámec");
     expect(textZostatku({ zostava: -2, spolu: 1 })).toBe("2 h nad rámec");

@@ -10,6 +10,7 @@ import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami,
 import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
 import { priemerDochadzky } from "./profil";
 import { textZostatku } from "./zostatokText";
+import { klucZdroja } from "./zdroje";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -570,7 +571,7 @@ export function buildAiContext(
 
     // Zdroje klientov — jediné miesto, kde sa marketing dotýka peňazí.
     const zdroje: Record<string, number> = {};
-    for (const c of clientList) if (c.zdroj) zdroje[c.zdroj] = (zdroje[c.zdroj] || 0) + 1;
+    for (const c of clientList) if (klucZdroja(c.zdroj)) zdroje[klucZdroja(c.zdroj)] = (zdroje[klucZdroja(c.zdroj)] || 0) + 1;
     const dopytyZdroje: Record<string, number> = {};
     for (const l of data.leads || []) if (l.source) dopytyZdroje[l.source] = (dopytyZdroje[l.source] || 0) + 1;
 

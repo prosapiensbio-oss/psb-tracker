@@ -219,7 +219,7 @@ export function zdravieKlienta(
   const dobré = varovne.filter((x) => x.tón === "dobre").map((x) => x.nazov.toLowerCase());
 
   const zaver = tón === "dobre"
-    ? "Nič nenaznačuje, že by odchádzal."
+    ? "Nič nenaznačuje odchod."
     : `${zle >= 2 ? "Pozor" : "Stojí za pohľad"}: ${zlé.join(" a ")} ${zlé.length > 1 ? "sa zhoršili" : "sa zhoršilo"}${dobré.length ? `, ale ${dobré.join(" a ")} drží` : ""}.`;
 
   return { signaly, zaver, tón };

@@ -575,7 +575,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               <button
                 key={m} type="button"
                 onClick={() => setDalsie((s) => [...s, { klient: m, popis: "", ks: f.ks || "1", cena: f.cena, naDoklade: false }])}
-                title={`${f.klient} platil za ${m} na staršej faktúre`}
+                title={`${f.klient}: platba za ${m} na staršej faktúre`}
                 style={{ padding: "6px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), color: C.accentLight, fontFamily: "inherit" }}
               >
                 + aj za {m} (ako minule)

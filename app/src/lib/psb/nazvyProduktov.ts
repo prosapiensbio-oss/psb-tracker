@@ -58,6 +58,31 @@ export function nazovProduktu(nazov: string): string {
 }
 
 /**
+ * Názov vo filtri pod grafom balíčkov. Graf hovorí „6h Předplatné", „Ročné" —
+ * filter nesmel hovoriť „OFF - 6h S viazanostou", „ONE YEAR" (kontrola po
+ * nasadení, 1. 11. 2026). V dátach ostáva pôvodný názov.
+ */
+export function nazovVoFiltri(nazov: string): string {
+  return /one year/i.test(nazov || "") ? "Ročné" : nazovProduktu(nazov);
+}
+
+/**
+ * Možnosti filtra: každý názov raz, hoci je v dátach v dvoch tvaroch („OFF - 6h
+ * S viazanostou" a „6h Předplatné"). Hodnota ostáva `m:<pôvodný názov>`.
+ */
+export function moznostiProduktov(nazvy: string[]): { value: string; label: string }[] {
+  const videne = new Set<string>();
+  const von: { value: string; label: string }[] = [];
+  for (const m of [...new Set(nazvy.filter(Boolean))].sort()) {
+    const label = nazovVoFiltri(m);
+    if (videne.has(label)) continue;
+    videne.add(label);
+    von.push({ value: `m:${m}`, label });
+  }
+  return von.sort((a, b) => a.label.localeCompare(b.label, "cs"));
+}
+
+/**
  * Skupina pre grafy a filtre — krátke a v tom istom slovníku.
  *
  * Nie je to `nazovProduktu`: ten rozlišuje počet hodín, lebo klient kupuje

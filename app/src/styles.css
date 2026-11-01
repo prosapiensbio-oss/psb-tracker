@@ -416,6 +416,22 @@ button {
   font-size: 12px !important;
 }
 
+/*
+ * TLAČIDLÁ NOTIFIKÁCIE NA TELEFÓNE (kontrola po nasadení, 1. 11. 2026).
+ * `linkBtn` je text bez výplne: 18 px na výšku a „⋯" 20×18 stálo 10 px od
+ * „Vybavené", ktoré zapisuje. Inline štýl prebije len `!important`; počítač
+ * ostáva bez zmeny. 760 px je rovnaká hranica ako `useMobilRozlozenie`.
+ */
+@media (max-width: 760px) {
+  .psb-akcie-polozky { gap: 14px !important; }
+  .psb-akcie-polozky > button {
+    min-height: 40px;
+    min-width: 44px;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+}
+
 /* Kostra sa ukáže až po chvíli — rýchla obrazovka nesmie preblikávať sivými pruhmi. */
 .psb-kostra { animation: psb-kostra-nabeh 0.15s ease-out 0.12s both; }
 @keyframes psb-kostra-nabeh { from { opacity: 0; } to { opacity: 1; } }

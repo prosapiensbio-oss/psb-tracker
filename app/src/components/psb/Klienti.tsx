@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { priemerDochadzky } from "../../lib/psb/profil";
 import { textZostatku } from "../../lib/psb/zostatokText";
 import { cenaZaSedenieVDnoch, menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
-import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
+import { moznostiProduktov, nazovProduktu, nazovVoFiltri } from "../../lib/psb/nazvyProduktov";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -62,8 +62,8 @@ export const SOURCES = [
 /** Alias — staršie obrazovky importujú ZDROJE. */
 export const ZDROJE = SOURCES;
 export const STATUSES = [
-  { value: "novy", label: "Ozval sa" },
-  { value: "neodpisal", label: "Neodpísal" },
+  { value: "novy", label: "Nový dopyt" },
+  { value: "neodpisal", label: "Neodpovedané" },
   { value: "dohodnuty", label: "Dohodnutý úvodný" },
   { value: "zruseny", label: "Zrušený úvodný" },
 ];
@@ -238,12 +238,11 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
 
   // Package-type filter options built from the real memberships in the data.
   const typeOptions = useMemo(() => {
-    const memberships = [...new Set(all.map((c) => c.membership).filter(Boolean))].sort();
     return [
       { value: "all", label: "Všetky typy" },
-      { value: "grp:6M Predplatné", label: "6M Predplatné (všetky)" },
+      { value: "grp:6M Predplatné", label: "Předplatné (všetky)" },
       { value: "grp:Balíček", label: "Balíček (všetky)" },
-      ...memberships.map((m) => ({ value: `m:${m}`, label: m })),
+      ...moznostiProduktov(all.map((c) => c.membership)),
     ];
   }, [all]);
 
@@ -311,7 +310,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     }
     if (membershipF) arr = arr.filter((c) => membershipBucket(c.membership) === membershipF);
     if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
-    else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
+    else if (typeF.startsWith("m:")) arr = arr.filter((c) => !!c.membership && nazovVoFiltri(c.membership) === nazovVoFiltri(typeF.slice(2)));
     if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
     if (lenBezZdroja) arr = arr.filter((c) => !c.zdroj);
     if (lenPauza) arr = arr.filter((c) => c.status === "Pauza");

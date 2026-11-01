@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { jePredplatne, nazovProduktu, skupinaProduktu } from "./nazvyProduktov";
+import { jePredplatne, nazovProduktu, skupinaProduktu, moznostiProduktov, nazovVoFiltri } from "./nazvyProduktov";
 
 describe("nazovProduktu", () => {
   it("viazanosť sa mení na Předplatné, jej absencia na Balíček", () => {
@@ -54,5 +54,18 @@ describe("skupinaProduktu", () => {
     expect(skupinaProduktu("Doplnenie členstva")).toBe("Doplnenie");
     expect(skupinaProduktu("SILVER členství")).toBe("Staršie členstvo");
     expect(skupinaProduktu("")).toBe("Bez balíčka");
+  });
+});
+
+describe("filter pod grafom balíčkov", () => {
+  it("hovorí tými istými názvami ako graf, hodnota ostáva pôvodná", () => {
+    const m = moznostiProduktov(["OFF - 6h S viazanostou", "ONE YEAR", "OFF - 8 hodín offline", "", "OFF - 6h S viazanostou"]);
+    expect(m.map((x) => x.label)).toEqual(["6h Předplatné", "8h Balíček", "Ročné"]);
+    expect(m.find((x) => x.label === "Ročné")?.value).toBe("m:ONE YEAR");
+  });
+  it("dva tvary toho istého názvu sú jedna možnosť a filter nájde oba", () => {
+    const m = moznostiProduktov(["OFF - 6h S viazanostou", "6h Předplatné"]);
+    expect(m).toHaveLength(1);
+    expect(nazovVoFiltri("OFF - 6h S viazanostou")).toBe(nazovVoFiltri("6h Předplatné"));
   });
 });

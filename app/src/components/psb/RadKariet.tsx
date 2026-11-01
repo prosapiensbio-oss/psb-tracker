@@ -41,8 +41,13 @@ export function RadKariet({ polozky, aktivna, onVyber, style }: {
               background: akt ? C.accentBg : "transparent",
             }}
           >
-            {p.nadpis}
-            {p.pocet > 0 && <span style={{ marginLeft: 5, fontSize: "0.85em", fontWeight: 800, color: C.orange }}>{p.pocet}</span>}
+            {/* Šírka sa meria na tučnom texte: aktívna karta je tučnejšia a rad by sa
+                po každom prepnutí posunul o 1–6 px (kontrola po nasadení, 1. 11. 2026). */}
+            <span style={{ display: "inline-grid" }}>
+              <span aria-hidden="true" style={{ gridArea: "1 / 1", fontWeight: 800, visibility: "hidden" }}>{p.nadpis}</span>
+              <span style={{ gridArea: "1 / 1" }}>{p.nadpis}</span>
+            </span>
+            {p.pocet > 0 && <span style={{ marginLeft: 5, fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: C.orange }}>{p.pocet}</span>}
           </button>
         );
       })}

@@ -85,7 +85,7 @@ describe("záver", () => {
   it("keď je všetko v poriadku, netvrdí nič zlé", () => {
     const z = zdravieKlienta(klient(), vstupy());
     expect(z.tón).toBe("dobre");
-    expect(z.zaver).toBe("Nič nenaznačuje, že by odchádzal.");
+    expect(z.zaver).toBe("Nič nenaznačuje odchod.");
   });
 
   it("dva zlé signály znamenajú „Pozor“", () => {

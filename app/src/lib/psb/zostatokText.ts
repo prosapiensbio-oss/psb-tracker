@@ -25,6 +25,12 @@ export function textZostatku(v: { zostava: number; spolu?: number | null; odvode
   return v.spolu ? `${znak}${v.zostava}/${v.spolu}` : `${znak}${v.zostava}`;
 }
 
+/** Krátko do riadku: „3 h" alebo „2 h nad rámec" — nikdy „−2 h". */
+export function hodinyKratko(zostava: number): string {
+  const nad = nadRamec(zostava);
+  return nad > 0 ? textNadRamec(nad) : `${String(Math.round(zostava * 100) / 100).replace(".", ",")} h`;
+}
+
 /** Veta do profilu: „3 h zostáva" alebo „2 h nad rámec". */
 export function vetaZostatku(zostava: number, odvodene = false): string {
   const nad = nadRamec(zostava);

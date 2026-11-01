@@ -30,6 +30,7 @@ import type {
 } from "./types";
 import { podlaRodu } from "./rodKlienta";
 import * as Sk from "./sklonovanie";
+import { textNadRamec } from "./zostatokText";
 
 export const TRAINERS = ["Jerry", "Terezka"] as const;
 export type TrainerName = string;
@@ -3183,7 +3184,7 @@ export function dnesneTreningy(
         // klientom tvrdil číslo, ktoré v PTminderi nikde nestojí.
         const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín)" : "";
         if (pred === 1) dovody.push(`dnes má poslednú hodinu z balíčka${odkial}`);
-        else if (pred <= 0) dovody.push(`hodiny má minuté — dnešný tréning je nad rámec (−${1 - pred})${odkial}`);
+        else if (pred <= 0) dovody.push(`hodiny má minuté — s dnešným tréningom ${textNadRamec(1 - pred)}${odkial}`);
         // Tlačidlo „Poslať SMS" aj tu (9. 10. 2026) — samostatná notifikácia
         // „posledná hodina / mínus" o tom istom človeku vtedy ustúpi.
         if (pred <= 1 && c.packageTotal > 0) sms = { meno: c.name, trener: c.primaryTrainer, zostatok: c.packageRemaining };
@@ -3453,7 +3454,7 @@ export function deriveRegister(
       // Vysvetlenie, ktoré Jerry sám zapísal pri zrušení, ide DO VETY — nie
       // do Jarvisa, kam sa treba spýtať. Bez neho appka pýtala „napíš mu"
       // pri človeku, o ktorom pred týždňom sám zapísal, že je u lekára.
-      `${b.meno}: naposledy trénoval ${fmtDMY(b.poslednySession)}, teda pred ${b.dni} dňami, a v kalendári nemá nič dopredu.${b.poznamka ? ` Zapísal si k nemu ${fmtDMY(b.poznamka.kedy)}: „${b.poznamka.text}“.` : ""} Napíš mu — alebo sem napíš, že je preč, a do najbližšieho tréningu bude ticho.`,
+      `${b.meno}: posledný tréning ${fmtDMY(b.poslednySession)}, teda pred ${b.dni} dňami, a v kalendári nič dopredu.${b.poznamka ? ` Poznámka z ${fmtDMY(b.poznamka.kedy)}: „${b.poznamka.text}“.` : ""} Ozvi sa — alebo sem napíš, že je preč, a do najbližšieho tréningu bude ticho.`,
       9,
       b.meno,
       "bezterminu",
@@ -4875,7 +4876,7 @@ export function pripomienkaDovodu(
 }
 
 /** Dôvody, ktoré sa v PSB opakujú. „Iné" sa dopíše rukou. */
-export const DOVODY_ODCHODU = ["cena", "čas", "vzdialenosť", "výsledok neprišiel", "rozmyslel si to"] as const;
+export const DOVODY_ODCHODU = ["cena", "čas", "vzdialenosť", "výsledok neprišiel", "zmena rozhodnutia"] as const;
 
 /**
  * Koho si dnes trénoval — mená na jeden klik.

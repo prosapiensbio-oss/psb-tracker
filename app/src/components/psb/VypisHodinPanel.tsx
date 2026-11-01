@@ -7,6 +7,7 @@ import { cisloPreBranu, dlzkaSpravy, textSms } from "../../lib/psb/sms";
 import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka, stavPreSpravu } from "../../lib/psb/vypisHodin";
 import type { RiadokVypisu } from "../../lib/psb/vypisHodin";
 import { dnesPraha } from "../../lib/psb/cas";
+import { hodinyKratko } from "../../lib/psb/zostatokText";
 
 /**
  * Ten istý riadok, ale slovami pre klienta.
@@ -259,7 +260,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
         <span style={{ color: C.textMuted }}>odtrénované <b style={{ color: C.text }}>{hod(v.odtrenovane)} h</b></span>
         {v.kupene > 0 && <span style={{ color: C.textMuted }}>kúpené <b style={{ color: C.green }}>+{hod(v.kupene)} h</b></span>}
         {v.koniec !== null && (
-          <span style={{ color: C.textMuted }}>zostáva <b style={{ color: v.koniec > 0 ? C.green : C.orange }}>{hod(v.koniec)} h</b></span>
+          <span style={{ color: C.textMuted }}>{v.koniec < 0 ? "" : "zostáva "}<b style={{ color: v.koniec > 0 ? C.green : C.orange }}>{hodinyKratko(v.koniec)}</b></span>
         )}
         {v.naDlh > 0 && (
           <span style={{ color: C.textMuted }}>na nezaplatené <b style={{ color: C.orange }}>{v.naDlh}×</b></span>

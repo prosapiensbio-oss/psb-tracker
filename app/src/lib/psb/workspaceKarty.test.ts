@@ -1,7 +1,7 @@
 // Workspace — jedna karta = jeden DRUH práce, a patrí tomu, kto je prihlásený.
 import { describe, expect, it } from "bun:test";
 
-import { BEZ_FRONTY, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok, prijmyUInehoTrenera, hromadnePresuny, odpovedPresunu, zapisPoJednom, anamnezyPodlaStavu, indexKartyPoZmene } from "./workspaceKarty";
+import { BEZ_FRONTY, dniZmeny, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok, prijmyUInehoTrenera, hromadnePresuny, odpovedPresunu, zapisPoJednom, anamnezyPodlaStavu, indexKartyPoZmene } from "./workspaceKarty";
 
 const zmena = (o: Partial<Zmena> & { id: string; trener: string }): Zmena => ({
   id: o.id, druh: o.druh ?? "zrusene", klient: o.klient ?? "Martin Vaško", nazov: null,
@@ -105,6 +105,16 @@ describe("karta patrí prihlásenému", () => {
 
   it("Jerry vidí peniaze", () => {
     expect(postavKarty({ ...zdroje, ktoSom: "jerry" }).some((x) => x.druh === "platby")).toBe(true);
+  });
+});
+
+describe("dniZmeny", () => {
+  it("premenovanie nesie názvy, nie čas: žiadny deň, žiadny pád appky", () => {
+    expect(dniZmeny({ pred: "Lukad Hanus", po: "Lukas Hanus" })).toEqual([]);
+  });
+  it("presun a zmiznutie dajú svoje dni", () => {
+    expect(dniZmeny({ pred: "2026-09-22T16:00", po: "2026-09-24T14:00" })).toEqual(["2026-09-22T16:00", "2026-09-24T14:00"]);
+    expect(dniZmeny({ pred: "2026-09-22T16:00", po: null })).toEqual(["2026-09-22T16:00"]);
   });
 });
 

@@ -70,7 +70,7 @@ function odpovedZa(l: Lead): string {
  * o pol roka sa z toho nedá prečítať nič.
  */
 const DOVODY_ID = "psb-dovody";
-const DOVODY = ["nezdvíhal telefón", "neodpísal", "cena", "vzdialenosť", "termín nesedel",
+const DOVODY = ["nezdvíha telefón", "neodpovedá", "cena", "vzdialenosť", "termín nesedel",
   "rozmyslel si to", "šiel inam", "len sa pýtal", "omyl / spam"];
 
 /**
@@ -358,7 +358,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
           <StatCard value={String(counts.total)} label="Dopytov spolu" color={C.blue} />
           <StatCard value={String(counts.dohodnuty)} label="Dohodnutý úvodný" color={C.accentLight} />
-          <StatCard value={String(counts.neodpisal)} label="Neodpísali" color={C.red} />
+          <StatCard value={String(counts.neodpisal)} label="Neodpovedané" color={C.red} />
           <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
             label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
           <StatCard
@@ -452,7 +452,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                 <th style={{ ...S.th, minWidth: 130 }}>Kampaň</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
                 <th style={{ ...S.th, minWidth: 130 }}>Ozvali sme sa</th>
-                <th style={{ ...S.th, minWidth: 150 }}><Info label="Prečo nie" text="Prečo sa z dopytu nestal klient. Pole sa objaví, až keď v stĺpci Stav nastavíš „Neodpísal“ alebo „Zrušený“ — pri dopyte, ktorý ešte žije, by bol dôvod straty veštba. Ponúkajú sa hotové dôvody, aby sa tie isté veci písali rovnako a dali sa spočítať; napísať sa dá čokoľvek." /></th>
+                <th style={{ ...S.th, minWidth: 150 }}><Info label="Prečo nie" text="Prečo sa z dopytu nestal klient. Pole sa objaví, až keď v stĺpci Stav nastavíš „Neodpovedané“ alebo „Zrušený“ — pri dopyte, ktorý ešte žije, by bol dôvod straty veštba. Ponúkajú sa hotové dôvody, aby sa tie isté veci písali rovnako a dali sa spočítať; napísať sa dá čokoľvek." /></th>
                 <th style={{ ...S.th, minWidth: 140 }}>Poznámka</th>
                 <th style={S.th} />
               </tr>
