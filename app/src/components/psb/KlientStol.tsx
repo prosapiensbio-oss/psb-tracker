@@ -1036,7 +1036,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             autoFocus
             style={{ flex: "1 1 240px", minWidth: 190, padding: "9px 12px", borderRadius: 10, fontSize: 13.5, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
           />
-          <div style={{ display: "flex", gap: 5 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             <button onClick={() => setStav("aktivni")} style={prepinac(stav === "aktivni")}>Aktívni ({pocty.aktivni})</button>
             <button onClick={() => setStav("neaktivni")} style={prepinac(stav === "neaktivni")}>Neaktívni ({pocty.neaktivni})</button>
             <button onClick={() => setStav("cakaju")} title="Ľudia bez jediného tréningu: dopyty a dohodnuté úvodné" style={prepinac(stav === "cakaju")}>Dopyty / čakajú ({pocty.cakaju})</button>
@@ -3327,7 +3327,7 @@ function PrepinacFiltra({ uzke, zmena, children }: { uzke: boolean; zmena: strin
 }
 
 const prepinac = (on: boolean) => ({
-  padding: "6px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+  padding: "6px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" as const,
   border: `1px solid ${on ? C.accent : C.border}`,
   background: on ? C.accentBg : "transparent",
   color: on ? C.accentLight : C.textMuted,

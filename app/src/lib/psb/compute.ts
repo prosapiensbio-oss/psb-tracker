@@ -2586,7 +2586,9 @@ export function deriveAnomalies(
       `referral|${l.id}`,
       "orange",
       "Odmena za odporúčanie",
-      `${l.referrer} odporučil ${l.name}${uzTrenuje ? ", ktorý už trénuje" : " (zatiaľ dopyt, ešte netrénuje)"} — nezabudni na 10 % zľavu za doporučenie`,
+      // Bez slovesa a bez skloňovania (1. 11. 2026): „Jakub Kaňovsky odporučil
+      // Linda Muth, ktorý už trénuje" mal zlý pád aj rod. Mená kanonické z karty.
+      `Odporúčanie: ${ref.name} → ${byNorm[normName(l.name)] ?? l.name} (${uzTrenuje ? "už trénuje" : "zatiaľ dopyt, ešte netrénuje"}) — nezabudni na 10 % zľavu za doporučenie`,
       l.referrer,
     );
   }

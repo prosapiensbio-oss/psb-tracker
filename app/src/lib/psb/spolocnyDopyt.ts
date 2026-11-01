@@ -49,6 +49,11 @@ const ZDIELANE = new Set([
   "/api/platby?klient=1",
   "/api/kalendar",
   "/api/jarvis-memory",
+  // Workspace pri otvorení pýtal tieto dve dvakrát (Uzávierka + banka; App +
+  // krok SMS). Obe sú čisté SELECTy (1. 11. 2026). Po poslanej SMS non-GET
+  // pamäť zahodí, takže „komu už odišla" nikdy nepríde staré.
+  "/api/periods",
+  "/api/sms?odoslane=1",
 ]);
 
 /**

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { membershipBucket } from "./compute";
 import { jePredplatne, nazovProduktu, skupinaProduktu, moznostiProduktov, nazovVoFiltri } from "./nazvyProduktov";
 
 describe("nazovProduktu", () => {
@@ -67,5 +68,13 @@ describe("filter pod grafom balíčkov", () => {
     const m = moznostiProduktov(["OFF - 6h S viazanostou", "6h Předplatné"]);
     expect(m).toHaveLength(1);
     expect(nazovVoFiltri("OFF - 6h S viazanostou")).toBe(nazovVoFiltri("6h Předplatné"));
+  });
+});
+
+describe("filter balíčkov hovorí slovami grafu", () => {
+  it("SPECIAL 3 a DYNAMIKA majú názov skupiny z membershipBucket", () => {
+    for (const n of ["SPECIAL 3", "DYNAMIKA", "ONE YEAR"]) expect(nazovVoFiltri(n)).toBe(membershipBucket(n));
+    expect(nazovVoFiltri("SPECIAL 3")).toBe("Špeciál");
+    expect(nazovVoFiltri("DYNAMIKA")).toBe("Iné");
   });
 });

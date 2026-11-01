@@ -60,10 +60,14 @@ export function nazovProduktu(nazov: string): string {
 /**
  * Názov vo filtri pod grafom balíčkov. Graf hovorí „6h Předplatné", „Ročné" —
  * filter nesmel hovoriť „OFF - 6h S viazanostou", „ONE YEAR" (kontrola po
- * nasadení, 1. 11. 2026). V dátach ostáva pôvodný názov.
+ * nasadení, 1. 11. 2026). To isté „SPECIAL 3" proti „Špeciál" a staré „DYNAMIKA"
+ * proti „Iné" — skupiny `membershipBucket`. V dátach ostáva pôvodný názov.
  */
 export function nazovVoFiltri(nazov: string): string {
-  return /one year/i.test(nazov || "") ? "Ročné" : nazovProduktu(nazov);
+  if (/one year/i.test(nazov || "")) return "Ročné";
+  if (/special|špeci/i.test(nazov || "")) return "Špeciál";
+  if (/dynamika|mfr|korekcia/i.test(nazov || "")) return "Iné";
+  return nazovProduktu(nazov);
 }
 
 /**
