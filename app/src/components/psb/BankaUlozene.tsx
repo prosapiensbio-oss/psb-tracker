@@ -1,5 +1,6 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
@@ -9,6 +10,8 @@ import { kategorieZoznam } from "./Banka";
 import { jeKategoriaPrijmu, KATEGORIE_PRIJMU } from "../../lib/psb/kategoriePrijmov";
 import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, type FilterPohybov } from "../../lib/psb/filtrePohybov";
 import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
+import { suhrnPodlaKategorie, vydavkySoZnamymPravidlom } from "../../lib/psb/vydavkySPravidlom";
+import { FioStiahnutie } from "./FioStiahnutie";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
 
@@ -127,40 +130,6 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
   };
   useEffect(nacitaj, []);
 
-  /**
-   * STIAHNUŤ Z FIO rovno nad zoznamom na potvrdenie (Jerry, 30. 10. 2026).
-   *
-   * Je to tá istá akcia `auto`, ktorú púšťa nočný plánovač: posledných 35 dní,
-   * zapíše len nové pohyby, nepotvrdené, kategória z pravidiel. Náhľad netreba
-   * — potvrdzuje sa práve v tomto zozname. Banka pustí jedno volanie za 30 s;
-   * jej odmietnutie sa ukáže vetou a nezmizne.
-   */
-  const [fioBezi, setFioBezi] = useState(false);
-  const stiahniFio = async () => {
-    if (fioBezi) return;
-    setFioBezi(true); setSprava("");
-    let r: { ok?: boolean; chyba?: string; error?: string; vydavky?: number; prijmy?: number; zamknute?: number };
-    try {
-      const res = await fetch("/api/fio", {
-        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ akcia: "auto" }),
-      });
-      const text = await res.text();
-      try { r = JSON.parse(text) as typeof r; }
-      catch { r = { ok: false, chyba: `Server odpovedal ${res.status}: ${text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)}` }; }
-    } catch (e) {
-      r = { ok: false, chyba: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` };
-    }
-    setFioBezi(false);
-    if (!r.ok) { setSprava(`Fio sa nestiahlo — ${r.chyba || r.error || "neznáma chyba"}`); return; }
-    const v = r.vydavky || 0, p = r.prijmy || 0;
-    setSprava(v || p
-      ? `Stiahnuté z Fio: ${v} ${v === 1 ? "nový výdavok" : v > 1 && v < 5 ? "nové výdavky" : "nových výdavkov"}, ${p} ${p === 1 ? "príjem" : p > 1 && p < 5 ? "príjmy" : "príjmov"}.`
-      : "Stiahnuté z Fio — nič nové, všetko už je v Kokpite.");
-    nacitaj();
-    if (v || p) oznam("peniaze");
-  };
-
   // V Kontrole peňazí len odomknuté mesiace; inde všetko.
   const pohybyVidno = kontrola ? pohyby.filter((p) => !zamknute.has(String(p.datum).slice(0, 7))) : pohyby;
   const mesiace = [...new Set(pohybyVidno.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
@@ -194,6 +163,24 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
     ? zMesiaca.filter((p) => String(p.datum).slice(0, 10) >= pondelok && (cakaNaPotvrdenie(p, maSplit(p)) || patriDoFiltra(p, "nezaradene", maSplit(p)))).length
     : 0;
 
+  /**
+   * POTVRDIŤ VŠETKY SO ZNÁMYM PRAVIDLOM (1. 11. 2026). 87 z 88 vecí v Kontrole
+   * boli výdavky s kategóriou z naučeného pravidla — 87 klikov, kým sa človek
+   * dostal k tým 3, ktoré naozaj potrebujú hlavu. Stále je to rozhodnutie
+   * človeka: okno ukáže kategórie a súčty a potvrdí sa až klikom; kategóriu,
+   * ktorá nesedí, sa dá odškrtnúť a ostane na ručné.
+   */
+  const soZnamymPravidlom = kontrola ? vydavkySoZnamymPravidlom(zMesiaca, pravidla, maSplit) : [];
+  const [oknoPravidla, setOknoPravidla] = useState(false);
+  const [vynechaneKat, setVynechaneKat] = useState<Set<string>>(new Set());
+  const skupinyPravidla = suhrnPodlaKategorie(soZnamymPravidlom);
+  const vybranePravidlom = soZnamymPravidlom.filter((p) => !vynechaneKat.has(p.kategoria));
+  const potvrdPravidlom = async () => {
+    const sumaVyberu = vybranePravidlom.reduce((a, p) => a + p.suma, 0);
+    setOknoPravidla(false);
+    await potvrd(vybranePravidlom.map((p) => p.kluc), false, `${fmtCZK(sumaVyberu)}, známe pravidlo`);
+  };
+
   /** Bez `kluce` sa mení celý označený výber; s nimi len tie riadky. */
   const zmen = async (kategoria: string, kluce?: string[], poznamka?: string) => {
     const vyber = kluce ? new Set(kluce) : oznacene;
@@ -226,23 +213,31 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
     }
   };
 
-  /** Potvrdí (alebo so `zrus` vráti medzi návrhy) dané výdavky. */
-  const potvrd = async (kluce: string[], zrus = false) => {
+  /**
+   * Potvrdí (alebo so `zrus` vráti medzi návrhy) dané výdavky.
+   * `hromadne` = popis do správy pri potvrdení so známym pravidlom; tá správa
+   * nezmizne sama, keď sa niečo preskočilo (pamäť „Tichá chyba").
+   */
+  const potvrd = async (kluce: string[], zrus = false, hromadne?: string) => {
     if (!kluce.length) return;
     zapamataj(`${zrus ? "vrátenie" : "potvrdenie"} ${kluce.length === 1 ? "1 výdavku" : `${kluce.length} výdavkov`}`, kluce);
     setBusy(true);
     const r = await fetch("/api/fio", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "potvrd", kluce, zrus, rozdelene: kluce.filter((k) => platnySplit(pohybSplits?.[k])) }),
-    }).then((x) => x.json()).catch(() => ({ ok: false }));
+      body: JSON.stringify({ akcia: "potvrd", kluce, zrus, rozdelene: kluce.filter((k) => platnySplit(pohybSplits?.[k])), ...(hromadne ? { hromadnePravidlo: true } : {}) }),
+    }).then((x) => x.json()).catch((e) => ({ ok: false, error: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` })) as { ok?: boolean; potvrdene?: number; preskocene?: number; error?: string };
     setBusy(false);
     if (r.ok) {
-      setSprava(`${zrus ? "Vrátené medzi návrhy" : "Potvrdené"}: ${r.potvrdene}${r.preskocene ? ` · ${r.preskocene} preskočených (bez kategórie alebo uzavretý mesiac)` : ""}. ⌘Z vráti.`);
+      setSprava(`${zrus ? "Vrátené medzi návrhy" : "Potvrdené"}: ${r.potvrdene}${hromadne ? ` (${hromadne})` : ""}${r.preskocene ? ` · ${r.preskocene} preskočených (bez kategórie alebo uzavretý mesiac)` : ""}. ⌘Z vráti.`);
       setOznacene(new Set());
       nacitaj();
       oznam("peniaze");
-      setTimeout(() => setSprava(""), 6000);
-    } else setSprava("Potvrdenie sa nepodarilo.");
+      if (!r.preskocene) setTimeout(() => setSprava(""), hromadne ? 15000 : 6000);
+    } else {
+      // Časť mohla prejsť: zoznam sa načíta znova, nech obrazovka hovorí pravdu.
+      setSprava(`Potvrdenie sa nepodarilo. ${r.error || ""}`.trim());
+      if (r.potvrdene) { nacitaj(); oznam("peniaze"); }
+    }
   };
 
   /** Krok späť — vráti kategóriu aj potvrdenie riadkov pred poslednou akciou. */
@@ -326,13 +321,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
         <H3><Info label={kontrola ? "Výdavky na potvrdenie" : uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
-        {kontrola && (
-          <button onClick={(e) => { e.stopPropagation(); void stiahniFio(); }} disabled={fioBezi}
-            title="Stiahne pohyby za posledných 35 dní — to isté, čo Kokpit robí každú noc"
-            style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: fioBezi ? "default" : "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600, opacity: fioBezi ? 0.5 : 1 }}>
-            {fioBezi ? "sťahujem…" : "↻ Stiahnuť Fio"}
-          </button>
-        )}
+        {kontrola && <FioStiahnutie onZapisane={nacitaj} />}
         {uzavierka && (
           <span style={{ fontSize: 11.5, color: naKontrolu ? C.orange : C.green }}>{naKontrolu ? `${naKontrolu} na kontrolu${kontrola && tentoTyzden ? ` · ${tentoTyzden} z tohto týždňa` : ""}` : "všetko skontrolované ✓"}</span>
         )}
@@ -343,6 +332,13 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
 
       {(otvorene || uzavierka) && (
         <div style={{ marginTop: 12 }}>
+          {soZnamymPravidlom.length > 0 && (
+            <button disabled={busy} onClick={() => { setVynechaneKat(new Set()); setOknoPravidla(true); }}
+              title="Ukáže kategórie a súčty; potvrdí sa až v okne"
+              style={{ display: "block", marginBottom: 10, padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: busy ? "default" : "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 14), color: C.green }}>
+              ✓ Potvrdiť všetky so známym pravidlom ({soZnamymPravidlom.length})
+            </button>
+          )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
             {ibaKat && (
               <button onClick={() => setIbaKat("")}
@@ -380,7 +376,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
               style={{ flex: "1 1 180px", minWidth: 0, padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           </div>
 
-          {sprava && <div style={{ marginBottom: 10, padding: "8px 11px", borderRadius: 8, background: mix(sprava.startsWith("Fio sa nestiahlo") ? C.orange : C.green, 12), color: C.text, fontSize: 12.5 }}>{sprava}</div>}
+          {sprava && <div style={{ marginBottom: 10, padding: "8px 11px", borderRadius: 8, background: mix(sprava.startsWith("Potvrdenie sa nepodarilo") ? C.orange : C.green, 12), color: C.text, fontSize: 12.5 }}>{sprava}</div>}
 
           {oznacene.size > 0 && (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 32)}` }}>
@@ -628,6 +624,42 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
         </div>
       )}
     </Card>
+    {/* Portálom: karta Workspace je absolútne umiestnená a orezáva, okno by v nej uviazlo. */}
+    {oknoPravidla && typeof document !== "undefined" && createPortal(
+      <div onClick={() => setOknoPravidla(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div role="dialog" aria-modal="true" aria-label="Potvrdiť výdavky so známym pravidlom" onClick={(e) => e.stopPropagation()}
+          style={{ background: C.surface, color: C.text, borderRadius: 12, border: `1px solid ${C.border}`, padding: 16, width: "min(560px, 100%)", maxHeight: "86vh", display: "flex", flexDirection: "column" }}>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>Potvrdiť {vybranePravidlom.length} výdavkov so známym pravidlom?</div>
+          <div style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 10px", lineHeight: 1.5 }}>
+            Kategóriu im dalo pravidlo, ktoré si už raz potvrdil. Kategóriu, ktorá nesedí, odškrtni — ostane na ručné. Výdavky bez pravidla sa nepotvrdia. ⌘Z vráti.
+          </div>
+          <div style={{ overflowY: "auto", minHeight: 0, flexGrow: 1 }}>
+            {skupinyPravidla.map((sk) => (
+              <label key={sk.kategoria} style={{ display: "flex", gap: 9, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, cursor: "pointer" }}>
+                <input type="checkbox" checked={!vynechaneKat.has(sk.kategoria)}
+                  onChange={(e) => setVynechaneKat((v) => { const n = new Set(v); if (e.target.checked) n.delete(sk.kategoria); else n.add(sk.kategoria); return n; })}
+                  style={{ accentColor: C.accent, cursor: "pointer" }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>{popisCiel(sk.kategoria)}</span>
+                  <span style={{ display: "block", fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sk.kto.slice(0, 4).join(", ")}{sk.kto.length > 4 ? ` a ďalší (${sk.kto.length - 4})` : ""}</span>
+                </span>
+                <span style={{ fontSize: 12, color: C.textMuted, whiteSpace: "nowrap" }}>{sk.pocet}×</span>
+                <span style={{ fontSize: 12.5, minWidth: 92, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(sk.suma)}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
+            <span style={{ fontSize: 12.5, marginRight: "auto" }}>Spolu <b style={{ fontVariantNumeric: "tabular-nums" }}>{fmtCZK(vybranePravidlom.reduce((a, p) => a + p.suma, 0))}</b></span>
+            <button onClick={() => setOknoPravidla(false)} style={{ padding: "7px 13px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>Zrušiť</button>
+            <button disabled={!vybranePravidlom.length || busy} onClick={() => void potvrdPravidlom()}
+              style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: vybranePravidlom.length ? "pointer" : "not-allowed", fontFamily: "inherit", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 16), color: C.green }}>
+              ✓ Potvrdiť {vybranePravidlom.length}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )}
     </div>
   );
 }

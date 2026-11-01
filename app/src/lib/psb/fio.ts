@@ -299,11 +299,19 @@ const SEED: [RegExp, string][] = [
  */
 export const MIN_VZOR = 4;
 
+/** Kategória z NAUČENÉHO pravidla (bez zabudovaných odhadov); prvé v poradí vyhráva. */
+export function kategoriaZPravidiel(text: string, pravidla: { vzor: string; kategoria: string }[] = []): string {
+  const t = text.toLowerCase();
+  for (const p of pravidla) {
+    if (p.vzor && p.vzor.trim().length >= MIN_VZOR && t.includes(p.vzor.toLowerCase())) return p.kategoria;
+  }
+  return "";
+}
+
 export function odhadniKategoriu(text: string, pravidla: { vzor: string; kategoria: string }[] = []): string {
   // Naučené pravidlá majú prednosť pred zabudovanými — Jerry vie lepšie.
-  for (const p of pravidla) {
-    if (p.vzor && p.vzor.trim().length >= MIN_VZOR && text.toLowerCase().includes(p.vzor.toLowerCase())) return p.kategoria;
-  }
+  const zPravidla = kategoriaZPravidiel(text, pravidla);
+  if (zPravidla) return zPravidla;
   for (const [re, kat] of SEED) if (re.test(text)) return kat;
   return "";
 }
