@@ -3297,3 +3297,19 @@ b76aef4). Čo z toho musí vedieť ďalšia session:
 - Výdavky so známym pravidlom sa potvrdzujú 1 klikom s potvrdením, nikdy samy. Príjem
   s VS = faktúra je návrh na 1 klik (`navrhZFaktury`) a nič sa z neho nenaučí.
 - V Uploade ostal len počet BTC dokladov a odkaz; párovanie je v Kontrole peňazí.
+
+**Druhé kolo (1. 11., verzia 2280)**
+- „Bez balíčka“ už nie je len Aktívny, pravidlo je `patriDoZoznamu`. Dlžník nie je
+  v „Balíček dojde“, stav hodín má v riadku Nezaplatené (`dojdeADlh.ts`).
+- Ukončený klient s termínom po ukončení = otázka v registri (`otazkaUkonceneho`).
+  Balíček sa nezakladá sám.
+- Tržby proti P&L: P&L počíta aj iné príjmy (`prijem.ine`), tabuľka Tržby len platby
+  klientov. Október: 251 062 proti 249 969; rozdiel nie je chyba. Prechod Fio v App
+  čaká na `dataHotove`, kto číta `peniazeOd`, musí tiež.
+- Nový automatický POST pri štarte patrí do `jeTichyPostPriStarte` len vtedy, keď pri
+  zmene volá `oznam`.
+- `hodinyKratko` je krátky tvar zostatku, `textZostatku` zlomok. Zdroj dopytu pre každú
+  tabuľku: `klucZdroja`/`popisZdroja`. `rezimBloku`: `data-tesne` len pre týždeň na
+  telefóne. Pri `premenovane` nesú `pred` a `po` názvy, nie čas (`dniZmeny`) — výpočet
+  týždňa z názvu zhodil celú appku.
+
