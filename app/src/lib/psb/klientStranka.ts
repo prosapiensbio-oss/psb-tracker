@@ -563,9 +563,13 @@ function blokOsi(vstup: VypisKlienta, zlozena: boolean): string {
    * sa otvára druhýkrát. Vidno preto prvé riadky a pod nimi „…a dalších N
    * řádků"; kto chce celú históriu, rozklikne ju jedným ťuknutím.
    *
-   * `PRVYCH` je zámerne malé číslo: tri riadky sú ukážka, osem je zoznam.
+   * `ZAKLAD` je zámerne malé číslo: tri riadky sú ukážka, osem je zoznam. Vidno
+   * ale aspoň tri tréningy (Jerry, 1. 11. 2026 pri Kalvovi): riadky balíčka a
+   * prenosu inak zaberú štyri miesta a nad trojuholníkom ostanú dva tréningy.
    */
-  const PRVYCH = 4;
+  const ZAKLAD = 4;
+  let PRVYCH = ZAKLAD;
+  while (PRVYCH < v.os.length && v.os.slice(0, PRVYCH).filter((b) => b.druh === "trening").length < 3) PRVYCH++;
   if (v.os.length > PRVYCH + 2) {
     const zvysok = v.os.length - PRVYCH;
     return `<div style="margin-top:30px">
