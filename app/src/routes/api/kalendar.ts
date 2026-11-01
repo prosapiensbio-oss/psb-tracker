@@ -360,7 +360,7 @@ export const Route = createFileRoute("/api/kalendar")({
            * znamená len, že o ňom dlho nikto nerozhodol.
            */
           DB.prepare(
-            // „Zmizla po konci" sa stráži až v kóde (`zmizlaPoKonci`): zmizla_at
+            // „Zmizla po konci“ sa stráži až v kóde (`zmizlaPoKonci`): zmizla_at
             // je UTC, koniec pražský a v SQL sa to porovnať nedá.
             `SELECT u.uid, u.trener, u.zaciatok, u.koniec, u.nazov, u.klient, u.typ, u.zmizla_at
                FROM kal_udalosti u

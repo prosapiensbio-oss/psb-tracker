@@ -1,7 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { audit } from "./audit.server";
-
 /**
  * ZÁPIS BEHU AUTOMATU.
  *
@@ -35,23 +33,5 @@ export async function zapisBeh(
     }
   } catch {
     /* zápis stavu nesmie zhodiť automat */
-  }
-}
-
-/** Obal pre celý beh: zapíše úspech aj pád a chybu pustí ďalej. */
-export async function sBehom<T>(
-  DB: D1Database | undefined,
-  automat: string,
-  praca: () => Promise<{ vysledok: T; detail?: string }>,
-): Promise<T> {
-  try {
-    const { vysledok, detail } = await praca();
-    await zapisBeh(DB, automat, true, detail);
-    return vysledok;
-  } catch (e) {
-    const sprava = e instanceof Error ? e.message : String(e);
-    await zapisBeh(DB, automat, false, undefined, sprava);
-    if (DB) await audit(DB, { action: "automat-spadol", predmet: automat, reason: sprava.slice(0, 300) }).catch(() => undefined);
-    throw e;
   }
 }
