@@ -19,6 +19,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
+  // Bez náhľadových adries. So zapnutými ostali dostupné staré verzie na
+  // `<hash>-kokpit.<účet>.workers.dev` — aj tie s únikom tajomstiev opraveným
+  // 1. 11. 2026, a heslo ani token ich nezatvoria. Beta ide tým istým súborom
+  // (`beta.sh` prepisuje len `--name`), takže toto platí aj pre ňu.
+  "preview_urls": false,
+
   // Statické súbory sa servírujú priamo, všetko ostatné (vrátane "/") padá
   // na SSR Worker. run_worker_first zapnuté BYŤ NESMIE — Worker nemá trasu
   // na /assets/* a vracal by na ne 404.
