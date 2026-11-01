@@ -72,6 +72,50 @@ export function rezervaZaObdobie(
 }
 
 /**
+ * KOĽKO TERAZ ODLOŽIŤ — jedno číslo pre register aj Jarvisa.
+ *
+ * Do 1. 11. 2026 si register pripočítal neodložené predošlé obdobie a Jarvis
+ * odpovedal len sumou za terajšie, takže na otázku „koľko mám odložiť" hovoril
+ * menej než notifikácia nad ním.
+ *
+ * Predošlé obdobie je vybavené odpoveďou v registri (`ack`) alebo prevodom
+ * medzi jeho dňom a dňom terajšieho.
+ */
+export type OdlozenieTeraz = {
+  obdobie: ObdobieRezervy;
+  teraz: RezervaNaOdlozenie;
+  /** Neodložený zvyšok predošlého obdobia; `null` = nič nechýba. */
+  dlzne: RezervaNaOdlozenie | null;
+  /** Čo na rezervu odišlo od dňa terajšej splatnosti. */
+  uzOdlozene: number;
+  /** Koľko ešte poslať; 0 = nič (aj pred prvým termínom `REZERVA_START`). */
+  zostava: number;
+};
+
+export function odlozenieTeraz(
+  platby: { date: string; amount: number }[],
+  prevody: PrevodRezervy[],
+  ack: Record<string, unknown>,
+  dnes: string,
+): OdlozenieTeraz {
+  const obdobie = obdobieRezervy(dnes);
+  const teraz = rezervaZaObdobie(platby, obdobie);
+  const pred = predosleObdobie(obdobie);
+  const predOdlozene = odlozeneOd(prevody, pred.splatne, obdobie.splatne);
+  const predRezerva = rezervaZaObdobie(platby, pred);
+  const predSuma = pred.splatne >= REZERVA_START ? predRezerva.suma : 0;
+  const dlzne = !ack[`rezerva|${pred.splatne}`] && predSuma > 0 && predOdlozene < predSuma - 1
+    ? { ...predRezerva, suma: predSuma - Math.max(0, predOdlozene) }
+    : null;
+  const spolu = teraz.suma + (dlzne?.suma || 0);
+  const uzOdlozene = odlozeneOd(prevody, obdobie.splatne);
+  const zostava = spolu > 0 && obdobie.splatne >= REZERVA_START && uzOdlozene < spolu - 1
+    ? spolu - Math.max(0, uzOdlozene)
+    : 0;
+  return { obdobie, teraz, dlzne, uzOdlozene, zostava };
+}
+
+/**
  * REZERVNÝ ÚČET PSB (Jerry, 27. 10. 2026): Fio 2503222384/2010, bez karty.
  * Peniaze naň idú z hlavného účtu, ktorý Kokpit každú noc sťahuje — preto sa
  * prevod spozná podľa ČÍSLA protiúčtu (meno je na oboch účtoch to isté

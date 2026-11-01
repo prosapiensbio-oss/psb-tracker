@@ -54,7 +54,7 @@ import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
 import { dnesPraha } from "./cas";
-import { obdobieRezervy, odlozeneOd, REZERVA_CISLO, REZERVA_DNI, REZERVA_PODIEL, rezervaZaObdobie, stavRezervnehoUctu } from "./rezervaOdlozenie";
+import { odlozeneOd, odlozenieTeraz, REZERVA_CISLO, REZERVA_DNI, REZERVA_PODIEL, stavRezervnehoUctu } from "./rezervaOdlozenie";
 import { trvanieText, zaciatokSpoluprace } from "./spolupraca";
 import { metrikyDozoru, suhrnDozoru } from "./reklamaDozor";
 
@@ -224,8 +224,8 @@ export function buildAiContext(
   const beziaci = kotva.ciastocny ? fin.find((m) => m.month === kotva.mesiac) : undefined;
   const kpi = {
     aktivnychKlientov: clientList.filter((c) => c.status !== "Neaktívny").length,
-    // Vedome NIE „tento týždeň“: PTminder sa prepisuje raz týždenne, takže
-    // posledný týždeň s dátami je spravidla ten minulý. Názov klamal.
+    // Vedome NIE „tento týždeň“: bežiaci týždeň ešte nie je celý, takže
+    // posledný úplný je spravidla ten minulý. Názov klamal.
     odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), ...(lastWeek ? rozsahTyzdna(lastWeek) : { tyzden: null, od: null, do: null }) },
     zarobkyPoslednyPlnyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), czk: r0(lastMonth.revenue) } : null,
     klientov6M: sixM.length,
@@ -353,7 +353,7 @@ export function buildAiContext(
 
   // ── Kalendár ──────────────────────────────────────────────────────────────
   //
-  // PTminder je účtovníctvo, kalendár je predpoveď — a Jarvis dovtedy videl len
+  // Evidencia je účtovníctvo, kalendár je predpoveď — a Jarvis dovtedy videl len
   // to prvé. Preto na „koľko sa mi tento týždeň zrušilo“ nevedel odpovedať a na
   // „kde vidím zrušené tréningy“ dokonca tvrdil, že to appka nesleduje.
   //
@@ -378,7 +378,7 @@ export function buildAiContext(
    */
   void porovnanie; void balicky;
   const subeznyChodBlok = {
-    poznamka: "PREČÍTAJ, NEPOČÍTAJ. Do PTmindera sa od 19. 10. 2026 nezapisuje; posledný export je z 19. 10. Kokpit je jediná evidencia dochádzky (Google kalendár), hodín (balíčky v Kokpite) aj peňazí (od 10/2026). Porovnania Kokpit ↔ PTminder sú vypnuté — na otázku „sedí to s PTminderom?“ odpovedz, že sa už neporovnáva. Odkiaľ je zostatok klienta, hovorí jeho „zostatokOdkial“ (Kokpit, alebo ešte export PTmindera, kým Jerry neschváli prepnutie). Staré členstvá zaplatené v PTminderi ďalej rozhoduje jedno pravidlo „zaplatený“ (poistka z PTmindera).",
+    poznamka: "PREČÍTAJ, NEPOČÍTAJ. Do PTmindera sa od 19. 10. 2026 nezapisuje; posledný export je z 19. 10. Kokpit je jediná evidencia dochádzky (Google kalendár), hodín (balíčky v Kokpite) aj peňazí (od 10/2026). Porovnania Kokpit ↔ PTminder sú vypnuté — na otázku „sedí to s PTminderom?“ odpovedz, že sa už neporovnáva. Zostatok hodín klienta je od 20. 10. 2026 vždy z balíčkov v Kokpite; kto v Kokpite nemá aktívny balíček, je bez balíčka, aj keby v poslednom exporte hodiny mal. Ako vznikol, hovorí jeho „zostatokOdkial“. Staré členstvá zaplatené v PTminderi ďalej rozhoduje jedno pravidlo „zaplatený“ (poistka z PTmindera).",
     cakaNaPriradenie: platby?.cakaju ?? 0,
   };
 
@@ -829,7 +829,7 @@ export function buildAiContext(
       // nedáva, kým sa nezaplatí; mínus nie je dlh v korunách, dlh je v `dlh`.
       zostatokNadRamec: c.packageTotal && c.packageRemaining < 0 ? -c.packageRemaining : undefined,
       // „≈" znamená, že export zostatok nedal a appka ho dopočítala z odtrénovaných
-      // hodín. Povedz to, keď sa na zostatok niekto pýta — nie je to výpis z PTmindera.
+      // hodín. Povedz to, keď sa na zostatok niekto pýta — nie je to presný zápis.
       zostatokDopocitany: c.packageOdvodeny || undefined,
       zostatokOdkial: c.packageOdkial || undefined,
       stavBalicka: c.packageStatus || null,
@@ -1021,7 +1021,7 @@ export function buildAiContext(
         klient: x.meno, trener: x.trener, dovod: x.dovod, clenstvo: x.membership,
         vMinuseHodin: x.vMinuse, objednanychTerminov: x.objednanych, dniOdTreningu: x.dni,
       })),
-      poznamka: "Aktívni klienti, ktorým nezostala ani hodina — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z PTmindera AJ z vlastnej evidencie balíčkov naraz, takže kto má balíček nahodený v Kokpite, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail — tam je len zostatok z exportu.",
+      poznamka: "Aktívni klienti, ktorým nezostala ani hodina — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z balíčkov v Kokpite, takže kto má platný balíček s hodinami, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail.",
     },
     // Predaje z PTmindera od 1. 10., ktoré Kokpit nemá v rovnakej podobe
     // (notifikácia „PTminder a Kokpit: iný balíček", 21. 10. 2026).
@@ -1121,17 +1121,20 @@ export function buildAiContext(
         }
       : null,
     rezervaFirmy: (() => {
-      const o = obdobieRezervy(dnesPraha());
-      const r = rezervaZaObdobie(data.payments, o);
+      const s = odlozenieTeraz(data.payments, data.rezervaPrevody || [], data.anomalyAck || {}, dnesPraha());
+      const o = s.obdobie;
+      const r = s.teraz;
       return {
-        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Rezerva firmy (Jerry, 26. 10. 2026): 3. a 18. v mesiaci odložiť 5 % z platieb klientov za uplynulé obdobie (3. = platby 18.–2., 18. = platby 3.–17.) na rezervný účet PSB (stavRezervnehoUctu = súčet prevodov naň, je aj v rezerve firmy). Pripomienka v registri má kľúč rezerva|<deň> a zmizne sama, keď prevod príde vo výpise (odlozenePrevodom). Suma je hotová, nerátaj ju z platieb sám.",
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Rezerva firmy (Jerry, 26. 10. 2026): 3. a 18. v mesiaci odložiť 5 % z platieb klientov za uplynulé obdobie (3. = platby 18.–2., 18. = platby 3.–17.) na rezervný účet PSB (stavRezervnehoUctu = súčet prevodov naň, je aj v rezerve firmy). Pripomienka v registri má kľúč rezerva|<deň> a zmizne sama, keď prevod príde vo výpise (odlozenePrevodom). odlozit je koľko ešte poslať, to isté číslo ako v pripomienke v registri: 5 % za toto obdobie (zaToToObdobie) plus neodložené z predošlého (neodlozenePredosle) mínus čo už odišlo. Suma je hotová, nerátaj ju z platieb sám.",
         podiel: REZERVA_PODIEL,
         dni: [...REZERVA_DNI],
         posledneSplatne: o.splatne,
         obdobie: { od: o.od, do: o.do },
         prijate: r.prijate,
         pocetPlatieb: r.pocet,
-        odlozit: r.suma,
+        odlozit: s.zostava,
+        zaToToObdobie: r.suma,
+        neodlozenePredosle: s.dlzne?.suma || 0,
         odlozenePrevodom: odlozeneOd(data.rezervaPrevody || [], o.splatne),
         odlozeneVybavene: !!data.anomalyAck?.[`rezerva|${o.splatne}`],
         rezervnyUcet: `${REZERVA_CISLO}/2010`,
@@ -1273,7 +1276,7 @@ export function buildAiContext(
       vyplaty: btc.vyplaty || [],
       nakupy: btc.nakupy || [],
       cielSats: btc.cielSats ?? null,
-      poznamka: "CELÁ kniha z appky prosapiens-btc: platby klientov, výplaty z rezervy, dokúpené satoshi a cieľ. Je to druhá appka a vlastná databáza — do SQL dopytov (`dopyt_db`) sa NEDOSTANEŠ, tieto čísla sú jediná cesta k nim, tak ich nehľadaj v tabuľkách Kokpitu. `platby` sú JEDNOTLIVÉ platby (dátum, satoshi, hodnota vtedy aj dnes) — na otázku o konkrétnej platbe odpovedaj z nich, nie zo súčtu v `klienti`. POZOR, `czkVtedy` NIE JE FAKTUROVANÁ CENA — je to hodnota poslaných mincí v deň platby a od ceny v PTminderi sa líši o kurz a spread brány (Michal Knapčok 7. 7. 2026: PTminder 14 805 Kč, bitcoin 14 598 Kč). Keď sa niekto pýta, KOĽKO KLIENT ZAPLATIL, odpovedaj sumou z PTmindera — ten je zdroj pravdy o tržbách; tieto čísla hovoria, ČÍM zaplatil a čo to má za hodnotu. Ak nie je jasné, ktoré chce, povedz obe a pomenuj rozdiel. `czkDnes` sú tie isté satoshi dnešným kurzom, teda čo by mince stáli teraz. PREČÍTAJ, NEPOČÍTAJ: obe čísla sú hotové. NEZAMIEŇAJ so „zhodnotením“ z BTC appky — to je vážený výnos celej rezervy proti nákupnej cene. Keď kurz nie je známy, czkDnes je null a dnešná hodnota sa NETVRDÍ.",
+      poznamka: "CELÁ kniha z appky prosapiens-btc: platby klientov, výplaty z rezervy, dokúpené satoshi a cieľ. Je to druhá appka a vlastná databáza — do SQL dopytov (`dopyt_db`) sa NEDOSTANEŠ, tieto čísla sú jediná cesta k nim, tak ich nehľadaj v tabuľkách Kokpitu. `platby` sú JEDNOTLIVÉ platby (dátum, satoshi, hodnota vtedy aj dnes) — na otázku o konkrétnej platbe odpovedaj z nich, nie zo súčtu v `klienti`. POZOR, `czkVtedy` NIE JE FAKTUROVANÁ CENA — je to hodnota poslaných mincí v deň platby a od ceny balíčka sa líši o kurz a spread brány (Michal Knapčok 7. 7. 2026: PTminder 14 805 Kč, bitcoin 14 598 Kč). Keď sa niekto pýta, KOĽKO KLIENT ZAPLATIL, odpovedaj sumou z knihy platieb (do 9/2026 archív PTmindera, od 10/2026 Kokpit) — tá je zdroj pravdy o tržbách; tieto čísla hovoria, ČÍM zaplatil a čo to má za hodnotu. Ak nie je jasné, ktoré chce, povedz obe a pomenuj rozdiel. `czkDnes` sú tie isté satoshi dnešným kurzom, teda čo by mince stáli teraz. PREČÍTAJ, NEPOČÍTAJ: obe čísla sú hotové. NEZAMIEŇAJ so „zhodnotením“ z BTC appky — to je vážený výnos celej rezervy proti nákupnej cene. Keď kurz nie je známy, czkDnes je null a dnešná hodnota sa NETVRDÍ.",
     } : null,
     ziskavanie,
     ekonomikaDopytu,
