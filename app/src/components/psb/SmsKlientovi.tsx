@@ -3,7 +3,7 @@ import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { VyberMena } from "./VyberMena";
 
-import { dlzkaSpravy, textSms, cisloPreBranu, cisloNaUkazku } from "../../lib/psb/sms";
+import { dlzkaSpravy, textSms, cisloPreBranu, cisloNaUkazku, type DruhSmsMimoHodin } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 import { navrhyCislaZDopytu, type DopytKontakt } from "../../lib/psb/cisloZDopytu";
 
@@ -104,7 +104,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * v audite `sms-<druh>`. Ako `sms-odoslana` by klienta vyčistila zo
    * zoznamu kroku 2 · SMS, ktorý stojí na stave hodín.
    */
-  druhAuditu?: "ponuka" | "kalendar" | "fotky" | "anamneza" | "faktura";
+  druhAuditu?: DruhSmsMimoHodin;
   /**
    * Náhľad INEJ stránky než /v/ (anamnéza /a/<token>). Keď je, okno sa na
    * odkaz /v/ nepýta a výber rozsahu balíčkov sa nekreslí.

@@ -18,6 +18,10 @@
  * na ktorú klient po presmerovaní dorazí, a odber v telefóne tak 302 nečaká. Doména NIE JE na Cloudflare (DNS je na Websupporte), takže
  * vlastná doména workera ani Workers Route neprichádzajú do úvahy.
  *
+ * `/a/` (anamnéza) V SNIPPETE NIE JE (overené 1. 11. 2026: `/a/…` → 301 na www
+ * → 404). Preto ide priamo na workera. Keď sa do snippetu pridá, stačí sem do
+ * regexu pripísať `a` — anamnézy už idú cez túto funkciu.
+ *
  * `bez www`: `prosapiens.cz` sa 301-kou presmeruje na `www`, ale v SMS sa
  * počíta každý znak a štyri navyše sú štyri navyše.
  */
@@ -39,3 +43,9 @@ export function verejnyOdkaz(cesta: string, zaloha?: string): string {
   }
   return `${VEREJNA_DOMENA}${c}`;
 }
+
+/**
+ * `?nahlad=1` — náhľad z Kokpitu. Otvorenie sa za neho nepočíta NIKDY, aj bez
+ * prihlásenia: klient túto adresu nedostane (krátky odkaz query string zahadzuje).
+ */
+export const jeNahladTrenera = (adresa: URL): boolean => adresa.searchParams.get("nahlad") === "1";

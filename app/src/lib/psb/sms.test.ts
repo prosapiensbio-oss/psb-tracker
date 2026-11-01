@@ -94,8 +94,8 @@ describe("textSms — jedno znenie pre všetky situácie okolo hodín", () => {
   });
 
   it("bez odkazu sa neposiela veta do prázdna", () => {
-    expect(textSms({ oslovenie: "Jan", trener: "Jerry", sMailom: true })).toContain("v maili");
-    expect(textSms({ oslovenie: "Jan", trener: "Jerry" })).toContain("ozvi sa mi");
+    expect(textSms({ oslovenie: "Jan", trener: "Jerry", sMailom: true })).toContain("v mailu najdes dochazku i QR");
+    expect(textSms({ oslovenie: "Jan", trener: "Jerry" })).toContain("ozvi se mi, projdeme si hodiny");
   });
 
   it("textSmsPlatba je tá istá správa — len iný názov", () => {

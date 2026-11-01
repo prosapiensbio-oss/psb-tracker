@@ -20,6 +20,25 @@
 import { zostavaHodin } from "./mailKlientovi";
 import { vokativ } from "./oslovenie";
 
+/**
+ * POD AKOU AKCIOU SPRÁVA PÔJDE DO AUDITU.
+ *
+ * `sms-odoslana` znamená „klient dostal SMS O HODINÁCH" — číta ju krok 2 · SMS
+ * (`/api/sms?odoslane=1`), `polozkyHodin` v registri aj ranný push. Vyčistí
+ * klienta zo zoznamu a umlčí „balíček minutý" až do ďalšej zmeny stavu.
+ * Každá iná správa preto musí mať vlastný druh. 31. 10. 2026 odišla Radke
+ * Kovaříkovej SMS po úvodnom bez druhu — a Kokpit jej v ten deň zamlčal minutý
+ * balíček.
+ */
+export const DRUHY_SMS_MIMO_HODIN = ["uvodny", "ponuka", "kalendar", "fotky", "anamneza", "faktura"] as const;
+export type DruhSmsMimoHodin = (typeof DRUHY_SMS_MIMO_HODIN)[number];
+
+export function akciaSmsAuditu(v: { dotaznik?: boolean; hromadna?: unknown; druh?: unknown }): string {
+  if (v.dotaznik) return "sms-dotaznik";
+  if (v.hromadna === true) return "sms-hromadna";
+  return (DRUHY_SMS_MIMO_HODIN as readonly unknown[]).includes(v.druh) ? `sms-${String(v.druh)}` : "sms-odoslana";
+}
+
 /** Znaky, ktoré sa zmestia do GSM 03.38 — všetko ostatné prepne na UCS-2. */
 const GSM = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
   + "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
@@ -178,8 +197,8 @@ export function textSms(v: {
     : v.odkaz
     ? (v.sQr ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}` : `tady máš přehled hodin: ${v.odkaz}`)
     : v.sMailom
-      ? `v maili najdeš dochádzku aj QR na platbu${za}.`
-      : `ozvi sa mi, prejdeme si hodiny${za}.`;
+      ? `v mailu najdeš docházku i QR na platbu${za}.`
+      : `ozvi se mi, projdeme si hodiny${za}.`;
   // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
   // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.
   const o = vokativ(v.oslovenie);

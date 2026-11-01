@@ -3,7 +3,7 @@ import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { SmsKlientovi } from "./SmsKlientovi";
-import { bezDiakritiky } from "../../lib/psb/sms";
+import { textSmsAnamnezy } from "../../lib/psb/smsSablony";
 import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
@@ -111,17 +111,6 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-
-/**
- * SMS s odkazom na anamnézu (Jerry, 25. 10. 2026: „prečo tu v anamnéze nemám
- * možnosť rovno poslať odkaz"). Bez diakritiky ako úvodná SMS z Kalendára —
- * jeden mäkčeň by zhodil limit zo 160 na 70 znakov.
- */
-function textSmsAnamnezy(url: string, uzBol: boolean): string {
-  return bezDiakritiky(uzBol
-    ? `Dobry den, prosime Vas jeste o kratky dotaznik k Vasemu treninku: ${url} Dekujeme, ProSapiens Biomechanic`
-    : `Dobry den, pred uvodni lekci Vas prosime o kratky dotaznik: ${url} Dekujeme, ProSapiens Biomechanic`);
-}
 
 export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
   clients: Record<string, ClientAgg>;

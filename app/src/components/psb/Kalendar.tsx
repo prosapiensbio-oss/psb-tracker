@@ -2099,7 +2099,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
                   onClick={(e) => otvorNahlad(e, `/u/${encodeURIComponent(uvToken)}?nahlad=1`)}
                   style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí (náhľad sa nepočíta ako otvorenie)</a>
               )}
-              <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene predvolenyText={uvText} />
+              <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene druhAuditu="uvodny" predvolenyText={uvText} />
             </>
           )}
           {uvChyba && <div style={{ fontSize: 11.5, color: C.red }}>{uvChyba}</div>}
