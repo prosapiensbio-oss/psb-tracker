@@ -27,10 +27,10 @@ export const NAHLAD_DOTAZNIKA = "NAHLADDOTAZNIK";
 export const MIN_ODPOVEDI = 5;
 
 export const OTAZKY: OtazkaDotazniku[] = [
-  { id: "nps", druh: "skala", text: "Jak pravděpodobné je, že byste nás doporučil(a) známému?", od: 0, do: 10, vlavo: "vůbec", vpravo: "určitě" },
+  { id: "nps", druh: "skala", text: "Jak pravděpodobné je, že nás doporučíš známému?", od: 0, do: 10, vlavo: "vůbec", vpravo: "určitě" },
   {
     id: "hodnota", druh: "vyber", najviac: 2,
-    text: "Co je pro vás na tréninku nejcennější? (vyberte nejvýš dvě)",
+    text: "Co je pro tebe na tréninku nejcennější? (vyber nejvýš dvě)",
     moznosti: [
       { id: "ulava", text: "úleva od bolesti" },
       { id: "vysvetlenie", text: "vysvětlení, proč to bolí" },
@@ -40,11 +40,11 @@ export const OTAZKY: OtazkaDotazniku[] = [
       { id: "ine", text: "něco jiného" },
     ],
   },
-  { id: "komunikacia", druh: "skala", text: "Jak hodnotíte komunikaci mimo tréninky (SMS, termíny, platby)?", od: 1, do: 5, vlavo: "špatně", vpravo: "výborně" },
+  { id: "komunikacia", druh: "skala", text: "Jak hodnotíš komunikaci mimo tréninky (SMS, termíny, platby)?", od: 1, do: 5, vlavo: "špatně", vpravo: "výborně" },
   { id: "cena", druh: "skala", text: "Cena odpovídá tomu, co dostávám.", od: 1, do: 5, vlavo: "nesouhlasím", vpravo: "souhlasím" },
-  { id: "prostredie", druh: "skala", text: "Jak hodnotíte prostředí studia?", od: 1, do: 5, vlavo: "špatně", vpravo: "výborně" },
-  { id: "zmena", druh: "text", text: "Kdybyste mohl(a) změnit jednu věc, co by to bylo?" },
-  { id: "odkaz", druh: "text", text: "Je něco, co byste nám chtěl(a) říct?", nepovinne: true },
+  { id: "prostredie", druh: "skala", text: "Jak hodnotíš prostředí studia?", od: 1, do: 5, vlavo: "špatně", vpravo: "výborně" },
+  { id: "zmena", druh: "text", text: "Kdyby šlo změnit jednu věc, co by to bylo?" },
+  { id: "odkaz", druh: "text", text: "Je něco, co nám chceš říct?", nepovinne: true },
 ];
 
 export type OdpovedDotazniku = Record<string, number | string | string[]>;

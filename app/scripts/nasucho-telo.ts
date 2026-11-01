@@ -18,7 +18,7 @@ for (const c of zoznamNavrhov) {
     ...balicky.filter((b: any) => normName(b.klient) === k && !b.zrusene_at).map((b: any) => ({ den: String(b.platnost_od || "").slice(0, 10), cena: b.cena_czk })),
     ...historiaBalickov.filter((h: any) => normName(h.client) === k).map((h: any) => ({ den: h.validFrom || "", cena: h.payment ?? null })),
   ];
-  const nav = navrhNovehoBalicka(c.name, os, stavy, ceny as never);
+  const nav = navrhNovehoBalicka(c.name, os, stavy, ceny as never, zruseneAutomaty(c.name, balicky));
   if (!nav) continue;
   navrhov++;
   const dlh = bezHodin.some((b: any) => normName(b.klient) === k && b.den === nav.odDna);
@@ -40,7 +40,7 @@ for (const c of zoznamNavrhov) {
     ...balicky.filter((b: any) => normName(b.klient) === k && !b.zrusene_at).map((b: any) => ({ den: String(b.platnost_od || "").slice(0, 10), cena: b.cena_czk })),
     ...historiaBalickov.filter((h: any) => normName(h.client) === k).map((h: any) => ({ den: h.validFrom || "", cena: h.payment ?? null })),
   ];
-  const nav = navrhNovehoBalicka(c.name, os, stavy, ceny as never);
+  const nav = navrhNovehoBalicka(c.name, os, stavy, ceny as never, zruseneAutomaty(c.name, balicky));
   if (nav) navrhy.push(nav);
 }
 const balickyPo = [...balicky, ...navrhy.map((n, i) => ({

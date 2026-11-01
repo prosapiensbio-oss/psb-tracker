@@ -139,19 +139,19 @@ export const FORMULAR: Formular = {
   klient: [
     {
       id: "uvod",
-      nazov: "Než přijdete",
-      pozn: "Pár otázek, ať víme, s čím přicházíte. Minuta času.",
+      nazov: "Než přijdeš",
+      pozn: "Pár otázek, ať víme, s čím přicházíš. Minuta času.",
       otazky: [
-        { id: "privadza", text: "Co vás k nám přivádí?", typ: "jedna", moznosti: PRIVADZA, povinna: true },
+        { id: "privadza", text: "Co tě k nám přivádí?", typ: "jedna", moznosti: PRIVADZA, povinna: true },
 
         // ── vetva A: bolesť alebo diagnóza ──
         {
-          id: "oblasti", text: "Kde to cítíte?", typ: "oblasti", povinna: true,
+          id: "oblasti", text: "Kde to cítíš?", typ: "oblasti", povinna: true,
           vetva: { otazka: "privadza", hodnoty: BOLI },
-          pomoc: "Zaškrtněte všechno, co sedí. U každé oblasti se pak zeptáme, jak silné to je.",
+          pomoc: "Zaškrtni všechno, co sedí. U každé oblasti se pak zeptáme, jak silné to je.",
         },
         {
-          id: "vlajky", text: "Zaškrtněte, co se vás týká — teď nebo v minulosti", typ: "viac", povinna: true,
+          id: "vlajky", text: "Zaškrtni, co se tě týká — teď nebo v minulosti", typ: "viac", povinna: true,
           vetva: { otazka: "privadza", hodnoty: BOLI },
           moznosti: [
             "bolest vyzařuje do ruky nebo nohy",
@@ -165,27 +165,27 @@ export const FORMULAR: Formular = {
           ],
         },
         {
-          id: "vlajky_popis", text: "Popište to krátce — kdy to začalo a co to spouští.", typ: "dlhy",
+          id: "vlajky_popis", text: "Popiš to krátce — kdy to začalo a co to spouští.", typ: "dlhy",
           vetva: { otazka: "vlajky", hodnoty: ["*"] },
           pomoc: "Stačí pár vět.",
         },
         {
-          id: "lieky", text: "Berete pravidelně nějaké léky nebo se s něčím léčíte?", typ: "dlhy", povinna: true,
+          id: "lieky", text: "Bereš pravidelně nějaké léky nebo se s něčím léčíš?", typ: "dlhy", povinna: true,
           vetva: { otazka: "privadza", hodnoty: BOLI },
-          pomoc: "Když nic, napište „ne“.",
+          pomoc: "Když nic, napiš „ne“.",
         },
 
         // ── vetva B: nič ma nebolí ──
         {
-          id: "ciel", text: "Co je váš hlavní cíl v pohybu nebo sportu?", typ: "viac", povinna: true,
+          id: "ciel", text: "Co je tvůj hlavní cíl v pohybu nebo sportu?", typ: "viac", povinna: true,
           vetva: { otazka: "privadza", hodnoty: [PRIVADZA[2]] },
           moznosti: CIELE,
         },
 
         // ── obe cesty ──
         {
-          id: "zakaz", text: "Zakázal vám lékař nějaký pohyb nebo zátěž?", typ: "ano-nie", povinna: true,
-          pomoc: "Když ano, napište prosím co.",
+          id: "zakaz", text: "Zakázal ti lékař nějaký pohyb nebo zátěž?", typ: "ano-nie", povinna: true,
+          pomoc: "Když ano, napiš prosím co.",
         },
       ],
     },

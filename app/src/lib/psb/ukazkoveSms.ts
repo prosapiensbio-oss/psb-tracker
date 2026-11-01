@@ -1,4 +1,5 @@
-import { bezDiakritiky, textSms } from "./sms";
+import { textSms } from "./sms";
+import { textSmsPoUvodnom, textSmsPredUvodnym } from "./smsSablony";
 import { UKAZKA } from "./ukazka";
 import { verejnyOdkaz } from "./verejnyOdkaz";
 
@@ -39,16 +40,12 @@ export function ukazkoveSms(v: { zaklad?: string } = {}): UkazkaSms[] {
     {
       kedy: "pred úvodným",
       kde: "Dnes → nový dopyt",
-      text: bezDiakritiky(
-        `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${Upred}`,
-      ),
+      text: textSmsPredUvodnym("Lukas", Upred),
     },
     {
       kedy: "po úvodnom",
       kde: "Dnes → SMS po úvodnom",
-      text: bezDiakritiky(
-        `Dekujeme za ucast na uvodni lekci. Termin dalsiho treninku, souhrn i doporucene cteni najdete zde: ${Upo}`,
-      ),
+      text: textSmsPoUvodnom("Lukas", Upo),
     },
     {
       kedy: "zostávajú hodiny · zapísaný balíček",

@@ -772,7 +772,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
                 komu: adresy,
-                predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
+                predmet: kus(b.predmet, 200) || "Výpis hodin — ProSapiens Biomechanic",
                 telo: v && v.oslovenie ? mailKlientovi({ ...v, odkaz: kus(b.uvod, 600) || undefined }).text : telo,
                 html,
                 prilohy: prilohy.length ? prilohy : undefined,

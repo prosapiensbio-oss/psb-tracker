@@ -4,7 +4,8 @@ import { saveAnomaly } from "../../lib/psb/client";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { bezDiakritiky, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { textSmsPoUvodnom } from "../../lib/psb/smsSablony";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -86,8 +87,7 @@ export function SmsPoUvodnom({ meno, trener, dalsiTrening, klucNotifikacie, onOd
       setFotky(r.fotky ?? 0);
       // Bez diakritiky: s mäkčeňmi má SMS 70 znakov namiesto 160.
       // Fotky pred a po sa spomenú len vtedy, keď ich stránka naozaj ukáže.
-      const co = [datum && cas ? "termin dalsiho treninku" : "", r.fotky ? "fotky pred a po" : "", "souhrn"].filter(Boolean).join(", ");
-      setText(bezDiakritiky(`Dekujeme za ucast na uvodni lekci. ${co.charAt(0).toUpperCase()}${co.slice(1)} i doporucene cteni najdete zde: ${r.odkaz}`));
+      setText(textSmsPoUvodnom(meno, r.odkaz, { termin: !!(datum && cas), fotky: !!r.fotky }));
     } catch {
       setChyba("Odkaz sa nepodarilo vyrobiť — skús znova.");
     } finally {

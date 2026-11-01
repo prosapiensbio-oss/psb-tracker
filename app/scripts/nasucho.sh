@@ -46,7 +46,7 @@ hlava = open("scripts/kontrola-profilov.ts", encoding="utf-8").read()
 hlava = hlava[:hlava.index("let nalezov = 0;")]
 if "navrhNovehoBalicka" not in hlava:
     hlava = hlava.replace('import { deriveClients }',
-        'import { navrhNovehoBalicka } from "../src/lib/psb/workspaceKroky";\nimport { deriveClients }', 1)
+        'import { navrhNovehoBalicka, zruseneAutomaty } from "../src/lib/psb/workspaceKroky";\nimport { deriveClients }', 1)
 telo = open("scripts/nasucho-telo.ts", encoding="utf-8").read()
 # Hlavička žije v scripts/, generovaný súbor inde — cesty k src/ musia sedieť.
 koren = os.path.abspath("src")

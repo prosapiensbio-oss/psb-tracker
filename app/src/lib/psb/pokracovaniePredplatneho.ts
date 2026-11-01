@@ -68,6 +68,11 @@ export function pokracovaniePredplatneho(
   dnes: string,
   zadarmo: Set<string> = new Set(),
   nezaplatene: Set<string> = new Set(),
+  /**
+   * Dni, na ktoré človek automatický balíček zrušil (`zruseneAutomaty`) — taký
+   * deň mesiac nezakladá, založí ho ďalší tréning (Jerry, 1. 11. 2026).
+   */
+  zruseneDni: ReadonlySet<string> = new Set(),
 ): PokracovaniePredplatneho | null {
   const k = normName(klient);
   const moje = balicky.filter((b) => normName(b.klient) === k && !b.zruseneAt);
@@ -87,7 +92,7 @@ export function pokracovaniePredplatneho(
    */
   const koniec = den(posledne.platnostDo);
   const prvy = sedenia
-    .filter((s) => normName(s.client) === k && den(s.date) > koniec && den(s.date) <= dnes && !zadarmo.has(`${k}|${den(s.date)}`))
+    .filter((s) => normName(s.client) === k && den(s.date) > koniec && den(s.date) <= dnes && !zadarmo.has(`${k}|${den(s.date)}`) && !zruseneDni.has(den(s.date)))
     .map((s) => den(s.date))
     .sort()[0];
   if (!prvy) return null;

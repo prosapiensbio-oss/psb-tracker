@@ -149,7 +149,7 @@ export type VolbyStranky = {
    */
   fotky?: string[];
   /**
-   * „Chcete platit fakturou?" — len po úvodnom (Jerry, 28. 10. 2026).
+   * „Chceš platit fakturou?" — len po úvodnom (Jerry, 28. 10. 2026).
    * Bez hodnoty sa blok nekreslí. Viď `fakturaKlienta.ts`.
    */
   faktura?: BlokFaktury | null;
@@ -170,7 +170,7 @@ export type VolbyStranky = {
  */
 const CENNIK_STRANKY: { off: string; on: string; nadpis: string; popis: string; pozn?: string }[] = [
   { off: "6h Předplatné", on: "6h Předplatné online", nadpis: "Předplatné 6 hodin", pozn: "měsíčně", popis: "6 měsíců, garance termínů, přednostní rezervace." },
-  { off: "6h Balíček", on: "6h Balíček online", nadpis: "Balíček 6 hodin", popis: "Platnost 2 měsíce. Plánujete podle svých časových možností." },
+  { off: "6h Balíček", on: "6h Balíček online", nadpis: "Balíček 6 hodin", popis: "Platnost 2 měsíce. Plánuješ podle svých časových možností." },
   { off: "1h Balíček", on: "1h Balíček online", nadpis: "Jednorázová lekce", popis: "1 hodina. Bez závazku." },
 ];
 
@@ -264,15 +264,15 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
   const bezTerminuPo = !kedy && !predUvodnym;
   const textPotvrdenia = kedy
     ? `Potvrzuji termín ${predUvodnym ? "úvodního tréninku" : "tréninku"} ${kedy.datum} v ${kedy.cas}.`
-    : bezTerminuPo ? "Dobrý den, rád/a bych si domluvil/a další trénink. Hodí se mi: " : "Potvrzuji termín.";
+    : bezTerminuPo ? "Ahoj, chci si domluvit další trénink. Hodí se mi: " : "Potvrzuji termín.";
   const smsHref = `sms:${tel}?&body=${encodeURIComponent(textPotvrdenia)}`;
 
   const hlavicka = kedy
     ? `<div style="margin-top:26px;font-size:11px;letter-spacing:2.4px;color:#9FBCA9">${predUvodnym ? "ÚVODNÍ TRÉNINK" : "PRVNÍ DALŠÍ TRÉNINK"}</div>
 <div style="margin-top:8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:40px;line-height:1.05">${esc(kedy.den)}<br>${esc(kedy.datum)}</div>
 <div style="margin-top:10px;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;color:#8FD3A8">${esc(kedy.cas)}</div>`
-    : `<div style="margin-top:26px;font-family:'Raleway',sans-serif;font-weight:700;font-size:34px;line-height:1.15">${predUvodnym ? "Váš úvodní trénink" : "Po úvodní lekci"}</div>
-<div style="margin-top:10px;font-size:15px;color:#C9D8CE">${bezTerminuPo ? "Až budete chtít pokračovat, napište nám a domluvíme další trénink." : "Termín Vám potvrdíme zprávou."}</div>`;
+    : `<div style="margin-top:26px;font-family:'Raleway',sans-serif;font-weight:700;font-size:34px;line-height:1.15">${predUvodnym ? "Tvůj úvodní trénink" : "Po úvodní lekci"}</div>
+<div style="margin-top:10px;font-size:15px;color:#C9D8CE">${bezTerminuPo ? "Až budeš chtít pokračovat, napiš nám a domluvíme další trénink." : "Termín ti potvrdíme zprávou."}</div>`;
 
   // Zľava sa NEZAMLČÍ: keď je cena nižšia než bežná, pôvodná zostane
   // prečiarknutá vedľa nej. Klient tak vidí, že dostal zľavu, a nie len
@@ -297,12 +297,12 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
    */
   const telo = predUvodnym
     ? `<h2 style="margin:24px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před lekcí</h2>
-<p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Podívejte se prosím na toto krátké video. Připravíte se tak lépe na to, co budeme společně zkoumat.</p>
+<p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Podívej se prosím na toto krátké video. Připravíš se tak lépe na to, co budeme společně zkoumat.</p>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <a href="${esc(ODKAZY.video)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:2px solid #1A2E24;border-radius:32px;padding:12px 22px;font-size:15px;font-weight:600;color:#1A2E24">Pustit video · 3 min</a>
 ${v.anamnezaUrl ? `<a href="${esc(v.anamnezaUrl)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;background:#1A2E24;border-radius:32px;padding:14px 24px;font-size:15px;font-weight:600;color:#FFFFFF">Vyplnit 3 otázky</a>` : ""}
 </div>
-${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#5B6B60">Otázky jsou o tom, co Vás trápí — ať nemusíme ztrácet čas na místě.</p>` : ""}
+${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#5B6B60">Otázky jsou o tom, co tě trápí — ať nemusíme ztrácet čas na místě.</p>` : ""}
 
 <div style="margin-top:30px;font-size:11px;letter-spacing:2.2px;color:#5B6B60">KDE</div>
 <div style="margin-top:6px;font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.3">${esc(MIESTO.ulica)}<br>${esc(MIESTO.mesto)}</div>
@@ -314,28 +314,28 @@ ${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;colo
 </a>
 
 <h2 style="margin:30px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Co si vzít</h2>
-<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Nezapomeňte si prosím sportovní oblečení – ideálně krátké legíny, šortky nebo jiné přiléhavé oblečení, aby bylo dobře vidět držení těla.</p>
+<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Nezapomeň si prosím sportovní oblečení – ideálně krátké legíny, šortky nebo jiné přiléhavé oblečení, aby bylo dobře vidět držení těla.</p>
 
 ${cennikHtml()}
 
 <div style="margin-top:26px;display:flex;gap:11px;align-items:center;border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px">
 <span style="font-size:26px;line-height:1" role="img" aria-label="pes">🐕</span>
-<span style="flex-grow:1;min-width:0;font-size:16px;line-height:1.55;color:#3C4C42">Chceme Vás také upozornit, že tady máme psa.</span>
+<span style="flex-grow:1;min-width:0;font-size:16px;line-height:1.55;color:#3C4C42">Chceme tě také upozornit, že tady máme psa.</span>
 </div>`
-    : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
+    : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíš?</h1>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : `Děkuji za účast a jsem ${t === "Terezka" ? "ráda" : "rád"}, že jsme domluvili pokračování.`}</p>
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
-  : `${v.odpovedChyba !== undefined ? `<div style="margin-top:22px;border-left:3px solid #B4432F;background:#FBF3F1;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Vaši odpověď se nepodařilo uložit. Text máte níže — zkuste ho prosím odeslat znovu.</div>` : ""}<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
-<div style="font-size:15.5px;line-height:1.6;color:#3C4C42">Napište mi pár slov — co Vás překvapilo, co bolí, na co se ptáte. Nemusíte psát nic.</div>
+  : `${v.odpovedChyba !== undefined ? `<div style="margin-top:22px;border-left:3px solid #B4432F;background:#FBF3F1;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Tvou odpověď se nepodařilo uložit. Text máš níže — zkus ho prosím odeslat znovu.</div>` : ""}<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
+<div style="font-size:15.5px;line-height:1.6;color:#3C4C42">Napiš mi pár slov — co tě překvapilo, co bolí, na co se chceš zeptat. Nemusíš psát nic.</div>
 <textarea name="odpoved" rows="4" maxlength="1000" placeholder="pár slov stačí…" style="width:100%;box-sizing:border-box;margin-top:12px;padding:13px 14px;border:1px solid #DCE3DD;border-radius:12px;font-family:inherit;font-size:15px;color:#1A2E24;line-height:1.6;resize:vertical">${esc(v.odpovedChyba || "")}</textarea>
 <div style="margin-top:12px"><button type="submit" style="border:0;background:#1A2E24;color:#FFFFFF;border-radius:32px;padding:13px 26px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Odeslat ${esc(trenerovi(t))}</button></div>
 <div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(trenerovi(t))}, nikam jinam.</div>
 </form>`}
 
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Souhrn z dnešní lekce</h2>
-<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes ${t === "Terezka" ? "říkala" : "říkal"}, je sepsané tady.</p>
+<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem ti dnes ${t === "Terezka" ? "říkala" : "říkal"}, je sepsané tady.</p>
 ${riadokOdkazu(ODKAZY.poUvodnej, "Informace po úvodní lekci", "souhrn z dnešního tréninku")}
 
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">K lepšímu pochopení</h2>
@@ -344,9 +344,9 @@ ${riadokOdkazu(ODKAZY.coOcekavat, "Co očekávat od biomechanického tréninku",
 ${riadokOdkazu(ODKAZY.idealniPristup, "Ideální přístup", "číst i poslechnout")}`;
 
   const zaver = predUvodnym
-    ? `<p style="margin:20px 0 0;font-size:16px;line-height:1.65;color:#3C4C42">Pokud budete mít jakékoli dotazy, napište mi kdykoliv.</p>
+    ? `<p style="margin:20px 0 0;font-size:16px;line-height:1.65;color:#3C4C42">Pokud budeš mít jakékoli dotazy, napiš mi kdykoliv.</p>
 <p style="margin:18px 0 0;font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.35">Děkuji a těším se na setkání!</p>`
-    : `<p style="margin:20px 0 0;font-size:16px;line-height:1.65;color:#3C4C42">V případě otázek mě neváhejte kontaktovat.</p>
+    : `<p style="margin:20px 0 0;font-size:16px;line-height:1.65;color:#3C4C42">V případě otázek mě neváhej kontaktovat.</p>
 <p style="margin:18px 0 0;font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.35">Těším se na další trénink!</p>`;
 
   return `<!doctype html>
@@ -354,7 +354,7 @@ ${riadokOdkazu(ODKAZY.idealniPristup, "Ideální přístup", "číst i poslechno
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>${predUvodnym ? "Váš úvodní trénink" : "Po úvodní lekci"} — ProSapiens Biomechanic</title>
+<title>${predUvodnym ? "Tvůj úvodní trénink" : "Po úvodní lekci"} — ProSapiens Biomechanic</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Raleway:wght@600;700&display=swap">
 <style>
 body{margin:0;background:#FFFFFF}
@@ -401,7 +401,7 @@ ${predUvodnym ? "" : fotkyHtml(v.fotky)}
 
 <div style="margin-top:36px;padding-top:26px;border-top:1px solid #DCE3DD">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
-<div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : t === "Terezka" ? "vaše trenérka" : "váš trenér")}</div>
+<div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · tvůj trenér" : t === "Terezka" ? "tvoje trenérka" : "tvůj trenér")}</div>
 <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
 <a href="${esc(profilUrl || ODKAZY.profil)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">Profil trenéra</a>
 <a href="tel:${esc(tel)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${esc(tr.telefon)}</a>

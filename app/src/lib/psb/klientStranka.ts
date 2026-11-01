@@ -1,4 +1,4 @@
-import type { VypisKlienta } from "./mailKlientovi";
+import { cesky, type VypisKlienta } from "./mailKlientovi";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — prehľad pre klienta.
@@ -57,25 +57,6 @@ const DNI = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek",
 
 /** „4 h" / „0,5 h" — pol hodiny sa nezaokrúhľuje na nulu. */
 const hod = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1).replace(".", ",")} h`;
-
-/**
- * Posledná slovenčina na povrchu. Popisy riadkov nesú názvy produktov
- * z PTmindera a tie sú miešané — „Doplnenie členstva" prechádza
- * `nazovProduktu` zámerne nezmenené (je to interný presun zostatku, nie
- * predaj). Na českej stránke to klient čítal po slovensky, takže tu stojí
- * slovníček pre POVRCH: v dátach ani v appke sa nič neprepisuje.
- *
- * Bez `\b` zámerne: v JS regexe nie je medzi „é" a medzerou hranica slova
- * (é nie je `\w`), takže `/\bzaplatené\b/` nenašlo nič.
- */
-const cesky = (t: string) =>
-  t
-    .replace(/doplnenie\s+členstva/gi, "Doplnění hodin")
-    .replace(/zaplatené/g, "zaplaceno")
-    .replace(/vrátené/g, "vráceno")
-    .replace(/koniec\s+platnosti/gi, "konec platnosti")
-    .replace(/tréning/g, "trénink")
-    .replace(/hodín/g, "hodin");
 
 /**
  * Hlavné číslo hore. Tri stavy, tri vety — tá istá logika ako v SMS:

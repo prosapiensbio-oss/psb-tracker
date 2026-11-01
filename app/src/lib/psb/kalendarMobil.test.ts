@@ -84,7 +84,7 @@ describe("stránka kalendára — otázka na telefón", () => {
   it("kým nezvolí, je tam len otázka — žiadne tlačidlo do kalendára", () => {
     const h = teloStrankyKalendara({ ...v, telefon: null });
     expect(h).toContain("Michale, jedním klepnutím");
-    expect(h).toContain("Jaký máte telefon?");
+    expect(h).toContain("Jaký máš telefon?");
     expect(h).toContain('href="?telefon=iphone#telefon"');
     expect(h).toContain('href="?telefon=android#telefon"');
     expect(h).not.toContain("Přidat do kalendáře");
@@ -101,7 +101,7 @@ describe("stránka kalendára — otázka na telefón", () => {
     const h = teloStrankyKalendara({ ...v, telefon: "android" });
     expect(h).toContain("prosapiens.cz/k/AbC12345</div>");
     expect(h).toContain("mailto:?subject=");
-    expect(h).toContain("Jste právě na počítači? Přidat přes Google Kalendář");
+    expect(h).toContain("Jsi právě na počítači? Přidat přes Google Kalendář");
     expect(h).toContain("at.bitfire.icsdroid");
     expect(h).not.toContain("Odstranit upozornění");
   });

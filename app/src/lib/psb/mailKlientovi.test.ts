@@ -19,21 +19,21 @@ describe("mailKlientovi", () => {
   it("skončený balíček nie je dochodený — hodiny mohli prepadnúť", () => {
     const v = mailKlientovi({ ...zaklad, platnostSkoncila: true, dnes: "2026-11-15" });
     expect(v.predmet).toContain("skončil");
-    expect(v.text).toContain("posledný balíček už skončil");
-    expect(v.text).not.toContain("dochodený");
+    expect(v.text).toContain("poslední balíček už skončil");
+    expect(v.text).not.toContain("dochozený");
   });
 
   it("keď balíček došiel, povie to hneď v predmete aj v prvej vete", () => {
     const v = mailKlientovi({ ...zaklad, dnes: "2026-09-28" });
-    expect(v.predmet).toContain("dochodený");
-    expect(v.text).toContain("dnes si mal poslednú hodinu");
-    expect(v.html).toContain("dnes si mal poslednú hodinu");
+    expect(v.predmet).toContain("dochozený");
+    expect(v.text).toContain("dnes proběhla poslední hodina");
+    expect(v.html).toContain("dnes proběhla poslední hodina");
   });
 
   it("keď hodiny ešte sú, povie koľko", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 3 });
-    expect(v.text).toContain("zostávajú 3 h");
-    expect(v.predmet).not.toContain("dochodený");
+    expect(v.text).toContain("zbývají 3 h");
+    expect(v.predmet).not.toContain("dochozený");
   });
 
   it("textová aj HTML podoba nesú tie isté dni", () => {
@@ -46,11 +46,11 @@ describe("mailKlientovi", () => {
 
   it("os ukazuje, ako sa balíček míňal — hodiny aj mínus", () => {
     const v = mailKlientovi(zaklad);
-    expect(v.html).toContain("Ako sa míňal balíček");
+    expect(v.html).toContain("Jak se čerpal balíček");
     expect(v.html).toContain("<b>1 h</b>");
     expect(v.html).toContain("−1");
     // Platba je bod na osi rovnako ako tréning.
-    expect(v.html).toContain("zaplatené 7 790 Kč");
+    expect(v.html).toContain("zaplaceno 7 790 Kč");
   });
 
   it("tréning pred platbou nesie hodiny AJ mínus", () => {
@@ -58,22 +58,22 @@ describe("mailKlientovi", () => {
     // veci a jedna nesmie prekryť druhú.
     const v = mailKlientovi(zaklad);
     expect(v.html).toContain("<b>6 h</b>");
-    expect(v.text).toContain("tréning (6 h, −1)");
+    expect(v.text).toContain("trénink (6 h, −1)");
   });
 
   it("tri čísla hore: hodiny, tempo, dĺžka vzťahu", () => {
     const v = mailKlientovi(zaklad);
     expect(v.html).toContain("19 h");
-    expect(v.html).toContain("tréningov mesačne");
-    expect(v.html).toContain("4 mesiace");
+    expect(v.html).toContain("tréninků měsíčně");
+    expect(v.html).toContain("4 měsíce");
     // „0 h zostáva" medzi ne nepatrí — hovorí to nadpis (Jerry, 29. 9. 2026).
-    expect(v.html).not.toContain("zostáva v balíčku");
+    expect(v.html).not.toContain("zbývá v balíčku");
   });
 
   it("bez tempa a dĺžky vzťahu zostane len počet hodín", () => {
     const v = mailKlientovi({ ...zaklad, tempo: undefined, mesiacov: undefined });
-    expect(v.html).toContain("odtrénované spolu");
-    expect(v.html).not.toContain("tréningov mesačne");
+    expect(v.html).toContain("odtrénováno celkem");
+    expect(v.html).not.toContain("tréninků měsíčně");
   });
 
   it("logo je príloha, nie odkaz na náš server", () => {
@@ -127,13 +127,13 @@ describe("koniec osi", () => {
   it("poslednou bodkou je zostatok a nemá dátum", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 2 });
     // „Zostávajú 2 h" je odpoveď, nie udalosť — dátum by z nej robil tréning.
-    expect(v.text.trimEnd().split("\n").find((r) => r.includes("Zostávajú 2 h"))).toBe("  Zostávajú 2 h");
-    expect(v.html).toContain("Zostávajú 2 h");
+    expect(v.text.trimEnd().split("\n").find((r) => r.includes("Zbývají 2 h"))).toBe("  Zbývají 2 h");
+    expect(v.html).toContain("Zbývají 2 h");
   });
 
   it("keď appka zostatok nevie, žiadnu poslednú bodku si nevymyslí", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: null });
-    expect(v.text).not.toContain("Zostáv");
+    expect(v.text).not.toContain("Zbýv");
   });
 
   it("prázdne riadky v textovej podobe zostávajú", () => {
@@ -145,19 +145,19 @@ describe("koniec osi", () => {
 describe("kedy padla posledná hodina", () => {
   it("o dnešku hovorí len vtedy, keď bol tréning naozaj dnes", () => {
     const v = mailKlientovi({ ...zaklad, dnes: "2026-09-28" });
-    expect(v.text).toContain("dnes si mal poslednú hodinu");
+    expect(v.text).toContain("dnes proběhla poslední hodina");
   });
 
   it("keď balíček dochodil skôr, povie kedy — nie „dnes“", () => {
     // Vítězslav Papiež dochodil 15. 9. a píše sa mu 29. — „dnes" by bola lož.
     const v = mailKlientovi({ ...zaklad, dnes: "2026-09-29" });
-    expect(v.text).not.toContain("dnes si mal");
-    expect(v.text).toContain("posledná hodina bola 28. 9. 2026");
+    expect(v.text).not.toContain("dnes proběhla");
+    expect(v.text).toContain("poslední hodina byla 28. 9. 2026");
   });
 
   it("bez dnešného dátumu sa na dnešok neodvoláva vôbec", () => {
     const v = mailKlientovi(zaklad);
-    expect(v.text).not.toContain("dnes si mal");
+    expect(v.text).not.toContain("dnes proběhla");
   });
 });
 
@@ -165,7 +165,7 @@ describe("hodiny nad rámec a najbližší termín", () => {
   it("mínusové hodiny sa nechovajú za „dochodený“", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: -1, dnes: "2026-09-29" });
     expect(v.text).toContain("hodinu nad rámec balíčka");
-    expect(v.text).toContain("v ďalšej platbe");
+    expect(v.text).toContain("v další platbě");
   });
 
   it("dve hodiny navyše sa skloňujú", () => {
@@ -176,12 +176,12 @@ describe("hodiny nad rámec a najbližší termín", () => {
   it("najbližší termín je posledný bod osi", () => {
     const v = mailKlientovi({ ...zaklad, dalsi: "2026-10-06T10:30" });
     const riadky = v.text.split("\n").filter((r) => r.startsWith("  "));
-    expect(riadky[riadky.length - 1]).toBe("  6. 10. 2026 · 10:30 — Najbližší tréning");
+    expect(riadky[riadky.length - 1]).toBe("  6. 10. 2026 · 10:30 — Nejbližší trénink");
   });
 
   it("bez dohodnutého termínu sa nepíše nič", () => {
     const v = mailKlientovi(zaklad);
-    expect(v.text).not.toContain("Najbližší");
+    expect(v.text).not.toContain("Nejbližší");
   });
 });
 
@@ -190,40 +190,40 @@ describe("celá história na vyžiadanie", () => {
 
   it("volá sa história, nie dochodený balíček — klient si pýtal prehľad", () => {
     const v = mailKlientovi(uplny);
-    expect(v.predmet).toBe("Tvoje tréningy a platby — ProSapiens");
-    expect(v.html).toContain("Celá história");
-    expect(v.text).toContain("posielam celú históriu tréningov aj platieb.");
-    expect(v.text).not.toContain("dochodený —");
-    expect(v.text).toContain("Tréningy a platby:");
+    expect(v.predmet).toBe("Tvoje tréninky a platby — ProSapiens");
+    expect(v.html).toContain("Celá historie");
+    expect(v.text).toContain("posílám celou historii tréninků i plateb.");
+    expect(v.text).not.toContain("dochozený —");
+    expect(v.text).toContain("Tréninky a platby:");
   });
 
   it("v dlaždici je zaplatená suma namiesto tempa", () => {
     const v = mailKlientovi(uplny);
     expect(v.html).toContain("31 160 Kč");
-    expect(v.html).toContain("zaplatené spolu");
-    expect(v.html).not.toContain("tréningov mesačne");
+    expect(v.html).toContain("zaplaceno celkem");
+    expect(v.html).not.toContain("tréninků měsíčně");
   });
 
   it("bežný výpis sa nemení", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 3 });
-    expect(v.predmet).toBe("Tvoja dochádzka v ProSapiens");
-    expect(v.html).toContain("Ako sa míňal balíček");
+    expect(v.predmet).toBe("Tvoje docházka v ProSapiens");
+    expect(v.html).toContain("Jak se čerpal balíček");
   });
 });
 
 describe("tlačidlo „chcem celú históriu“", () => {
   it("v bežnom výpise je a nesie meno klienta v predmete", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 3 });
-    expect(v.html).toContain("Chcem celú históriu tréningov a platieb");
+    expect(v.html).toContain("Chci celou historii tréninků a plateb");
     expect(v.html).toContain(`mailto:${ADRESA_HISTORIE}`);
-    expect(v.html).toContain(encodeURIComponent("Celá história tréningov a platieb — Richard Matl"));
-    expect(v.text).toContain("Napíš na info@prosapiens.cz");
+    expect(v.html).toContain(encodeURIComponent("Celá historie tréninků a plateb — Richard Matl"));
+    expect(v.text).toContain("Napiš na info@prosapiens.cz");
   });
 
   it("v úplnej histórii tlačidlo nie je — klient ju práve drží v ruke", () => {
     const v = mailKlientovi({ ...zaklad, uplna: true, zaplateneSpolu: 1000 });
-    expect(v.html).not.toContain("Chcem celú históriu");
-    expect(v.text).not.toContain("Napíš na info@");
+    expect(v.html).not.toContain("Chci celou historii");
+    expect(v.text).not.toContain("Napiš na info@");
   });
 });
 

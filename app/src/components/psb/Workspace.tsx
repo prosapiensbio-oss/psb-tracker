@@ -1192,7 +1192,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
                                   trener={a.trener || ""}
                                   vlozene
                                   druhAuditu="anamneza"
-                                  predvolenyText={textSmsAnamnezy(smsAnamnezy.url, !!a.uzBol)}
+                                  predvolenyText={textSmsAnamnezy(smsAnamnezy.url, !!a.uzBol, a.klient)}
                                   nahladOdkazu={smsAnamnezy.url}
                                   onOdoslane={() => setSmsAnamnezy(null)}
                                 />

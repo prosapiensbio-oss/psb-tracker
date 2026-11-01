@@ -151,7 +151,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
         akcia: "posli-vypis",
         klient: meno,
         komu: komu.trim(),
-        predmet: predmet.trim() || (uplna ? "Tvoje tréningy a platby — ProSapiens" : `Výpis hodín — ProSapiens Biomechanic`),
+        predmet: predmet.trim() || (uplna ? "Tvoje tréninky a platby — ProSapiens" : `Výpis hodin — ProSapiens Biomechanic`),
         telo: zobrazenyText,
         uvod: uvod.trim(),
         /**
@@ -287,7 +287,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
         <input
           value={predmet}
           onChange={(e) => setPredmet(e.target.value)}
-          placeholder="Výpis hodín — ProSapiens Biomechanic"
+          placeholder="Výpis hodin — ProSapiens Biomechanic"
           style={{ flex: "2 1 260px", padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
         />
       </div>
@@ -352,7 +352,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
       <input
         value={uvod}
         onChange={(e) => setUvod(e.target.value)}
-        placeholder="posielam prehľad aj QR na ďalší."
+        placeholder="posílám přehled i QR na další."
         style={{
           width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, fontSize: 12,
           border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", marginBottom: 8,

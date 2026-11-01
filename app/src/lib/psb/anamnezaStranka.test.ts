@@ -18,7 +18,7 @@ describe("údaje o klientovi na anamnéze", () => {
     // Jerry, 3. 10. 2026: „polia tam nemusia byť dostupné, ale Opravte nás
     // môže byť podčiarknuté a keď na to klikne, rozbalí sa to." Zabalené
     // sú — `details` bez `open` — a podčiarknutie je jediné, čo o tom hovorí.
-    expect(h).toContain("Nesedí něco? <u>Opravte nás.</u>");
+    expect(h).toContain("Nesedí něco? <u>Oprav nás.</u>");
     expect(h).toContain("<details class=\"oprava\">");
     expect(h).not.toContain('<details class="oprava" open>');
     expect(h).toContain('name="oprava_meno"');

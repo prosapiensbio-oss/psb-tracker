@@ -259,7 +259,7 @@ export const Route = createFileRoute("/u/$token")({
         if (!DB) return prec("Tento odkaz neplatí.", 404);
 
         const r = await riadokOdkazu(DB, token);
-        if (!r) return prec("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.", 404);
+        if (!r) return prec("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.", 404);
 
         const q = new URL(request.url).searchParams;
 
@@ -354,7 +354,7 @@ export const Route = createFileRoute("/u/$token")({
           console.error("/u/: odpoveď klienta sa neuložila", e);
           const riadok = await riadokOdkazu(DB, token).catch(() => null);
           const html = riadok ? await stranka(DB, request, riadok, { odpovedChyba: text }).catch(() => null) : null;
-          return new Response(html || "<!doctype html><html lang=\"cs\"><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex\"><p style=\"font-family:sans-serif;text-align:center;margin:80px 20px\">Vaši odpověď se nepodařilo uložit. Zkuste to prosím za chvíli znovu.</p></html>", { status: 503, headers: HLAVICKY });
+          return new Response(html || "<!doctype html><html lang=\"cs\"><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex\"><p style=\"font-family:sans-serif;text-align:center;margin:80px 20px\">Tvou odpověď se nepodařilo uložit. Zkus to prosím za chvíli znovu.</p></html>", { status: 503, headers: HLAVICKY });
         }
 
         return spat(true);

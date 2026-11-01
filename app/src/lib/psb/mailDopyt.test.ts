@@ -224,6 +224,11 @@ describe("žiadosť o históriu z tlačidla v maili", () => {
     expect("historia" in re).toBe(true);
   });
 
+  it("spozná aj nové české znenie — staré maily s tlačidlom u klientov ostávajú", () => {
+    const v = naDopyt(mail("Celá historie tréninků a plateb — Lukas Hanus"));
+    expect("historia" in v && v.historia).toEqual({ meno: "Lukas Hanus", email: "lukas.h@seznam.cz" });
+  });
+
   it("nezaloží sa z nej dopyt — človek už klientom je", () => {
     const v = naDopyt(mail("Celá história tréningov a platieb — Lukas Hanus"));
     expect("dopyt" in v).toBe(false);

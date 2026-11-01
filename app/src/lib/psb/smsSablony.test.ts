@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { textSmsPonuky } from "./ponukaTerminov";
 import { akciaSmsAuditu, DRUHY_SMS_MIMO_HODIN, dlzkaSpravy } from "./sms";
-import { oslovenieDoSms, textSmsAnamnezy, textSmsFotiek, textSmsKalendara, zlozHromadnuSms } from "./smsSablony";
+import { oslovenieDoSms, textSmsAnamnezy, textSmsFotiek, textSmsKalendara, textSmsPoUvodnom, textSmsPredUvodnym, zlozHromadnuSms } from "./smsSablony";
 import { jeNahladTrenera, verejnyOdkaz } from "./verejnyOdkaz";
 
 /**
@@ -25,8 +25,10 @@ describe("šablóny SMS sú jedna správa", () => {
   it("anamnéza aj s dlhou adresou workera (a v bete)", () => {
     for (const origin of [WORKER, BETA]) {
       const url = verejnyOdkaz(`/a/${TOKEN}`, origin);
-      jednaSprava(textSmsAnamnezy(url, true));
-      jednaSprava(textSmsAnamnezy(url, false));
+      for (const m of MENA) {
+        jednaSprava(textSmsAnamnezy(url, true, m));
+        jednaSprava(textSmsAnamnezy(url, false, m));
+      }
     }
   });
 
@@ -38,9 +40,28 @@ describe("šablóny SMS sú jedna správa", () => {
     }
   });
 
+  it("pred úvodným a po ňom s každým menom a každým variantom", () => {
+    for (const m of MENA) {
+      jednaSprava(textSmsPredUvodnym(m, verejnyOdkaz(`/u/${TOKEN}`, WORKER)));
+      for (const termin of [true, false]) for (const fotky of [true, false]) {
+        jednaSprava(textSmsPoUvodnom(m, verejnyOdkaz(`/u/${TOKEN}`, WORKER), { termin, fotky }));
+      }
+    }
+  });
+
+  it("úvodná SMS tyká a osloví menom; bez mena len Ahoj", () => {
+    expect(textSmsPredUvodnym("Kateřina Mátlová", "https://x.cz/u/a")).toBe("Ahoj Katerino, vitej v ProSapiens Biomechanic. Termin, adresu i co si vzit k uvodni lekci najdes tady: https://x.cz/u/a");
+    expect(textSmsPredUvodnym("", "https://x.cz/u/a")).toBe("Ahoj, vitej v ProSapiens Biomechanic. Termin, adresu i co si vzit k uvodni lekci najdes tady: https://x.cz/u/a");
+    expect(textSmsPoUvodnom("Michal Knapčok", "https://x.cz/u/a", { termin: true, fotky: true })).toBe("Ahoj Michale, diky za uvodni lekci. Termin dalsiho treninku, fotky pred a po, souhrn i cteni najdes tady: https://x.cz/u/a");
+    // Bez termínu a fotiek sa nemenuje, čo na stránke nie je.
+    expect(textSmsPoUvodnom("Michal Knapčok", "https://x.cz/u/a", {})).toBe("Ahoj Michale, diky za uvodni lekci. Souhrn i doporucene cteni najdes tady: https://x.cz/u/a");
+    expect(textSmsAnamnezy("https://x.cz/a/a", false, "Michal Knapčok")).toBe("Ahoj Michale, pred uvodni lekci te prosime o kratky dotaznik: https://x.cz/a/a Diky, ProSapiens Biomechanic");
+    expect(textSmsAnamnezy("https://x.cz/a/a", true)).toBe("Ahoj, prosime te jeste o kratky dotaznik k treninku: https://x.cz/a/a Diky, ProSapiens Biomechanic");
+  });
+
   it("v šablónach nie je dlhá pomlčka — tá zhadzuje limit rovnako ako mäkčeň", () => {
     expect(textSmsKalendara("Michal Knapčok", "https://x.cz/k/a", "Filip")).toBe(
-      "Michale, vase treninky si muzete dat do kalendare v mobilu - pripomene vam je sam: https://x.cz/k/a Filip",
+      "Ahoj Michale, treninky si muzes dat do kalendare v mobilu - pripomene ti je sam: https://x.cz/k/a Filip",
     );
   });
 

@@ -40,7 +40,7 @@ describe("stránka pred úvodným", () => {
 
   it("nesie Jerryho znenie, nezmenené", () => {
     expect(h).toContain("ideálně krátké legíny, šortky nebo jiné přiléhavé oblečení");
-    expect(h).toContain("Chceme Vás také upozornit, že tady máme psa.");
+    expect(h).toContain("Chceme tě také upozornit, že tady máme psa.");
     expect(h).toContain("Děkuji a těším se na setkání!");
   });
 
@@ -116,14 +116,14 @@ describe("stránka po úvodnom", () => {
 describe("bez termínu stránka neklame", () => {
   it("nevymyslí dátum a povie, že termín príde", () => {
     const h = uvodnaStrankaHtml({ druh: "pred", trener: "Jerry", kedy: null, logoUrl: "/l.svg" });
-    expect(h).toContain("Termín Vám potvrdíme zprávou.");
+    expect(h).toContain("Termín ti potvrdíme zprávou.");
     expect(h).toContain(encodeURIComponent("Potvrzuji termín."));
   });
   it("po úvodnom bez termínu nepotvrdzuje nič — ponúkne domluvit další trénink (Linda Muth, 28. 10. 2026)", () => {
     const h = uvodnaStrankaHtml({ druh: "po", trener: "Terezka", kedy: null, logoUrl: "/l.svg" });
     expect(h).toContain("Domluvit další trénink");
     expect(h).not.toContain(">Potvrdit termín<");
-    expect(h).not.toContain("Termín Vám potvrdíme zprávou.");
+    expect(h).not.toContain("Termín ti potvrdíme zprávou.");
     expect(h).not.toContain("domluvili pokračování");
   });
 });
@@ -255,7 +255,7 @@ describe("tréner v 3. páde a v správnom rode", () => {
     expect(h).toContain("Zavolat Filipovi</a>");
     expect(h).not.toContain("Jerrymu");
     expect(h).toContain("jsem rád");
-    expect(h).toContain("jsem Vám dnes říkal,");
+    expect(h).toContain("jsem ti dnes říkal,");
   });
   it("Terezka je Terezce a píše v ženskom rode", () => {
     const h = po("Terezka");
@@ -263,7 +263,7 @@ describe("tréner v 3. páde a v správnom rode", () => {
     expect(h).toContain("Přijde to rovnou Terezce, nikam jinam.");
     expect(h).toContain("Zavolat Terezce</a>");
     expect(h).toContain("jsem ráda");
-    expect(h).toContain("jsem Vám dnes říkala,");
+    expect(h).toContain("jsem ti dnes říkala,");
     expect(h).not.toContain("jsem rád,");
   });
   it("cena po zľave má tiež medzeru", () => {

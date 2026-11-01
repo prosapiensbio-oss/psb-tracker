@@ -146,7 +146,7 @@ export const Route = createFileRoute("/a/$token")({
         if (!DB || !ANAMNEZA_KLUC) return odkaz("Tento odkaz neplatí.", 404);
 
         const a = await podlaTokenu(DB, token, ANAMNEZA_KLUC);
-        if (!a) return odkaz("Tento odkaz neplatí. Ozvěte se nám a pošleme vám nový.", 404);
+        if (!a) return odkaz("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.", 404);
 
         const k = await kontext(DB, a.klient);
         return new Response(strankaHtml({

@@ -80,7 +80,7 @@ export const Route = createFileRoute("/k/$token")({
           ).run().catch(() => null);
         }
         const logo = `<img class="logo" src="${url.origin}/znacka-napis-tmava.svg" alt="ProSapiens Biomechanic">`;
-        if (!r || r.zrusene_at) return html(`${logo}<h1>Tento odkaz už neplatí</h1><p>Napište nám a pošleme nový.</p>`, 404);
+        if (!r || r.zrusene_at) return html(`${logo}<h1>Tento odkaz už neplatí</h1><p>Napiš nám a pošleme ti nový.</p>`, 404);
 
         const t = TRENERI[r.trener || ""] || TRENERI.Jerry;
         const webcal = `webcal://${url.host}/k/${token}/kalendar.ics`;

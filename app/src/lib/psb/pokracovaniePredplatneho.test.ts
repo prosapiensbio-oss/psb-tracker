@@ -26,6 +26,15 @@ describe("předplatné pokračuje prvým tréningom po konci (Jerry, 22. a 25. 1
     expect(pokracovaniePredplatneho(R, robin, historia, treningy, "2026-10-21")).toBeNull();
   });
 
+  it("zrušený automatický mesiac sa na ten deň nevráti; začne ho ďalší tréning (Jerry, 1. 11. 2026)", () => {
+    const dva = [...poKonci, t("2026-10-26")];
+    expect(pokracovaniePredplatneho(R, robin, historia, dva, "2026-10-27")?.odDna).toBe("2026-10-22");
+    expect(pokracovaniePredplatneho(R, robin, historia, dva, "2026-10-27", new Set(), new Set(), new Set(["2026-10-22"]))?.odDna).toBe("2026-10-26");
+    expect(pokracovaniePredplatneho(R, robin, historia, poKonci, "2026-10-27", new Set(), new Set(), new Set(["2026-10-22"]))).toBeNull();
+    // Prázdna množina nemení nič — klient, ktorý nikdy zrušený nemal.
+    expect(pokracovaniePredplatneho(R, robin, historia, dva, "2026-10-27", new Set(), new Set(), new Set())).toEqual(pokracovaniePredplatneho(R, robin, historia, dva, "2026-10-27"));
+  });
+
   it("tréning zadarmo mesiac nezačína", () => {
     const n = pokracovaniePredplatneho(R, robin, historia, [...poKonci, t("2026-10-21")], "2026-10-22", new Set(["martinek robin|2026-10-21", "robin martinek|2026-10-21"]));
     expect(n?.odDna).toBe("2026-10-22");

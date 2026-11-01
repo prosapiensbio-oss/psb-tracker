@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DOVODY_S_DOCHADZKOU, DOVODY_ZRUSENIA } from "../../lib/psb/kalendarZmeny";
 import { fmtDMY, normName } from "../../lib/psb/format";
-import { bezDiakritiky as textBezDiakritiky } from "../../lib/psb/sms";
+import { textSmsPredUvodnym } from "../../lib/psb/smsSablony";
 import { SmsKlientovi } from "./SmsKlientovi";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
@@ -1901,7 +1901,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     if (!r.ok || !r.odkaz) { setUvChyba(r.error || "Odkaz sa nepodarilo vyrobiť."); return; }
     setUvToken(r.token || "");
     // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov a z jednej správy by boli tri.
-    setUvText(textBezDiakritiky(`Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`));
+    setUvText(textSmsPredUvodnym(klientUdalosti, r.odkaz));
   };
   const inemuTrenerovi = async () => {
     if (!u || !novyTrener) return;
