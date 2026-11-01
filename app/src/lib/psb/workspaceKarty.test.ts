@@ -1,7 +1,7 @@
 // Workspace — jedna karta = jeden DRUH práce, a patrí tomu, kto je prihlásený.
 import { describe, expect, it } from "bun:test";
 
-import { BEZ_FRONTY, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
+import { BEZ_FRONTY, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok, prijmyUInehoTrenera, hromadnePresuny, odpovedPresunu, zapisPoJednom, anamnezyPodlaStavu } from "./workspaceKarty";
 
 const zmena = (o: Partial<Zmena> & { id: string; trener: string }): Zmena => ({
   id: o.id, druh: o.druh ?? "zrusene", klient: o.klient ?? "Martin Vaško", nazov: null,
@@ -261,5 +261,91 @@ describe("beta: peniaze podľa trénera klienta", () => {
     // Dopyty len Terezke, uzávierka obom (Terezka v nej má svoje kroky).
     expect(ids(krokyBety(k, { mesacne: true, ja: "Terezka" }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka"]);
     expect(ids(krokyBety(k, { mesacne: true, ja: "Jerry" }))).toEqual(["kalendar", "sms", "platby", "uzavierka", "kontroly"]);
+  });
+});
+
+describe("príjmy bez klienta v kroku 3", () => {
+  const riadok = (fioId: string, kandidati: string[], x: Record<string, unknown> = {}) => ({ fioId, datum: "2026-10-30", suma: 1100, text: "t", kandidati, klientsky: true, ...x });
+  const zaklad = {
+    zmeny: [], nezname: [], navrhMena: () => "", ktoSom: null, rozdelPeniaze: true,
+    trenerKlienta: (m: string) => (m === "Radka Kovaříková" ? "Terezka" : "Jerry"),
+  };
+  const platbyKarty = (k: ReturnType<typeof postavKarty>) => k.find((x) => x.druh === "platby")?.polozky || [];
+
+  it("vrátka z e-shopu je v zozname a v počte, ide posledná", () => {
+    const k = postavKarty({ ...zaklad, trener: "Jerry", platby: [riadok("dual", [], { klientsky: false }), riadok("a", ["Ján Novák"])] } as never);
+    const p = platbyKarty(k) as { fioId: string; nevyzeraNaKlienta?: boolean }[];
+    expect(p.map((x) => x.fioId)).toEqual(["a", "dual"]);
+    expect(p[1].nevyzeraNaKlienta).toBe(true);
+  });
+  it("Terezkina platba je v Jerryho počte nie, u Terezky áno; Jerry ju vidí v riadku", () => {
+    const platby = [riadok("r", ["Radka Kovaříková"])];
+    expect(platbyKarty(postavKarty({ ...zaklad, trener: "Jerry", platby } as never))).toEqual([]);
+    expect(platbyKarty(postavKarty({ ...zaklad, trener: "Terezka", platby } as never)).length).toBe(1);
+    const u = prijmyUInehoTrenera(platby as never, "Jerry", zaklad.trenerKlienta);
+    expect(u.map((x) => [x.trener, x.riadky.map((y) => y.fioId)])).toEqual([["Terezka", ["r"]]]);
+  });
+  it("Terezke sa Jerryho peniaze neukazujú", () => {
+    expect(prijmyUInehoTrenera([riadok("a", ["Ján Novák"])] as never, "Terezka", zaklad.trenerKlienta)).toEqual([]);
+    expect(prijmyUInehoTrenera([riadok("a", ["Ján Novák"])] as never, null, zaklad.trenerKlienta)).toEqual([]);
+  });
+  it("faktúra s inou sumou sa nepredvyplní, istá áno", () => {
+    const k = postavKarty({ ...zaklad, trener: "Jerry", platby: [
+      riadok("o", ["Ján Novák"], { faktura: { istota: "otazka", cislo: "1", dovod: "x" } }),
+      riadok("j", ["Ján Novák"], { faktura: { istota: "jedna", cislo: "2", klient: "Ján Novák", suma: 1100, dovod: "y" } }),
+    ] } as never);
+    const p = platbyKarty(k) as { fioId: string; navrh: string }[];
+    expect(p.find((x) => x.fioId === "o")?.navrh).toBe("");
+    expect(p.find((x) => x.fioId === "j")?.navrh).toBe("Ján Novák");
+  });
+});
+
+describe("hromadné „presunuli sme“", () => {
+  const z = (id: string, druh: string, pred = "2026-10-28T10:00") => ({ id, druh, klient: `K${id}`, nazov: null, pred, po: null, kedy: "2026-10-27", trener: "Jerry" });
+  const presuny = {
+    b: { zaciatok: "2026-10-30T15:00", kandidatov: 1 },
+    c: { zaciatok: "2026-10-30T15:00", kandidatov: 2 },
+  };
+  it("„zmizlo\" bez nájdeného termínu do hromadnej odpovede nikdy nepatrí", () => {
+    const v = hromadnePresuny([z("a", "zrusene")] as never, presuny);
+    expect(v.posuny).toEqual([]);
+    expect(v.vyzeraNaPresun).toEqual([]);
+  });
+  it("viac kandidátov je otázka — hromadne nie", () => {
+    expect(hromadnePresuny([z("c", "zrusene")] as never, presuny).vyzeraNaPresun).toEqual([]);
+  });
+  it("posun a jednoznačný presun dostanú presne tú vetu, čo štítok pri riadku", () => {
+    const v = hromadnePresuny([z("p", "posunute"), z("b", "zrusene")] as never, presuny);
+    expect(v.posuny[0].poznamka).toBe(odpovedPresunu(null));
+    expect(v.posuny[0].poznamka).toBe("presunuli sme");
+    expect(v.vyzeraNaPresun[0].poznamka).toBe(odpovedPresunu(presuny.b));
+    expect(v.vyzeraNaPresun[0].poznamka).toContain("15:00");
+  });
+  it("po jednom: chyba jedného nezhodí ostatné a povie sa", async () => {
+    const zapisane: string[] = [];
+    const v = await zapisPoJednom(["a", "b", "c"], async (x) => {
+      if (x === "b") throw new Error("spojenie");
+      zapisane.push(x);
+    });
+    expect(zapisane).toEqual(["a", "c"]);
+    expect(v.hotovo).toBe(2);
+    expect(v.chyby).toEqual([{ polozka: "b", chyba: "spojenie" }]);
+  });
+});
+
+describe("anamnézy podľa stavu", () => {
+  const a = (klient: string, x: Partial<{ klientVyplnilAt: string; zapisAt: string; uzBol: boolean; odkaz: string }>) => ({
+    klient, trener: "Jerry", uvodny: "2026-11-02", stav: "ceka", odkaz: null, klientVyplnilAt: null, zapisAt: null, uzBol: false, ...x,
+  });
+  it("hotové, čaká na trénera, čaká na klienta", () => {
+    const v = anamnezyPodlaStavu([
+      a("hotova", { zapisAt: "x" }),
+      a("vyplnil", { klientVyplnilAt: "x" }),
+      a("bol", { uzBol: true }),
+      a("pride", { odkaz: "u" }),
+    ] as never);
+    expect(v.hotove.map((x) => x.klient)).toEqual(["hotova"]);
+    expect(v.naTrenera.map((x) => x.klient)).toEqual(["vyplnil", "bol"]);
+    expect(v.naKlienta.map((x) => x.klient)).toEqual(["pride"]);
   });
 });

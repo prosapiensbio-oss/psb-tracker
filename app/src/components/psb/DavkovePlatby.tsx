@@ -31,6 +31,7 @@ type Navrh = {
   rozdelenie?: { klient: string; suma: number }[];
   zdrojRozdelenia?: "faktura" | "spolocne" | "ptminder";
   poznamka?: string;
+  faktura?: { istota: "jedna" | "otazka"; cislo: string; dovod: string };
 };
 
 const ZDROJ_ROZDELENIA: Record<string, string> = {
@@ -80,7 +81,8 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
     for (const p of n) {
       // Spoločný prevod sa jednému človeku celý nepredvyplní nikdy.
       if (p.rozdelenie) { if (p.zdrojRozdelenia !== "ptminder") delene[p.fioId] = true; continue; }
-      if (p.kandidati.length === 1 && p.zdrojNavrhu !== "suma") predvolene[p.fioId] = p.kandidati[0];
+      // Faktúra s inou sumou alebo faktúra, čo už platbu má, je otázka — nič vopred.
+      if (p.kandidati.length === 1 && p.zdrojNavrhu !== "suma" && p.faktura?.istota !== "otazka") predvolene[p.fioId] = p.kandidati[0];
     }
     setVyber(predvolene);
     setRozdelit(delene);
@@ -90,10 +92,10 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
   const { jednoznacne, podlaSumy, naVyber, spolocne } = useMemo(() => {
     const cele = (vsetky || []).filter((p) => !p.rozdelenie);
     return {
-      jednoznacne: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu !== "suma"),
+      jednoznacne: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu !== "suma" && p.faktura?.istota !== "otazka"),
       // Odhad zo sumy má vlastnú kopu — nie je to dôkaz, je to zhoda čísla.
-      podlaSumy: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu === "suma"),
-      naVyber: cele.filter((p) => p.kandidati.length > 1),
+      podlaSumy: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu === "suma" && p.faktura?.istota !== "otazka"),
+      naVyber: cele.filter((p) => p.kandidati.length > 1 || (p.kandidati.length > 0 && p.faktura?.istota === "otazka")),
       // Jeden prevod za viacerých — Dan a Monika, 4. 10. 2026.
       spolocne: (vsetky || []).filter((p) => p.rozdelenie),
     };
@@ -123,6 +125,18 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
     if (j.chyby?.length) setChyba(j.chyby.join(" · "));
     setVyber({});
     setRozdelit({});
+    await nacitaj();
+    oznam("peniaze");
+  };
+
+  const nieJeKlient = async (fioId: string) => {
+    setChyba("");
+    const j = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "nieKlient", fioId }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    if (!j?.ok) { setChyba(j?.error || "Nepodarilo sa uložiť."); return; }
     await nacitaj();
     oznam("peniaze");
   };
@@ -172,7 +186,10 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
           <span style={{ fontSize: 10.5, color: C.textDim }}> · {ZDROJ[p.zdrojNavrhu || ""] || "odhad"}</span>
         </span>
       )}
-      {p.poznamka && <div style={{ flexBasis: "100%", fontSize: 11, color: C.orange, paddingLeft: 24 }}>{p.poznamka}</div>}
+      <button type="button" onClick={() => void nieJeKlient(p.fioId)} disabled={pracujem}
+        style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>nie je klient</button>
+      {p.faktura && <div style={{ flexBasis: "100%", fontSize: 11, color: p.faktura.istota === "jedna" ? C.green : C.orange, paddingLeft: 24 }}>{p.faktura.dovod}</div>}
+      {p.poznamka && !p.faktura && <div style={{ flexBasis: "100%", fontSize: 11, color: C.orange, paddingLeft: 24 }}>{p.poznamka}</div>}
     </div>
   );
 
@@ -272,9 +289,9 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
       )}
 
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
-        Príjmy, ku ktorým appka nevie navrhnúť nikoho, tu nie sú — tie sa dopisujú ručne vo
-        Workspace na karte „Platby z banky". Pri potvrdení si appka zapamätá pravidlo len vtedy,
-        keď je meno klienta priamo v odosielateľovi; zo sprostredkovaného prevodu sa neučí.
+        Príjmy, ku ktorým appka nevie navrhnúť nikoho, sú v zozname pod touto kartou aj vo Workspace
+        v kroku 3. Pri potvrdení si appka zapamätá pravidlo len vtedy, keď je meno klienta priamo
+        v odosielateľovi; zo sprostredkovaného prevodu ani z platby s číslom faktúry sa neučí.
       </div>
     </Card>
   );

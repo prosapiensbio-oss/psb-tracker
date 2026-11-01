@@ -9,7 +9,7 @@ import { mailFaktury } from "../../lib/psb/mailFaktury";
 import {
   DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura, type PolozkaFaktury,
 } from "../../lib/psb/vydanaFaktura";
-import { Card, H3, Info } from "./ui";
+import { Card, Info } from "./ui";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dlhyNaFakturu } from "../../lib/psb/fakturaDlhy";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
@@ -134,6 +134,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
    * klikom — mail aj SMS idú k cudziemu človeku a späť sa vziať nedajú.
    */
   const [vyberPoslania, setVyberPoslania] = useState<string | null>(null);
+  /** Riadok s otvoreným „⋯" (storno, zmazať). */
+  const [menuRiadku, setMenuRiadku] = useState<string | null>(null);
   const [smsPoMaile, setSmsPoMaile] = useState<string | null>(null);
   const [upravujemUdaje, setUpravujemUdaje] = useState(false);
   const [f, setF] = useState({
@@ -388,12 +390,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
 
   return (
     <Card>
-      <H3>
-        <Info
-          label="Faktúry"
-          text="Doklady, ktoré PSB vystavilo. Číselná rada RRRR1NNN je vlastná — nemôže sa stretnúť so starými faktúrami z iDokladu (RRRR0NNN). PSB nie je platca DPH, takže na doklade žiadne DPH nie je. Faktúra sa nemaže, chybná sa stornuje."
-        />
-      </H3>
+      {/* Nadpis „Faktúry" nesie karta Workspace; druhý by bol ten istý nápis pod ním. */}
+      <div style={{ float: "right" }}>
+        <Info text="Doklady, ktoré PSB vystavilo. Číselná rada RRRR1NNN je vlastná — nemôže sa stretnúť so starými faktúrami z iDokladu (RRRR0NNN). PSB nie je platca DPH, takže na doklade žiadne DPH nie je. Odoslaná faktúra sa stornuje, zmazať sa má len skúšobná." />
+      </div>
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", margin: "6px 0 14px" }}>
         <div>
@@ -843,8 +843,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   {!!r.dalsie?.length && <span style={{ color: C.accentLight }}> + {[...new Set(r.dalsie.map((d) => d.klient))].join(", ")}</span>}
                   <span style={{ color: C.textDim }}> — {r.popis.length > 46 ? `${r.popis.slice(0, 44)}…` : r.popis}</span>
                 </span>
-                <span style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>{suma(r.celkom_czk)} Kč</span>
-                <span style={{ fontSize: 11.5, color: mesk ? C.red : C.textDim }}>
+                {/* Pevná šírka a zarovnanie vpravo: sumy pod sebou sa dajú porovnať očami. */}
+                <span style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums", minWidth: 78, textAlign: "right" }}>{suma(r.celkom_czk)} Kč</span>
+                <span style={{ fontSize: 11.5, color: mesk ? C.red : C.textDim, flex: "1 1 170px" }}>
                   {r.storno_at ? `storno — ${r.storno_dovod}`
                     : r.uhradene_at ? `uhradená ${den(r.uhradene_at.slice(0, 10))}`
                       : mesk ? `po splatnosti od ${den(r.splatnost)}` : `splatná ${den(r.splatnost)}`}
@@ -873,39 +874,48 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   <button type="button" onClick={() => void posli({ akcia: "uhradena", id: r.id }, r.id)} style={odkazStyl}>uhradená</button>
                 )}
                 {!r.storno_at && r.uhradene_at && (
-                  <button type="button" onClick={() => void posli({ akcia: "neuhradena", id: r.id }, r.id)} style={odkazStyl}>predsa nie</button>
+                  <button type="button" title="Faktúra sa znova označí ako neuhradená" onClick={() => void posli({ akcia: "neuhradena", id: r.id }, r.id)} style={odkazStyl}>zrušiť úhradu</button>
                 )}
-                {!r.storno_at && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const dovod = window.prompt(`Prečo sa faktúra ${r.cislo} stornuje? Číslo v rade zostane obsadené.`);
-                      if (dovod && dovod.trim()) void posli({ akcia: "storno", id: r.id, dovod: dovod.trim() }, r.id);
-                    }}
-                    style={{ ...odkazStyl, color: C.textMuted }}
-                  >
-                    storno
-                  </button>
+                {/* Storno a mazanie za „⋯", oddelene od bežných akcií: vyzerali
+                    rovnako ako „uhradená" a stáli hneď vedľa nej. */}
+                <button type="button" aria-expanded={menuRiadku === r.id} title="Storno a zmazanie"
+                  onClick={() => setMenuRiadku((x) => (x === r.id ? null : r.id))}
+                  style={{ ...odkazStyl, color: C.textMuted, textDecoration: "none", fontWeight: 700, padding: "0 4px" }}>⋯</button>
+                {menuRiadku === r.id && (
+                  <span style={{ display: "inline-flex", gap: 10, alignItems: "baseline", paddingLeft: 10, borderLeft: `1px solid ${C.border}` }}>
+                    {!r.storno_at && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const dovod = window.prompt(`Prečo sa faktúra ${r.cislo} stornuje? Číslo v rade zostane obsadené.`);
+                          if (dovod && dovod.trim()) void posli({ akcia: "storno", id: r.id, dovod: dovod.trim() }, r.id);
+                        }}
+                        style={{ ...odkazStyl, color: C.textMuted }}
+                      >
+                        storno
+                      </button>
+                    )}
+                    {/* Mazanie vedľa storna, nie namiesto neho. Storno je pre
+                        doklad, ktorý niekomu odišiel — má byť vidieť, že bol
+                        a prečo padol. Mazanie je pre skúšobné a omylom založené
+                        faktúry (Jerry, 26. 9. 2026). */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const posledna = r.cislo === riadky[0]?.cislo;
+                        const otazka = r.odoslane_at
+                          ? `Faktúra ${r.cislo} už bola odoslaná klientovi. Naozaj ju zmazať? Po zmazaní po nej zostane len riadok v audite.`
+                          : posledna
+                            ? `Zmazať faktúru ${r.cislo}? Číslo sa uvoľní a dostane ho ďalšia faktúra.`
+                            : `Zmazať faktúru ${r.cislo}? V číselnej rade po nej zostane diera — ak doklad niekomu odišiel, správne je storno.`;
+                        if (window.confirm(otazka)) void posli({ akcia: "zmaz", id: r.id }, r.id);
+                      }}
+                      style={{ ...odkazStyl, color: C.red }}
+                    >
+                      zmazať
+                    </button>
+                  </span>
                 )}
-                {/* Mazanie vedľa storna, nie namiesto neho. Storno je pre
-                    doklad, ktorý niekomu odišiel — má byť vidieť, že bol
-                    a prečo padol. Mazanie je pre skúšobné a omylom založené
-                    faktúry (Jerry, 26. 9. 2026). */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const posledna = r.cislo === riadky[0]?.cislo;
-                    const otazka = r.odoslane_at
-                      ? `Faktúra ${r.cislo} už bola odoslaná klientovi. Naozaj ju zmazať? Po zmazaní po nej zostane len riadok v audite.`
-                      : posledna
-                        ? `Zmazať faktúru ${r.cislo}? Číslo sa uvoľní a dostane ho ďalšia faktúra.`
-                        : `Zmazať faktúru ${r.cislo}? V číselnej rade po nej zostane diera — ak doklad niekomu odišiel, správne je storno.`;
-                    if (window.confirm(otazka)) void posli({ akcia: "zmaz", id: r.id }, r.id);
-                  }}
-                  style={{ ...odkazStyl, color: C.textDim }}
-                >
-                  zmazať
-                </button>
               </div>
               {vyberPoslania === r.id && !r.storno_at && (
                 <div style={{ margin: "4px 0 2px 12px", padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>

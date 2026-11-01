@@ -6,8 +6,8 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import {
-  chybaZoznamuMien, fakturyZIdokladu, nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
-  sposobZRiadku, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
+  chybaZoznamuMien, cislaVTexte, fakturyZIdokladu, nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
+  sposobZRiadku, textPlatby, TOLERANCIA_FAKTURY, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
@@ -192,6 +192,55 @@ async function opravPravidlo(
   return { naucil: false };
 }
 
+/**
+ * NESIE PLATBA ČÍSLO FAKTÚRY? Odpovedá server, nie obrazovka, lebo priradiť sa
+ * dá z piatich miest (krok 3, dlžník, profil, Evidencia, dávka) a nesmie sa
+ * učiť ani z jedného: odosielateľ faktúry je dôkaz o tejto faktúre, nie o tom,
+ * za koho platí nabudúce (kokpit-sa-ma-pytat, faktura-je-vazba).
+ * Chyba čítania sa ráta ako „nesie" — radšej nič nenaučiť než sa naučiť zle.
+ */
+async function fakturaVPlatbe(DB: D1Database, r: FioRiadok): Promise<{ nesie: boolean; vydane: { id: string; cislo: string; klient: string; celkom_czk: number; platba_id: string | null }[] }> {
+  const cisla = cislaVTexte(textPlatby(r)).slice(0, 20);
+  if (!cisla.length) return { nesie: false, vydane: [] };
+  const otazniky = cisla.map((_, i) => `?${i + 1}`).join(",");
+  try {
+    const [v, d] = await DB.batch([
+      DB.prepare(`SELECT id, cislo, klient, celkom_czk, platba_id FROM vydane_faktury WHERE storno_at IS NULL AND cislo IN (${otazniky})`).bind(...cisla),
+      DB.prepare(`SELECT cislo FROM idoklad_faktury WHERE cislo IN (${otazniky})`).bind(...cisla),
+    ]);
+    const vydane = (v.results || []) as unknown as { id: string; cislo: string; klient: string; celkom_czk: number; platba_id: string | null }[];
+    return { nesie: vydane.length > 0 || (d.results || []).length > 0, vydane };
+  } catch {
+    return { nesie: true, vydane: [] };
+  }
+}
+
+/**
+ * Priradená platba je úhrada faktúry: doplní sa väzba, a kým je faktúra
+ * otvorená, aj deň úhrady. Len jedna faktúra, ten istý klient, suma sedí, väzbu
+ * ešte nemá. Uhradená automaticky bez väzby (Vanková, 23. 10.) dátum nemení.
+ * Druhá platba s tým istým VS sa potom pýta (`navrhZFaktury`).
+ */
+async function pripojFakturu(
+  DB: D1Database,
+  vydane: { id: string; cislo: string; klient: string; celkom_czk: number; platba_id: string | null }[],
+  r: FioRiadok,
+  klient: string,
+  kto: string | null | undefined,
+): Promise<void> {
+  if (vydane.length !== 1) return;
+  const f = vydane[0];
+  const suma = Number(f.celkom_czk) || 0;
+  if (f.platba_id || normName(f.klient) !== normName(klient)) return;
+  if (!suma || Math.abs(suma - r.amount_czk) > Math.max(1, suma * TOLERANCIA_FAKTURY)) return;
+  const p = ((await DB.prepare("SELECT id, klient FROM platby WHERE fio_id = ?1 AND zrusene_at IS NULL").bind(r.id).all()).results || []) as unknown as { id: string; klient: string }[];
+  const moja = p.find((x) => normName(x.klient) === normName(klient));
+  if (!moja) return;
+  await DB.prepare("UPDATE vydane_faktury SET platba_id = ?2, uhradene_at = COALESCE(uhradene_at, ?3) WHERE id = ?1 AND platba_id IS NULL")
+    .bind(f.id, moja.id, r.date.slice(0, 10)).run();
+  await audit(DB, { action: "faktura-platba", predmet: f.cislo, neu: `${klient} · ${r.amount_czk} Kč · ${r.date.slice(0, 10)} — platba priradená podľa čísla faktúry`, actor: kto || undefined });
+}
+
 const textChyby = (e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160);
 const teraz = () => new Date().toISOString();
 const denISO = (s: unknown) => {
@@ -209,7 +258,7 @@ const naPlatbu = (r: PlatbaRiadok): Platba => ({
   sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
 });
 
-type FakturaRiadok = { id: string; cislo: string; klient: string; ks: number; cena_czk: number };
+type FakturaRiadok = { id: string; cislo: string; klient: string; ks: number; cena_czk: number; celkom_czk?: number | null; platba_id?: string | null };
 type PolozkaRiadok = { faktura_id: string; klient: string; celkom_czk: number };
 
 /**
@@ -222,7 +271,8 @@ function fakturyKokpitu(faktury: FakturaRiadok[], polozky: PolozkaRiadok[]): Fak
   for (const p of polozky) dalsie.set(p.faktura_id, [...(dalsie.get(p.faktura_id) || []), p]);
   return faktury.filter((f) => f.cislo).map((f) => {
     const jeho = dalsie.get(f.id) || [];
-    if (!jeho.length) return { cislo: f.cislo, klient: f.klient };
+    const spolocne = { suma: Number(f.celkom_czk) || undefined, platbaId: f.platba_id || null };
+    if (!jeho.length) return { cislo: f.cislo, klient: f.klient, ...spolocne };
     const diely = new Map<string, number>();
     const pridaj = (k: string, n: number) => {
       const kl = normName(k);
@@ -232,7 +282,7 @@ function fakturyKokpitu(faktury: FakturaRiadok[], polozky: PolozkaRiadok[]): Fak
     pridaj(f.klient, (Number(f.ks) || 1) * (Number(f.cena_czk) || 0));
     for (const p of jeho) pridaj(p.klient, Number(p.celkom_czk) || 0);
     return {
-      cislo: f.cislo, klient: f.klient,
+      cislo: f.cislo, klient: f.klient, ...spolocne,
       ...(diely.size > 1 ? { diely: [...diely].map(([klient, suma]) => ({ klient, suma })) } : {}),
     };
   });
@@ -410,13 +460,13 @@ async function stavPlatieb(DB: D1Database) {
     // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
     // Číslo faktúry chodí ako variabilný symbol; firma je fakturačný
     // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
-    DB.prepare("SELECT id, cislo, klient, ks, cena_czk FROM vydane_faktury WHERE storno_at IS NULL"),
+    DB.prepare("SELECT id, cislo, klient, ks, cena_czk, celkom_czk, platba_id FROM vydane_faktury WHERE storno_at IS NULL"),
     DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
     // Faktúry vystavené v iDoklade. Číslo dokladu stojí v texte prevodu
     // („20260037 MGR. FILIP STRANAVSKY") a je to variabilný symbol —
     // najtvrdší dôkaz, aký v tom texte býva. Meno na faktúre je ale
     // firma, takže sa prekladá cez spárované fakturačné kontakty.
-    DB.prepare("SELECT cislo, nazov FROM idoklad_faktury"),
+    DB.prepare("SELECT cislo, nazov, suma_czk FROM idoklad_faktury"),
     DB.prepare("SELECT firma, klient FROM fakturacne_kontakty WHERE klient IS NOT NULL AND klient <> ''"),
     // Faktúra za viacerých klientov — podľa položiek sa platba rozdelí.
     DB.prepare("SELECT faktura_id, klient, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie"),
@@ -457,7 +507,7 @@ async function stavPlatieb(DB: D1Database) {
   // Kontakt môže patriť viacerým klientom („A, B, C“) — rozloží sa na mená
   // a faktúra ich ponúkne na výber (21. 10. 2026, `fakturyZIdokladu`).
   const zIdokladu = fakturyZIdokladu(
-    (idoklad.results || []) as unknown as { cislo: string; nazov: string }[],
+    (idoklad.results || []) as unknown as { cislo: string; nazov: string; suma_czk: number | null }[],
     (kontakty.results || []) as unknown as { firma: string; klient: string }[],
     menaKlientov,
   );
@@ -573,8 +623,11 @@ export const Route = createFileRoute("/api/platby")({
           const vzor = vzorPlatby(r);
           let naucil = false;
           let chybaPravidla = "";
+          const zFaktury = await fakturaVPlatbe(DB, r);
           try {
-            naucil = (await opravPravidlo(DB, vzor, [klient], !!b.zapamataj && smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil;
+            if (zFaktury.nesie) await pripojFakturu(DB, zFaktury.vydane, r, klient, kto);
+            // Platba s číslom faktúry sa neučí a pravidlá nemení.
+            else naucil = (await opravPravidlo(DB, vzor, [klient], !!b.zapamataj && smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil;
           } catch (e) {
             // Platba už je zapísaná — nevracia sa chyba celej akcie, ale
             // povie sa to nahlas a zostane stopa v audite.
@@ -674,7 +727,9 @@ export const Route = createFileRoute("/api/platby")({
               zapisane.push(`${oznacenie} → ${klient}${v.stav === "uz-bola" ? " (už bolo)" : ""}`);
               hotovo++;
               try {
-                if ((await opravPravidlo(DB, vzor, [klient], smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil) naucenych++;
+                const zFaktury = await fakturaVPlatbe(DB, r);
+                if (zFaktury.nesie) await pripojFakturu(DB, zFaktury.vydane, r, klient, kto);
+                else if ((await opravPravidlo(DB, vzor, [klient], smieSaZapamatat(vzor, klient) ? klient : null, kto)).naucil) naucenych++;
               } catch (e) {
                 chyby.push(`${oznacenie}: platba zapísaná, pravidlo platiteľa nie (${textChyby(e)})`);
               }
