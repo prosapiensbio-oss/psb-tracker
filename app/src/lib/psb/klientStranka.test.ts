@@ -453,7 +453,7 @@ describe("os ukáže začiatok a zvyšok schová", () => {
   it("nad trojuholníkom sú aspoň tri tréningy, aj keď riadky balíčka zaberú miesto", () => {
     const tr = (d: number) => ({ ...dlha.os[0], den: `2026-10-${String(d).padStart(2, "0")}`, druh: "trening" as const, popis: "tréning" });
     const bal = (d: number, popis: string) => ({ ...dlha.os[0], den: `2026-10-${String(d).padStart(2, "0")}`, druh: "balicekOd" as const, popis });
-    const os = [tr(29), tr(19), bal(17, "6h Předplatné"), bal(16, "Prenesené z minulého balíčka: 1 h"), tr(15), tr(12), tr(8), tr(5), tr(1)];
+    const os = [tr(29), tr(19), bal(17, "6h Předplatné"), bal(16, "Prenesené z minulého balíčka: 1 h"), tr(15), tr(12), tr(8), tr(5), tr(1)].reverse();
     expect(klientStranka({ ...zaklad, os })).toContain("…a další 4 řádky");
   });
 
