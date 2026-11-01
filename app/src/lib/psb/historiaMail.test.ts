@@ -138,10 +138,30 @@ describe("rozsah balíčkov — prenesené hodiny nie sú balíček (Kalva, 29. 
     expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(
       ["2026-09-17", "2026-09-24", "2026-10-01", "2026-10-15", "2026-10-19", "2026-10-29"]);
   });
-  it("1 balíček = od nového mesiaca, prenesené hodiny sú v ňom vidno", () => {
+  it("1 balíček s menej než 3 tréningami ukáže aj predošlý", () => {
     const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 1);
-    expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(["2026-10-19", "2026-10-29"]);
-    expect(v.os.some((b) => b.druh === "balicekOd" && b.den === "2026-10-16")).toBe(true);
+    expect(v.balickov).toBe(2);
+    expect(v.os.filter((b) => b.druh === "trening").length).toBe(6);
+  });
+  it("1 balíček s 3 tréningami ostáva jeden", () => {
+    const os3: Udalost[] = [...osK, { druh: "trening", den: "2026-11-02" }];
+    const v = historiaPreMail("Jaroslav Kalva", os3, k, "2026-11-02", undefined, false, 1);
+    expect(v.balickov).toBe(1);
+    expect(v.os.filter((b) => b.druh === "trening").map((b) => b.den)).toEqual(["2026-10-19", "2026-10-29", "2026-11-02"]);
+  });
+  it("prvý balíček klienta nemá čo pridať", () => {
+    const os1: Udalost[] = [{ druh: "balicekOd", den: "2026-10-17", nazov: "6h Předplatné", hodin: 6, zKokpitu: true }, { druh: "trening", den: "2026-10-19" }];
+    const v = historiaPreMail("Jaroslav Kalva", os1, k, "2026-10-29", undefined, false, 1);
+    expect(v.balickov).toBe(1);
+  });
+  it("prenesené hodiny hovoria skutočný počet, nie počet z rozhodnutia", () => {
+    const v = historiaPreMail("Jaroslav Kalva", osK, k, "2026-10-29", undefined, false, 2);
+    const r = v.os.find((b) => b.druh === "balicekOd" && b.den === "2026-10-16");
+    expect(r?.popis).toBe("Prenesené z minulého balíčka: 2 h");
+    const osMenej: Udalost[] = [...osK.slice(0, 5), { druh: "trening" as const, den: "2026-10-12" }, { druh: "trening" as const, den: "2026-10-13" }, { druh: "trening" as const, den: "2026-10-14" }, ...osK.slice(5)]
+      .sort((a, b) => a.den.localeCompare(b.den));
+    const v2 = historiaPreMail("Jaroslav Kalva", osMenej, k, "2026-10-29", undefined, false, 2);
+    expect(v2.os.find((b) => b.druh === "balicekOd" && b.den === "2026-10-16")?.popis).toBe("Prenesené z minulého balíčka: 1 h");
   });
 });
 

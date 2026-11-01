@@ -298,6 +298,7 @@ const mesiacovCZ = (n: number) => `${n} ${n === 1 ? "měsíc" : n < 5 ? "měsíc
 export const cesky = (t: string) =>
   t
     .replace(/doplnenie\s+členstva/gi, "Doplnění hodin")
+    .replace(/prenesené z minulého balíčka/gi, "Přeneseno z minulého balíčku")
     .replace(/prenesené\s+hodiny/gi, "Přenesené hodiny")
     .replace(/zaplatené/g, "zaplaceno")
     .replace(/vrátené/g, "vráceno")

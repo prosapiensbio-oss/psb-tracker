@@ -59,6 +59,8 @@ export type RiadokVypisu = {
   prevzateDni?: string[];
   /** „Doplnenie členstva" — vnútorný záznam, nie predaj. */
   doplnenie?: boolean;
+  /** Prenesené hodiny: koľko sa z balíčka naozaj prenieslo, nie koľko bolo v rozhodnutí. */
+  prenesene?: number;
   /** Koľkou hodinou ďalšieho balíčka sa tréning stane po zaplatení (`StavRiadku.buduca`). */
   buduca?: number;
   /** Staré obdobie z PTmindera — tréning nad rámec sa nepočíta (`StavRiadku.vyrovnane`). */
@@ -318,7 +320,7 @@ export function priebehBalickov(
   os: Udalost[],
   zostatokTeraz: number | null = null,
   dnes = dnesPraha(),
-): { stavy: Map<Udalost, StavRiadku>; koniec: number | null; platnostSkoncila: boolean } {
+): { stavy: Map<Udalost, StavRiadku>; koniec: number | null; platnostSkoncila: boolean; skutocnePrenesene: Map<Udalost, number> } {
   const rad = vCase(os).filter((u) => u.den <= dnes);
   const stavy = new Map<Udalost, StavRiadku>();
 
@@ -361,6 +363,9 @@ export function priebehBalickov(
    * — karta minie najprv starý, os ho dovtedy zahodila.
    */
   const prenosy = new Set<Udalost>();
+  // Koľko hodín sa z balíčka naozaj prenieslo: riadok vzniká v deň rozhodnutia,
+  // do konca platnosti sa ešte trénuje (Kalva: 13. 10. „2 h", 15. 10. tréning, reálne 1 h).
+  const skutocnePrenesene = new Map<Udalost, number>();
   /**
    * Obdobia, ktorých zvyšok NAHRADIL prenos alebo doplnenie zapísané v deň
    * konca platnosti či neskôr (Katarína Tchuřová: 1 h zvyšku + doplnenie 1 h
@@ -479,6 +484,7 @@ export function priebehBalickov(
       const posl = useky[useky.length - 1];
       const zvysok = /prenesen/i.test(u.nazov) && posl.balicek ? zvysokUseku(posl) : u.hodin;
       if (posl.balicek?.doDna && u.den >= posl.balicek.doDna) nahradeneUseky.set(posl, u.den);
+      if (/prenesen/i.test(u.nazov)) skutocnePrenesene.set(u, Math.max(0, Math.min(u.hodin, zvysok)));
       for (let h = Math.min(u.hodin, zvysok); h >= 1; h--) {
         // Prenos aj doplnenie sú 0 Kč — „nezaplatené" by zdedili len od dňa
         // (nezaplatený poplatok v ten istý deň, Štigut a Stoklasko).
@@ -893,7 +899,7 @@ export function priebehBalickov(
   const nevyuzityPrenos = cakajuce.filter((x) => kopiePrenosu.has(x) && (x.druh !== "balicekOd" || !x.doDna || x.doDna >= dnes)).length;
   if (koniec !== null && nevyuzityPrenos && !koniecUkotveny) koniec += nevyuzityPrenos;
 
-  return { stavy, koniec, platnostSkoncila };
+  return { stavy, koniec, platnostSkoncila, skutocnePrenesene };
 }
 
 /**
@@ -905,7 +911,7 @@ export function priebehBalickov(
  */
 export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: number | null = null): Vypis {
   const dnes = doDna || dnesPraha();
-  const { stavy, koniec: konecnyZostatok, platnostSkoncila } = priebehBalickov(os, zostatokTeraz, dnes);
+  const { stavy, koniec: konecnyZostatok, platnostSkoncila, skutocnePrenesene } = priebehBalickov(os, zostatokTeraz, dnes);
   const vsetko = vCase(os);
 
   let zaciatok: number | null = null;
@@ -940,6 +946,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       zKalendara: u.druh === "trening" ? u.zKalendara : undefined,
       odvodene: u.druh === "balicekOd" || u.druh === "balicekDo" ? u.odvodene : undefined,
       doplnenie: u.druh === "balicekOd" ? u.doplnenie : undefined,
+      prenesene: skutocnePrenesene.get(u),
       prevzate: stav?.prevzate,
       prevzateDni: stav?.prevzateDni,
       buduca: stav?.buduca,

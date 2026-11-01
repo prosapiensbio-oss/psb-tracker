@@ -34,6 +34,7 @@ import type { VypisKlienta } from "./mailKlientovi";
  * jazyk pre zákazníka).
  */
 export const popisPreKlienta = (r: RiadokVypisu): string => {
+  if (r.druh === "balicekOd" && r.prenesene != null) return `Prenesené z minulého balíčka: ${r.prenesene} h`;
   if (r.druh === "balicekOd") return r.popis.split("·")[0].trim();
   if (r.druh === "platba" && /^vrátené/i.test(r.popis)) return r.popis.split("·")[0].trim();
   if (r.druh === "platba") return `zaplatené ${r.popis.replace(/^(platba|zaplatil)\s*/i, "").split("·")[0].trim()}`;
@@ -109,7 +110,7 @@ export function historiaPreMail(
    * videli výpis, čo sa začína riadkom „Doplnenie členstva" a nemá jediné
    * číslo. Rez teraz hľadá skutočný balíček.
    */
-  const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo" && !r.doplnenie);
+  const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo" && !r.doplnenie && r.prenesene !== 0);
   // Hranice balíčkov od najnovšieho. Pri `balickov` = 2 sa režie až za
   // DRUHÝM `balicekOd`, takže v zozname zostanú dva celé balíčky.
   /**
@@ -133,26 +134,37 @@ export function historiaPreMail(
    */
   const jeZvysok = (r: RiadokVypisu) => /prenesen|doplnen/i.test(r.popis);
   const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" && maHodiny(r) && !jeZvysok(r) ? [...a, i] : a), []);
-  const kolko = Math.max(1, Math.floor(balickov));
-  const hranica = zaciatky[kolko - 1];
   /**
-   * REZ IDE ZA TRÉNINGY, KTORÉ SI BALÍČEK PREVZAL — nie po jeho riadok.
-   *
-   * Prvé hodiny balíčka minuli tréningy, ktoré sa stali PRED ním (Hanusovi
-   * 25. 8. a 3. 9. zobrali hodiny 6 a 5). Keď sa rez spraví po riadku
-   * balíčka, odpadnú — a odpočet sa klientovi otvorí šestkou a hneď pokračuje
-   * štvorkou. Presne to Jerry videl 2. aj 3. 10. 2026: „chybí tam 5 h."
-   * Tie tréningy k balíčku patria, lebo sú z neho zaplatené.
+   * POSLEDNÝ BALÍČEK S MÁLO TRÉNINGAMI UKÁŽE AJ PREDOŠLÝ (Jerry, 1. 11. 2026 pri
+   * Kalvovi: „dám 1 balíček a ukáže 2 tréningy"). Dva riadky klientovi nepovedia,
+   * kam sa hodiny podeli, a výpis tak vyzerá takmer prázdny.
    */
-  const dni = hranica == null ? null : vsetky[hranica]?.prevzateDni;
-  let rez = hranica;
-  // Prenos tesne pred balíčkom k nemu patrí — hodiny z neho minie tento balíček.
-  while (rez != null && vsetky[rez + 1]?.druh === "balicekOd" && jeZvysok(vsetky[rez + 1])) rez++;
-  if (rez != null && dni?.length) {
-    const najstarsi = dni.reduce((a, b) => (a < b ? a : b));
-    for (let i = rez; i < vsetky.length; i++) if (vsetky[i].den >= najstarsi) rez = i;
-  }
-  const vyrez = uplna || rez == null ? vsetky : vsetky.slice(0, rez + 1);
+  const MALO_TRENINGOV = 3;
+  const vyrezPre = (kolko: number): RiadokVypisu[] => {
+    const hranica = zaciatky[kolko - 1];
+    /**
+     * REZ IDE ZA TRÉNINGY, KTORÉ SI BALÍČEK PREVZAL — nie po jeho riadok.
+     *
+     * Prvé hodiny balíčka minuli tréningy, ktoré sa stali PRED ním (Hanusovi
+     * 25. 8. a 3. 9. zobrali hodiny 6 a 5). Keď sa rez spraví po riadku
+     * balíčka, odpadnú — a odpočet sa klientovi otvorí šestkou a hneď pokračuje
+     * štvorkou. Presne to Jerry videl 2. aj 3. 10. 2026: „chybí tam 5 h."
+     * Tie tréningy k balíčku patria, lebo sú z neho zaplatené.
+     */
+    const dni = hranica == null ? null : vsetky[hranica]?.prevzateDni;
+    let rez = hranica;
+    // Prenos tesne pred balíčkom k nemu patrí — hodiny z neho minie tento balíček.
+    while (rez != null && vsetky[rez + 1]?.druh === "balicekOd" && jeZvysok(vsetky[rez + 1])) rez++;
+    if (rez != null && dni?.length) {
+      const najstarsi = dni.reduce((a, b) => (a < b ? a : b));
+      for (let i = rez; i < vsetky.length; i++) if (vsetky[i].den >= najstarsi) rez = i;
+    }
+    return uplna || rez == null ? vsetky : vsetky.slice(0, rez + 1);
+  };
+  let kolko = Math.max(1, Math.floor(balickov));
+  if (!uplna && kolko === 1 && zaciatky.length > 1
+    && vyrezPre(1).filter((r) => r.druh === "trening").length < MALO_TRENINGOV) kolko = 2;
+  const vyrez = vyrezPre(kolko);
   const body = [...vyrez].reverse()
     .map((r) => ({
       den: r.den,
