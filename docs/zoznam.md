@@ -83,7 +83,7 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 
 10i. [x] (31. 10.) Pri kontrole kritiky dorobené: audit editora (Inšpektor na plnú výšku, strizna 732caec), editor pod pruhmi, scenár karty podľa účtu + háčiky účtu, hashtagy podľa účtu, Jarvis bez fáz štúdia pre osobné účty.
 10j. [ ] Naživo po prihlásení Clauda (`~/.local/bin/claude` → /login): Napísať, ✦ text titulky, scenár osobnej karty, prvý strih, feed iného účtu.
-- **10k** [ ] Montáž cvikov (1. 11. 2026): nahratie „jedno video“ z 3+ klipov bez reči strihá hneď Claude po pozretí záberov (Príbeh z klipov aj pre PSB); všetky klipy dávky, bez švihov, bez falošných nápisov. Overené na kópii. Ostáva: Jerry kliknúť Aktualizovať a nahrať ďalší cvik naostro; porovnať s ručným strihom (2026-11-01, r3).
+- **10k** [ ] Montáž cvikov (1. 11. 2026): nahratie „jedno video“ z 3+ klipov bez reči strihá hneď Claude (aj podľa hudby), appka kontroluje kameru, druhé nahratie berie nové nastavenia. Overené na kópii. Ostáva: Jerry nahrá znova naostro a posúdi; hudba z Instagramu sa nedá vypočuť – test katalógu Metricoolu čaká na povolenie (createScheduledPost blokuje auto mode).
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
