@@ -1828,7 +1828,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                * priradenie príjmov; kontrola bola tretie miesto na to isté.
                * Zostalo hlásenie: beží appke všetko? Nič sa v ňom neodklepáva.
                */
-              kontroly: <ZdravieKokpitu rozpory={rozpory || []} mesiac={mk} />,
+              kontroly: <ZdravieKokpitu rozpory={rozpory || []} mesiac={mk} chybySekcii={data.chybySekcii} />,
               // Metricool sa sťahuje zeleným tlačidlom v riadku kroku (cez MCP,
               // 8. 10. 2026) — okno na CSV Jerry v ten istý deň zrušil.
               // Fio a zaraďovanie výdavkov z uzávierky ODIŠLI (29. 10. 2026):

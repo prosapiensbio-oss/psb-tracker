@@ -249,6 +249,8 @@ export type PSBData = {
    * o rozbitom formulári by sa Jerry dozvedel znova až ručným pokusom.
    */
   webKontroly: { kluc: string; nazov: string; stav: "ok" | "varovanie" | "chyba"; detail: string; beh: string }[];
+  /** Voliteľné sekcie, ktoré sa pri tomto načítaní nenačítali (Zdravie Kokpitu). */
+  chybySekcii?: string[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
   zavery: ZaverRow[];
   /** Nezaplatené poplatky z PTminderu — čo je v exporte, je otvorené. */

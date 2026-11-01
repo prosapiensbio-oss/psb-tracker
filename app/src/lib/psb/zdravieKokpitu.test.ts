@@ -87,3 +87,15 @@ describe("suhrnZdravia", () => {
     expect(suhrnZdravia(chyba).veta).toContain("1 vec");
   });
 });
+
+describe("sekcie dát, ktoré sa nenačítali", () => {
+  const vstup = { teraz: "2026-11-01T10:00:00.000Z", behy: [], chybyPrehliadaca: [], rozpory: [] };
+  it("bez chyby riadok nestraší", () => {
+    expect(sekciaChyb(vstup).riadky).toHaveLength(1);
+  });
+  it("chýbajúca sekcia je nález s menom", () => {
+    const s = sekciaChyb({ ...vstup, chybySekcii: ["kontroly webu"] });
+    expect(s.stav).toBe("pozor");
+    expect(s.riadky[1].detail).toContain("kontroly webu");
+  });
+});

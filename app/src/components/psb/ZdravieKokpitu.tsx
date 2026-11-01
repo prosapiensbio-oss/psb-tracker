@@ -33,9 +33,11 @@ const OBLASTI: { id: string; nazov: string }[] = [
   { id: "jarvis", nazov: "Jarvis a dáta" },
 ];
 
-export function ZdravieKokpitu({ rozpory, mesiac }: {
+export function ZdravieKokpitu({ rozpory, mesiac, chybySekcii }: {
   /** Porovnania dvoch zdrojov, ktoré appka už počíta inde. */
   rozpory: { nazov: string; pocet: number | null; detail?: string }[];
+  /** Čo `loadData` pri poslednom načítaní nevedel prečítať. */
+  chybySekcii?: string[];
   /** Mesiac, ktorý sa uzatvára — ide do promptu. */
   mesiac: string;
 }) {
@@ -56,7 +58,7 @@ export function ZdravieKokpitu({ rozpory, mesiac }: {
 
   if (behy === null) return <div style={{ fontSize: 12, color: C.textDim }}>pozerám sa, čo appke beží…</div>;
 
-  const sekcie = zdravieKokpitu({ teraz: new Date().toISOString(), behy, chybyPrehliadaca: chyby, rozpory });
+  const sekcie = zdravieKokpitu({ teraz: new Date().toISOString(), behy, chybyPrehliadaca: chyby, chybySekcii, rozpory });
   const suhrn = suhrnZdravia(sekcie);
   const farba = (s: StavZdravia) => (s === "pozor" ? C.orange : s === "nevie" ? C.textDim : C.green);
   const znak = (s: StavZdravia) => (s === "pozor" ? "!" : s === "nevie" ? "?" : "✓");
