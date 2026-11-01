@@ -91,3 +91,34 @@ export const poznamkaVratenia = (nevycerpane: number) =>
  */
 export const jeUkonceny = (b: { poznamka?: string | null }): boolean =>
   /(^|·\s*)ukončené \d/.test(String(b.poznamka || ""));
+
+/**
+ * UKONČIL, ALE V KALENDÁRI MÁ TERMÍNY (kontrola po nasadení, 1. 11. 2026).
+ *
+ * Radek Baláž ukončil 13. 10. a dostal peniaze späť, ale v kalendári má 14
+ * termínov od 17. 11. Príznak „ukončený“ ho vyraďuje zo všetkých zoznamov, takže
+ * od 17. 11. by trénoval a nikde by nebol. Appka nevie, či termíny platia —
+ * mohli ostať zo starej série —, preto sa pýta. Balíček nezakladá nikdy: to je
+ * rozhodnutie trénera (`smieVzniknutAutomaticky`). Kľúč nesie deň ukončenia,
+ * takže odpoveď platí na toto ukončenie a pri ďalšom sa appka spýta znova.
+ */
+export function otazkaUkonceneho(
+  c: { name: string; ukonceny?: boolean; packageValidTo?: string | null },
+  terminy: string[],
+  dnes: string,
+): { kluc: string; titulok: string; detail: string; akcie: { popis: string; poznamka: string }[] } | null {
+  if (!c.ukonceny) return null;
+  const buduce = [...new Set(terminy.map((t) => String(t).slice(0, 10)).filter((d) => d > dnes))].sort();
+  if (!buduce.length) return null;
+  const koniec = String(c.packageValidTo || "").slice(0, 10);
+  const pocet = buduce.length === 1 ? "1 termín" : buduce.length < 5 ? `${buduce.length} termíny` : `${buduce.length} termínov`;
+  return {
+    kluc: `ukonceny-termin|${c.name}|${koniec}`,
+    titulok: "Balíček ukončený, v kalendári termíny",
+    detail: `${c.name}: balíček ukončený${koniec ? ` ${datumSk(koniec)}` : ""}, ale v kalendári je ${pocet} od ${datumSk(buduce[0])} — platia? Po prvom tréningu sa ukáže v karte Bez balíčka; balíček sa sám nezaloží.`,
+    akcie: [
+      { popis: "platia, vracia sa", poznamka: "termíny platia — vracia sa, balíček založí tréner" },
+      { popis: "neplatia", poznamka: "termíny neplatia — treba ich vymazať z kalendára" },
+    ],
+  };
+}

@@ -1,3 +1,5 @@
+import * as Sk from "./sklonovanie";
+
 /**
  * KONTROLA PEŇAZÍ PATRÍ DO WORKSPACE, NIE DO NOTIFIKÁCIÍ (Jerry, 27. 10. 2026:
  * „v notifikáciách mám veľa notifikácií… z týchto platobných mi sprav kartu").
@@ -13,6 +15,21 @@
 const PREDPONY = ["naklad|", "dvojity|", "pravidlo|", "prijmy|", "nezhody|"];
 
 export const jeKontrolaPenazi = (kluc: string): boolean => PREDPONY.some((p) => kluc.startsWith(p));
+
+/**
+ * ČO JE V ODZNAKU KARTY KONTROLA PEŇAZÍ (kontrola po nasadení, 1. 11. 2026).
+ *
+ * Odznak hlásil 85 a text pod ním 84: odznak sčíta tri fronty, text hovoril len
+ * o výdavkoch. Jedna funkcia dáva číslo aj rozpis, takže sa nerozídu.
+ */
+export function rozpisKontrolyPenazi(v: { vydavky: number; platby: number; kontroly: number }): { spolu: number; text: string } {
+  const casti = [
+    v.vydavky ? `${Sk.vydavky(v.vydavky)} na potvrdenie` : "",
+    v.platby ? `${Sk.platby(v.platby)} mesiaca` : "",
+    v.kontroly ? `${v.kontroly} ${v.kontroly === 1 ? "náklad nesedí" : v.kontroly < 5 ? "náklady nesedia" : "nákladov nesedí"}` : "",
+  ].filter(Boolean);
+  return { spolu: v.vydavky + v.platby + v.kontroly, text: casti.join(" · ") };
+}
 
 /**
  * REKLAMY: NA DNES JEDNA NOTIFIKÁCIA, ROZHODNUTIA V DOZORE (Jerry, 27. 10. 2026:

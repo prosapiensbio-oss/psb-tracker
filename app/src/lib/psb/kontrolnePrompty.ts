@@ -54,7 +54,8 @@ miesta, kde tu už chyby boli:
    platba BEZ nového balíčka (členstvo sa zakladá až od prvého tréningu
    nového cyklu, ktorý ešte nemusí byť dohodnutý) aj balíček BEZ platby
    (balíček sa nahodí hneď, klient z neho čerpá, faktúra dobehne — preto je
-   ten istý človek naraz v „Balíček dojde…" aj v „Nezaplatené").
+   ten človek v „Nezaplatené" a stav hodín má v riadku, v „Balíček dojde…"
+   nie je).
    Viď prevadzka.md, oddiel 12c.
 4. Dlh z výplat a jeho tempo: číslo na obrazovke = Jarvisovo číslo.
 5. Break-even a predikcia: z akého obdobia sa počítajú a či to obdobie ešte

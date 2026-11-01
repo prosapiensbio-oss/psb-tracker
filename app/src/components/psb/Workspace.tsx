@@ -29,7 +29,7 @@ import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
 import { NaCeluObrazovku } from "./NaCeluObrazovku";
-import { jeKontrolaPenazi, jeReklamaDozoru } from "../../lib/psb/kontrolaPenazi";
+import { jeKontrolaPenazi, jeReklamaDozoru, rozpisKontrolyPenazi } from "../../lib/psb/kontrolaPenazi";
 import { platbyNaZaplatenie } from "../../lib/psb/platbyMesiaca";
 import { PlatbyMesiaca } from "./PlatbyMesiaca";
 import type { Actions } from "./App";
@@ -135,12 +135,14 @@ const pamatKopy: {
   platby: PlatbaRiadok[];
 } = { zdroje: null, balicky: [], platby: [] };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTreningy, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
   data: PSBData;
   kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null; uid?: string; trener?: string; koniec?: string; nazov?: string }[];
+  /** Termíny ďaleko dopredu — hlavné okno kalendára končí o 14 dní. */
+  buduceTreningy?: { klient: string | null; zaciatok: string }[];
   btcSats?: Record<string, number>;
   /** Bitcoinová kniha a kurz — profil klienta z nej sádže záložku ₿. */
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
@@ -376,13 +378,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return bezAktivnehoBalicka(
       Object.values(clients),
       evidencia,
-      treningyZObochZdrojov(data.sessions, kalUdalosti || []),
+      treningyZObochZdrojov(data.sessions, kalUdalosti || [], buduceTreningy),
       undefined,
       // Mínus berie tá istá funkcia, ktorá kreslí čísla na osi v profile.
       (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
     );
     },
-    [clients, balicky, kalUdalosti, data],
+    [clients, balicky, kalUdalosti, buduceTreningy, data],
   );
 
   /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */
@@ -965,7 +967,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const vybavenych = hotove.size;
   /** Koho vybralo prihlásenie; null = appka nevie, kto sedí pri appke. */
   const automat = trenerZPrihlasenia(ktoSom);
-  const spolu = karty.reduce((a, x) => a + x.polozky.length, 0);
 
   if (!zive.length) {
     return (
@@ -988,6 +989,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // Bez useMemo: stojí pod skorším returnom (hooky pod returnom zhasnú appku).
   const kontrolaPenazi = (register || []).filter((r) => jeKontrolaPenazi(r.key) && !r.acked);
   const zostava = (x: Karta) => (x.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).filter((p) => !hotove.has(klucPolozky(x.druh, p))).length;
+  const rozpisKontroly = () => rozpisKontrolyPenazi({
+    vydavky: vydavkyNaPotvrdenie,
+    platby: platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length,
+    kontroly: kontrolaPenazi.length,
+  });
   // Presvitajúce karty idú tiež dokola — na poslednej je za ňou prvá.
   const dalsie = zive.length > 1
     ? [1, 2].slice(0, Math.min(2, zive.length - 1)).map((o) => zive[(i + o) % zive.length])
@@ -1944,6 +1950,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       const polozky = kontrolaPenazi;
       return (
         <>
+          {/* To isté číslo ako odznak, rozpísané — tri fronty, nie jedna. */}
+          {rozpisKontroly().spolu > 0 && (
+            <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 10 }}>{rozpisKontroly().text}</div>
+          )}
           {/* VÝDAVKY NA POTVRDENIE — každý týždeň, nie pri uzávierke (Jerry,
               29. 10. 2026). Banka sa sťahuje sama každú noc; tu sa len
               potvrdí, čo pravidlá zaradili, a doplní, čo nezaradili. */}
@@ -2159,7 +2169,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const pocetKarty = (x: Karta): number => {
     if (x.druh === "krok") {
-      if (x.krok === "kontroly") return kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length;
+      if (x.krok === "kontroly") return rozpisKontroly().spolu;
       if (x.krok === "sms") return pocetSms ?? 0;
       if (x.krok === "dopyty") return pocetDopytov;
       if (x.krok === "uzavierka") return pocetUzavierky;
@@ -2170,6 +2180,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (x.druh === "reklamy") return (register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length;
     return BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x);
   };
+  /**
+   * „CELKOM“ JE SÚČET ODZNAKOV (kontrola po nasadení, 1. 11. 2026). Dovtedy sa
+   * sčítali surové `karty.polozky`: pred rozdelením do krokov, bez SMS, Dopytov,
+   * Uzávierky a Kontroly peňazí (tie majú počet mimo `polozky`) a bez ohľadu na
+   * to, ktoré karty sú pre vybraný filter vôbec v kope. Preto 71 proti 103.
+   */
+  const spolu = zive.reduce((a, x) => a + pocetKarty(x), 0);
 
   /** Rad kariet — na telefóne sa lepí pod horný riadok, lebo roluje celá stránka. */
   const radKariet = (
@@ -2314,7 +2331,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           <Card style={{ marginBottom: 0, height: mobil ? undefined : "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{kk.nadpis}</div>
-              {!BEZ_FRONTY.includes(kk.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(kk)} zostáva</div>}
+              {!BEZ_FRONTY.includes(kk.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{pocetKarty(kk)} zostáva</div>}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>
               {kk.podnadpis}
@@ -2408,8 +2425,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             <button
               key={idKarty(x)}
               onClick={() => (j === i ? undefined : prepni(j > i ? 1 : -1, j))}
-              aria-label={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} (${zostava(x)} zostáva)`}
-              title={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} · ${zostava(x)} zostáva`}
+              aria-label={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} (${pocetKarty(x)} zostáva)`}
+              title={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} · ${pocetKarty(x)} zostáva`}
               style={{
                 width: j === i ? 11 : 8, height: j === i ? 11 : 8, borderRadius: "50%",
                 border: "none", padding: 0, cursor: "pointer",

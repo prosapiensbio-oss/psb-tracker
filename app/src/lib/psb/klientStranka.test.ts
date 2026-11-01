@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { klientStranka, SADZBA } from "./klientStranka";
+import { aDalsichRadku, klientStranka, SADZBA } from "./klientStranka";
 import type { VypisKlienta } from "./mailKlientovi";
 
 const zaklad: VypisKlienta = {
@@ -500,5 +500,32 @@ describe("za koho platí niekto iný", () => {
     expect(h).toContain("Balíček za tebe platí");
     expect(h).toContain("Jakub Kaňovský");
     expect(h).not.toContain("Načti QR");
+  });
+});
+
+describe("ukončený balíček na stránke klienta", () => {
+  const novy = { suma: 21150, popis: "OFF - 18 hodín offline", novy: true };
+  it("netvrdí „Poslední hodina“ a neťahá hneď na platbu", () => {
+    const h = klientStranka({ ...zaklad, zostatok: 0, ukonceny: true, platba: novy as never });
+    expect(h).toContain("Balíček ukončen");
+    expect(h).not.toContain("Poslední hodina");
+    expect(h).not.toContain("Zaplatit");
+    expect(h).toContain("Když budeš pokračovat");
+  });
+  it("po tréningu za ukončením je to normálne nezaplatené", () => {
+    expect(klientStranka({ ...zaklad, zostatok: -1, ukonceny: true })).toContain("Nezaplaceno 1 h");
+  });
+  it("kto neukončil, vidí pôvodný nadpis a „Nový balíček“", () => {
+    const h = klientStranka({ ...zaklad, zostatok: 0, platba: novy as never });
+    expect(h).toContain("Poslední hodina");
+    expect(h).toContain("Nový balíček");
+  });
+});
+
+describe("skloňovanie riadkov", () => {
+  it("1 řádek, 2–4 řádky, 5+ řádků", () => {
+    expect(aDalsichRadku(1)).toBe("a další 1 řádek");
+    expect(aDalsichRadku(3)).toBe("a další 3 řádky");
+    expect(aDalsichRadku(5)).toBe("a dalších 5 řádků");
   });
 });

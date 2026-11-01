@@ -116,6 +116,8 @@ export type VypisKlienta = {
   os: BodOsi[];
   /** Koľko hodín zostáva; `null` = appka to nevie povedať. */
   zostatok: number | null;
+  /** Balíček ukončený s vrátením peňazí a odvtedy nič nové (`ClientAgg.ukonceny`). */
+  ukonceny?: boolean;
   /** Nula preto, že posledný balíček skončil — nie preto, že sa dochodil (`priebehBalickov`). */
   platnostSkoncila?: boolean;
   /** Odtrénované hodiny spolu a odkedy klient chodí. */
@@ -266,7 +268,7 @@ export function vetaPrevzatych(b: { prevzate?: number; prevzateDni?: string[] },
   if (!dni.length) return `${n} ${hodina} padly na starší tréninky`;
   const zoznam = dni.length <= 3
     ? dni.length === 1 ? dni[0] : `${dni.slice(0, -1).join(", ")} a ${dni[dni.length - 1]}`
-    : `${dni.slice(0, 2).join(", ")} a dalších ${dni.length - 2}`;
+    : `${dni.slice(0, 2).join(", ")} a ${dni.length - 2 < 5 ? "další" : "dalších"} ${dni.length - 2}`;
   return `${n} ${hodina} ${n === 1 ? "padla" : "padly"} na tréninky ${zoznam}`;
 }
 

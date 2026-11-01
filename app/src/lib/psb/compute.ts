@@ -20,6 +20,7 @@ import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { klucPlatbyMesiaca, platbyNaZaplatenie } from "./platbyMesiaca";
+import { otazkaUkonceneho } from "./ukoncenieBalicka";
 import { odlozenieTeraz, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL } from "./rezervaOdlozenie";
 import type {
   Lead,
@@ -2204,7 +2205,7 @@ export function zaverKryjeKlienta(
 export function deriveAnomalies(
   data: PSBData,
   clients: Record<string, ClientAgg>,
-  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; zmeny?: ZmenaVKalendari[] },
+  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; zmeny?: ZmenaVKalendari[]; buduce?: { klient: string | null; zaciatok: string }[] },
 ): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
@@ -2367,6 +2368,18 @@ export function deriveAnomalies(
         : `${c.name} má narodeniny ${dni === 1 ? "zajtra" : `o ${dni} dní`} (${fmtDMY(c.narodeniny)})${kolky}`,
       c.name,
     );
+  }
+
+  // Ukončený klient s termínmi v kalendári — nezávisle od stavu, ukončený býva
+  // Neaktívny a tých slučka nižšie preskakuje. `buduce` siaha ďalej než okno
+  // udalostí; na serveri (ranný push) príde otázka, až keď je termín v okne.
+  for (const c of Object.values(clients)) {
+    if (!c.ukonceny) continue;
+    const k = normName(c.name);
+    const terminy = [...(kal?.buduce || []), ...(kal?.udalosti || []).filter((u) => u.typ === "trening" || u.typ === "uvodny")]
+      .filter((u) => u.klient && normName(u.klient) === k).map((u) => u.zaciatok);
+    const o = otazkaUkonceneho(c, terminy, dnesPraha(now));
+    if (o) push(o.kluc, "orange", o.titulok, o.detail, c.name, o.akcie);
   }
 
   for (const c of Object.values(clients)) {
@@ -3231,7 +3244,7 @@ export function deriveRegister(
   clients: Record<string, ClientAgg>,
   sixM: SixMRow[],
   capacity: CapacityRow[],
-  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; zmeny?: ZmenaVKalendari[] },
+  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; zmeny?: ZmenaVKalendari[]; buduce?: { klient: string | null; zaciatok: string }[] },
 ): RegisterItem[] {
   const ack = data.anomalyAck || {};
   const items: RegisterItem[] = [];

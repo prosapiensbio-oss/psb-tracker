@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaUkoncenia, navrhUkoncenia, poznamkaUkoncenia, poznamkaVratenia } from "./ukoncenieBalicka";
+import { chybaUkoncenia, navrhUkoncenia, otazkaUkonceneho, poznamkaUkoncenia, poznamkaVratenia } from "./ukoncenieBalicka";
 import { dlhyKlientov } from "./zaplatene";
 
 describe("ukončenie balíčka — Radek Baláž, 13. 10. 2026", () => {
@@ -122,5 +122,20 @@ describe("ukončený prevzatý zostatok nie je koniec — Panagiotis Tsiolis uka
     const z = zostatokKokpitu(balicky, "Panagiotis Tsiolis", sedenia, "2026-10-22")!;
     expect(z.zostatok).toBe(13);
     expect(z.nazov).toBe("OFF - 18 hodín offline");
+  });
+});
+
+describe("ukončený klient s termínmi", () => {
+  const radek = { name: "Radek Balaž", ukonceny: true, packageValidTo: "2026-10-13" };
+  it("pýta sa, keď má termín po dnešku; bez termínu mlčí", () => {
+    const o = otazkaUkonceneho(radek, ["2026-11-17T10:00", "2026-11-19T10:00", "2026-11-19T10:00"], "2026-11-01");
+    expect(o?.kluc).toBe("ukonceny-termin|Radek Balaž|2026-10-13");
+    expect(o?.detail).toContain("2 termíny od 17. 11. 2026");
+    expect(o?.akcie.map((a) => a.popis)).toEqual(["platia, vracia sa", "neplatia"]);
+    expect(o?.akcie.some((a) => "balicek" in a)).toBe(false);
+    expect(otazkaUkonceneho(radek, ["2026-10-20T10:00"], "2026-11-01")).toBeNull();
+  });
+  it("kto neukončil, na toho sa nepýta", () => {
+    expect(otazkaUkonceneho({ name: "A", packageValidTo: "" }, ["2026-11-17T10:00"], "2026-11-01")).toBeNull();
   });
 });

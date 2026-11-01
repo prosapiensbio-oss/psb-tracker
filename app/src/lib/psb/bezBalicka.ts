@@ -59,7 +59,7 @@ export type BezBalicka = {
   /** Čo o ňom hovorí posledný export. */
   membership: string;
   /** Prečo je v zozname — veta, ktorá sa dá prečítať bez ďalšieho klikania. */
-  dovod: "hodiny minuté" | "platnosť skončila" | "žiadne členstvo";
+  dovod: "hodiny minuté" | "platnosť skončila" | "žiadne členstvo" | "balíček ukončený";
   platnostDo: string;
   poslednyTrening: string;
   /** Dní od posledného tréningu; −1 = netrénoval nikdy. */
@@ -88,6 +88,11 @@ const dniMedzi = (a: string, b: string) => Math.round((Date.parse(b) - Date.pars
 export function treningyZObochZdrojov(
   sessions: { client: string; date: string }[],
   kalUdalosti: Udalost[],
+  /**
+   * Termíny ďaleko dopredu (`buduceTreningy` z `/api/kalendar`). Hlavné okno
+   * kalendára končí o 14 dní: kto má termín až potom, ako by žiadny nemal.
+   */
+  buduce: { klient: string | null; zaciatok: string }[] = [],
 ): Udalost[] {
   const out: Udalost[] = [];
   const uz = new Set<string>();
@@ -103,6 +108,13 @@ export function treningyZObochZdrojov(
     if (uz.has(kluc)) continue;
     uz.add(kluc);
     out.push(u);
+  }
+  for (const u of buduce) {
+    if (!u.klient) continue;
+    const kluc = `${normName(u.klient)}|${den(u.zaciatok)}`;
+    if (uz.has(kluc)) continue;
+    uz.add(kluc);
+    out.push({ klient: u.klient, zaciatok: u.zaciatok, typ: "trening" });
   }
   return out;
 }
@@ -157,6 +169,61 @@ export function vMinuseKlienta(
   return 0;
 }
 
+/** Sporadický bez termínu patrí do zoznamu len mesiac po tréningu; potom je to otázka „duch“, nie predaj. */
+const SPORADICKY_DNI = 30;
+
+/**
+ * KTO SA MÁ V ZOZNAME OBJAVIŤ (kontrola po nasadení, 1. 11. 2026).
+ *
+ * Svetopluk Stoklasko (Sporadický, termín 12. 11., doplnenie minuté) a Kateřina
+ * Stoklásková vypadli z „Balíček dojde“, keď sa vyčerpané doplnenie prestalo
+ * tváriť ako členstvo — a sem sa nedostali, lebo sem smel len „Aktívny“. Stav
+ * hovorí o dochádzke, nie o tom, či má klient na čo chodiť:
+ *  • termín v kalendári je silnejší než stav (to isté pravidlo ako v predikcii:
+ *    kto má dohodnutý termín, neodišiel), platí aj pre Pauzu a Neaktívneho;
+ *  • Sporadický bez termínu ostáva mesiac po poslednom tréningu — okrem toho,
+ *    kto mal len úvodný (Linda Muth, Radka Kovaříková): ten nič nedočerpal, je
+ *    nový a prvý balíček zakladá tréner po dohode;
+ *  • kto ešte netrénoval, má pred sebou úvodný — ten rieši Kalendár, balíček
+ *    mu vznikne prvým tréningom.
+ *
+ * UKONČENÝ S VRÁTENÍM je výnimka: nula hodín u neho nie je „predaj mu ďalší“
+ * a patrí sem, až keď po ukončení naozaj odtrénoval (`packageRemaining` < 0,
+ * `zostatokKokpitu`). Samotné termíny rieši otázka v registri
+ * (`otazkaUkonceneho`), lebo ešte sa môžu zrušiť.
+ */
+function patriDoZoznamu(c: KlientPreKartu, objednanych: number, dnes: string, lenUvodny: boolean): boolean {
+  if (c.ukonceny) return c.packageRemaining < 0;
+  if (c.status === "Aktívny") return true;
+  const posledny = den(c.lastSession);
+  if (!posledny) return false;
+  if (objednanych > 0) return true;
+  return c.status === "Sporadický" && !lenUvodny && dniMedzi(posledny, dnes) <= SPORADICKY_DNI;
+}
+
+const jeUvodny = (b: Balicek) => /^\s*úvodn/i.test(b.nazov);
+
+/**
+ * PREČO NEMÁ NA ČO CHODIŤ — keď karta členstvo nenesie (`membership` prázdne).
+ *
+ * Karta názov členstva zhodí, keď je posledný zápis vyčerpané doplnenie bez
+ * konca alebo skončený balíček. „Žiadne členstvo“ potom Štigutovi a Regine
+ * tvrdilo, že nikdy nič nemali. Rozhoduje posledný balíček: skončil dátumom =
+ * platnosť skončila, bez dátumu (doplnenie, prenos) = hodiny minuté.
+ */
+function dovodBezClenstva(vlastne: Balicek[], meno: string, dnes: string): { dovod: BezBalicka["dovod"]; platnostDo: string } {
+  const k = normName(meno);
+  const posledny = vlastne
+    .filter((b) => normName(b.klient) === k && !b.zruseneAt && (b.hodiny == null || b.hodiny > 0))
+    .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
+  if (!posledny) return { dovod: "žiadne členstvo", platnostDo: "" };
+  const koniec = den(posledny.platnostDo || "");
+  // Úvodný platí jeden deň a jedna hodina sa minie v ten istý deň.
+  return koniec && koniec < dnes && !jeUvodny(posledny)
+    ? { dovod: "platnosť skončila", platnostDo: koniec }
+    : { dovod: "hodiny minuté", platnostDo: koniec };
+}
+
 export function bezAktivnehoBalicka(
   clients: KlientPreKartu[],
   vlastne: Balicek[],
@@ -170,8 +237,16 @@ export function bezAktivnehoBalicka(
   minus?: (meno: string) => number,
 ): BezBalicka[] {
   const out: BezBalicka[] = [];
+  const objednane = new Map<string, number>();
+  for (const u of udalosti) {
+    if (!u.klient || (u.typ !== "trening" && u.typ !== "uvodny") || den(u.zaciatok) <= dnes) continue;
+    const k = normName(u.klient);
+    objednane.set(k, (objednane.get(k) || 0) + 1);
+  }
   for (const c of clients) {
-    if (c.status !== "Aktívny" || c.ukonceny) continue;
+    const objednanych = objednane.get(normName(c.name)) || 0;
+    const moje = vlastne.filter((b) => normName(b.klient) === normName(c.name) && !b.zruseneAt);
+    if (!patriDoZoznamu(c, objednanych, dnes, moje.length > 0 && moje.every(jeUvodny))) continue;
 
     const vKokpite = zostatokVKokpite(vlastne, udalosti, c.name, dnes);
     // Paušál v Kokpite = predplatené mesiace, nie hodiny. Nepatrí sem.
@@ -185,24 +260,22 @@ export function bezAktivnehoBalicka(
     const poPlatnosti = !!c.packageValidTo && den(c.packageValidTo) < dnes;
     if (c.packageRemaining > 0 && !poPlatnosti) continue;
 
-    const dovod: BezBalicka["dovod"] = !c.membership
-      ? "žiadne členstvo"
+    const zPosledneho = !c.membership ? dovodBezClenstva(vlastne, c.name, dnes) : null;
+    const dovod: BezBalicka["dovod"] = c.ukonceny
+      ? "balíček ukončený"
+      : zPosledneho ? zPosledneho.dovod
       : poPlatnosti && c.packageRemaining > 0 ? "platnosť skončila" : "hodiny minuté";
 
     const posledny = den(c.lastSession);
-    const k = normName(c.name);
     out.push({
       meno: c.name,
       trener: c.primaryTrainer,
       membership: c.membership,
       dovod,
-      platnostDo: den(c.packageValidTo),
+      platnostDo: den(c.packageValidTo) || zPosledneho?.platnostDo || "",
       poslednyTrening: posledny,
       dni: posledny ? dniMedzi(posledny, dnes) : -1,
-      objednanych: udalosti.filter((u) =>
-        u.klient && normName(u.klient) === k
-        && (u.typ === "trening" || u.typ === "uvodny")
-        && den(u.zaciatok) > dnes).length,
+      objednanych,
       vMinuse: minus ? minus(c.name) : 0,
     });
   }
