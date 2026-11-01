@@ -157,8 +157,8 @@ export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMR
         {!shown.length && (
           <Empty>
             {sixM.length
-              ? `${trainer} zatiaľ nemá žiadnych 6M klientov (službu „S viazanostou“).`
-              : `Nahraj Payroll by Service CSV pre 6M tracker (klienti so službou „S viazanostou“).`}
+              ? `${trainer} zatiaľ nemá žiadnych 6M klientov (službu Předplatné).`
+              : `Nahraj Payroll by Service CSV pre 6M tracker (klienti so službou Předplatné).`}
           </Empty>
         )}
       </Card>

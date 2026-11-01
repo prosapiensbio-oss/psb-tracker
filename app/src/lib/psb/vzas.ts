@@ -805,6 +805,15 @@ export function nazovKategorie(kat: string): string {
   if (kat.startsWith("spolocne.")) return `Spoločné · ${kat.slice("spolocne.".length)}`;
   if (kat === "rezerva") return "Rezerva firmy";
   if (kat === "presun") return "Presun hotovosti na účet";
+  // Tieto dve rodiny nie sú riadky P&L, ale v pohyboch stoja rovnako — bez
+  // nich by Evidencia písala „vyplaty.jerry" a „mimo".
+  if (kat === "mimo") return "Mimo firmy (súkromné)";
+  if (kat === "vyplaty") return "Výplaty";
+  if (kat === "vyplaty.jerry") return "Výplata · Jerry";
+  if (kat === "vyplaty.terezka") return "Výplata · Terezka";
+  if (kat === "vyplaty.delene") return "Výplata · delená";
+  if (kat === "prijem.produkt") return "Príjem · produkt";
+  if (kat === "prijem.ine") return "Príjem · iné";
   const [sekK, subK, itemK] = kat.split(".");
   const sek = (PNL as Record<string, VzasSection>)[sekK];
   const sub = sek?.subcategories?.[subK];
@@ -1682,11 +1691,11 @@ export function kpiAdvice(id: string, c: KpiAdviceCtx): string[] {
     case "trzby":
       return [
         "Tržby sú výsledok troch čísel: koľko hodín odtrénuješ, za koľko, a ako dlho klient zostane. Rásť sa dá v ktoromkoľvek — najlacnejšie je to tretie.",
-        `Dnes robíš ${Math.round(c.hodinyMes)} h/mes. Keby si zdvihol cenu o 100 Kč/h, je to ${kc(c.hodinyMes * 100)}/mes bez jedinej hodiny navyše.`,
+        `Dnes robíš ${Math.round(c.hodinyMes)} h/mes. Zdvihnutie ceny o 100 Kč/h je ${kc(c.hodinyMes * 100)}/mes bez jedinej hodiny navyše.`,
       ];
     case "marza":
       return [
-        chyba > 0 ? `Do cieľa chýba ${chyba.toFixed(1)} b. p., čo je pri dnešných tržbách asi ${kc((chyba / 100) * c.trzbyMes)}/mes.` : "Si na cieli — drž náklady, keď porastú tržby.",
+        chyba > 0 ? `Do cieľa chýba ${chyba.toFixed(1).replace(".", ",")} b. p., čo je pri dnešných tržbách asi ${kc((chyba / 100) * c.trzbyMes)}/mes.` : "Si na cieli — drž náklady, keď porastú tržby.",
         "Marža sa nezlepší škrtaním drobností. Dve páky, ktoré s ňou naozaj hýbu: cena za hodinu a podiel výplat na tržbách (dnes ~60 %).",
         "Pozor na poradie: najprv cena, potom náklady. Škrtanie voliteľných nákladov ti dá pár tisíc, cena desaťtisíce.",
       ];
@@ -1722,7 +1731,7 @@ export function kpiAdvice(id: string, c: KpiAdviceCtx): string[] {
       ];
     case "dlzka":
       return [
-        `Priemer ${c.value.toFixed(1)} mes. Jeden mesiac navyše u každého z ${c.klienti} klientov je ~${kc((c.trzbyMes / Math.max(1, c.klienti)) * c.klienti)} tržieb — a nestojí ani korunu marketingu.`,
+        `Priemer ${c.value.toFixed(1).replace(".", ",")} mes. Jeden mesiac navyše u každého z ${c.klienti} klientov je ~${kc((c.trzbyMes / Math.max(1, c.klienti)) * c.klienti)} tržieb — a nestojí ani korunu marketingu.`,
         "Najväčší odchod je na konci balíčka. Widget „Blíži sa koniec balíčka“ je presne na to — ozvať sa skôr, než sa rozhodne sám.",
         "Prechod z balíčkov na 6M členstvo rieši toto číslo aj kolísavý cashflow naraz.",
       ];
