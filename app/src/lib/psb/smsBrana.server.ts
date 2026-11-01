@@ -60,14 +60,33 @@ async function smsManager(u: BranaUcet, cislo: string, text: string): Promise<Vy
       } }],
     }),
   });
-  const j = await r.json().catch(() => null) as {
-    request_id?: string;
-    accepted?: { message_id?: string }[];
-    message?: string; error?: string; detail?: string;
-  } | null;
-  const id = j?.accepted?.[0]?.message_id || j?.request_id || "";
-  if (r.ok && id) return { ok: true, id: String(id) };
-  return { ok: false, chyba: kus(j?.message || j?.error || j?.detail || `brána odpovedala ${r.status}`) };
+  return vysledokSmsManagera(r.ok, r.status, await r.json().catch(() => null) as OdpovedSmsManagera | null);
+}
+
+type OdpovedSmsManagera = {
+  request_id?: string;
+  accepted?: { message_id?: string }[];
+  rejected?: { reason?: string; message?: string; error?: string; detail?: string }[];
+  message?: string; error?: string; detail?: string;
+};
+
+/**
+ * ČO BRÁNA NAOZAJ PRIJALA. HTTP 200 a `request_id` znamenajú len „požiadavku
+ * som dostala": správa odmietnutá pre číslo príde s prázdnym `accepted`
+ * a plným `rejected`. Do 1. 11. 2026 sa taká zapísala ako odoslaná a tréner
+ * sa nikdy nedozvedel, že klientovi nič neprišlo.
+ */
+export function vysledokSmsManagera(ok: boolean, status: number, j: OdpovedSmsManagera | null): VysledokSms {
+  const chyba = kus(j?.message || j?.error || j?.detail || `brána odpovedala ${status}`);
+  if (!ok) return { ok: false, chyba };
+  const prijata = j?.accepted?.[0]?.message_id;
+  if (j?.accepted?.length) return prijata || j.request_id ? { ok: true, id: String(prijata || j.request_id) } : { ok: false, chyba };
+  const odmietnuta = j?.rejected?.[0];
+  if (odmietnuta) return { ok: false, chyba: kus(`brána správu odmietla: ${odmietnuta.reason || odmietnuta.message || odmietnuta.error || odmietnuta.detail || JSON.stringify(odmietnuta)}`) };
+  // Prázdne `accepted` bez `rejected` tiež nič neprijalo. Starší tvar odpovede
+  // polia `accepted` vôbec nemá — vtedy stačí identifikátor požiadavky.
+  if (j?.accepted || !j?.request_id) return { ok: false, chyba: j?.accepted ? "brána správu neprijala (prázdna odpoveď)" : chyba };
+  return { ok: true, id: String(j.request_id) };
 }
 
 async function twilio(u: BranaUcet, cislo: string, text: string): Promise<VysledokSms> {
