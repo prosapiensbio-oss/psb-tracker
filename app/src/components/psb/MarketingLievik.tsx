@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { kotvaDat, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
 import { klucZdroja, popisZdroja } from "../../lib/psb/zdroje";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
@@ -150,6 +150,7 @@ const NAD_UVODNY = 500;
 // Definícia žije v lib/psb/compute.ts (jedna pre obrazovku aj Jarvisov
 // kontext) — tu sa importuje a re-exportuje, nech existujúce importy fungujú.
 import { jeKlient } from "../../lib/psb/compute";
+import { parovanieDopytov } from "../../lib/psb/parovanieDopytov";
 import * as Sk from "../../lib/psb/sklonovanie";
 export { jeKlient };
 
@@ -184,44 +185,21 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
   const trzba = data.payments
     .filter((p) => p.client && menaNovych.has(p.client) && v(p.date))
     .reduce((a, p) => a + p.amount, 0);
-  // Dopyt → klient. Páruje sa podľa mena; e-mail v dopyte často chýba a
-  // v klientoch nie je vôbec.
-  // Párovanie cez `najdiKlienta` (presne + fuzzy), nie cez holé `normName`.
-  // „Lukáš Hanus" z dopytu a „Lukas Hanus" z PTmindera sú jeden človek; presná
-  // zhoda z nich robila dvoch a konverzia na obrazovke vychádzala nižšia než
-  // tá, ktorú počíta Jarvis. Rovnaké párovanie ako v aiContext (18. 8. 2026).
-  const menaPlatiacich = Object.values(clients).filter((c) => jeKlient(c, data.payments)).map((c) => c.name);
-  // …a klientom sa musel stať PO dopyte. Bez tejto podmienky sa ako
-  // „konverzia dopytu" počítal aj existujúci klient, ktorý vyplnil formulár
-  // znova — jeho firstSession je roky pred dopytom (revízia 19. 8. 2026).
-  const prvePodlaMena = new Map(Object.values(clients).map((c) => [normName(c.name), c.firstSession || ""]));
-  const zDopytu = data.leads.filter((l) => {
-    if (!v(l.date) || !l.name) return false;
-    const kanonicke = najdiKlienta(menaPlatiacich, l.name);
-    if (!kanonicke) return false;
-    const prve = prvePodlaMena.get(normName(kanonicke)) || "";
-    return !prve || prve >= l.date;
-  }).length;
+  // Dopyt → klient a dopyt → úvodný: jedna definícia pre všetky obrazovky
+  // (`parovanieDopytov`). Páruje sa podľa mena; e-mail v dopyte často chýba.
+  const par = parovanieDopytov(data, clients);
+  const zDopytu = data.leads.filter((l) => v(l.date) && !!par.klient(l)).length;
 
   const prvaPlatba = (meno: string) =>
     data.payments.filter((p) => p.client === meno).map((p) => p.date).sort()[0] || "";
 
-  // Dopyt → úvodný. Úvodné z CELEJ histórie (dopyt z konca okna má úvodný
-  // pokojne o dva týždne neskôr — mimo okna) a úvodný musí byť najskôr v deň
-  // dopytu, inak by sa počítal existujúci klient, ktorý vyplnil formulár znova.
-  const uvodneVsetky = new Map<string, string>();
-  for (const sx of [...data.sessions].filter((x) => x.sessionType === "UVODNE").sort((a, b) => a.date.localeCompare(b.date)))
-    if (!uvodneVsetky.has(sx.client)) uvodneVsetky.set(sx.client, sx.date);
-  const menaUvodnychVsetky = [...uvodneVsetky.keys()];
   const menaZDopytu = new Set<string>();
   const naUvodnyRiadky = data.leads.flatMap((l) => {
-    if (!v(l.date) || !l.name) return [];
-    const kan = najdiKlienta(menaUvodnychVsetky, l.name);
-    if (!kan) return [];
-    const datumUvodneho = (uvodneVsetky.get(kan) || "").slice(0, 10);
-    if (datumUvodneho && datumUvodneho < l.date.slice(0, 10)) return [];
-    menaZDopytu.add(kan);
-    return [{ meno: l.name, dopyt: l.date, uvodny: datumUvodneho }];
+    if (!v(l.date)) return [];
+    const u = par.uvodny(l);
+    if (!u) return [];
+    menaZDopytu.add(u.meno);
+    return [{ meno: l.name, dopyt: l.date, uvodny: u.datum }];
   });
   const uvodneZDopytu = [...uvodneMapa.keys()].filter((m) => menaZDopytu.has(m)).length;
 
@@ -633,60 +611,52 @@ export function Lievik({ data, clients, onPoznamka }: {
 // a „Kampane" to boli štyri karty a štyri rôzne čísla. Nahradila ich jedna:
 // components/psb/Reklama.tsx nad výpočtom v lib/psb/reklama.ts.
 
-export function Kohorta({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
-  const riadky = useMemo(() => {
-    const podlaNorm = new Map<string, ClientAgg>();
-    for (const c of Object.values(clients)) podlaNorm.set(normName(c.name), c);
-    // najdiKlienta (presne + fuzzy), nie holé normName — rovnaké párovanie
-    // ako Lievik o kartu vyššie a aiContext. Revízia 19. 8.: kohorty párovali
-    // vlastným pravidlom, takže „Lukas Hanus" z dopytu a „Lukáš Hanus"
-    // z PTmindera boli dvaja ľudia a kohorty hlásili nižšiu konverziu než
-    // Lievik na tej istej obrazovke.
-    const vsetkyMena = [...podlaNorm.values()].map((c) => c.name);
-    const najdi = (meno: string) => {
-      const kanonicke = najdiKlienta(vsetkyMena, meno);
-      return kanonicke ? podlaNorm.get(normName(kanonicke)) : undefined;
-    };
-    // Jedna definícia klienta pre celý súbor — viď jeKlient hore. Lokálna
-    // kópia tu mala mäkšie pravidlo („má platbu") a stĺpec „Začali chodiť"
-    // tak počítal aj ľudí, ktorí prišli raz na úvodný a zmizli.
-    const zaplatil = (c: ClientAgg) => jeKlient(c, data.payments);
-
-    // Každý riadok kohorty si nesie mená, z ktorých vznikol — klik na mesiac
-    // ich ukáže. Bez toho bola kohorta čistá tabuľka čísel bez možnosti
-    // overiť očami, kto v nej je (revízia 19. 8. 2026).
-    type Kto = { meno: string; datum: string; uvodny: string; klient: boolean; trzba: number };
-    const m = new Map<string, { dopytov: number; uvodny: number; klient: number; trzba: number; dni: number[]; kto: Kto[] }>();
-    for (const l of data.leads) {
-      const mk = monthKey(l.date);
-      if (!mk) continue;
-      const e = m.get(mk) || { dopytov: 0, uvodny: 0, klient: 0, trzba: 0, dni: [], kto: [] };
-      e.dopytov++;
-      const c = najdi(l.name || "");
-      let jeKl = false, tr = 0;
-      if (c && c.firstSession) {
-        e.uvodny++;
-        const d = Math.round((Date.parse(c.firstSession) - Date.parse(l.date)) / 86400000);
-        if (d >= 0 && d < 400) e.dni.push(d);
-        if (zaplatil(c)) {
-          e.klient++;
-          tr = data.payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
-          e.trzba += tr;
-          jeKl = true;
-        }
-      }
-      e.kto.push({ meno: l.name || "(bez mena)", datum: l.date, uvodny: c?.firstSession || "", klient: jeKl, trzba: tr });
-      m.set(mk, e);
+/**
+ * Kohorty dopytov po mesiacoch. Stĺpce sú TIE ISTÉ otázky ako v Lieviku
+ * (`parovanieDopytov`): súčet stĺpcov za okno = `zDopytuUvodny` a `zDopytu`.
+ * Do 1. 11. 2026 tu stálo 44 úvodných a 33 klientov vedľa Lievikových 37 a 29,
+ * lebo sa nepozeralo, či sa to stalo až po dopyte.
+ */
+export function kohortyDopytov(data: PSBData, clients: Record<string, ClientAgg>) {
+  const par = parovanieDopytov(data, clients);
+  // Každý riadok kohorty si nesie mená, z ktorých vznikol — klik na mesiac
+  // ich ukáže. Bez toho bola kohorta čistá tabuľka čísel bez možnosti
+  // overiť očami, kto v nej je (revízia 19. 8. 2026).
+  type Kto = { meno: string; datum: string; uvodny: string; klient: boolean; trzba: number };
+  const m = new Map<string, { dopytov: number; uvodny: number; klient: number; trzba: number; dni: number[]; kto: Kto[] }>();
+  for (const l of data.leads) {
+    const mk = monthKey(l.date);
+    if (!mk) continue;
+    const e = m.get(mk) || { dopytov: 0, uvodny: 0, klient: 0, trzba: 0, dni: [], kto: [] };
+    e.dopytov++;
+    const u = par.uvodny(l);
+    if (u) {
+      e.uvodny++;
+      const d = Math.round((Date.parse(u.datum) - Date.parse(l.date)) / 86400000);
+      if (d >= 0 && d < 400) e.dni.push(d);
     }
-    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
-  }, [data.leads, data.payments, clients]);
+    const klient = par.klient(l);
+    let tr = 0;
+    if (klient) {
+      e.klient++;
+      tr = data.payments.filter((p) => p.client === klient).reduce((a, p) => a + p.amount, 0);
+      e.trzba += tr;
+    }
+    e.kto.push({ meno: l.name || "(bez mena)", datum: l.date, uvodny: u?.datum || "", klient: !!klient, trzba: tr });
+    m.set(mk, e);
+  }
+  return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
+}
+
+export function Kohorta({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+  const riadky = useMemo(() => kohortyDopytov(data, clients), [data, clients]);
 
   const [otvorenaKohorta, setOtvorenaKohorta] = useState<string | null>(null);
   const fmtDenK = (d: string) => { const [r, mm, dd] = (d || "").slice(0, 10).split("-"); return dd ? `${Number(dd)}. ${Number(mm)}. ${r}` : "—"; };
 
   return (
     <Card>
-      <H3><Info text="Skupina ľudí, ktorí sa ozvali v jednom mesiaci, sledovaná ďalej v čase — koľko z nich prišlo na úvodný tréning a koľko potom zaplatilo. Mesačná konverzia by pri štyroch úvodných mesačne bola šum; kohorta nie. Dopyt sa páruje s klientom podľa mena bez diakritiky, takže preklep v mene znamená nespárovaný riadok, nie chybu vo výpočte." label="Kohorty dopytov" /></H3>
+      <H3><Info text="Skupina ľudí, ktorí sa ozvali v jednom mesiaci, sledovaná ďalej v čase — koľko z nich prišlo na úvodný tréning a koľko sa potom stalo klientom. Počíta sa to isté ako v Lieviku: úvodný aj klient až po dopyte, takže starý klient, ktorý vyplnil formulár znova, tu nie je. Mesačná konverzia by pri štyroch úvodných mesačne bola šum; kohorta nie. Dopyt sa páruje s klientom podľa mena bez diakritiky, takže preklep v mene znamená nespárovaný riadok, nie chybu vo výpočte." label="Kohorty dopytov" /></H3>
       {riadky.length === 0 ? (
         <Empty>Zatiaľ žiadne zapísané dopyty — bez nich sa cesta od ozvania po klienta nedá sledovať.</Empty>
       ) : (

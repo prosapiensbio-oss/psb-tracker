@@ -30,6 +30,15 @@ export function poznamkaHodinDlznika(r: RiadokDojde): string {
   return r.dojde ? `dôjde ${fmtDMY(r.dojde)}` : `${r.teraz} h zostáva`;
 }
 
+/**
+ * Veta pod „Balíček dojde“. Do 1. 11. 2026 hovorila „6 ľudí s minutými hodinami“,
+ * hoci rátala všetkých dlžníkov vyradených zo zoznamu — aj Papiežove 2 h.
+ */
+export function vetaDlznikovMimoDojde(pocet: number): string {
+  const kto = pocet === 1 ? "1 klient dlží" : pocet < 5 ? `${pocet} klienti dlžia` : `${pocet} klientov dlží`;
+  return `${kto} za balíček, preto tu nie sú: stoja v Nezaplatené vyššie, stav hodín majú v riadku.`;
+}
+
 /** `hodinyDlznikov` má kľúč `normName` — tvar mena z dlhu a z kalendára sa môže líšiť v dĺžňoch. */
 export function rozdelDojdeADlh<T extends RiadokDojde>(riadky: T[], dlznici: string[]): { riadky: T[]; hodinyDlznikov: Map<string, string> } {
   const kto = new Set(dlznici.map(normName));

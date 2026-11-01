@@ -180,3 +180,23 @@ describe("zdieľaná funkcia (bitcoinová rezerva)", () => {
     expect(n).toBe(2);
   });
 });
+
+describe("Workspace pri otvorení (1. 11. 2026)", () => {
+  it("/api/periods a „komu už SMS odišla“ idú raz; po zápise znova zo servera", async () => {
+    const f = falosny();
+    const z = vytvorZdielanie(f.fetch);
+    for (const url of ["/api/periods", "/api/sms?odoslane=1"]) {
+      const dve = [z.fetch(url, { cache: "no-store" }), z.fetch(url, { cache: "no-store" })];
+      await f.pust();
+      await Promise.all(dve);
+      expect(f.volania.filter((v) => v.url === url)).toHaveLength(1);
+    }
+    const zapis = z.fetch("/api/sms", { method: "POST" });
+    await f.pust();
+    await zapis;
+    const po = z.fetch("/api/sms?odoslane=1", { cache: "no-store" });
+    await f.pust();
+    await po;
+    expect(f.volania.filter((v) => v.url === "/api/sms?odoslane=1")).toHaveLength(2);
+  });
+});

@@ -115,7 +115,7 @@ export function otazkaUkonceneho(
   return {
     kluc: `ukonceny-termin|${c.name}|${koniec}`,
     titulok: "Balíček ukončený, v kalendári termíny",
-    detail: `${c.name}: balíček ukončený${koniec ? ` ${datumSk(koniec)}` : ""}, ale v kalendári je ${pocet} od ${datumSk(buduce[0])} — platia? Po prvom tréningu sa ukáže v karte Bez balíčka; balíček sa sám nezaloží.`,
+    detail: `${c.name}: balíček ukončený${koniec ? ` ${datumSk(koniec)}` : ""}, ale v kalendári je ${pocet} od ${datumSk(buduce[0])} — platia? Po prvom tréningu sa ukáže v kroku 2 · SMS; balíček sa sám nezaloží.`,
     akcie: [
       { popis: "platia, vracia sa", poznamka: "termíny platia — vracia sa, balíček založí tréner" },
       { popis: "neplatia", poznamka: "termíny neplatia — treba ich vymazať z kalendára" },

@@ -129,6 +129,9 @@ describe("ukončený klient s termínmi", () => {
   const radek = { name: "Radek Balaž", ukonceny: true, packageValidTo: "2026-10-13" };
   it("pýta sa, keď má termín po dnešku; bez termínu mlčí", () => {
     const o = otazkaUkonceneho(radek, ["2026-11-17T10:00", "2026-11-19T10:00", "2026-11-19T10:00"], "2026-11-01");
+    // Karta „Bez balíčka" vo Workspace neexistuje; ľudia bez hodín sú v kroku 2.
+    expect(o?.detail).toContain("kroku 2 · SMS");
+    expect(o?.detail).not.toContain("Bez balíčka");
     expect(o?.kluc).toBe("ukonceny-termin|Radek Balaž|2026-10-13");
     expect(o?.detail).toContain("2 termíny od 17. 11. 2026");
     expect(o?.akcie.map((a) => a.popis)).toEqual(["platia, vracia sa", "neplatia"]);

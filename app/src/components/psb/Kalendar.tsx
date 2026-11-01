@@ -1,4 +1,4 @@
-import { rozdelDojdeADlh } from "../../lib/psb/dojdeADlh";
+import { rozdelDojdeADlh, vetaDlznikovMimoDojde } from "../../lib/psb/dojdeADlh";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import type { NavFocus } from "./App";
@@ -1479,7 +1479,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           </div>
           {/* Tri týždne dozadu, dva dopredu — presne tam, kam siaha stiahnutý
               kalendár. Ďalej by týždeň zíval prázdnotou, ktorá vyzerá ako
-              zrušené tréningy. */}
+              zrušené tréningy. Šípky a dátum sa nedelia: na telefóne „→" padalo
+              do druhého riadku bez dátumu. */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button onClick={() => krok(-1)} disabled={naZaciatok}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: naZaciatok ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: naZaciatok ? C.textDim : C.textMuted }}>←</button>
           <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 116, textAlign: "center" }}>
@@ -1487,6 +1489,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           </span>
           <button onClick={() => krok(1)} disabled={naKonci}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: naKonci ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: naKonci ? C.textDim : C.textMuted }}>→</button>
+          </div>
           {/* „dnes" ide vždy na tento týždeň — aj v nedeľu, keď sa „Týždeň" otvára na budúcom. */}
           {(posun !== 0 || (rozsah !== 7 && zaciatok !== dnesVTyzdni)) && (
             <button onClick={() => { setPosun(0); setZac(dnesVTyzdni); }}
@@ -2775,7 +2778,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
       )}
       {hodinyDlznikov.size > 0 && (
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-          {Sk.ludia(hodinyDlznikov.size)} s minutými hodinami dlží za balíček — sú v Nezaplatené vyššie, so stavom hodín v riadku.
+          {vetaDlznikovMimoDojde(hodinyDlznikov.size)}
         </div>
       )}
       {typeof children === "function" ? children(new Set(riadkyVsetky.map((r) => r.meno))) : children}

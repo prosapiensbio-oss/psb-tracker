@@ -133,7 +133,8 @@ export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "ed
  *
  * „Bez balíčka" v kroku Balíčky nie je: klient, ktorému sa minuli hodiny
  * a trénuje ďalej, dostane návrh nového balíčka, a ten, kto je na nule,
- * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát.
+ * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát. Zoznam
+ * preto kŕmi krok 2 (`zoznamSms`, parameter `bezHodin`), nie vlastnú kartu.
  */
 export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: string | null } = {}): Karta[] {
   /**

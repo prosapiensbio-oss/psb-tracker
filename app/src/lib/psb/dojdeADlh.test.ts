@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { normName } from "./format";
-import { poznamkaHodinDlznika, rozdelDojdeADlh } from "./dojdeADlh";
+import { poznamkaHodinDlznika, rozdelDojdeADlh, vetaDlznikovMimoDojde } from "./dojdeADlh";
 
 const r = (meno: string, teraz: number, dojde = "") => ({ meno, teraz, uzDosiel: teraz <= 0, dojde });
 
@@ -25,5 +25,14 @@ describe("Balíček dojde a dlh", () => {
     const v = rozdelDojdeADlh([r("A", 0)], []);
     expect(v.riadky).toHaveLength(1);
     expect(v.hodinyDlznikov.size).toBe(0);
+  });
+});
+
+describe("veta pod Balíček dojde", () => {
+  it("hovorí, čo počíta: dlžníkov, nie minuté hodiny", () => {
+    expect(vetaDlznikovMimoDojde(6)).toBe("6 klientov dlží za balíček, preto tu nie sú: stoja v Nezaplatené vyššie, stav hodín majú v riadku.");
+    expect(vetaDlznikovMimoDojde(1)).toStartWith("1 klient dlží");
+    expect(vetaDlznikovMimoDojde(2)).toStartWith("2 klienti dlžia");
+    expect(vetaDlznikovMimoDojde(6)).not.toContain("minut");
   });
 });

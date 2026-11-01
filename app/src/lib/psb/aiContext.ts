@@ -25,6 +25,7 @@ import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
 import { chybyNaStrankach, najdiAdresuPodlaTitulku, prilezitostiTitulkov } from "./webObsah";
 import { hodnotenie } from "./pagespeed";
+import { parovanieDopytov } from "./parovanieDopytov";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -46,7 +47,6 @@ import {
   odpovedeZRegistra,
   vytazenieSpolu,
   poUvodnomNikdy,
-  jeKlient,
 } from "./compute";
 import { rozborUvodnych } from "./uvodneTreningy";
 import type { BezBalicka } from "./bezBalicka";
@@ -730,10 +730,12 @@ export function buildAiContext(
       // párujú cez najdiKlienta — inak „Lukáš Hanus“ z dopytu a „Lukas Hanus“
       // z PTmindera prežijú ako dvaja ľudia a konverzia vyjde nižšia.
       lievik: (() => {
+        const parDopytov = parovanieDopytov(data, clients);
+        const vsetkyDopyty = data.leads || [];
         const menaKlientov = clientList.map((c) => c.name);
         const podla: Record<string, { dopytov: number; trenoval: number; klient: number; zostal: number }> = {};
         const videne = new Set<string>();
-        let spolu = 0, trenovaloS = 0, klientovS = 0, zostaloS = 0;
+        let spolu = 0, trenovaloS = 0, zostaloS = 0;
         for (const l of data.leads || []) {
           const kluc = normName(l.name || "");
           if (!kluc || videne.has(kluc)) continue;
@@ -747,7 +749,7 @@ export function buildAiContext(
           // nad úvodný) — to isté číslo, ktoré ukazuje karta Lievik. Jarvis
           // dovtedy poznal len „zostal (5+)" a na otázku „koľko dopytov sa
           // stalo klientom" odpovedal iným číslom než obrazovka (19. 8. 2026).
-          if (k && jeKlient(k, data.payments)) { e.klient++; klientovS++; }
+          if (parDopytov.klient(l)) e.klient++;
           if (k && k.sessionCount >= 5) { e.zostal++; zostaloS++; }
         }
         const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -760,11 +762,16 @@ export function buildAiContext(
           .sort((a, b) => a - b);
         return {
           poznamka: "Dopyt → trénoval aspoň raz → zostal (5+ sedení), nad ROVNAKÝM obdobím. Toto je jediné miesto, odkiaľ sa smie brať konverzia. „zostal“ je prísnejšia a pravdivejšia miera než „trénoval“: kto prišiel dvakrát a zmizol, nikdy neobsadil miesto. Dopyty sa evidujú od januára 2026; staršie neexistujú.",
-          spolu, trenovalo: trenovaloS, klientov: klientovS, zostalo: zostaloS,
+          spolu, trenovalo: trenovaloS, zostalo: zostaloS,
+          // Tie isté čísla ako karty Lievik, Dopyty a kohorty (`parovanieDopytov`);
+          // „spolu" a podlaZdroja sú počty ľudí, tieto tri počty dopytov.
+          dopytov: vsetkyDopyty.length,
+          naUvodny: vsetkyDopyty.filter((l) => parDopytov.uvodny(l)).length,
+          klientov: vsetkyDopyty.filter((l) => parDopytov.klient(l)).length,
           trenovaloPct: pct(trenovaloS, spolu),
           // „klientovPct" je TO ISTÉ číslo ako konverzia na karte Lievik —
           // na otázku „koľko dopytov sa stalo klientom" odpovedaj týmto.
-          klientovPct: pct(klientovS, spolu), zostaloPct: pct(zostaloS, spolu),
+          klientovPct: pct(vsetkyDopyty.filter((l) => parDopytov.klient(l)).length, vsetkyDopyty.length), zostaloPct: pct(zostaloS, spolu),
           podlaZdroja: Object.fromEntries(Object.entries(podla).map(([z, e]) => [z, { ...e, zostaloPct: pct(e.zostal, e.dopytov) }])),
           // Kto prišiel na úvodný a už nikdy — vrátane dôvodu, ak ho niekto
           // zapísal. Obrazovka to vie od 13. 8., Jarvis až od 14. 8.: na otázku
@@ -1045,7 +1052,7 @@ export function buildAiContext(
         klient: x.meno, trener: x.trener, dovod: x.dovod, clenstvo: x.membership,
         vMinuseHodin: x.vMinuse, objednanychTerminov: x.objednanych, dniOdTreningu: x.dni,
       })),
-      poznamka: "Klienti, ktorým nezostala ani hodina — aktívni, sporadickí do mesiaca po tréningu, každý s termínom v kalendári a ukončený, ktorý po ukončení trénoval — karta „Bez balíčka“ vo Workspace. vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z balíčkov v Kokpite, takže kto má platný balíček s hodinami, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail.",
+      poznamka: "Klienti, ktorým nezostala ani hodina — aktívni, sporadickí do mesiaca po tréningu, každý s termínom v kalendári a ukončený, ktorý po ukončení trénoval — vo Workspace stoja v kroku 2 · SMS (vlastná karta „Bez balíčka“ neexistuje). vMinuseHodin = koľko tréningov už odtrénoval bez krytia, to isté číslo, aké v profile stojí ako −1, −2, −3; nula znamená „je presne na nule“, nie „nič nedlží“. Zoznam je zoradený od najväčšieho mínusu. Počíta sa z balíčkov v Kokpite, takže kto má platný balíček s hodinami, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail.",
     },
     // Predaje z PTmindera od 1. 10., ktoré Kokpit nemá v rovnakej podobe
     // (notifikácia „PTminder a Kokpit: iný balíček", 21. 10. 2026).

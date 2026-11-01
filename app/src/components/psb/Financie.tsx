@@ -264,7 +264,7 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
           </div>
           {cashPred.perClient.length > 0 && (
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
-              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 5).map((x) => `«${x.name}» ${fmtCZK(x.suma)} v ${monthLabel(x.kedy)} — dochodí zostatok o ~${x.tyzdnov} týž. (${Math.round(x.confidence * 100)} %)`).join(" · ")}
+              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 5).map((x) => `«${x.name}» ${fmtCZK(x.suma)} v ${monthLabel(x.kedy)} — dochodí zostatok o ~${x.tyzdnov.toLocaleString("sk-SK", { maximumFractionDigits: 1 })} týž. (${Math.round(x.confidence * 100)} %)`).join(" · ")}
             </div>
           )}
         </Card>
