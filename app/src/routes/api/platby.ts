@@ -12,7 +12,7 @@ import {
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { dnesPraha } from "../../lib/psb/cas";
-import { btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { btcEsteNezapisane, btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
 import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
 import { najdiKlienta } from "../../lib/psb/compute";
 
@@ -953,8 +953,10 @@ export const Route = createFileRoute("/api/platby")({
          * btc-reserve.ts) a posiela ju sem. Zapisuje sa od mesiaca, od
          * ktorého sa súbežný chod súdi (`platby_od`) — staršie mesiace sa
          * neporovnávajú a do dlhov by zasiahli bez dôvodu. Opakované
-         * načítanie nič nezdvojí: `fio_id` je kľúč zápisu v knihe a
-         * dvojica (fio_id, klient) je v DB unikátna.
+         * načítanie nič nezdvojí: `fio_id` je kľúč zápisu v knihe a položka,
+         * ktorá už má pre svoj kľúč akýkoľvek riadok (aj zrušený), sa preskočí
+         * celá (`btcEsteNezapisane`) — rozdelenie sa počíta z dnešných dlhov
+         * a o týždeň by tá istá platba vyšla inak.
          */
         if (akcia === "btc-import") {
           const kniha = Array.isArray(b.platby) ? (b.platby as { klient: string | null; datum: string; czk: number | null; sats?: number }[]).slice(0, 2000) : [];
@@ -965,7 +967,10 @@ export const Route = createFileRoute("/api/platby")({
             DB.prepare("SELECT DISTINCT klient m FROM balicky WHERE zrusene_at IS NULL"),
           ]);
           const mena = [...new Set([...(s1.results || []), ...(s2.results || [])].map((x) => String((x as { m: string }).m || "")).filter(Boolean))];
-          const { zapisat, nesparovane } = btcNaPlatby(kniha, (m) => najdiKlienta(mena, m) || null, `${od}-01`);
+          const { zapisat: vKnihe, nesparovane } = btcNaPlatby(kniha, (m) => najdiKlienta(mena, m) || null, `${od}-01`);
+          // Bez `.catch`: prázdny zoznam pri výpadku D1 by znova otvoril všetky platby.
+          const zapisane = (await DB.prepare("SELECT DISTINCT fio_id FROM platby WHERE fio_id LIKE 'btc:%'").all<{ fio_id: string }>()).results || [];
+          const zapisat = btcEsteNezapisane(vKnihe, zapisane.map((r) => r.fio_id));
           /**
            * JEDEN PLATÍ ZA VIACERÝCH (Jerry, 21. 10. 2026: Jakub Kaňovský
            * platí aj za Annu Kadličkovú). V knihe stojí jedno meno a jedna
@@ -1005,13 +1010,15 @@ export const Route = createFileRoute("/api/platby")({
               ]);
               if (r) { diely = r; rozdelenych += 1; }
             }
-            for (const d of diely) {
+            // Diely jednej platby idú naraz: keby druhý nedobehol, kľúč už má
+            // riadok a ďalší import by chýbajúci diel nikdy nedopísal.
+            const zapisy = await Promise.all(diely.map(async (d) => {
               const popis = `z BTC knihy${z.sats ? ` · ${z.sats.toLocaleString("sk-SK")} sats` : ""}${diely.length > 1 ? ` · spoločná platba (${z.klient})` : ""}`;
-              const r = await DB.prepare(
+              return DB.prepare(
                 "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'bitcoin',?,?,?,?,?)",
-              ).bind(uid(), d.klient, z.datum, d.suma, z.kluc, popis, teraz(), "btc-kniha", (await jeVopred(DB, d.klient)) ? 1 : 0).run();
-              nove += r.meta?.changes || 0;
-            }
+              ).bind(uid(), d.klient, z.datum, d.suma, z.kluc, popis, teraz(), "btc-kniha", (await jeVopred(DB, d.klient)) ? 1 : 0);
+            }));
+            for (const r of await DB.batch(zapisy)) nove += r.meta?.changes || 0;
           }
           if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy${rozdelenych ? ` · ${rozdelenych} rozdelená` : ""}`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
           // Nespoznané mená sa ODLOŽIA — inak by ticho chýbali v tržbách a
