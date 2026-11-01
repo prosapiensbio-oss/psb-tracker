@@ -2,27 +2,28 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { rozdelNastavenia } from "../../lib/psb/tajneKluce";
 import { bindings } from "../../lib/bindings.server";
 
 // Small key/value store for things the app lets Jerry change and expects to
 // survive a redeploy — right now the KPI targets. The table already exists from
 // migration 0004; this is the first thing to use it.
+//
+// Tajomstvá (tajneKluce.ts) tu ležia tiež, ale GET ich nevracia: `settings` ich
+// nemá a `nastavene` hovorí len áno/nie. Zapísať sa dajú ďalej cez POST, audit
+// ich skryje sám. Server si ich číta priamo z D1.
 export const Route = createFileRoute("/api/vzas-settings")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
-        if (!DB) return Response.json({ ok: false, settings: {} });
+        if (!DB) return Response.json({ ok: false, settings: {}, nastavene: {} });
         try {
           const rs = await DB.prepare("SELECT key, value FROM vzas_settings").all();
-          const settings: Record<string, unknown> = {};
-          for (const r of rs.results as { key: string; value: string }[]) {
-            try { settings[r.key] = JSON.parse(r.value); } catch { settings[r.key] = r.value; }
-          }
-          return Response.json({ ok: true, settings });
+          return Response.json({ ok: true, ...rozdelNastavenia(rs.results as { key: string; value: string }[]) });
         } catch {
-          return Response.json({ ok: false, settings: {} });
+          return Response.json({ ok: false, settings: {}, nastavene: {} });
         }
       },
       POST: async ({ request }) => {

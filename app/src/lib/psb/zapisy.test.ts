@@ -30,6 +30,10 @@ const VYNIMKY: Record<string, Record<string, string>> = {
     potvrdene_at: "potvrdenie výdavku v uzávierke — pri importe je kategória len návrh",
     potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at",
   },
+  // Nové konto začína na DEFAULT 0 a stĺpec môže chýbať, kým nebeží migrácia 0129.
+  users: {
+    session_ver: "odhlásenie všade — nové konto ešte nikto neodhlasoval",
+  },
   ponuky_terminov: {
     zrusene_at: "mäkké zrušenie — nová ponuka zrušená nevzniká",
   },

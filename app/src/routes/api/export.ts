@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { dnesPraha } from "../../lib/psb/cas";
+import { jeTajnyKluc, maskujAuditRiadok } from "../../lib/psb/tajneKluce";
 
 // Kompletná záloha databázy ako jeden JSON na stiahnutie.
 //
@@ -24,6 +25,23 @@ import { dnesPraha } from "../../lib/psb/cas";
 // Databáza vie, čo v nej je; nech to teda povie ona.
 const SYSTEMOVE = /^(sqlite_|_cf_|d1_)/;
 
+/**
+ * Súbor zálohy odchádza z Cloudflaru na disk, preto v ňom nie sú tajomstvá ani
+ * odtlačky hesiel. Po obnove sa prístupy zadajú znova; súbor sám hovorí ktoré
+ * (`vynechane`, len mená kľúčov).
+ */
+function bezTajomstiev(tabulka: string, riadky: Record<string, unknown>[], vynechane: string[]): unknown[] {
+  if (tabulka === "vzas_settings") {
+    return riadky.filter((r) => {
+      if (!jeTajnyKluc(r.key)) return true;
+      vynechane.push(String(r.key));
+      return false;
+    });
+  }
+  if (tabulka === "vzas_audit") return riadky.map(maskujAuditRiadok);
+  if (tabulka === "users") return riadky.map(({ pass_hash: _h, pass_salt: _s, ...r }) => r);
+  return riadky;
+}
 
 export const Route = createFileRoute("/api/export")({
   server: {
@@ -41,10 +59,11 @@ export const Route = createFileRoute("/api/export")({
           .filter((n) => !SYSTEMOVE.test(n));
 
         const data: Record<string, unknown[]> = {};
+        const vynechane: string[] = [];
         for (const t of tabulky) {
           try {
             const rs = await DB.prepare(`SELECT * FROM ${t}`).all();
-            data[t] = rs.results as unknown[];
+            data[t] = bezTajomstiev(t, rs.results as Record<string, unknown>[], vynechane);
           } catch {
             data[t] = [];   // tabuľka ešte neexistuje (staršia migrácia)
           }
@@ -60,7 +79,7 @@ export const Route = createFileRoute("/api/export")({
 
         // `tabulky` je v súbore zámerne: pri obnove je hneď vidieť, čo záloha
         // obsahovala, bez lúštenia kľúčov v `data`.
-        return new Response(JSON.stringify({ verzia: 2, vytvorene: new Date().toISOString(), tabulky, data }, null, 1), {
+        return new Response(JSON.stringify({ verzia: 2, vytvorene: new Date().toISOString(), tabulky, vynechane, data }, null, 1), {
           headers: {
             "content-type": "application/json; charset=utf-8",
             "content-disposition": `attachment; filename="psb-zaloha-${den}.json"`,

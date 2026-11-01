@@ -134,7 +134,7 @@ describe("SCHEMA_DB pre Jarvisa", () => {
       "jarvis_chats", "jarvis_dokument_casti", "jarvis_dokumenty",
       "kal_snimky", "kal_zdroje", "kal_mapovanie_nove",
       "napad_obrazky", "push_odbery", "push_poslane",
-      "platba_mapovanie", "platba_nie_klient",
+      "platba_mapovanie", "platba_nie_klient", "login_pokusy",
     ]);
     const chat = readFileSync(`${KOREN}src/routes/api/chat.ts`, "utf8");
     const i = chat.indexOf("const SCHEMA_DB");

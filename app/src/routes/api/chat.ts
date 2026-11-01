@@ -10,6 +10,7 @@ import { nacitajDokument } from "./jarvis-dokument";
 import { blokyNaSpravu, type StreamBlok } from "../../lib/psb/chatBloky";
 import { brief } from "../../lib/psb/zamerania";
 import { dnesPraha } from "../../lib/psb/cas";
+import { bezpecnySql } from "../../lib/psb/bezpecnySql";
 
 // Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
 // the ~30s gateway window. "Hlboká debata" swaps in Opus for the strategic
@@ -551,7 +552,7 @@ gads_ucty(id, nazov, valuta, je_manager)  — účty pod manažérskym účtom, 
 web_rychlost(id, url, strategia, merane_at, vykon, seo, pristupnost, postupy, lcp_ms, cls, tbt_ms, fcp_ms, prilezitosti, chyba)  — meranie rýchlosti z Google PageSpeed Insights. strategia: mobile | desktop, a sú to DVE RÔZNE merania na rôznych pripojeniach — nikdy ich nespriemeruj, rozhoduje mobile. Skóre sú 0–100, časy v milisekundách. lcp_ms = za ako dlho človek uvidí hlavný obsah; Google berie do 2500 ako dobré, nad 4000 ako zlé. cls = ako veľmi obsah poskakuje (nad 0,1 zle). prilezitosti je JSON pole [{nazov, usetriMs}]. HISTÓRIA SA NEMAŽE: na aktuálny stav ber posledné meranie na stránku a zariadenie (MAX(merane_at) GROUP BY url, strategia), viac riadkov pre tú istú stránku je vývoj v čase, nie rozpor. Riadok s vyplneným \`chyba\` je NEZMERANÉ, nie pomalé — nikdy ho nerátaj ako nulu.
 web_stranky(url, typ, titulok, meta_popis, h1, text, znakov, zmenene, nacitane_at)  — TEXT CELÉHO VLASTNÉHO WEBU prosapiens.cz — všetky stránky a články zo sitemapy (počet sa mení s webom). typ: stranka | clanok. \`text\` je čitateľný obsah bez značiek (do 20 000 znakov na stránku), \`titulok\` je to, čo človek vidí vo výsledkoch Googlu, \`zmenene\` je lastmod zo sitemapy. Adresa je v rovnakom tvare ako v gsc_strany, takže sa dá JOIN-nuť priamo: \`SELECT w.titulok, g.zobrazenia, g.kliky FROM web_stranky w JOIN gsc_strany g ON g.url = w.url\`. TOTO JE PLNÝ PRÍSTUP NA WEB — na otázku „čo je na stránke X" alebo „kde na webe sa píše o Y" NEODPOVEDAJ, že web nevidíš, a nechoď to čítať nástrojom web_fetch: je to tu, aj s textom. Hľadaj cez \`WHERE text LIKE '%výraz%'\`. Keď v tabuľke stránka nie je vôbec, až potom je web_fetch na mieste.
 meta_volania(den, volani, chyb)  — počítadlo volaní do Meta Marketing API po dňoch (podmienka Full Access: 500 volaní za posledných 15 dní pri chybovosti pod 15 %). Na otázku „koľko volaní nám chýba na Full Access" spočítaj SUM(volani) a SUM(chyb) WHERE den >= date('now','-15 days').
-users(login, name, active, last_login)  — kontá; vzas_audit(at, actor, action, ...) — kto čo zmenil
+users(login, name, active, last_login)  — kontá; vzas_audit(at, actor, action, payment_id, month, old_value, new_value, reason) — kto čo zmenil. Prístupy (heslá, tokeny, kľúče) sa ti cez SQL nezobrazia: vo vzas_settings nie sú a v audite majú [skryté]. Je to zámer, nie chyba dát.
 vzas_payments, vzas_payment_splits — POZOR: PRÁZDNE, appka ich nepoužíva. Reálne POSLANÉ výplaty (Jerry/Terezka) po mesiacoch drží MODEL, nie SQL — sú v <data> kľúč pnlSuhrn.mesiace ako poslane_jerry / poslane_terezka (+ narok_jerry/terezka, hodiny_jerry/terezka). Na „koľko si Jerry/Terezka poslal(a)" alebo „hodinovka" NIKDY nedopytuj tieto tabuľky ani banku (vyplaty.jerry v fio_transactions je len časť, mieša sa s osobnými nákupmi) — PREČÍTAJ pnlSuhrn.
 vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log, algo_novinky`;
 
@@ -665,17 +666,6 @@ const TOOLS = [
     },
   },
 ];
-
-/** Guard: pustíme len čítanie. Nič iné sa cez tento nástroj nedostane. */
-function bezpecnySql(raw: string): { sql: string } | { chyba: string } {
-  const sql = raw.trim().replace(/;+\s*$/, "");
-  if (!/^\s*(select|with)\b/i.test(sql)) return { chyba: "Povolený je len SELECT alebo WITH." };
-  if (sql.includes(";")) return { chyba: "Len jeden dopyt, bez stredníkov." };
-  if (/\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum)\b/i.test(sql))
-    return { chyba: "Zápisové a DDL príkazy nie sú povolené — na zmenu dát použi psb-action blok." };
-  const sLimit = /\blimit\s+\d+/i.test(sql) ? sql : `${sql} LIMIT 200`;
-  return { sql: sLimit };
-}
 
 async function spustiNastroj(name: string, input: Record<string, unknown>): Promise<string> {
   if (name === "meta_citaj") {

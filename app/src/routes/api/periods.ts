@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { jeMesiac } from "../../lib/psb/format";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { maskujAuditRiadok } from "../../lib/psb/tajneKluce";
 import { bindings } from "../../lib/bindings.server";
 
 // Uzávierky mesiacov + čítanie auditu.
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/periods")({
             periods: (p.results as Record<string, unknown>[]).map((r) => ({
               month: r.month, locked: !!r.locked, lockedAt: r.locked_at, note: r.note || "",
             })),
-            audit: (a.results as Record<string, unknown>[]).map((r) => ({
+            audit: (a.results as Record<string, unknown>[]).map(maskujAuditRiadok).map((r) => ({
               at: r.at, actor: r.actor, action: r.action, predmet: r.payment_id,
               month: r.month, old: r.old_value, neu: r.new_value, reason: r.reason,
             })),

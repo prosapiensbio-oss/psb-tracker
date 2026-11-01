@@ -6,7 +6,7 @@ import type { AssistantChat } from "./Assistant";
 import type { KrokUzavierky, NavFocus } from "./App";
 import { SpravaMesiaca } from "./SpravaMesiaca";
 import { ReportyMesiaca, type ReportVstup } from "./ReportyMesiaca";
-import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
+import { fetchKonta, fetchPeriods, odhlasVsade, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -42,12 +42,15 @@ const POPIS: Record<string, string> = {
   "zmazanie-klienta": "Zmazanie klienta",
   "nove-konto": "Nové konto",
   "uprava-konta": "Úprava konta",
+  "odhlasenie-vsade": "Odhlásenie všade",
 };
 
 const CHYBY: Record<string, string> = {
   bad_login: "Prihlasovacie meno smie mať len písmená bez diakritiky, číslice, bodku, pomlčku alebo podčiarkovník.",
   short_password: "Heslo musí mať aspoň 8 znakov.",
   need_password: "Nové konto sa nedá založiť bez hesla.",
+  no_user: "Také konto neexistuje.",
+  no_migration: "Odhlásenie zatiaľ nejde — v databáze chýba migrácia 0129.",
   no_db: "Databáza neodpovedala.",
 };
 
@@ -82,6 +85,15 @@ function Konta() {
     nacitaj();
   };
 
+  const odhlas = async (u: Konto) => {
+    if (!window.confirm(`Odhlásiť ${u.name} na všetkých zariadeniach? Prihlásiť sa bude treba znova heslom.`)) return;
+    setChyba(""); setHotovo("");
+    const r = await odhlasVsade(u.login);
+    if (!r.ok) { setChyba(CHYBY[r.error || ""] || "Nepodarilo sa odhlásiť."); return; }
+    if (u.name === ja) { window.location.reload(); return; }
+    setHotovo(`${u.name}: odhlásené na všetkých zariadeniach.`);
+  };
+
   return (
     <Card>
       <H3><Info text="Kým konto nemá nikto, appka beží na zdieľanom hesle a v audite je pri každej zmene „app“. Keď má každý vlastné konto, v audite je vidieť meno. Prístup majú obaja rovnaký — konto je identita, nie oprávnenie. Zdieľané heslo zostáva funkčné ako núdzová brzda." label="Kontá" /></H3>
@@ -99,6 +111,10 @@ function Konta() {
               <span style={{ marginLeft: "auto", color: C.textDim, fontSize: 11 }}>
                 {u.lastLogin ? `naposledy ${fmtDMY(u.lastLogin)}` : "ešte sa neprihlásil"}
               </span>
+              <button type="button" onClick={() => void odhlas(u)}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: C.textMuted, textDecoration: "underline" }}>
+                odhlásiť všade
+              </button>
             </div>
           ))}
         </div>

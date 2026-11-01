@@ -1,5 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { hodnotaDoAuditu } from "./tajneKluce";
+
 // Audit log a zamykanie období.
 //
 // Doteraz sa dalo v appke zmeniť čokoľvek a nezostala po tom stopa. Pri
@@ -44,7 +46,8 @@ export async function audit(DB: D1Database | undefined, z: AuditZapis): Promise<
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
     )
       .bind(uid(), new Date().toISOString(), z.actor || "app", z.action, z.predmet || null,
-        z.month || null, skrat(z.old), skrat(z.neu), z.reason || null)
+        // Tajomstvo sa do auditu nedostane, nech ho volá ktokoľvek.
+        z.month || null, skrat(hodnotaDoAuditu(z.predmet, z.old)), skrat(hodnotaDoAuditu(z.predmet, z.neu)), z.reason || null)
       .run();
   } catch {
     /* audit nesmie zhodiť zápis, ktorý loguje */
