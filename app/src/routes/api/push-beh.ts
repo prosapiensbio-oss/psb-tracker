@@ -7,6 +7,7 @@ import { loadData } from "../../lib/psb/db.server";
 import { capacityByTrainer, deriveClients, deriveRegister, deriveSixM, patriTrenerovi, type RegisterItem } from "../../lib/psb/compute";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { maIstNaTelefon } from "../../lib/psb/pushVyber";
+import { rozosliOdlozene } from "../../lib/psb/ponukaTerminov.server";
 import { jeTichyCas } from "../../lib/psb/tichyCas";
 
 // Beh plánovača: pozri, čo je otvorené, a čo je nové, pošli na telefón.
@@ -45,6 +46,8 @@ export const Route = createFileRoute("/api/push-beh")({
         const DB = env.DB;
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const zaciatok = Date.now();
+        // Pred dátami a pred každým skorým návratom: nezávisí od registra.
+        await rozosliOdlozene(DB);
 
         const [data, kluceRs, odberyRs, udalostiRs, zmenyRs] = await Promise.all([
           loadData(DB),

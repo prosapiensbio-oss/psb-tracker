@@ -5,6 +5,7 @@ import { audit } from "../lib/psb/audit.server";
 import { dniZEditu, fotkyNeplati, fotkyStranka, parZEditu, type CisloKarty, type KartaFotky } from "../lib/psb/fotkyStranka";
 import { TRENERI } from "../lib/psb/mailFaktury";
 import { pushTrenerovi } from "../lib/psb/ponukaTerminov.server";
+import { jeTichyCas } from "../lib/psb/tichyCas";
 import { odsifruj, odsifrujBajty, zasifruj } from "../lib/psb/sifra.server";
 
 /**
@@ -152,7 +153,8 @@ export const Route = createFileRoute("/f/$token")({
             .bind(token, o.klient, await zasifruj(text, ANAMNEZA_KLUC), new Date().toISOString()).run();
           await audit(DB, { action: "fotky-odpoved", predmet: o.klient, actor: "klient" });
           // Hneď aj na mobil trénerovi; notifikácia v Kokpite vznikne z registra.
-          if (o.trener) {
+          // V tichu nezvoní: položka je oranžová, takže ju ráno pošle `push-beh`.
+          if (o.trener && !jeTichyCas()) {
             await pushTrenerovi(DB, o.trener, {
               titulok: `${o.klient}: odpoveď na fotky`,
               // Bez obsahu správy — notifikácia je vidno aj na zamknutom telefóne.

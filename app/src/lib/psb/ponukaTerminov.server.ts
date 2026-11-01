@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { posli as posliPush, type Odber } from "./push.server";
+import { jeTichyCas } from "./tichyCas";
 import { vybranyUsek, type CasPonuky, type Obsadene } from "./ponukaTerminov";
 
 /**
@@ -59,17 +60,62 @@ export function oknoCasov(casy: { zaciatok: string }[]): { od: string; do: strin
   return { od: dni[0] || "0000-01-01", do: dalsi };
 }
 
-/** Notifikácia trénerovi na telefón (ticho zlyhá — výber termínu sa kvôli nej nesmie stratiť). */
-export async function pushTrenerovi(DB: D1Database, trener: string, obsah: { titulok: string; text: string; url?: string; znacka?: string }): Promise<void> {
+type ObsahPushu = { titulok: string; text: string; url?: string; znacka?: string };
+
+/**
+ * Čo odišlo v nočnom tichu a nie je v registri, odkiaľ by to ráno poslal
+ * `push-beh`: výber termínu (je rovno v kalendári, na nič nečaká) a žiadosť
+ * o históriu. Riadok v `vzas_settings`, zoznam v JSON.
+ */
+const KLUC_ODLOZENE = "push_odlozene";
+
+/**
+ * Notifikácia trénerovi na telefón (ticho zlyhá — výber termínu sa kvôli nej nesmie stratiť).
+ *
+ * Klient klikne aj o polnoci a telefón by zazvonil (rozbor, 1. 11. 2026). V tichu
+ * (`tichyCas.ts`) sa preto odloží a odíde prvým denným behom `push-beh`.
+ */
+export async function pushTrenerovi(DB: D1Database, trener: string, obsah: ObsahPushu, teraz: Date = new Date()): Promise<void> {
   try {
-    const nast = (await DB.prepare("SELECT key, value FROM vzas_settings WHERE key IN ('vapid_public','vapid_private')").all()).results as { key: string; value: string }[];
-    const m = Object.fromEntries(nast.map((r) => [r.key, String(r.value || "")]));
-    if (!m.vapid_public || !m.vapid_private) return;
-    const kluce = { verejny: m.vapid_public, sukromny: m.vapid_private, kontakt: "mailto:prosapiensbio@gmail.com" };
-    const odbery = (await DB.prepare("SELECT endpoint, p256dh, auth, kto FROM push_odbery").all()).results as unknown as (Odber & { kto: string })[];
-    for (const o of odbery) {
-      if ((o.kto || "").trim().toLowerCase() !== trener.trim().toLowerCase()) continue;
-      await posliPush(o, obsah, kluce);
+    if (jeTichyCas(teraz)) {
+      // json_insert v jednom príkaze: dvaja klienti naraz sa neprepíšu.
+      await DB.prepare(
+        `INSERT INTO vzas_settings (key, value) VALUES (?1, json_array(json(?2)))
+         ON CONFLICT(key) DO UPDATE SET value = json_insert(value, '$[#]', json(?2))`,
+      ).bind(KLUC_ODLOZENE, JSON.stringify({ trener, obsah })).run();
+      return;
     }
-  } catch { /* push nie je podmienka */ }
+    await posliHned(DB, trener, obsah);
+  } catch (e) { console.error("push trénerovi:", e); /* push nie je podmienka */ }
+}
+
+/**
+ * Pošle, čo čakalo na koniec ticha; volá `push-beh` po nočnej kontrole. Zo zoznamu
+ * sa maže až po odoslaní a len ak sa medzitým nezmenil: radšej raz navyše (rovnaká
+ * značka notifikáciu na telefóne len nahradí) než stratiť. Vráti počet.
+ */
+export async function rozosliOdlozene(DB: D1Database): Promise<number> {
+  try {
+    const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(KLUC_ODLOZENE).first<{ value: string }>();
+    if (!r?.value) return 0;
+    const zoznam = JSON.parse(r.value) as { trener: string; obsah: ObsahPushu }[];
+    for (const p of zoznam) await posliHned(DB, p.trener, p.obsah);
+    await DB.prepare("DELETE FROM vzas_settings WHERE key = ?1 AND value = ?2").bind(KLUC_ODLOZENE, r.value).run();
+    return zoznam.length;
+  } catch (e) {
+    console.error("odložené notifikácie:", e);
+    return 0;
+  }
+}
+
+async function posliHned(DB: D1Database, trener: string, obsah: ObsahPushu): Promise<void> {
+  const nast = (await DB.prepare("SELECT key, value FROM vzas_settings WHERE key IN ('vapid_public','vapid_private')").all()).results as { key: string; value: string }[];
+  const m = Object.fromEntries(nast.map((r) => [r.key, String(r.value || "")]));
+  if (!m.vapid_public || !m.vapid_private) return;
+  const kluce = { verejny: m.vapid_public, sukromny: m.vapid_private, kontakt: "mailto:prosapiensbio@gmail.com" };
+  const odbery = (await DB.prepare("SELECT endpoint, p256dh, auth, kto FROM push_odbery").all()).results as unknown as (Odber & { kto: string })[];
+  for (const o of odbery) {
+    if ((o.kto || "").trim().toLowerCase() !== trener.trim().toLowerCase()) continue;
+    await posliPush(o, obsah, kluce);
+  }
 }
