@@ -10,6 +10,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { Card, Info } from "./ui";
 
 import { krokyZa, oknoMesiacov } from "./MarketingLievik";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Čísla, ktoré rozhodujú o marketingu — na povrchu, s výkladom pod trojuholníkom.
@@ -119,7 +120,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     };
     const rDopyty = k.kto.dopyty.map((x) => ({ meno: x.meno, vpravo: `${fmtDen(x.datum)}${x.zdroj ? ` · ${x.zdroj}` : ""}` }));
     const rUvodne = k.kto.uvodne.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)}` }));
-    const rKlienti = k.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""}` }));
+    const rKlienti = k.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatené ${fmtDen(x.zaplatil)}` : ""}` }));
 
     // Konvertujú sa DOPYTY, nie klienti — inak vyjde nad sto percent, lebo
     // klienti z odporúčaní nemajú zapísaný dopyt. Viď krokyZa.
@@ -150,18 +151,18 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       {
         kluc: "dopyty",
         nazov: "Dopytov mesačne",
-        hodnota: dopytovMes.toFixed(1),
+        hodnota: dopytovMes.toFixed(1).replace(".", ","),
         h: hD,
         smer: "čím viac, tým lepšie · treba 10,5",
         preco: "Vstup lievika. Klientov nemôže pribudnúť viac, než koľko ľudí sa ozve — žiadne zlepšenie textu, ceny ani rýchlosti odpovede to neobíde.",
         verdikt: verdikt(hD, {
           dobre: "Blíži sa to k 10,5 dopytu mesačne, čo je tempo na zaplnenie 18 miest za pol roka.",
-          priestor: `Na zaplnenie 18 miest za pol roka treba 10,5 mesačne. Chýba ${Math.max(0, 10.5 - dopytovMes).toFixed(1)} — to je diera, ktorú má zaplniť reklama.`,
+          priestor: `Na zaplnenie 18 miest za pol roka treba 10,5 mesačne. Chýba ${Math.max(0, 10.5 - dopytovMes).toFixed(1).replace(".", ",")} — to je diera, ktorú má zaplniť reklama.`,
           zle: "Takmer sa nikto neozýva. Kým sa to nezmení, na ostatných číslach nezáleží.",
           bezDat: "Zatiaľ nemám dosť mesiacov na priemer.",
         }),
         riadky: rDopyty,
-        zoznamNadpis: `Kto sa ozval — ${k.dopyty} dopytov za ${mes} mesiacov`,
+        zoznamNadpis: `Kto sa ozval — ${Sk.dopyty(k.dopyty)} za ${Sk.mesiace(mes)}`,
       },
       {
         kluc: "konverzia",
@@ -198,13 +199,13 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       {
         kluc: "uvodne",
         nazov: "Úvodných mesačne",
-        hodnota: uvodnych.toFixed(1),
+        hodnota: uvodnych.toFixed(1).replace(".", ","),
         h: bez,
         smer: "čím viac, tým lepšie",
         preco: "Medzičlánok medzi dopytom a klientom. Keď dopytov pribúda a úvodných nie, problém je v tom, čo sa deje po prvom kontakte — nie v reklame.",
         verdikt: "Porovnaj s dopytmi vedľa: keď je medzi nimi veľká diera, stráca sa to pri dohadovaní termínu.",
         riadky: rUvodne,
-        zoznamNadpis: `Kto prišiel na úvodný — ${k.uvodne} ľudí za ${mes} mesiacov`,
+        zoznamNadpis: `Kto prišiel na úvodný — ${Sk.ludia(k.uvodne)} za ${Sk.mesiace(mes)}`,
       },
       {
         kluc: "naUvodny",
@@ -230,7 +231,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         riadky: zlucKampane(kampane.filter((x) => mesiace.includes(x.mesiac)))
           .slice().sort((a, b) => b.spend - a.spend)
           .map((x) => ({ meno: x.nazov, vpravo: fmtCZK(x.spend) })),
-        zoznamNadpis: `Kampane z Mety za ${mes} mesiacov, zoradené podľa výdavku`,
+        zoznamNadpis: `Kampane z Mety za ${Sk.mesiace(mes)}, zoradené podľa výdavku`,
       },
     ];
   }, [data, clients, kampane]);

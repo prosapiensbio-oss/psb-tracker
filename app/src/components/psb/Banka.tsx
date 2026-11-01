@@ -10,6 +10,7 @@ import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, H3, Info, TableWrap } from "./ui";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Import bankového výpisu — s náhľadom, nie naslepo.
 //
@@ -319,7 +320,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     setBusy(false);
     if (r.ok) {
       setHistoria([]);
-      setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
+      setVysledok(`Zapísané: ${Sk.pohyby(r.pridane)}${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
       setNahlad(null);
       onHotovo?.();
       // Import výpisu mení náklady v P&L aj kroky uzávierky — `refresh()`
@@ -436,7 +437,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
           )}
           {bezId > 0 && (
             <div style={{ marginTop: kontrola ? 9 : 0, padding: "9px 12px", borderRadius: 8, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12, color: C.text, lineHeight: 1.55 }}>
-              <b>{bezId} riadkov nemá ID operácie.</b> Bez neho sa dva rovnaké pohyby v ten istý deň (napríklad dve výplaty po 1 000 Kč)
+              <b>Bez ID operácie: {Sk.riadky(bezId)}.</b> Bez neho sa dva rovnaké pohyby v ten istý deň (napríklad dve výplaty po 1 000 Kč)
               nedajú rozlíšiť a zapíše sa len jeden. Stiahni radšej export <b>Výpis z účtu</b> — ten ID aj kontrolné súčty má.
             </div>
           )}
@@ -482,7 +483,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
             ) : (
               <button onClick={() => void zapis()} disabled={busy}
                 style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: C.accent, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
-                Zapísať {suhrn.nove} pohybov
+                Zapísať {Sk.pohyby(suhrn.nove)}
               </button>
             )}
           </div>

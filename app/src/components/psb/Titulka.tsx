@@ -16,6 +16,7 @@ import {
 } from "../../lib/psb/titulkaSkladby";
 import { mimoZony, VODIDLA, vodidlaDoSvg } from "../../lib/psb/titulkaVodidla";
 import { Info, Modal } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Titulka príspevku — sadzba, nie generovanie obrázka.
@@ -797,7 +798,7 @@ export function Titulka({ zdroj, mesiac, faza, kluc, ulozene, onUloz, onZavri }:
           )}
           {priDlhy(riadkyN.length) && (
             <div style={{ fontSize: 11.5, color: C.orange, marginTop: 4, lineHeight: 1.45 }}>
-              {riadkyN.length} riadkov — vo feede fungujú najviac {MAX_RIADKOV_NADPIS}.
+              {Sk.riadky(riadkyN.length)} — vo feede fungujú najviac {MAX_RIADKOV_NADPIS}.
             </div>
           )}
 

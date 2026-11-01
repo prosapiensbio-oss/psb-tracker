@@ -11,7 +11,7 @@
 import { useMemo } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
-import { fmtDMY, monthLabel } from "../../lib/psb/format";
+import { fmtDMY, mesiacCely } from "../../lib/psb/format";
 import { klucPlatbyMesiaca, PLATBY_MESIACA_OD, stavPlatieb, type PohybPlatby, type StavPlatby } from "../../lib/psb/platbyMesiaca";
 import { C } from "../../lib/psb/theme";
 import { NadpisSekcie } from "./WorkspaceKroky";
@@ -39,7 +39,7 @@ export function PlatbyMesiaca({ pohyby, ack, onAck }: {
 
   return (
     <div style={{ marginBottom: 18 }}>
-      <NadpisSekcie pocet={stav.length - hotovo + dlhMinuly.length}>Platby mesiaca — {monthLabel(teraz)}</NadpisSekcie>
+      <NadpisSekcie pocet={stav.length - hotovo + dlhMinuly.length}>Platby mesiaca — {mesiacCely(teraz)}</NadpisSekcie>
       {dlhMinuly.map((s) => <Riadok key={s.mesiac + s.platba.id} s={s} onAck={onAck} minuly />)}
       {stav.map((s) => <Riadok key={s.mesiac + s.platba.id} s={s} onAck={onAck} />)}
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
@@ -55,7 +55,7 @@ function Riadok({ s, onAck, minuly }: { s: StavPlatby; onAck: (key: string, note
   const stavText = s.zaplatene === "banka"
     ? `zaplatené ${s.pohyby.map((p) => fmtDMY(p.datum)).filter((d, i, a) => a.indexOf(d) === i).join(", ")}`
     : s.zaplatene === "rucne" ? "odkliknuté"
-    : minuly ? `nezaplatené za ${monthLabel(s.mesiac)}`
+    : minuly ? `nezaplatené za ${mesiacCely(s.mesiac)}`
     : s.pripomenut ? "treba zaplatiť"
     : `pripomeniem ${s.platba.den}.`;
   return (

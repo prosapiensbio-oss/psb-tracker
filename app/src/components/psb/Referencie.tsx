@@ -6,6 +6,7 @@ import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Referencie — presunuté z Marketingu ku klientom (Jerryho postreh:
 // odporúčanie je vzťah medzi ľuďmi, nie kanál). Vo vlastnom súbore preto,
@@ -194,7 +195,7 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
         )}
         {r.bezMena > 0 && (
           <div style={{ marginTop: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.orange, 7), border: `1px solid ${mix(C.orange, 22)}`, fontSize: 12, color: C.text, lineHeight: 1.55 }}>
-            <b>{r.bezMena} klientov prišlo z odporúčania, ale nevie sa od koho.</b> Bez mena sa nedá odovzdať odmena
+            <b>Z odporúčania, ale nevie sa od koho: {Sk.klienti(r.bezMena)}.</b> Bez mena sa nedá odovzdať odmena
             za doporučenie ani poďakovať — a práve to je celý mechanizmus, ktorý ten kanál drží pri živote.
           </div>
         )}

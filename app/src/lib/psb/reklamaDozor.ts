@@ -63,6 +63,7 @@ export type NastavenieDozoru = {
 };
 
 import { termZUtm } from "./utm";
+import * as Sk from "./sklonovanie";
 
 export type DozorData = {
   kampane: DozorKampan[];
@@ -219,10 +220,10 @@ export function stavKampane(
   const dovod = !bezi
     ? "kampaň nedoručuje"
     : dniOd >= prahDni
-      ? `${posledne ? "od posledného rozhodnutia" : "od spustenia"} ${dniOd} dní`
+      ? `${posledne ? "od posledného rozhodnutia" : "od spustenia"} ${Sk.dni(dniOd)}`
       : minuteOd >= PRAHY.kcNaVyhodnotenie
         ? `minula ${kc(minuteOd)} ${posledne ? "od posledného rozhodnutia" : "od spustenia"}`
-        : `ďalšie vyhodnotenie o ${prahDni - dniOd} dní alebo po ${kc(PRAHY.kcNaVyhodnotenie - minuteOd)}`;
+        : `ďalšie vyhodnotenie o ${Sk.dni(prahDni - dniOd)} alebo po ${kc(PRAHY.kcNaVyhodnotenie - minuteOd)}`;
   const cenaZaDopyt = dopytyOd > 0 ? minuteOd / dopytyOd : null;
   return {
     kampan: k, od, posledne, dniOd, minuteOd, klikyOd, naStrankeOd, dopytyOd, bezOdkazuOd, minuteCelkom,
@@ -300,7 +301,7 @@ export function promptPreClauda(s: StavKampane, dnes: string): string {
   return [
     `Reklama v Mete (účet ${UCET}): „${k.nazov}“ — kampaň ${k.id}, cieľ ${k.ciel}, ${k.dennyRozpocet ? `denný rozpočet ${kc(k.dennyRozpocet)}` : "bez denného rozpočtu"}.`,
     `Sady: ${k.sady.map((x) => `${x.nazov} (${x.id}, ${x.stav.toLowerCase()}${x.denny ? `, ${kc(x.denny)}/deň` : ""})`).join("; ") || "—"}.`,
-    `Od ${denKratko(s.od)} do ${denKratko(dnes)} (${s.dniOd} dní): minuté ${kc(s.minuteOd)}, kliky ${s.klikyOd}, na stránke ${s.naStrankeOd}, dopyty s odkazom z tejto kampane ${s.dopytyOd}, dopyty z reklamy bez odkazu ${s.bezOdkazuOd}.`,
+    `Od ${denKratko(s.od)} do ${denKratko(dnes)} (${Sk.dni(s.dniOd)}): minuté ${kc(s.minuteOd)}, kliky ${s.klikyOd}, na stránke ${s.naStrankeOd}, dopyty s odkazom z tejto kampane ${s.dopytyOd}, dopyty z reklamy bez odkazu ${s.bezOdkazuOd}.`,
     `Kokpit navrhuje: ${s.navrh.veta}`,
     ``,
     `Chcem: [doplň — nová kreatíva / nové publikum / nová sada / iný cieľ].`,
@@ -381,7 +382,7 @@ export function polozkyDozoru(
       category: "Rozhodnutie",
       tone: s.navrh.akcia === "vypnut" ? "red" : "orange",
       title: `Reklama: čas vyhodnotiť — ${k.nazov}`,
-      detail: `Reklama „${k.nazov}“ (${nazovCiela(k.ciel) || "kampaň"}) — čas vyhodnotiť. Od ${denKratko(s.od)} (${s.dniOd} dní): ${kc(s.minuteOd)}, ${navstevyTxt}; ${dopytyTxt}. Návrh: ${s.navrh.veta}`,
+      detail: `Reklama „${k.nazov}“ (${nazovCiela(k.ciel) || "kampaň"}) — čas vyhodnotiť. Od ${denKratko(s.od)} (${Sk.dni(s.dniOd)}): ${kc(s.minuteOd)}, ${navstevyTxt}; ${dopytyTxt}. Návrh: ${s.navrh.veta}`,
       priority: 8,
       reklama: {
         druh: "vyhodnot", kampanId: k.id, nazov: k.nazov, ciel: k.ciel, dennyRozpocet: k.dennyRozpocet,

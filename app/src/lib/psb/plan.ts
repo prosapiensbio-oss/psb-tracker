@@ -17,6 +17,7 @@
  */
 
 import { jeMesiac } from "./format";
+import * as Sk from "./sklonovanie";
 
 export type StavPlanu = "navrh" | "bezi" | "vyhodnoteny";
 
@@ -148,7 +149,7 @@ export function skontrolujPlan(p: Plan): NalezPlanu[] {
   if (!p.nazov.trim()) n.push({ text: "Plán nemá názov — v zozname sa nedá rozoznať.", tvrdy: true });
   if (!mes.length) n.push({ text: "Obdobie nie je platné. Zadaj od a do vo tvare RRRR-MM, do nesmie byť pred od.", tvrdy: true });
   if (!p.ciel.trim()) n.push({ text: "Chýba cieľ. Plán bez cieľa sa nedá vyhodnotiť, iba odpracovať.", tvrdy: true });
-  if (!p.metriky.length) n.push({ text: "Nevybral si ani jednu metriku — nebude sa čím merať, či plán vyšiel.", tvrdy: true });
+  if (!p.metriky.length) n.push({ text: "Nie je vybraná ani jedna metrika — nebude sa čím merať, či plán vyšiel.", tvrdy: true });
   for (const m of p.metriky) {
     if (!METRIKA_MAPA.has(m.kluc)) n.push({ text: `Neznáma metrika „${m.kluc}“.`, tvrdy: true });
     else if (!(m.cielova > 0)) n.push({ text: `Metrika „${METRIKA_MAPA.get(m.kluc)?.nazov}“ nemá cieľovú hodnotu.`, tvrdy: true });
@@ -156,7 +157,7 @@ export function skontrolujPlan(p: Plan): NalezPlanu[] {
   if (p.rozpocet > 0 && !p.metriky.some((m) => m.kluc === "cenaZaDopyt" || m.kluc === "dopyty")) {
     n.push({ text: "Máš rozpočet na reklamu, ale žiadnu metriku, ktorá by ukázala, čo za tie peniaze prišlo. Pridaj dopyty alebo cenu za dopyt.", tvrdy: false });
   }
-  if (mes.length > 12) n.push({ text: `Plán na ${mes.length} mesiacov sa nedá riadiť — po roku sa zmenia vstupy aj kapacita.`, tvrdy: false });
+  if (mes.length > 12) n.push({ text: `Plán na ${Sk.mesiace(mes.length)} sa nedá riadiť — po roku sa zmenia vstupy aj kapacita.`, tvrdy: false });
   if (mes.length === 1) n.push({ text: "Jeden mesiac je krátke okno: pri troch dopytoch mesačne je rozdiel medzi úspechom a neúspechom náhoda.", tvrdy: false });
   if (!p.pristup.trim()) n.push({ text: "Nie je napísané, ČO pre ten cieľ urobíš. Bez toho je to prianie, nie plán.", tvrdy: false });
   return n;

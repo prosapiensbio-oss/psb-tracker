@@ -16,6 +16,7 @@ import { fmtDMY } from "./format";
 import { zastaranaBanka } from "./kontrolaNakladov";
 import type { BtcKnihaPlatba } from "./compute";
 import type { PaymentRow } from "./types";
+import * as Sk from "./sklonovanie";
 
 type Ack = Record<string, { note?: string; ackedAt?: string } | undefined>;
 
@@ -35,7 +36,7 @@ export function polozkaZastaranaBanka(poslednyPohyb: string, ack: Ack, dnes = ne
      * P&L (odhad kategórie nemá tiecť do P&L bez človeka). Text hovoril
      * „nahráva sa", čo pochádzalo z čias súboru.
      */
-    title: `Výdavky z banky nie sú stiahnuté ${stara.dni} dní`,
+    title: `Výdavky z banky nie sú stiahnuté ${Sk.dni(stara.dni)}`,
     detail: `Posledný výdavok z Fio je z ${fmtDMY(stara.poslednyPohyb)}, teda spred ${stara.dni} dní.`
       + (stara.dni >= 30
         ? " Bežiaci mesiac tak má v P&L tržby, ale nie náklady — zisk vyzerá vyšší, než je."

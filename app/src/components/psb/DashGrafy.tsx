@@ -20,6 +20,7 @@ import { tokyKlientov } from "./Fluktuacia";
 import { PlatobneKanaly } from "./PlatobneKanaly";
 import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } from "./ui";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Knižnica grafov.
 //
@@ -625,7 +626,7 @@ export function useExtraGrafy({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
             <MiniStat label="Break-even / mes." value={fmtCZK(beAvg)} color={C.orange} />
-            <MiniStat label="Rezerva nad ním" value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
+            <MiniStat label="Rezerva nad ním" value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1).replace(".", ",")} %`} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
             <MiniStat label="Mzdy z tržieb" value={`${mzdyPct.toFixed(0)} %`} color={mzdyPct <= 50 ? C.green : mzdyPct <= 60 ? C.orange : C.red} />
             <MiniStat label="Viem škrtnúť / mes." value={fmtCZK(volitelne)} color={skrtPct >= 30 ? C.green : C.orange} />
           </div>
@@ -755,7 +756,7 @@ export function useExtraGrafy({
             <BarRow
               label="Marža" value={Math.max(0, marzaRok)} max={Math.max(ciel.marzaPct, marzaRok, 1)}
               color={marzaRok >= ciel.marzaPct ? C.green : C.red}
-              sub={`${marzaRok.toFixed(1)} % · cieľ ${ciel.marzaPct} %`}
+              sub={`${marzaRok.toFixed(1).replace(".", ",")} % · cieľ ${ciel.marzaPct} %`}
             />
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
               Ročný cieľ {fmtCZK(ciel.rocneTrzby)} · projektové ciele a ďalší krok → Výsledky
@@ -776,7 +777,7 @@ export function useExtraGrafy({
               <MiniStat label="Hodnota rezervy" value={fmtCZK(btc.czk || 0)} color={C.orange} />
               <MiniStat
                 label="Mesiacov prevádzky"
-                value={`${(beAvg > 0 ? (btc.czk || 0) / beAvg : 0).toFixed(1)}`}
+                value={`${(beAvg > 0 ? (btc.czk || 0) / beAvg : 0).toFixed(1).replace(".", ",")}`}
                 color={(beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 3 ? C.green : (beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 1 ? C.orange : C.red}
               />
             </div>
@@ -878,7 +879,7 @@ export function useExtraGrafy({
                       koľko toho v danom mesiaci prišlo. */}
                   <MiniStat
                     label="Zhodnotenie"
-                    value={btcPlatby.zhodMesPct === null ? "—" : `${btcPlatby.zhodMesPct >= 0 ? "+" : ""}${btcPlatby.zhodMesPct.toFixed(1)} %`}
+                    value={btcPlatby.zhodMesPct === null ? "—" : `${btcPlatby.zhodMesPct >= 0 ? "+" : ""}${btcPlatby.zhodMesPct.toFixed(1).replace(".", ",")} %`}
                     pod={btcPlatby.dnesMesiac === null ? undefined : `${btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}`}
                     color={(btcPlatby.zhodMesPct ?? 0) >= 0 ? C.green : C.red}
                   />
@@ -907,7 +908,7 @@ export function useExtraGrafy({
                       takže sa dajú porovnať pohľadom. */}
                   <MiniStat
                     label="Zhodnotenie portfólia"
-                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(2)} %`}
+                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(2).replace(".", ",")} %`}
                     pod={btcPlatby.zhodLifeCzk === null ? undefined : `${btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.zhodLifeCzk)}`}
                     color={(btcPlatby.zhodLifePct ?? 0) >= 0 ? C.green : C.red}
                   />
@@ -1011,7 +1012,7 @@ export function useExtraGrafy({
             <MiniStat label="Príjmy · Ø / mes." value={fmtCZK(priem(p.prijmy))} color={C.green} />
             <MiniStat label="Náklady · Ø / mes." value={fmtCZK(priem(p.celkoveNaklady))} color={C.red} />
             <MiniStat label="Hrubý zisk · Ø / mes." value={fmtCZK(priem(p.hrubyZisk))} color={priem(p.hrubyZisk) >= 0 ? C.green : C.red} />
-            <MiniStat label="Marža za obdobie" value={`${marzaSpolu.toFixed(1)} %`} color={marzaSpolu >= 15 ? C.green : marzaSpolu >= 0 ? C.orange : C.red} />
+            <MiniStat label="Marža za obdobie" value={`${marzaSpolu.toFixed(1).replace(".", ",")} %`} color={marzaSpolu >= 15 ? C.green : marzaSpolu >= 0 ? C.orange : C.red} />
           </div>
         </Klik>
       </Card>
@@ -1212,7 +1213,7 @@ export function useExtraGrafy({
                   <MiniStat label="Odchod" value={`${z.odchodMes}/mes`} color={C.red} />
                 </div>
                 <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-                  Priemer za posledných 12 uzavretých mesiacov · chodí {z.aktivnych} klientov · za rok treba {z.trebaZiskat(12)}
+                  Priemer za posledných 12 uzavretých mesiacov · chodí {Sk.klienti(z.aktivnych)} · za rok treba {z.trebaZiskat(12)}
                 </div>
               </div>
             )}
@@ -1233,7 +1234,7 @@ export function useExtraGrafy({
       .map(([l, v], i) => ({ label: l, value: v, color: MEMBERSHIP_COLORS[l] || [C.accent, C.blue, C.orange, C.green, C.accentLight][i % 5] }));
     nodes.balicky = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Klienti podľa balíčka" text="Na čom stojí príjem: koľko ľudí má viazanosť, koľko voľné balíčky a koľko chodí bez členstva. Neaktívni sa nerátajú." /></H3>
+        <H3><Info label="Klienti podľa balíčka" text="Na čom stojí príjem: koľko ľudí má Předplatné, koľko Balíček a koľko chodí bez členstva. Neaktívni sa nerátajú." /></H3>
         <Klik kam={() => onNavigate("klienti", "klienti")} onNavigate="Klienti">
           {balickyData.length ? (
             <Donut size={140} centerLabel={String(balickyData.reduce((a, d) => a + d.value, 0))} data={balickyData} />
@@ -1565,7 +1566,7 @@ export function useExtraGrafy({
             <Klik kam={() => onNavigate("vzas", "sedenia")} onNavigate="Peniaze → Sedenia & cena">
               <LineChart
                 data={cenaRad.map((x) => ({ label: monthLabel(x.mk), values: [x.v] }))}
-                series={[{ name: "Ø CZK / sedenie", color: C.accent }]}
+                series={[{ name: "Ø Kč / sedenie", color: C.accent }]}
                 height={190} fmt={(n) => `${Math.round(n)}`} autoY alignEnd bezSuhrnu
                 {...(cielHodinovky ? { refLine: { value: cielHodinovky, label: `cieľ ${fmtCZK(cielHodinovky)}`, color: C.green } } : {})}
               />
@@ -1601,8 +1602,8 @@ export function useExtraGrafy({
           {weeks === null ? <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>
             : !skore.jerry.length && !skore.terezka.length ? <Empty>Zatiaľ žiadne týždenné hodnotenia náročnosti.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-              <MiniStat label={`Jerry · Ø (${skore.jerry.length} týž.)`} value={`${priemSkore(skore.jerry).toFixed(1)} / 10`} color={farbaSkore(priemSkore(skore.jerry))} />
-              <MiniStat label={`Terezka · Ø (${skore.terezka.length} týž.)`} value={`${priemSkore(skore.terezka).toFixed(1)} / 10`} color={farbaSkore(priemSkore(skore.terezka))} />
+              <MiniStat label={`Jerry · Ø (${skore.jerry.length} týž.)`} value={`${priemSkore(skore.jerry).toFixed(1).replace(".", ",")} / 10`} color={farbaSkore(priemSkore(skore.jerry))} />
+              <MiniStat label={`Terezka · Ø (${skore.terezka.length} týž.)`} value={`${priemSkore(skore.terezka).toFixed(1).replace(".", ",")} / 10`} color={farbaSkore(priemSkore(skore.terezka))} />
               <MiniStat label="Jerry · najťažší týždeň" value={skore.jerry.length ? `${Math.max(...skore.jerry)} / 10` : "—"} />
               <MiniStat label="Terezka · najťažší týždeň" value={skore.terezka.length ? `${Math.max(...skore.terezka)} / 10` : "—"} />
             </div>
@@ -1773,7 +1774,7 @@ export function useExtraGrafy({
           {ltvKlienti.length === 0 ? <Empty>Zatiaľ nie sú klienti s tromi a viac sedeniami.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
               <MiniStat label="Ø hodnota klienta" value={fmtCZK(ltvOdislych)} color={C.green} />
-              <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1)} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
+              <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1).replace(".", ",")} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
               {/* Popis musí povedať, prečo sa toto číslo NEROVNÁ dlaždici
                   „Aktívni klienti". Jerry sa na to spýtal do minúty, čo číslo
                   uvidel (22. 8. 2026): 58 verzus 61. Nie je to spor — je to
@@ -1872,7 +1873,7 @@ export function useExtraGrafy({
                 <MiniStat label="Tržby · Ø / mes." value={fmtCZK(priem(p.prijmy))} color={C.green} />
                 <MiniStat label="Náklady · Ø / mes." value={fmtCZK(priem(p.celkoveNaklady))} color={C.red} />
                 <MiniStat label="Zisk · Ø / mes." value={fmtCZK(priem(p.hrubyZisk))} color={priem(p.hrubyZisk) >= 0 ? C.green : C.red} />
-                <MiniStat label="Marža za obdobie" value={`${marzaSpolu.toFixed(1)} %`} color={marzaSpolu >= 15 ? C.green : marzaSpolu >= 0 ? C.orange : C.red} />
+                <MiniStat label="Marža za obdobie" value={`${marzaSpolu.toFixed(1).replace(".", ",")} %`} color={marzaSpolu >= 15 ? C.green : marzaSpolu >= 0 ? C.orange : C.red} />
               </div>
             </Klik>
           </div>
@@ -2087,7 +2088,7 @@ function CenaZaKlienta({
               klik na Lievik, teda na inú obrazovku s iným oknom. */}
           <div onClick={() => onNavigate("marketing", "naklady")} style={{ cursor: "pointer" }} title="Otvoriť Marketing → Čo to stálo"><MiniStat label="Výdaje na reklamu" value={spend ? fmtCZK(spend) : "—"} color={C.orange} /></div>
           <div onClick={otvorLudi(`Prišli na úvodný (${OKNA.find((o) => o.id === okno)?.label})`, uvodniMena)} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Úvodných" value={String(uvodne)} /></div>
-          <div onClick={otvorLudi(`Menovateľ ceny za úvodný — ${uvodne} ľudí na úvodnom`, uvodniMena)} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Cena za úvodný" value={spend && uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} /></div>
+          <div onClick={otvorLudi(`Menovateľ ceny za úvodný — ${Sk.ludia(uvodne)} na úvodnom`, uvodniMena)} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Cena za úvodný" value={spend && uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} /></div>
           <div onClick={otvorLudi(`Menovateľ ceny za klienta — ${novi} nových klientov (jeKlient)`, noviZoznam.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Cena za klienta" value={spend && novi ? fmtCZK(spend / novi) : "—"} color={C.accent} /></div>
         </div>
       )}

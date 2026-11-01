@@ -11,6 +11,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { Card, H3 } from "./ui";
 import { ChatConversation, type AssistantChat } from "./Assistant";
 import { useUzke } from "./useUzke";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /** Pevná konverzácia reklamného agenta — jedno stále vlákno so zameraním Kampaň. */
 export const REKLAMA_AGENT = { id: "reklama-agent", kategoria: "kampan", nazov: "Reklama · Jarvis" } as const;
@@ -222,7 +223,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
     setStav("sťahujem z Mety…");
     const v = (await posli({ akcia: "dozor" })) as { ok: boolean; error?: string; kampani?: number; dni?: number; problemov?: number; varovania?: string[] };
     if (!v.ok) { setStav(`Nestiahlo sa: ${v.error}`); return; }
-    setStav(`Stiahnuté: ${v.kampani} bežiacich kampaní, ${v.dni} dní, ${v.problemov} problémov${v.varovania?.length ? ` · čiastočne: ${v.varovania.join("; ")}` : ""}`);
+    setStav(`Stiahnuté: bežiace kampane ${v.kampani}, ${Sk.dni(v.dni)}, ${Sk.problemy(v.problemov)}${v.varovania?.length ? ` · čiastočne: ${v.varovania.join("; ")}` : ""}`);
     oznam("reklama");
   };
   const ulozNastavenie = async () => {
@@ -254,7 +255,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
                 <span style={{ color: C.textMuted }}>{x.ciel}{x.dennyRozpocet ? ` · ${kc(x.dennyRozpocet)}/deň` : ""}{x.bezi ? "" : " · nedoručuje"}</span>
               </div>
               <div style={{ color: C.text, marginTop: 2 }}>
-                od {x.obdobie.od.slice(8, 10).replace(/^0/, "")}. {x.obdobie.od.slice(5, 7).replace(/^0/, "")}. ({x.obdobie.dni} dní): {kc(x.minuteKc)} · {x.kliky} klikov · {x.naStranke} na stránke · dopyty s odkazom {x.dopytySOdkazom}{x.dopytyZReklamyBezOdkazu ? ` (+${x.dopytyZReklamyBezOdkazu} z reklamy bez odkazu)` : ""}{x.cenaZaDopyt ? ` · ${kc(x.cenaZaDopyt)} za dopyt` : ""}
+                od {x.obdobie.od.slice(8, 10).replace(/^0/, "")}. {x.obdobie.od.slice(5, 7).replace(/^0/, "")}. ({Sk.dni(x.obdobie.dni)}): {kc(x.minuteKc)} · {x.kliky} klikov · {x.naStranke} na stránke · dopyty s odkazom {x.dopytySOdkazom}{x.dopytyZReklamyBezOdkazu ? ` (+${x.dopytyZReklamyBezOdkazu} z reklamy bez odkazu)` : ""}{x.cenaZaDopyt ? ` · ${kc(x.cenaZaDopyt)} za dopyt` : ""}
               </div>
               <div style={{ color: C.textMuted, marginTop: 2 }}>
                 {x.cakaNaVyhodnotenie ? "Čaká na vyhodnotenie (je v notifikáciách). " : `${x.dovod[0].toUpperCase()}${x.dovod.slice(1)}. `}{x.navrh}
@@ -281,7 +282,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
           {vyhodnotenia.map((v) => (
             <div key={`${v.kampanId}${v.kedy}`} style={{ marginTop: 4 }}>
               {v.kedy.slice(0, 10)} · {nazvy.get(v.kampanId) || v.kampanId}: {v.rozhodnutie === "nechat" ? "nechať" : v.rozhodnutie === "vypnut" ? "vypnúť" : `rozpočet → ${v.rozpocetPo} Kč/deň`}
-              {v.minuteKc !== null ? ` · pri ${kc(v.minuteKc)}` : ""}{v.dopyty !== null ? `, ${v.dopyty} dopytov` : ""}{v.dm !== null ? `, ${v.dm} DM` : ""}
+              {v.minuteKc !== null ? ` · pri ${kc(v.minuteKc)}` : ""}{v.dopyty !== null ? `, ${Sk.dopyty(v.dopyty)}` : ""}{v.dm !== null ? `, ${v.dm} DM` : ""}
             </div>
           ))}
         </details>
@@ -380,11 +381,11 @@ export function MetrikyReklamy({ data }: { data: PSBData }) {
       {riadok("Cena za dohodnutý úvodný (30 dní)", m.cenaZaDohodnuty30 !== null ? kc(m.cenaZaDohodnuty30) : "—",
         `${m.dohodnute30} dohodnutých z ${m.dopyty30} dopytov z reklamy · toto je hlavné meradlo`)}
       {riadok("Cena za dopyt (30 dní)", m.cenaZaDopyt30 !== null ? kc(m.cenaZaDopyt30) : "—",
-        `${kc(m.minute30)} ÷ ${m.dopyty30} dopytov (${m.dopytySOdkazom30} s odkazom z reklamy)${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)}
+        `${kc(m.minute30)} ÷ ${Sk.dopyty(m.dopyty30)} (${m.dopytySOdkazom30} s odkazom z reklamy)${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)}
       {riadok("Dorazilo na stránku (7 dní)", m.dorazilo7 !== null ? `${m.dorazilo7} %` : "—",
         `${m.naStranke7} z ${m.kliky7} klikov${m.cenaZaNavstevu7 !== null ? ` · ${String(m.cenaZaNavstevu7).replace(".", ",")} Kč za návštevu` : ""}`, dorFarba)}
       {riadok("Od posledného dopytu z reklamy", m.minuteOdPoslednehoDopytu !== null ? kc(m.minuteOdPoslednehoDopytu) : "—",
-        m.poslednyDopyt ? `${m.dniOdPoslednehoDopytu} dní (${Number(m.poslednyDopyt.slice(8, 10))}. ${Number(m.poslednyDopyt.slice(5, 7))}.)` : "zatiaľ žiadny", tichoFarba)}
+        m.poslednyDopyt ? `${Sk.dni(m.dniOdPoslednehoDopytu)} (${Number(m.poslednyDopyt.slice(8, 10))}. ${Number(m.poslednyDopyt.slice(5, 7))}.)` : "zatiaľ žiadny", tichoFarba)}
       {riadok("Tento mesiac", kc(m.minuteMesiac), `${kc(m.denneRozpocty)} denne → ~${kc(m.mesacnePriTomtoTempe)} za 30 dní${d?.nastavenie.stropMesiac ? ` · strop ${kc(d.nastavenie.stropMesiac)}` : ""}`)}
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textMuted }}>Výdavok po dňoch (30 dní) · ● dopyt z reklamy</div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 54, marginTop: 4 }}>

@@ -279,8 +279,8 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
 
       {summary && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
-          <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
+          <StatCard value={`${summary.avgH.toFixed(1).replace(".", ",")}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
+          <StatCard value={summary.avgScore.toFixed(1).replace(".", ",")} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
           <StatCard value={fmtCZK(summary.avgCzk)} label={<Info text="Cena ZAPÍSANÁ pri sedení, sčítaná a delená počtom sedení. Je nižšia než „Ø cena sedenia“ na Kokpite a v Peniazoch — tá ráta z prijatých peňazí. Rozdiel je v tom, že pri časti sedení je zapísaná cena nulová, lebo platba visí na balíčku; tu tie nuly priemer stláčajú, tam sa platba za balíček započíta. Toto číslo hovorí „koľko je odtrénované ocenené“, to druhé „koľko peňazí prišlo na hodinu“." label="Ø zapísané / sedenie" />} />
         </div>
       )}
@@ -299,10 +299,10 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
               <div key={tren} style={{ background: C.track, borderRadius: 9, padding: "8px 11px" }}>
                 <div style={{ fontSize: 12, color: C.textMuted }}>{tren}</div>
                 <div style={{ fontSize: 19, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>
-                  {h.mzdove.toFixed(1)} h
+                  {h.mzdove.toFixed(1).replace(".", ",")} h
                 </div>
                 <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
-                  {h.sedeni} sedení · {h.vsetky.toFixed(1)} h spolu s úvodnými (toto je v reporte)
+                  {h.sedeni} sedení · {h.vsetky.toFixed(1).replace(".", ",")} h spolu s úvodnými (toto je v reporte)
                 </div>
               </div>
             ))}

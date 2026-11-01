@@ -138,6 +138,7 @@ const NAD_UVODNY = 500;
 // Definícia žije v lib/psb/compute.ts (jedna pre obrazovku aj Jarvisov
 // kontext) — tu sa importuje a re-exportuje, nech existujúce importy fungujú.
 import { jeKlient } from "../../lib/psb/compute";
+import * as Sk from "../../lib/psb/sklonovanie";
 export { jeKlient };
 
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
@@ -305,7 +306,7 @@ function StrataRiadok({ x, onPoznamka }: {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={enterPosle(uloz)}
             onBlur={uloz}
-            placeholder="prečo neprišiel? (cena, vzdialenosť, termíny, nebolo to preňho…)"
+            placeholder="dôvod? (cena, vzdialenosť, termíny, nesedelo to…)"
             style={{
               flex: 1, minWidth: 0, padding: "5px 9px", borderRadius: 7,
               border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12,
@@ -468,7 +469,7 @@ export function Lievik({ data, clients, onPoznamka }: {
                   ? k.kto.nepokracovali.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)} · pred ${x.dni} dňami` }))
                   : k.kto.klienti.map((x) => ({
                   meno: x.meno,
-                  vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""} · ${fmtCZK(x.trzbaVOkne)}`,
+                  vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatené ${fmtDen(x.zaplatil)}` : ""} · ${fmtCZK(x.trzbaVOkne)}`,
                 }));
           return (
             <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
@@ -689,7 +690,7 @@ export function Kohorta({ data, clients }: { data: PSBData; clients: Record<stri
               <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textMuted }}>
-                    Ozvali sa v {monthLabel(mk)} — {v.dopytov} dopytov · {v.uvodny} na úvodnom · {v.klient} začali chodiť
+                    Ozvali sa v {monthLabel(mk)} — {Sk.dopyty(v.dopytov)} · {v.uvodny} na úvodnom · {v.klient} začali chodiť
                   </span>
                   <button onClick={() => setOtvorenaKohorta(null)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>zavrieť</button>
                 </div>

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { BulletGraph, Info, Sparkline, Trend } from "./ui";
+import { tvar } from "../../lib/psb/sklonovanie";
 
 /**
  * Panel prístrojov — prvá obrazovka Kokpitu.
@@ -134,7 +135,7 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
             {tab(p.prepinac.label, true)}
           </span>
         ) : (
-          <span style={{ fontSize: velka ? 11.5 : 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontSize: velka ? 11.5 : 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: C.textDim, minWidth: 0, lineHeight: 1.25 }}>
             {p.label}
           </span>
         )}
@@ -370,11 +371,12 @@ export function PrehladPanel({
 
   const stav = useMemo(() => {
     const casti: string[] = [];
-    if (zle.length) casti.push(`${zle.length}× mimo pásma`);
+    const ukazovatel = (n: number) => `${n} ${tvar(n, "ukazovateľ", "ukazovatele", "ukazovateľov")}`;
+    if (zle.length) casti.push(`${ukazovatel(zle.length)} mimo pásma`);
     const pozor = mimo.length - zle.length;
-    if (pozor) casti.push(`${pozor}× na hrane`);
-    if (vyzaduju.kritickych) casti.push(`${vyzaduju.kritickych} na akciu`);
-    return { text: casti.join(" · "), farba: zle.length ? C.red : C.orange };
+    if (pozor) casti.push(`${casti.length ? pozor : ukazovatel(pozor)} na hrane`);
+    if (vyzaduju.kritickych) casti.push(`${vyzaduju.kritickych} ${tvar(vyzaduju.kritickych, "vec čaká", "veci čakajú", "vecí čaká")} na akciu`);
+    return { text: casti.join(", "), farba: zle.length ? C.red : C.orange };
   }, [mimo.length, zle.length, vyzaduju.kritickych]);
 
   return (
@@ -392,7 +394,7 @@ export function PrehladPanel({
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: stav.farba, flexShrink: 0, boxShadow: `0 0 8px ${stav.farba}` }} />
             <span style={{ fontSize: 14.5, fontWeight: 700, color: stav.farba }}>{stav.text}</span>
             {mimo.length > 0 && (
-              <span style={{ fontSize: 12, color: C.textDim }}>— {mimo.map((p) => p.label.toLowerCase()).join(", ")}</span>
+              <span style={{ fontSize: 12, color: C.textDim }}>Týka sa: {mimo.map((p) => p.label.replace(/ — (.+)$/, " ($1)")).join(", ")}</span>
             )}
             {cerstvost.zastarane && (
               <span style={{ fontSize: 11.5, color: C.red, fontWeight: 600 }}>⚠ dáta len k {cerstvost.text} — nahraj nový export</span>

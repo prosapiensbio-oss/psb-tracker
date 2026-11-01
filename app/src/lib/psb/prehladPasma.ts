@@ -1,3 +1,4 @@
+import * as Sk from "./sklonovanie";
 /**
  * Logika prehľadových obrazoviek (Marketing → Prehľad, Peniaze → Prehľad),
  * ktorá musí byť testovateľná.
@@ -58,14 +59,14 @@ export function diagnozaLievika(v: {
   if (zdravy && v.dopytyMes < v.cielDopytov) {
     return {
       nadpis: "Lievik nie je problém — chýbajú dopyty",
-      veta: `Z ${v.dopytov} dopytov sa stalo ${v.klientov} klientov, oba prechody držia. Aby sa miesta zaplnili, treba ${cislo(v.cielDopytov)} dopytov mesačne; chodí ${cislo(v.dopytyMes)}. Práca je pred lievikom, nie v ňom.`,
+      veta: `Z ${v.dopytov} dopytov sa stalo ${Sk.klienti(v.klientov)}, oba prechody držia. Aby sa miesta zaplnili, treba ${cislo(v.cielDopytov)} dopytov mesačne; chodí ${cislo(v.dopytyMes)}. Práca je pred lievikom, nie v ňom.`,
       vazne: true,
     };
   }
   if (zdravy) {
     return {
       nadpis: "Lievik aj vstup držia",
-      veta: `${v.dopytov} dopytov, ${v.klientov} klientov, oba prechody nad ${ZDRAVY_PRECHOD} %. Tu teraz nie je čo opravovať.`,
+      veta: `${Sk.dopyty(v.dopytov)}, ${Sk.klienti(v.klientov)}, oba prechody nad ${ZDRAVY_PRECHOD} %. Tu teraz nie je čo opravovať.`,
       vazne: false,
     };
   }

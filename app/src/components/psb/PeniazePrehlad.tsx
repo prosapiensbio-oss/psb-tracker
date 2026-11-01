@@ -13,6 +13,7 @@ import {
 import { popisPoplatku, smerDlhu } from "../../lib/psb/prehladPasma";
 import { PristrojeMriezka, type Pasmo, type Pristroj } from "./Prehlad";
 import { Card, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * PENIAZE NA JEDNEJ OBRAZOVKE — skúška v bete.
@@ -278,7 +279,7 @@ export function PeniazePrehlad({ data, onNavigate }: {
         <Card id="pp-zoznam-nezaplatene">
           <H3>
             <Info
-              label={`Nezaplatené · ${dlhy.length} položiek · ${fmtCZK(nezaplatene)}`}
+              label={`Nezaplatené · ${Sk.polozky(dlhy.length)} · ${fmtCZK(nezaplatene)}`}
               text="Predaný balíček alebo úvodný tréning, ku ktorému nie je platba — z archívu aj z Kokpitu (jedno pravidlo „zaplatený“). Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
             />
             <button

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Vlastná evidencia balíčkov a jej porovnanie s PTminderom.
@@ -90,7 +91,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
     setPracujem("");
     if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return null; }
     if (typeof j.pridanych === "number") {
-      setHlaska(`Naliatych ${j.pridanych} balíčkov z exportu${j.preskocenych ? `, ${j.preskocenych} preskočených (bez dátumu platnosti)` : ""}.`);
+      setHlaska(`Z exportu pribudlo: ${Sk.balicky(j.pridanych)}${j.preskocenych ? `, preskočené (bez dátumu platnosti): ${j.preskocenych}` : ""}.`);
     }
     await nacitaj();
     oznam("peniaze");
@@ -132,7 +133,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis, onKlient }: {
               2026 vypnuté — do PTmindera sa nezapisuje, takže by rozdiel
               rástol každým tréningom a nehovoril nič o Kokpite. */}
           <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55, margin: "2px 0 10px" }}>
-            {zive.length} balíčkov v evidencii, z toho {zive.filter((b) => b.zdroj === "rucne").length} zapísaných v Kokpite.
+            {Sk.balicky(zive.length)} v evidencii, z toho {zive.filter((b) => b.zdroj === "rucne").length} zapísaných v Kokpite.
             Zostatok klienta je v jeho profile — tam sa balíček aj upravuje.
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>

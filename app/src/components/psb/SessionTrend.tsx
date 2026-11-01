@@ -70,14 +70,14 @@ export function SessionTrend({ sessions, onNavigate }: { sessions: SessionRow[];
             <LineChart
               data={data}
               series={[{ name: cfg.label, color: cfg.color }]}
-              refLine={{ value: avg, label: `Ø ${avg.toFixed(1)}` }}
+              refLine={{ value: avg, label: `Ø ${avg.toFixed(1).replace(".", ",")}` }}
               height={180}
               fmt={(x) => String(Math.round(x))}
               autoY={type === "total" || type === "offline"}
             />
           </div>
           <div style={{ flex: "1 1 130px", textAlign: "center", padding: "4px 8px" }}>
-            <div style={{ fontSize: 40, fontWeight: 800, color: cfg.color, lineHeight: 1 }}>{avg.toFixed(1)}</div>
+            <div style={{ fontSize: 40, fontWeight: 800, color: cfg.color, lineHeight: 1 }}>{avg.toFixed(1).replace(".", ",")}</div>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>Ø {cfg.label}<br />sedení / mesiac</div>
           </div>
         </div>

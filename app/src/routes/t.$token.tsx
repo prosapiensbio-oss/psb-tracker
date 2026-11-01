@@ -133,7 +133,7 @@ export const Route = createFileRoute("/t/$token")({
         await DB.prepare("UPDATE ponuky_terminov SET udalost_uid = ?2 WHERE token = ?1").bind(token, r.uid).run();
         await pushTrenerovi(DB, c.trener, {
           titulok: "Termín vybraný",
-          text: `${x.p.klient} si vybral(a) ${denCz(c.zaciatok, false)} o ${casHHMM(c.zaciatok)} — už je v kalendári.`,
+          text: `${x.p.klient}: vybraný termín ${denCz(c.zaciatok, false)} o ${casHHMM(c.zaciatok)} — už je v kalendári.`,
           url: "/#kalendar", znacka: `ponuka-${token}`,
         });
         return spat();

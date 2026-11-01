@@ -1,7 +1,7 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, mesiacCely } from "../../lib/psb/format";
 import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -11,6 +11,7 @@ import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, type FilterPo
 import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Čo je už zapísané — a možnosť to prehodiť.
 //
@@ -325,7 +326,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       } : undefined}>
       <div onClick={() => !uzavierka && setOtvorene((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: uzavierka ? "default" : "pointer", flexWrap: "wrap" }}>
         {!uzavierka && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "▼" : "▶"}</span>}
-        <H3><Info label={kontrola ? "Výdavky na potvrdenie" : uzavierka && mesiac ? `Pohyby za ${mesiac} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
+        <H3><Info label={kontrola ? "Výdavky na potvrdenie" : uzavierka && mesiac ? `Pohyby za ${mesiacCely(mesiac)} (${zMesiaca.length})` : `Zapísané pohyby (${pohyby.length})`} text="Čo už je v databáze. Kategóriu sa dá prehodiť aj dodatočne — označ riadky a vyber novú. Uzavreté mesiace sa nemenia." /></H3>
         {kontrola && (
           <button onClick={(e) => { e.stopPropagation(); void stiahniFio(); }} disabled={fioBezi}
             title="Stiahne pohyby za posledných 35 dní — to isté, čo Kokpit robí každú noc"
@@ -337,7 +338,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
           <span style={{ fontSize: 11.5, color: naKontrolu ? C.orange : C.green }}>{naKontrolu ? `${naKontrolu} na kontrolu${kontrola && tentoTyzden ? ` · ${tentoTyzden} z tohto týždňa` : ""}` : "všetko skontrolované ✓"}</span>
         )}
         {(uzavierka ? pocet("nezaradene") : nezaradenych) > 0 && (
-          <span style={{ fontSize: 11.5, color: C.orange }}>{uzavierka ? pocet("nezaradene") : nezaradenych} výdavkov bez kategórie</span>
+          <span style={{ fontSize: 11.5, color: C.orange }}>{Sk.vydavky(uzavierka ? pocet("nezaradene") : nezaradenych)} bez kategórie</span>
         )}
       </div>
 

@@ -10,9 +10,10 @@ import { reklamaSuhrn } from "../../lib/psb/reklama";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { jeKlient, krokyZa, oknoMesiacov } from "./MarketingLievik";
-import { SOURCES } from "./Klienti";
 import { PristrojeMriezka, type Pristroj } from "./Prehlad";
 import { Card, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
+import { nazovZdroja } from "../../lib/psb/zdroje";
 
 /**
  * MARKETING NA JEDNEJ OBRAZOVKE — skúška v bete.
@@ -108,13 +109,14 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
     // Instagram je silnejší, než v skutočnosti vieme.
     const podlaZdroja = new Map<string, number>();
     for (const c of noviKlienti) {
-      const z = (c.zdroj || "").trim() || "—";
+      // Veľkosť písmen nie je iný zdroj: „Referencia" a „referencia" sú jedno.
+      const z = (c.zdroj || "").trim().toLowerCase() || "—";
       podlaZdroja.set(z, (podlaZdroja.get(z) || 0) + 1);
     }
     const zdroje = [...podlaZdroja.entries()]
       .map(([kluc, pocet]) => ({
         kluc,
-        label: kluc === "—" ? "nevyplnené" : (SOURCES.find((s) => s.value === kluc)?.label || kluc),
+        label: kluc === "—" ? "Zdroj nezapísaný" : nazovZdroja(kluc),
         pocet,
       }))
       .sort((a, b) => b.pocet - a.pocet || a.label.localeCompare(b.label));
@@ -202,7 +204,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
       id: "mp-cena-dopyt",
       label: "Cena za dopyt",
       hodnota: cd.cena === null ? "—" : fmtCZK(cd.cena),
-      podnadpis: `${fmtCZK(cd.spend)} ÷ ${cd.dopyty.length} dopytov z reklamy · od 9/2026`,
+      podnadpis: `${fmtCZK(cd.spend)} ÷ ${Sk.dopyty(cd.dopyty.length)} z reklamy · od 9/2026`,
       pasmo: cd.cena === null ? "nevie" : "ok",
       poznamka: cd.cena === null
         ? "Od septembra sa ešte nikto neozval z reklamy — cena sa nedá počítať."
@@ -215,7 +217,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
       id: "mp-cena-klient",
       label: "Cena za klienta",
       hodnota: reklama.platena.cenaZaKlienta === null ? "—" : fmtCZK(reklama.platena.cenaZaKlienta),
-      podnadpis: `${reklama.platena.klientov} klientov z reklamy`,
+      podnadpis: `${Sk.klienti(reklama.platena.klientov)} z reklamy`,
       pasmo: pasmoZoSkore(hCenaKlient.skore, hCenaKlient.bezDat),
       poznamka: reklama.platena.klientov === 0
         ? "Z reklamy sa zatiaľ nezapísal ani jeden klient — rozpočet tak nemá podľa čoho rásť ani klesať."
@@ -286,7 +288,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
         <H3>
           <Info
             label="Odkiaľ noví klienti prišli"
-            text="Zdroj sa vypĺňa ručne pri dopyte a pri klientovi. Riadok „nevyplnené“ je tu zámerne: bez neho by rebríček tvrdil, že kanál je silnejší, než o ňom v skutočnosti vieme."
+            text="Zdroj sa vypĺňa ručne pri dopyte a pri klientovi. Riadok „Zdroj nezapísaný“ je tu zámerne: bez neho by rebríček tvrdil, že kanál je silnejší, než o ňom v skutočnosti vieme."
           />
         </H3>
         {v.zdroje.length === 0 ? (

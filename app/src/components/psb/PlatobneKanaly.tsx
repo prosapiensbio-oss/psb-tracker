@@ -145,7 +145,7 @@ export function PlatobneKanaly({
                 <span style={{ width: 10, height: 10, borderRadius: 3, background: x.farba, flexShrink: 0 }} />
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600, minWidth: 104 }}>{x.label}</span>
                 <span style={{ fontSize: 13.5, color: C.text, fontVariantNumeric: "tabular-nums", minWidth: 96 }}>{fmtCZK(x.czk)}</span>
-                <span style={{ fontSize: 12.5, color: x.farba, fontWeight: 700, minWidth: 46 }}>{pct.toFixed(1)} %</span>
+                <span style={{ fontSize: 12.5, color: x.farba, fontWeight: 700, minWidth: 46 }}>{pct.toFixed(1).replace(".", ",")} %</span>
                 <span style={{ fontSize: 11.5, color: C.textDim, flex: 1 }}>
                   {x.mena.size} {x.mena.size === 1 ? "klient" : x.mena.size < 5 ? "klienti" : "klientov"} →
                 </span>

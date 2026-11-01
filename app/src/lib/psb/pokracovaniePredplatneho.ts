@@ -24,7 +24,7 @@
  * nič nezakladá, lebo ďalší balíček existuje.
  */
 import { CENNIK, platnostDo } from "./cennik";
-import { normName } from "./format";
+import { fmtCZK, normName } from "./format";
 import { jePredplatne, nazovProduktu } from "./nazvyProduktov";
 import { PRESUN_MAX_HODIN } from "./platnostZostatok";
 import { zvysokNaKonci, type BalicekPreZostatok, type SedeniePreZostatok } from "./zostatokKokpitu";
@@ -132,6 +132,6 @@ export function pokracovaniePredplatneho(
     zaciatokZavazku: zaciatok,
     mesiac: ((poradie - 1) % ZAVAZOK_MESIACOV) + 1,
     polrok: Math.floor((poradie - 1) / ZAVAZOK_MESIACOV) + 1,
-    cenaPoznamka: stalaInaCena ? `platí stále ${cena} Kč, cenník je ${katalog}` : undefined,
+    cenaPoznamka: stalaInaCena ? `platí stále ${fmtCZK(cena)}, cenník je ${fmtCZK(katalog)}` : undefined,
   };
 }

@@ -1,3 +1,4 @@
+import * as Sk from "./sklonovanie";
 /**
  * POCITOVKA — čo si klient sám klepne na svojej stránke.
  *
@@ -192,9 +193,9 @@ export function vetaOPocitoch(z: ZhrnutiePocitov): string {
   if (!z.pocet || !z.posledne) return "Klient sa zatiaľ nehodnotil.";
   const kusy = z.rady.map((r) => {
     const smer = r.body.length < 2 ? ""
-      : r.lepsieO > 0 ? ` (lepšie o ${r.lepsieO} za ${r.dni} dní)`
-        : r.lepsieO < 0 ? ` (horšie o ${-r.lepsieO} za ${r.dni} dní)`
-          : ` (bez zmeny za ${r.dni} dní)`;
+      : r.lepsieO > 0 ? ` (lepšie o ${r.lepsieO} za ${Sk.dni(r.dni)})`
+        : r.lepsieO < 0 ? ` (horšie o ${-r.lepsieO} za ${Sk.dni(r.dni)})`
+          : ` (bez zmeny za ${Sk.dni(r.dni)})`;
     return `${r.nazov}: ${r.posledna}/10${smer}`;
   });
   if (z.posun) kusy.push(`zmenu k lepšiemu cíti: ${z.posun.text}`);

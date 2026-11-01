@@ -168,13 +168,13 @@ export function Mail() {
                       <span style={{ color: C.textDim, fontSize: 11 }}> ({k.otvorenia})</span>
                     </td>
                     <td style={{ ...S.td, textAlign: "right", color: (m.preklikovost ?? 0) >= 3 ? C.green : C.textMuted }}>
-                      {m.preklikovost == null ? "—" : `${m.preklikovost.toFixed(1)} %`}
+                      {m.preklikovost == null ? "—" : `${m.preklikovost.toFixed(1).replace(".", ",")} %`}
                     </td>
                     <td style={{ ...S.td, textAlign: "right", color: C.textDim }}>
                       {m.preklikZOtvorenych == null ? "—" : `${Math.round(m.preklikZOtvorenych)} %`}
                     </td>
                     <td style={{ ...S.td, textAlign: "right", color: (m.odhlasenost ?? 0) > 1 ? C.red : C.textDim }}>
-                      {m.odhlasenost == null ? "—" : `${m.odhlasenost.toFixed(1)} %`}
+                      {m.odhlasenost == null ? "—" : `${m.odhlasenost.toFixed(1).replace(".", ",")} %`}
                     </td>
                   </tr>
                 );

@@ -9,6 +9,8 @@ import { Dennik } from "./Dennik";
 import { Card, Info, ValueBars } from "./ui";
 import { KlientOsCasu, osCasuZapnuta } from "./KlientOsCasu";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
+import { nazovZdroja } from "../../lib/psb/zdroje";
 
 // Profil klienta — všetko o jednom človeku na jednej obrazovke.
 //
@@ -180,12 +182,12 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
         <span style={{ fontSize: 11.5, color: C.textMuted }}>{c.segment} · {c.primaryTrainer || "?"} · {c.modality}</span>
         {c.zdroj && (
           <span style={{ fontSize: 12, fontWeight: 700, color: C.accentLight, background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 9, padding: "2px 10px" }}>
-            prišiel cez: {c.zdroj}{c.zdrojKto ? ` · ${c.zdrojKto}` : ""}
+            zdroj: {nazovZdroja(c.zdroj)}{c.zdrojKto ? ` · ${c.zdrojKto}` : ""}
           </span>
         )}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           {c.is6m && <span style={{ fontSize: 10.5, color: C.accentLight, border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 8, padding: "1px 7px" }}>6M</span>}
-          {c.bitcoin && <span style={{ fontSize: 10.5, color: C.orange }}>₿ platí v BTC{btcSats ? ` · zaplatil ${btcSats.toLocaleString("cs-CZ")} sats` : ""}</span>}
+          {c.bitcoin && <span style={{ fontSize: 10.5, color: C.orange }}>₿ platí v BTC{btcSats ? ` · zaplatené ${btcSats.toLocaleString("cs-CZ")} sats` : ""}</span>}
           {c.specialRate && <span title={c.specialRateNote} style={{ fontSize: 10.5, color: C.orange, cursor: c.specialRateNote ? "help" : "default" }}>špeciálna sadzba</span>}
           {!c.contractSigned && <span style={{ fontSize: 10.5, color: C.red }}>bez zmluvy</span>}
           <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť ×</button>
@@ -214,7 +216,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           const casti = [fmtDMY(c.narodeniny)];
           if (vek !== null) casti.push(`${vek} r.`);
           if (dni === 0) casti.push("DNES");
-          else if (dni !== undefined) casti.push(`o ${dni} dní`);
+          else if (dni !== undefined) casti.push(`o ${Sk.dni(dni)}`);
           return stat(
             "Narodeniny",
             casti.join(" · "),
@@ -236,7 +238,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             „dokedy" pauza trvá, nie odkedy — tak sa okno nedá očistiť presne.
             Preto sa pri pauze tempo NEZAMLČÍ ani nevymyslí, ale označí: je to
             tempo z obdobia, kam pauza padá, a tak sa má čítať. */}
-        {stat("Tempo", `${burnRate.toFixed(1)}/mes · ${(burnRate / 4.33).toFixed(1)}/týž`, c.status === "Pauza" ? C.textDim : undefined,
+        {stat("Tempo", `${burnRate.toFixed(1).replace(".", ",")}/mes · ${(burnRate / 4.33).toFixed(1).replace(".", ",")}/týž`, c.status === "Pauza" ? C.textDim : undefined,
           c.status === "Pauza"
             ? `Z posledných 90 dní — ale klient je NA PAUZE${c.pauseUntil ? ` (do ${fmtDMY(c.pauseUntil)})` : ""}, takže číslo zahŕňa mesiace, keď zámerne nechodil. Nie je to spomalenie; skutočné tempo uvidíš, až keď sa vráti.`
             : "Priemerný počet sedení za mesiac a za týždeň z posledných 90 dní.")}
@@ -255,7 +257,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             // výpis, pritom Jerry povie klientovi nahlas.
             c.packageOdvodeny ? "≈ dopočítané z odtrénovaných hodín" : "",
           ].filter(Boolean).join(" · ") || undefined)}
-        {p.priemMedzera != null && stat("Ø medzi nákupmi", `${Math.round(p.priemMedzera)} dní`, undefined,
+        {p.priemMedzera != null && stat("Ø medzi nákupmi", `${Sk.dni(Math.round(p.priemMedzera))}`, undefined,
           "Priemerný odstup medzi platbami (platby menej než 7 dní od seba sa rátajú ako doplnky k tej istej kúpe). Hovorí, ako často klient reálne obnovuje.")}
         {p.minieO != null && stat("Zostatok minie o", `~${p.minieO.toFixed(0)} týž.`, p.minieO <= 2 ? C.orange : undefined,
           "Zostávajúce hodiny balíčka delené súčasným tempom — kedy príde ďalší nákup, ak bude chodiť ako teraz.")}
@@ -303,7 +305,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>
             <Info text="Porovnanie s priemerom AKTÍVNYCH klientov (bez tohto klienta). Číslo bez mierky nič nehovorí — tempo 2,1 je málo alebo veľa len oproti tomu, ako chodia ostatní." label="Oproti ostatným" />
           </div>
-          <Porovnanie label="Tempo (sedení / mes.)" hodnota={burnRate} priemer={p.priemery.tempo} fmt={(n) => n.toFixed(1)} />
+          <Porovnanie label="Tempo (sedení / mes.)" hodnota={burnRate} priemer={p.priemery.tempo} fmt={(n) => n.toFixed(1).replace(".", ",")} />
           {/* Dochádzka s krátkou históriou nie je dochádzka, ale dátum
               začiatku: jej menovateľ je `max(6, týždne)`, takže dvojtýždňový
               klient má strop 33 %. Radšej vetu než klamlivý stĺpec. */}

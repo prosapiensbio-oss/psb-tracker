@@ -210,7 +210,7 @@ export function BtcParovanie({
                       {vyber.length > 0 && (
                         <span style={{ fontSize: 11.5, color: Math.abs(sucet - (p.czk || 0)) > (p.czk || 0) * 0.08 ? C.orange : C.textDim }}>
                           Faktúry {fmtCZK(sucet)} · platba {fmtCZK(p.czk || 0)} · rozdiel {fmtCZK(Math.abs(sucet - (p.czk || 0)))}
-                          {(p.czk || 0) > 0 && ` (${(Math.abs(sucet - (p.czk || 0)) / (p.czk || 1) * 100).toFixed(1)} %)`}
+                          {(p.czk || 0) > 0 && ` (${(Math.abs(sucet - (p.czk || 0)) / (p.czk || 1) * 100).toFixed(1).replace(".", ",")} %)`}
                         </span>
                       )}
                     </div>

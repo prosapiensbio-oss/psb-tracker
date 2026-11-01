@@ -5,6 +5,8 @@ import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { filtrujPohyby, jeNesparovany, jeZBanky, type DruhPohybov, type PohybFio } from "../../lib/psb/pohybyFio";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
+import { nazovKategorie } from "../../lib/psb/vzas";
 
 /**
  * POHYBY NA ÚČTE FIO — náhľad v Evidencii (Jerry, 29. 10. 2026).
@@ -65,8 +67,8 @@ export function PohybyFio() {
       {pohyby && (
         <>
           <div style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 10px" }}>
-            {banka.length} pohybov{posledny ? ` · posledný ${fmtDMY(posledny)}` : ""}
-            {nesparovanych > 0 && <> · <span style={{ color: C.orange }}>{nesparovanych} príjmov bez klienta</span></>}
+            {Sk.pohyby(banka.length)}{posledny ? ` · posledný ${fmtDMY(posledny)}` : ""}
+            {nesparovanych > 0 && <> · <span style={{ color: C.orange }}>{Sk.prijmy(nesparovanych)} bez klienta</span></>}
           </div>
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
@@ -114,7 +116,7 @@ export function PohybyFio() {
                         : p.nieKlient
                           ? <span style={{ color: C.textDim }}>nie je klient</span>
                           : <span style={{ color: C.orange }}>bez klienta</span>
-                      : <span style={{ color: C.textDim }}>{p.kategoria || "bez kategórie"}</span>}
+                      : <span style={{ color: C.textDim }}>{p.kategoria ? nazovKategorie(p.kategoria) : "bez kategórie"}</span>}
                   </span>
                 </div>
               ))}

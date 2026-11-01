@@ -4,6 +4,7 @@ import ALGORITMY from "../../lib/psb/algoritmy.md?raw";
 import { fmtDMY } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Ako fungujú algoritmy — a čo sa v nich práve zmenilo.
 //
@@ -120,7 +121,7 @@ export function Algoritmus() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
           <H3><Info text="Zhrnutie toho, ako jednotlivé platformy rozhodujú o dosahu, s číslami PSB priamo pri každom signáli. Jarvis má ten istý text v znalostiach, takže sa naň dá pýtať." label="Ako to funguje (stav k 3. 8. 2026)" /></H3>
           <span style={{ fontSize: 11.5, color: zastarane ? C.orange : C.textDim }}>
-            {zastarane ? `Text má ${dniOdRevizie} dní — čas prejsť ho znova.` : `Prejsť znova o ${POL_ROKA - dniOdRevizie} dní.`}
+            {zastarane ? `Text má ${Sk.dni(dniOdRevizie)} — čas prejsť ho znova.` : `Prejsť znova o ${Sk.dni(POL_ROKA - dniOdRevizie)}.`}
           </span>
         </div>
         <Text md={ALGORITMY} />

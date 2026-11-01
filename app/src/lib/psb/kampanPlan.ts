@@ -21,6 +21,7 @@
  */
 
 import { slug, znackovanyOdkaz } from "./utm";
+import * as Sk from "./sklonovanie";
 
 /**
  * Reklamný účet, na ktorom kampane VZNIKAJÚ. Jediný.
@@ -145,9 +146,9 @@ export function pripravKampan(p: Plan): Vysledok {
       const naDen = (p.celkomKc || 0) / p.dni;
       if (naDen < MIN_DENNE_KC) {
         chyby.push(
-          `${Math.round(p.celkomKc || 0)} Kč na ${p.dni} dní je ${naDen.toFixed(0)} Kč na deň — Meta chce aspoň `
+          `${Math.round(p.celkomKc || 0)} Kč na ${Sk.dni(p.dni)} je ${naDen.toFixed(0)} Kč na deň — Meta chce aspoň `
           + `${MIN_DENNE_KC} Kč. Buď zvýš sumu na ${Math.ceil(MIN_DENNE_KC * p.dni)} Kč, alebo skráť na `
-          + `${Math.floor((p.celkomKc || 0) / MIN_DENNE_KC)} dní.`,
+          + `${Sk.dni(Math.floor((p.celkomKc || 0) / MIN_DENNE_KC))}.`,
         );
       }
     }
@@ -196,7 +197,7 @@ export function pripravKampan(p: Plan): Vysledok {
     const cakane = (p.denneKc * p.dni) / p.cenaZaDopytKc;
     if (cakane < CITATELNY_TEST) {
       varovania.push(
-        `Za ${p.dni} dní pri ${p.denneKc} Kč denne a cene ${Math.round(p.cenaZaDopytKc)} Kč za dopyt čakaj `
+        `Za ${Sk.dni(p.dni)} pri ${p.denneKc} Kč denne a cene ${Math.round(p.cenaZaDopytKc)} Kč za dopyt čakaj `
         + `zhruba ${cakane < 1 ? "menej než jeden dopyt" : `${Math.round(cakane * 10) / 10} dopytu`.replace(".", ",")}. `
         + "Z toho sa nedá rozhodnúť nič — buď dlhšie, alebo viac denne.",
       );

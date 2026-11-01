@@ -15,7 +15,7 @@ const kl = (...k: ClientAgg[]) => Object.fromEntries(k.map((c) => [c.name, c]));
 describe("otázka na dôvod odchodu", () => {
   it("pýta sa pri tom, kto po úvodnom neprišiel a dôvod nemá", () => {
     const [x] = pripomienkaDovodu(kl(klient("Hana Hrdinova", "2026-08-06")), [], [], {}, DNES);
-    expect(x.title).toContain("Prečo neprišiel znova");
+    expect(x.title).toContain("Prečo neprišla znova — Hana Hrdinova");
     expect(x.client).toBe("Hana Hrdinova");
   });
 

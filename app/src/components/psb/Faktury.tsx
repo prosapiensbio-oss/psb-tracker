@@ -9,6 +9,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, H3, Info, TableWrap } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Rozpis faktúr — náhľad pred zápisom, rovnako ako pri banke.
 //
@@ -129,7 +130,7 @@ export function FakturyNahlad({
       body: JSON.stringify({ polozky: riadky }),
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
-    if (r.ok) { setVysledok(`Zapísané: ${r.pridane} položiek, naučených pravidiel ${r.pravidla}.`); onHotovo(); oznam("peniaze"); }
+    if (r.ok) { setVysledok(`Zapísané: ${Sk.polozky(r.pridane)}, naučených pravidiel ${r.pravidla}.`); onHotovo(); oznam("peniaze"); }
     else setVysledok("Zápis sa nepodaril.");
   };
 
@@ -149,7 +150,7 @@ export function FakturyNahlad({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            label={`Faktúry — ${naZapis.length} ${naZapis.length === 1 ? "doklad" : "doklady"}, ${polozekSpolu} položiek`}
+            label={`Faktúry — ${naZapis.length} ${naZapis.length === 1 ? "doklad" : "doklady"}, ${Sk.polozky(polozekSpolu)}`}
             text="Rozpis dokladu na jednotlivé veci, aby sa dala každá zaradiť zvlášť. Opraviť sa dá názov aj suma — parser číta dobre, ale nie neomylne. Čo zaradíš, appka si zapamätá podľa prvých troch slov názvu, takže ďalšie granule sa zaradia samy."
           />
         </H3>
@@ -162,7 +163,7 @@ export function FakturyNahlad({
         )}
         <button onClick={() => void zapis()} disabled={busy || !polozekSpolu}
           style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: polozekSpolu ? C.accent : C.border, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: polozekSpolu ? "pointer" : "default" }}>
-          Zapísať {polozekSpolu} položiek
+          Zapísať {Sk.polozky(polozekSpolu)}
         </button>
         </div>
       </div>

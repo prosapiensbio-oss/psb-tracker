@@ -94,7 +94,7 @@ describe("ručné rozdelenie platby", () => {
     // Koruna tolerancie: zaokrúhlenie pri troch dieloch.
     expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 7402 }])).toBeNull();
     expect(chybaDielov(14802, [{ klient: JAKUB, suma: 7401 }, { klient: ANNA, suma: 5000 }]))
-      .toBe("Diely dávajú 12401 Kč, platba je 14802 Kč.");
+      .toBe("Diely dávajú 12\u00a0401 Kč, platba je 14\u00a0802 Kč.");
   });
   it("jeden diel nie je rozdelenie", () => {
     expect(chybaDielov(7401, [{ klient: JAKUB, suma: 7401 }])).toBe("Na rozdelenie treba aspoň dvoch klientov.");

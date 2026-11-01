@@ -334,7 +334,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat, reportV
                 disabled={hromadne}
                 style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, cursor: hromadne ? "wait" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
               >
-                {hromadne ? "Zamykám…" : `🔒 Zamknúť starších ${staršie.length} mesiacov naraz`}
+                {hromadne ? "Zamykám…" : `🔒 Zamknúť staršie mesiace naraz (${staršie.length})`}
               </button>
               <span style={{ fontSize: 11, color: C.textDim, flex: 1, minWidth: 220, lineHeight: 1.5 }}>
                 {staršie[staršie.length - 1] && label(staršie[staršie.length - 1])} – {label(staršie[0])}, tak ako sú.

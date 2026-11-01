@@ -16,6 +16,7 @@ import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 type ParsedAction = {
   type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav" | "prompt-claude";
@@ -710,7 +711,7 @@ export function useAssistantChat(
           .then((r) => r.json())
           .then((j: { ok?: boolean; zmenene?: number; zamknute?: number }) => {
             oznamVysledok(j.ok
-              ? `Zaradených ${j.zmenene ?? 0} pohybov${j.zamknute ? `, ${j.zamknute} preskočených (zamknutý mesiac)` : ""}.`
+              ? `Zaradené: ${Sk.pohyby(j.zmenene ?? 0)}${j.zamknute ? `, ${j.zamknute} preskočených (zamknutý mesiac)` : ""}.`
               : "Zaradenie pohybov zlyhalo.");
             void actions.refresh();
             // Kategórie pohybov žijú v /api/fio, nie v /api/data — refresh
@@ -913,7 +914,7 @@ export function useAssistantChat(
     const results = await actions.ingest(pending);
     setBusy(false);
     setPending(null);
-    const summary = results.map((r) => (r.error ? `• ${r.filename}: ${r.error}` : `• ${r.filename}: +${r.added} riadkov${r.skipped ? `, ${r.skipped} preskočených` : ""}`)).join("\n");
+    const summary = results.map((r) => (r.error ? `• ${r.filename}: ${r.error}` : `• ${r.filename}: +${Sk.riadky(r.added)}${r.skipped ? `, ${r.skipped} preskočených` : ""}`)).join("\n");
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
@@ -1010,6 +1011,12 @@ export function useAssistantChat(
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
+const NAVRHY_OTAZOK = [
+  "Čo mám dnes vyriešiť ako prvé?",
+  "Kto dlží peniaze a odkedy?",
+  "Komu tento týždeň dôjde balíček?",
+];
+
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, onKampan }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void; onKampan?: (n: NavrhKampane) => void }) {
   const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav, zvyraznit, setZvyraznit, jeKlient } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
@@ -1087,6 +1094,18 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
       onDrop={(e) => { e.preventDefault(); setDrag(false); void handleIncoming(e.dataTransfer.files); }}
     >
       <div ref={scrollRef} onScroll={priScrollovani} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Prázdny rozhovor: tri návrhy, klik len vloží text — pošle ho až človek. */}
+        {!msgs.length && !busy && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+            <div style={{ fontSize: 12, color: C.textDim }}>Napríklad:</div>
+            {NAVRHY_OTAZOK.map((n) => (
+              <button key={n} type="button" onClick={() => { setInput(n); inputRef.current?.focus(); }}
+                style={{ padding: "6px 11px", borderRadius: 14, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", textAlign: "left", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
         {msgs.map((m, mi) => (
           // Skip the empty assistant placeholder before the first streamed token ("Rozmýšľam…" covers it).
           m.role === "assistant" && !m.text && !m.images && !m.actions?.length ? null : (

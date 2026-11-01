@@ -5,6 +5,7 @@ import { MIN_DENNE_KC, MIN_STROP_KC, OBLASTI, OKRUH_MAX_KM, OKRUH_MIN_KM, UCET_R
 import { C, mix, S } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // ── Pripraviť kampaň ─────────────────────────────────────────────────────────
 //
@@ -187,8 +188,8 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
       const naDen = c / d;
       return naDen < MIN_DENNE_KC
         ? {
-          text: `${kc(c)} Kč na ${d} dní je ${naDen.toFixed(0)} Kč na deň — pod minimom ${MIN_DENNE_KC} Kč. `
-            + `Zvýš sumu na ${kc(MIN_DENNE_KC * d)} Kč, alebo skráť na ${Math.floor(c / MIN_DENNE_KC)} dní.`,
+          text: `${kc(c)} Kč na ${Sk.dni(d)} je ${naDen.toFixed(0)} Kč na deň — pod minimom ${MIN_DENNE_KC} Kč. `
+            + `Zvýš sumu na ${kc(MIN_DENNE_KC * d)} Kč, alebo skráť na ${Sk.dni(Math.floor(c / MIN_DENNE_KC))}.`,
           varovanie: true,
         }
         : { text: `= ${naDen.toFixed(0)} Kč na deň počas ${d} dní.`, varovanie: false };

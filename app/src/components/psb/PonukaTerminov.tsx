@@ -236,7 +236,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const farba = (tr: string) => (tr === "Terezka" ? C.blue : C.accent);
   const zoradene = [...navrhy].sort((a, b) => a.den.localeCompare(b.den) || a.od - b.od);
   const nedela = dni[6];
-  const STAV: Record<Ponuka["stav"], string> = { caka: "čaká na výber", vybrane: "vybral(a)", zrusene: "zrušená", vyprsala: "vypršala", obsadene: "všetko obsadené" };
+  const STAV: Record<Ponuka["stav"], string> = { caka: "čaká na výber", vybrane: "termín vybraný", zrusene: "zrušená", vyprsala: "vypršala", obsadene: "všetko obsadené" };
 
   return (
     <div style={{ display: "flex", gap: 16, flexWrap: uzke ? "wrap" : "nowrap", alignItems: "flex-start" }}>
@@ -285,7 +285,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                         <div key={u.uid} title={`${u.zaciatok.slice(11, 16)} ${u.klient || u.nazov || ""}`} style={{
                           position: "absolute", left: 1, right: 1, top: (Math.max(od, OD_H * 60) - OD_H * 60) / 60 * PX, height: Math.max(10, (Math.min(doMin, DO_H * 60) - Math.max(od, OD_H * 60)) / 60 * PX - 2),
                           borderRadius: 5, background: mix(farba(tr), 16), borderLeft: `3px solid ${mix(farba(tr), 55)}`, fontSize: 10, lineHeight: 1.2, padding: "2px 4px",
-                          color: C.textMuted, overflow: "hidden", pointerEvents: "none",
+                          color: C.textMuted, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", pointerEvents: "none",
                         }}>{uzke ? "" : `${u.zaciatok.slice(11, 16)} `}{u.klient || u.nazov}</div>
                       );
                     })}

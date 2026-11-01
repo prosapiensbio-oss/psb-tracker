@@ -14,6 +14,7 @@ import { RastAStrata } from "./Fluktuacia";
 import { SixMTracker } from "./SixM";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, TrenerPills, useSort } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
 const segColor = (s: string) => (s === "Anchor" ? C.green : s === "Stabilný" ? C.orange : C.red);
@@ -455,7 +456,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               dva priemery, dva rôzne menovatele, jeden pás. Ľudia sú
               v tabuľke priamo pod tým, s tými istými filtrami. */}
           <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text={`Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času. Delené VŠETKÝMI ${kpis.count} klientmi vo výbere — aj tými, čo v zvolenom okne nechodili.`} label={`Ø dochádzka · ÷ ${kpis.count}`} />} />
-          <StatCard value={kpis.hpc.toFixed(1)} label={<Info text={`Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu). Delené ${kpis.denom} klientmi — ${kpis.scoped ? "len tými, čo v okne reálne chodili" : "všetkými vo výbere"}.`} label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""} · ÷ ${kpis.denom}`} />} />
+          <StatCard value={kpis.hpc.toFixed(1).replace(".", ",")} label={<Info text={`Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu). Delené ${kpis.denom} klientmi — ${kpis.scoped ? "len tými, čo v okne reálne chodili" : "všetkými vo výbere"}.`} label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""} · ÷ ${kpis.denom}`} />} />
           <StatCard value={fmtCZK(kpis.avg)} label={<Info text={`Prijaté peniaze delené počtom odtrénovaných sedení (${kpis.sedeni}) za zvolené obdobie, pre klientov v tomto zozname. Rovnaká definícia ako „Ø cena sedenia“ na Kokpite a v Peniazoch. Neráta sa z ceny zapísanej pri sedení: tá je pri 19 % sedení nulová, lebo platba visí na balíčku.`} label={`Ø CZK/sedenie · ÷ ${kpis.sedeni} sed.`} />} />
         </div>
       </Card>
@@ -584,7 +585,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               {(typeF !== "all" || modalityF !== "all" || nameSearch || lenPauza || lenBezZdroja) && (
                 <button onClick={() => { setTypeF("all"); setModalityF("all"); setNameSearch(""); setMembershipF(""); setLenPauza(false); setLenBezZdroja(false); }} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť filtre</button>
               )}
-              <span style={{ marginLeft: "auto", fontSize: 13, color: C.accentLight, fontWeight: 600 }}>{list.length} klientov</span>
+              <span style={{ marginLeft: "auto", fontSize: 13, color: C.accentLight, fontWeight: 600 }}>{Sk.klienti(list.length)}</span>
             </>
           )}
         </div>
@@ -633,7 +634,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               <SortTh label="Zostatok" sortKey="pkg" sort={sort} onSort={toggle} align="right" info="Zostatok sedení v aktuálnom balíčku." />
               <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" info="Celková odtrénovaná história. Stĺpec s hodinami tu bol tiež a hovoril prakticky to isté — sedenie trvá 60 alebo 90 minút, takže sa obe čísla líšili len mierkou. Presné hodiny ukáže myš nad číslom." />
               <SortTh label="Dochádzka" sortKey="attendance" sort={sort} onSort={toggle} align="right" info="Podiel týždňov s tréningom za posledných 18 týždňov." />
-              <SortTh label="Ø CZK" sortKey="avg" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Ø Kč" sortKey="avg" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Posledný" sortKey="last" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Zdroj" sortKey="zdroj" sort={sort} onSort={toggle} info="Odkiaľ sa o nás klient dozvedel. Toto je jediné miesto, kde sa marketing spája s peniazmi — bez neho je každé číslo o návratnosti kanála odhad. Pri referencii dopíš aj meno toho, kto ho poslal (klik na ✎)." />
               <SortTh label="₿" sortKey="bitcoin" sort={sort} onSort={toggle} align="center" info="Platí v Bitcoine. Zaškrtni klientov platiacich BTC — potom ich vieš filtrovať a AI asistent vie porovnať BTC vs. klasické platby." />
@@ -830,7 +831,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               : "Vyplň, len keď klient chodil už PRED januárom 2025 a vrátil sa. Dovtedy ho appka počíta ako nového a skresľuje tým, čo priniesla reklama."}
           </div>
           {/* 6M proces — ručná oprava odvodenia.
-              Pravidlo („S viazanostou" + 6 990 Kč = 6M) je správne a zostáva;
+              Pravidlo (Předplatné + 6 990 Kč = 6M) je správne a zostáva;
               toto je výnimka pre prípad, keď si klient viazanosť kúpil, ale do
               procesu nevstúpil — alebo naopak. Tri stavy zámerne: prázdno
               znamená „nikto sa nevyjadril", nie „nie". Prepínač riadi všetko
@@ -851,7 +852,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               ? "Ručne mimo 6M — nebude v zozname 6M ani v pripomienkach (zmluva, 5. mesiac)."
               : editC.v6m === "ano"
                 ? "Ručne v 6M — appka mu bude počítať fázy aj pripomienky."
-                : "Appka to odvodzuje z balíčka a platieb: balíček s viazanosťou a 6 990 Kč mesačne = 6M."}
+                : "Appka to odvodzuje z balíčka a platieb: Předplatné a 6 990 Kč mesačne = 6M."}
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Odkiaľ sa o nás dozvedel</div>
           <Select

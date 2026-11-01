@@ -159,7 +159,7 @@ export function ObsahZive() {
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.ulozenia}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.zdielania}</td>
               <td style={{ ...S.td, textAlign: "right", color: r.viewRate ? C.text : C.textDim }}>
-                {r.viewRate ? `${r.viewRate.toFixed(1)} %` : "—"}
+                {r.viewRate ? `${r.viewRate.toFixed(1).replace(".", ",")} %` : "—"}
                 {r.zVR > 0 && <span style={{ color: C.textDim, fontSize: 11 }}> ({r.zVR})</span>}
               </td>
             </tr>

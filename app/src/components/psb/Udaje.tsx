@@ -25,6 +25,7 @@ import { ThemeSwitch } from "./ThemeSwitch";
 import { Uzavierky } from "./Uzavierky";
 import { Card, H3, Info } from "./ui";
 import { Konta, KontaNadpis } from "./Konta";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 // Údaje — jedno miesto pre všetko, čo nie je pohľad na štúdio, ale obsluha
 // appky: nahrávanie súborov, uzávierky, audit, kontá, záloha, vzhľad a reset.
@@ -309,7 +310,7 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
   // riadku ani potvrdiť.
   const posliFotkyJarvisovi = async (fotky: File[]) => {
     setPdfStav(
-      `${fotky.length === 1 ? "Fotka patrí" : "Fotky patria"} do karty „Zošit — hotovostné platby“ nižšie na tejto obrazovke. ` +
+      `${fotky.length === 1 ? "Fotka patrí" : "Fotky patria"} do karty „Zošit — hotovostné platby“ vo Workspace → Uzávierka mesiaca. ` +
       "Prepíše riadky do tabuľky, kde ich skontroluješ a opravíš, a až potom sa zapíšu.",
     );
   };
@@ -423,8 +424,8 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
         <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
           {zameranie
             ? "Typ rozpozná sám; duplicity preskočí, históriu zachová."
-            : <>Bankový výpis z Fio, faktúry, marketing aj ďalšie zdroje. Typ rozpozná sám; duplicity preskočí,
-              históriu zachová. Bankový výpis sa najprv ukáže na kontrolu.</>}
+            : <>iDoklad, faktúry z Alzy, Klienti, cenník aj ďalšie zdroje. Typ rozpozná sám; duplicity preskočí,
+              históriu zachová. Pohyby z banky a zošit sú vo Workspace → Uzávierka mesiaca.</>}
         </div>
       </div>
       {pdfStav && (
@@ -603,15 +604,15 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
           <span style={{ color: zositNahraty ? C.green : C.orange, flexShrink: 0 }}>{zositNahraty ? "✓" : "✗"}</span>
           <span>
             <strong style={{ color: C.text }}>Zošit — hotovostné platby</strong>
-            {zositStav?.posledny && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {zositStav.pocet} riadkov, dáta do {fmtDMY(zositStav.posledny)}</span>}
-            <br /><span style={{ color: C.textDim }}>Odfoť stranu zošita do karty „Zošit — hotovostné platby“ hore. Bez neho chýba hotovosť, a s ňou časť nákladov aj výplat — mesiac potom vyzerá ziskovejší, než bol.</span>
+            {zositStav?.posledny && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {Sk.riadky(zositStav.pocet)}, dáta do {fmtDMY(zositStav.posledny)}</span>}
+            <br /><span style={{ color: C.textDim }}>Odfoť stranu zošita do karty „Zošit — hotovostné platby“ vo Workspace → Uzávierka mesiaca. Bez neho chýba hotovosť, a s ňou časť nákladov aj výplat — mesiac potom vyzerá ziskovejší, než bol.</span>
           </span>
         </div>
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
           <span style={{ color: fakturyNahrate ? C.green : C.textDim, flexShrink: 0 }}>{fakturyNahrate ? "✓" : "·"}</span>
           <span>
             <strong style={{ color: C.text }}>{FAKTURY_ZDROJ.label}</strong>
-            {fakturyNahrate > 0 && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {fakturyNahrate} položiek</span>}
+            {fakturyNahrate > 0 && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {Sk.polozky(fakturyNahrate)}</span>}
             <br /><span style={{ color: C.textDim }}>{FAKTURY_ZDROJ.path}</span>
           </span>
         </div>
@@ -647,7 +648,7 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
           );
         })}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5, padding: "8px 10px", borderRadius: 7, background: mix(C.orange, 8) }}>
-          Nahratý mesiac prepíše čísla v obrazovke Marketing; mesiace, ktoré si nenahral, bežia ďalej na
+          Nahratý mesiac prepíše čísla v obrazovke Marketing; mesiace, ktoré nie sú nahraté, bežia ďalej na
           jednorazovom prepise. <strong style={{ color: C.text }}>V novembri dôjde naplánovaný obsah</strong> —
           to, čo sa natočilo a naplánovalo v decembri 2025, sa dovtedy minie. Nový content treba mať natočený,
           nastrihaný a naplánovaný skôr.
@@ -1343,8 +1344,8 @@ function CoJarvisVieZvonku({ data }: { data: PSBData }) {
               </button>
               <span style={{ fontSize: 11, color: stare ? C.orange : C.textDim, marginLeft: "auto" }}>
                 {stare
-                  ? `treba obnoviť — ${dni} dní, lehota bola ${v.obnovovatPoDnoch}`
-                  : zostava !== null ? `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))} · obnoviť o ${zostava} dní` : `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))}`}
+                  ? `treba obnoviť — ${Sk.dni(dni)}, lehota bola ${v.obnovovatPoDnoch}`
+                  : zostava !== null ? `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))} · obnoviť o ${Sk.dni(zostava)}` : `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))}`}
               </span>
             </div>
             <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3, lineHeight: 1.5 }}>{v.oCom}</div>
@@ -1929,7 +1930,7 @@ function NapojenieMeta() {
           return (
             <span style={{ color: bezKonca ? C.green : zle ? C.orange : C.textMuted }}>
               {" · "}platí {bezKonca ? "bez obmedzenia" : `do ${doKedy!.toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`}
-              {zle && (dni! <= 0 ? " — vyprší dnes, predĺž ho" : ` — ostáva ${dni} dní`)}
+              {zle && (dni! <= 0 ? " — vyprší dnes, predĺž ho" : ` — ostáva ${Sk.dni(dni!)}`)}
             </span>
           );
         })()}

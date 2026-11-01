@@ -10,6 +10,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { BtcParovanie } from "./BtcParovanie";
 import { FakturyNahlad } from "./Faktury";
 import { FakturyUctenka } from "./FakturyUctenka";
+import { mesiacCely } from "../../lib/psb/format";
 
 /**
  * ALZA A NÁKUPY BITCOINOM — krok mesačnej uzávierky (9. 10. 2026).
@@ -235,7 +236,7 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
         </div>
       )}
 
-      {nadpis("2", `Faktúry za ${mesiac} — rozdeľ položky`)}
+      {nadpis("2", `Faktúry za ${mesiacCely(mesiac)} — rozdeľ položky`)}
       {polozky === null ? (
         <div style={{ fontSize: 12, color: C.textDim }}>načítavam faktúry…</div>
       ) : !doklady.length ? (

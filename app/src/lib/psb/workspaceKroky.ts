@@ -15,7 +15,7 @@
 import type { DlhPolozka } from "./zaplatene";
 import { CENNIK, platnostDo, type Sablona } from "./cennik";
 import { UVODNY } from "./uvodnaStranka";
-import { normName } from "./format";
+import { fmtCZK, normName } from "./format";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { NAZOV_PRENESENYCH } from "./platnostZostatok";
@@ -401,14 +401,14 @@ export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined, acks?: Record<stri
     if (Math.abs(zaplatene - cena * 0.9) <= 2) {
       moznosti.push({ druh: "cena", popis: "zľava 10 % za odporúčanie", cena: zaplatene, dovod: "zľava 10 % za odporúčanie" });
     }
-    moznosti.push({ druh: "cena", popis: `iná cena: ${zaplatene} Kč`, cena: zaplatene, dovod: "" });
+    moznosti.push({ druh: "cena", popis: `iná cena: ${fmtCZK(zaplatene)}`, cena: zaplatene, dovod: "" });
     out.push({
       klient: x.klient, balicekId: x.id, balicek: nazovProduktu(x.nazov), platnostOd: den(x.den), cena, zaplatene,
       veta: moznosti.some((m) => m.druh === "velkost")
-        ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč. Sedí veľkosť balíčka?`
+        ? `Prišlo ${fmtCZK(zaplatene)}, ${nazovProduktu(x.nazov)} stojí ${fmtCZK(cena)}. Sedí veľkosť balíčka?`
         : zlava > 0 && zlava < 50
-          ? `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč — o ${zlava} % menej. Prečo?`
-          : `Prišlo ${zaplatene} Kč, ${nazovProduktu(x.nazov)} stojí ${cena} Kč.`,
+          ? `Prišlo ${fmtCZK(zaplatene)}, ${nazovProduktu(x.nazov)} stojí ${fmtCZK(cena)} — o ${zlava} % menej. Prečo?`
+          : `Prišlo ${fmtCZK(zaplatene)}, ${nazovProduktu(x.nazov)} stojí ${fmtCZK(cena)}.`,
       moznosti,
     });
   }
@@ -473,10 +473,10 @@ export function zoznamSms(
       // Bez slovesa v minulom čase — „mal/mala" by sa pri mene pomýlilo
       // (to isté pravidlo ako text SMS od 2. 10. 2026).
       veta: stav === "minus"
-        ? `${zostatok} h nad rámec${dlh ? ` · dlh ${dlh} Kč` : ""}`
+        ? `${zostatok} h nad rámec${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
         : stav === "nula"
-          ? `na nule — balíček minutý${dlh ? ` · dlh ${dlh} Kč` : ""}`
-          : `dlh ${dlh} Kč`,
+          ? `na nule — balíček minutý${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
+          : `dlh ${fmtCZK(dlh)}`,
     });
   }
   return out.sort((a, b) => a.zostatok - b.zostatok || b.dlh - a.dlh || a.meno.localeCompare(b.meno, "cs"));

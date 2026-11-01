@@ -115,6 +115,7 @@ import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImport
 import { dnesPraha } from "../../lib/psb/cas";
 import { UDALOST_DO_EDITORA } from "../../lib/psb/doEditora";
 import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -2150,7 +2151,7 @@ function skupinaFaktur(
           out.push({
             key, category: "Rozhodnutie", tone: "orange",
             title: `${monthLabel(mk)}: ${mena.length === 1 ? "odišiel klient" : `odišli ${mena.length} klienti`} a nevieme prečo${trener ? ` (${trener})` : ""}`,
-            detail: `${mena.join(", ")} — ${mena.length === 1 ? "prestal" : "prestali"} chodiť v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
+            detail: `${mena.join(", ")} — odchod v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
             ...stavPolozky(key, "odchody"), priority: 5, client: "klienti|rast",
             // Filter podľa trénera potrebuje meno, nie cieľ prekliku. Stačí
             // jedno — všetci v skupine majú toho istého trénera.
@@ -2296,7 +2297,7 @@ function skupinaFaktur(
     const key = `web|text|${dnesPraha().slice(0, 7)}`;
     return [{
       key, category: "Anomália" as const, tone: "blue" as const,
-      title: `Text webu sa nečítal ${dni} dní`,
+      title: `Text webu sa nečítal ${Sk.dni(dni)}`,
       detail: `Kópia webu v appke je z ${fmtDMY(webNaposledy.slice(0, 10))}. Nové články a prepísané titulky v nej nie sú, takže Jarvis o nich nevie a odpovedá zo starého. Údaje → Napojenia → „Prečítať web“ — nové adresy zo sitemapy pribudnú samé a text sa stiahne len tam, kde sa naozaj zmenil.`,
       ...stavPolozky(key),
       client: "udaje|",
@@ -2813,7 +2814,7 @@ function skupinaFaktur(
 
     const sedeniaMes = data.sessions.filter((x) => x.date.slice(0, 7) === mk);
     const hodinyMes = sedeniaMes.reduce((a, x) => a + x.duration / 60, 0);
-    r.push(`Odtrénované: ${sedeniaMes.length} sedení, ${Math.round(hodinyMes)} hodín`);
+    r.push(`Odtrénované: ${Sk.sedenia(sedeniaMes.length)}, ${Sk.hodiny(Math.round(hodinyMes))}`);
     const noviMes = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mk);
     r.push(`Noví klienti: ${noviMes.length}${noviMes.length ? ` (${noviMes.map((c) => c.name).join(", ")})` : ""}`);
     const dopytyMes = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mk).length;
@@ -2855,7 +2856,7 @@ function skupinaFaktur(
   }, [data, clients, registerAll, zapisy]);
 
   // Textová podoba pre zámok a pre Jarvisa — jeden zdroj, dve podoby.
-  const prekazkyZamku = useCallback((mk: string): string[] => {
+  const prekazkyZamku = useCallback((mk: string, preJarvisa = false): string[] => {
     const out: string[] = [];
     for (const kr of krokyZamku(mk)) {
       if (kr.hotovo) continue;
@@ -2873,10 +2874,10 @@ function skupinaFaktur(
     // takže sa počítala druhýkrát pod iným menom hneď vedľa „nie sú
     // zodpovedané otázky mesiaca".
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
-    for (const r of nevybavene) out.push(`nevysvetlené upozornenie „${r.title}" (key: ${r.key})`);
+    for (const r of nevybavene) out.push(`nevysvetlené upozornenie „${r.title}"${preJarvisa ? ` (key: ${r.key})` : ""}`);
     // Zamknutý mesiac sa už nedá potvrdiť — nepotvrdené výdavky by v ňom
     // ostali navždy. Nie je to krok uzávierky (robia sa týždenne), len stráž.
-    if (bankaNaPotvrdenie[mk]) out.push(`${bankaNaPotvrdenie[mk]} výdavkov čaká na potvrdenie (Workspace → Kontrola peňazí)`);
+    if (bankaNaPotvrdenie[mk]) out.push(`Na potvrdenie: ${Sk.vydavky(bankaNaPotvrdenie[mk])} (Workspace → Kontrola peňazí)`);
     if (!bankaSumy[mk]) out.push("za mesiac nie je stiahnutý výpis z Fio");
     return out;
   }, [krokyZamku, registerAll, bankaNaPotvrdenie, bankaSumy]);
@@ -2887,7 +2888,7 @@ function skupinaFaktur(
     const mk = kotvaDat(data).plny;
     if (!mk) return undefined;
     const kroky = krokyZamku(mk).map((k) => ({ id: k.id, label: k.label, hotovo: k.hotovo, detail: k.detail }));
-    return { mesiac: mk, zamknuty: zamknuteMesiace.includes(mk), kroky, prekazky: prekazkyZamku(mk) };
+    return { mesiac: mk, zamknuty: zamknuteMesiace.includes(mk), kroky, prekazky: prekazkyZamku(mk, true) };
   }, [data, krokyZamku, prekazkyZamku, zamknuteMesiace]);
 
   /**

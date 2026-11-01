@@ -23,6 +23,7 @@ import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from ".
 import { VyberMena } from "./VyberMena";
 import { PonukaTerminov } from "./PonukaTerminov";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -208,7 +209,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
       const v = j.vysledok;
       const t = j.trener || "?";
       casti.push(v?.ok
-        ? `${t}: ${v.udalosti} udalostí${v.prveStiahnutie ? " (prvé načítanie)" : `, ${v.zmien} zmien`}`
+        ? `${t}: ${Sk.udalosti(v.udalosti)}${v.prveStiahnutie ? " (prvé načítanie)" : `, ${Sk.zmeny(v.zmien)}`}`
         : `${t}: ${v?.chyba || "nepodarilo sa"}`);
       setSprava(casti.join(" · "));
       const zostava: string[] = Array.isArray(j.zostava) ? j.zostava : [];
@@ -315,7 +316,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
                 border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight,
               }}
             >
-              {pracuje ? "Sťahujem…" : "Stiahnuť kalendár teraz"}
+              {pracuje ? "Sťahujem…" : "Stiahnuť oba kalendáre"}
             </button>
             {sprava && <span style={{ fontSize: 12, color: C.textMuted }}>{sprava}</span>}
             {chyba && <span style={{ fontSize: 12, color: C.red }}>{chyba}</span>}
@@ -399,7 +400,7 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
                     {zastaraný && (
                       <div style={{ marginTop: 2 }}>
                         {Number.isFinite(hodin)
-                          ? `Nesťahoval sa ${Math.floor(hodin / 24)} dní — to, čo tu vidíš, môže byť neaktuálne.`
+                          ? `Nesťahoval sa ${Sk.dni(Math.floor(hodin / 24))} — to, čo tu vidíš, môže byť neaktuálne.`
                           : "Ešte sa nikdy nestiahol."}
                       </div>
                     )}
@@ -935,10 +936,10 @@ function Zmeny({ zmeny, vybavene, onHotovo, mena, cakaVoWorkspace }: { zmeny: Zm
           } finally { setObnovujem(false); }
         }}
         disabled={obnovujem}
-        title="Stiahnuť kalendár teraz a prepočítať rozdiely"
+        title="Stiahne jeden kalendár — ten, ktorý sa najdlhšie nesťahoval — a prepočíta rozdiely. Oba naraz sťahuje tlačidlo dole na tejto obrazovke."
         style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, cursor: obnovujem ? "wait" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
       >
-        {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
+        {obnovujem ? "Sťahujem…" : "↻ Stiahnuť starší kalendár"}
       </button>
       {chybaObnovy && <span style={{ fontSize: 11.5, color: C.red }}>{chybaObnovy}</span>}
       <button
@@ -1456,7 +1457,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
         <H3>
           <Info
             text="Týždeň tak, ako ho vidíš v Google Kalendári. Medzi týždňami sa dá prepínať posunom prsta alebo dvoma prstami na touchpade doľava a doprava. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Presun: udalosť chyť a chvíľu podrž, kým sa zvýrazní, potom ťahaj; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
-            label="Týždeň"
+            label={rozsah === 7 ? "Týždeň" : rozsah === 1 ? "Deň" : "3 dni"}
           />
         </H3>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -1490,7 +1491,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       </div>
 
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
-        {trening.length} tréningov · {Math.round(hodinSpolu)} h · predbežné
+        {Sk.treningy(trening.length)} · {Math.round(hodinSpolu)} h · predbežné
       </div>
 
       {!vZobrazeni.length && (
@@ -1693,7 +1694,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
       </ScrollX>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10, fontSize: 11, color: C.textDim }}>
-        {[["Tréning", C.accent], ["Úvodný", C.blue], ["Guillermo", C.green], ["Súkromné", C.textDim]].map(([l, f]) => (
+        {[["Tréning", C.accent], ["Úvodný", C.blue], ["Guillermo (vzdelávanie)", C.green], ["Súkromné", C.textDim]].map(([l, f]) => (
           <span key={String(l)} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: String(f) }} /> {l}
           </span>
@@ -2269,7 +2270,7 @@ function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavr
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <input autoFocus value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void uloz(text); } }}
-              placeholder="vlastnými slovami… (Enter uloží)"
+              placeholder="iný dôvod… (Enter)"
               style={{ flex: 1, minWidth: 0, padding: "7px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
             <button onClick={() => void uloz(text)} disabled={uklada || !text.trim()}
               style={{ padding: "7px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, opacity: text.trim() ? 1 : 0.5 }}>
@@ -2638,7 +2639,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
             <button
               onClick={() => { setObnovujem(true); setChybaObnovy(""); void onObnov().catch((e) => setChybaObnovy(String((e as Error)?.message || "Obnovenie zlyhalo."))).finally(() => setObnovujem(false)); }}
               disabled={obnovujem}
-              title="Stiahnuť kalendár teraz a prepočítať zostatky"
+              title="Načítať kalendár znova a prepočítať zostatky"
               style={{
                 padding: "4px 11px", borderRadius: 8, fontSize: 11.5, cursor: obnovujem ? "wait" : "pointer",
                 border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
@@ -2845,7 +2846,7 @@ export function GuillermoKarta() {
 
       {!kotva ? (
         <div style={{ fontSize: 12, color: C.orange, margin: "8px 0 0", lineHeight: 1.55 }}>
-          Zatiaľ nie je od čoho počítať. Klikni na <b>opraviť stav</b> a zapíš, koľko sedení si mal
+          Zatiaľ nie je od čoho počítať. Klikni na <b>opraviť stav</b> a zapíš, koľko sedení bolo
           k danému dňu — napríklad „+3 k 29. 7. 2026" podľa správy Josému.
         </div>
       ) : (
@@ -2855,7 +2856,7 @@ export function GuillermoKarta() {
               {zostatok > 0 ? "+" : ""}{zostatok}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim }}>
-              {zostatok < 0 ? `${-zostatok} sedení dlžíš` : zostatok === 0 ? "vyrovnané — čas zaplatiť" : "sedení dopredu"}
+              {zostatok < 0 ? `${Sk.sedenia(-zostatok)} dlžíš` : zostatok === 0 ? "vyrovnané — čas zaplatiť" : "sedení dopredu"}
             </div>
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>
@@ -2918,7 +2919,7 @@ export function GuillermoKarta() {
           {nakupy.map((z) => (
             <div key={z.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "5px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: C.textMuted, minWidth: 82 }}>{z.datum.split("-").reverse().join(". ")}</span>
-              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{z.hodiny} sedení</span>
+              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{Sk.sedenia(z.hodiny)}</span>
               {z.suma_czk ? <span style={{ fontSize: 12, color: C.textMuted }}>{Math.round(z.suma_czk).toLocaleString("cs-CZ")} Kč</span> : null}
               <button onClick={async () => { const j = await posli({ akcia: "guillermo-zmaz", id: z.id }).catch(() => ({ ok: false, error: "spojenie" })); if (!j.ok) { setChybaG(j.error || "Zmazanie neprešlo."); return; } await nacitaj(); }}
                 style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>

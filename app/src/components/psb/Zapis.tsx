@@ -201,7 +201,7 @@ export function ZapisButton({
   const [open, setOpen] = useState(false);
   useEffect(() => { if (otvor > 0) setOpen(true); }, [otvor]);
   const [dopytMeno, setDopytMeno] = useState("");
-  const [dopytZdroj, setDopytZdroj] = useState("reklama");
+  const [dopytZdroj, setDopytZdroj] = useState("");
   /** Pri referencii: kto ho poslal — meno z klientov, alebo „iné" + voľný text
    *  (odporučiť môže aj človek, ktorý u nás nikdy netrénoval). */
   const [dopytOdKoho, setDopytOdKoho] = useState("");
@@ -331,6 +331,9 @@ export function ZapisButton({
               e.preventDefault();
               const m = dopytMeno.trim();
               if (!m || dopytBusy) return;
+              // Predvolená „Reklama" kazila štatistiku, odkiaľ ľudia prišli.
+              // Hláška ostáva, kým sa zdroj nevyberie — nezmizne po 4 s.
+              if (!dopytZdroj) { setDopytChyba(`Dopyt „${m}" sa NEULOŽIL — vyber zdroj.`); return; }
               setDopytBusy(true);
               const referrer = dopytZdroj === "referencia" ? (dopytOdKoho === "__ine__" ? dopytOdKohoIne.trim() : dopytOdKoho) : "";
               void saveLead({ date: dopytDatum || dnesPraha(), name: m, source: dopytZdroj as never, status: "novy", referrer, note: "" })
@@ -359,13 +362,15 @@ export function ZapisButton({
                 value={dopytDatum}
                 onChange={(e) => setDopytDatum(e.target.value)}
                 max={dnesPraha()}
-                title="Kedy sa ozval — nie kedy to zapisuješ. Z toho sa počíta lievik."
+                title="Kedy dopyt prišiel — nie kedy to zapisuješ. Z toho sa počíta lievik."
                 style={{ flex: "0 1 132px", minWidth: 0, padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, colorScheme: "dark" }}
               />
               <select
-                value={dopytZdroj} onChange={(e) => setDopytZdroj(e.target.value)}
-                style={{ flex: "1 1 120px", minWidth: 0, padding: "7px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
+                value={dopytZdroj} onChange={(e) => { setDopytZdroj(e.target.value); setDopytChyba(""); }}
+                aria-label="Zdroj dopytu"
+                style={{ flex: "1 1 120px", minWidth: 0, padding: "7px 8px", borderRadius: 8, border: `1px solid ${dopytChyba && !dopytZdroj ? C.red : C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
               >
+                <option value="" style={{ background: C.card }}>Zdroj — vyber…</option>
                 {SOURCES.map((z) => <option key={z.value} value={z.value} style={{ background: C.card }}>{z.label}</option>)}
               </select>
               <button type="submit" disabled={dopytBusy || !dopytMeno.trim()}
@@ -423,7 +428,7 @@ export function ZapisButton({
               )}
               {dnesTrenoval.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 11.5, color: C.textMuted }}>Dnes si trénoval:</span>
+                  <span style={{ fontSize: 11.5, color: C.textMuted }}>Dnes na tréningu:</span>
                   {dnesTrenoval.map((m) => {
                     // Krstné meno stačí, kým je jediné. Dvaja Martinovia
                     // v jednom dni by boli dva rovnaké čipy a zápis by mohol
@@ -592,7 +597,7 @@ export function ZapisButton({
             ))}
           </div>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 12, lineHeight: 1.5 }}>
-            Zapisuje sa tam, kde to patrí — toto je len rozcestník, aby si nemusel pamätať kde.
+            Zapisuje sa tam, kde to patrí — toto je len rozcestník, netreba si pamätať kde.
             Týždeň sa píše cez víkend, mesiac na prvý víkend nasledujúceho mesiaca.
           </div>
         </Modal>

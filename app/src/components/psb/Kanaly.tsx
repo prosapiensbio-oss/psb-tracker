@@ -266,7 +266,7 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
         {(igSaved != null || igShares != null) && stat("Uloženia + zdieľania", cislo((igSaved || 0) + (igShares || 0)),
           "Najsilnejší signál zo všetkých: obsah, ktorý si ľudia ODKLADAJÚ a POSIELAJÚ známym. Desať uložení znamená viac než sto lajkov — lajk je zdvorilosť, uloženie je úmysel.", C.green)}
         {adsSpent != null && stat("Reklama", `${cislo(Math.round(adsSpent))} Kč`,
-          adsClicks ? `Minuté na Meta Ads za mesiac. Priniesla ${cislo(adsClicks)} klikov, teda ~${(adsSpent / adsClicks).toFixed(1)} Kč za klik. Klik ešte nie je klient — spojenie s klientmi ukazuje lievik dopytov.` : "Minuté na Meta Ads za mesiac.", C.orange)}
+          adsClicks ? `Minuté na Meta Ads za mesiac. Priniesla ${cislo(adsClicks)} klikov, teda ~${(adsSpent / adsClicks).toFixed(1).replace(".", ",")} Kč za klik. Klik ešte nie je klient — spojenie s klientmi ukazuje lievik dopytov.` : "Minuté na Meta Ads za mesiac.", C.orange)}
         {webVisitors != null && stat("Návštevníci webu", cislo(webVisitors),
           "Ľudí na webe za mesiac (z Metricoolu; presnejšie čísla má GA4 v karte Dosah). Web je miesto, kam reklama aj Instagram posielajú — keď rastie obsah a web nie, niekde po ceste sa strácajú.")}
         {konkSled != null && stat("Konkurencia — sledovatelia", cislo(konkSled),
@@ -451,7 +451,7 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
                     <td style={S.td}>{r.metrika}</td>
                     <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{cislo(r.hodnota)}</td>
                     <td style={{ ...S.td, textAlign: "right", color: farbaZmeny(r.zmena), fontVariantNumeric: "tabular-nums" }}>
-                      {r.zmena == null ? "\u2014" : `${sipka(r.zmena)} ${r.zmena.toFixed(1)} %`}
+                      {r.zmena == null ? "\u2014" : `${sipka(r.zmena)} ${r.zmena.toFixed(1).replace(".", ",")} %`}
                     </td>
                     <td style={{ ...S.td, color: C.textDim, fontSize: 11.5 }}>{r.poznamka}</td>
                   </tr>

@@ -10,6 +10,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { jeKlient } from "./MarketingLievik";
 import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Čo priniesla reklama — JEDNA karta namiesto štyroch.
@@ -117,11 +118,11 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
       riadky: v.poMesiacoch.filter((r) => r.spend > 0).map((r) => ({ meno: r.mesiac, vpravo: fmtCZK(r.spend) })),
     },
     dopyty: {
-      nadpis: `Dopyty so zdrojom „reklama“ alebo s kampaňou — ${v.platena.dopytov} ľudí (jeden človek = jeden dopyt, aj keď napísal dvakrát)`,
+      nadpis: `Dopyty so zdrojom „reklama“ alebo s kampaňou — ${Sk.ludia(v.platena.dopytov)} (jeden človek = jeden dopyt, aj keď napísal dvakrát)`,
       riadky: v.platena.kto.dopyty.map((x) => ({ meno: x.meno || "(bez mena)", vpravo: `${fmtDen(x.datum)}${x.klient ? " · stal sa klientom" : ""}` })),
     },
     cenadopyt: {
-      nadpis: `Cena za dopyt = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${v.platena.dopytov} dopytov z reklamy`,
+      nadpis: `Cena za dopyt = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${Sk.dopyty(v.platena.dopytov)} z reklamy`,
       riadky: v.platena.kto.dopyty.map((x) => ({ meno: x.meno || "(bez mena)", vpravo: `${fmtDen(x.datum)}${x.klient ? " · stal sa klientom" : ""}` })),
     },
     klienti: {
@@ -129,7 +130,7 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
       riadky: v.platena.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `tržba v okne ${fmtCZK(x.trzbaVOkne)}` })),
     },
     cena: {
-      nadpis: `Cena za klienta = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${v.platena.klientov} klientov (zoznam „Z nich klientov“)`,
+      nadpis: `Cena za klienta = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${Sk.klienti(v.platena.klientov)} (zoznam „Z nich klientov“)`,
       riadky: v.platena.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `tržba v okne ${fmtCZK(x.trzbaVOkne)}` })),
     },
     dorazilo: {

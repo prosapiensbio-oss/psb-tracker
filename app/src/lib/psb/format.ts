@@ -5,7 +5,7 @@ export const fmtDate = (d?: string | null): string =>
   d ? new Date(d).toLocaleDateString("cs-CZ") : "—";
 
 export const fmtCZK = (n?: number | null): string =>
-  n != null ? Math.round(n).toLocaleString("cs-CZ") + " CZK" : "—";
+  n != null ? Math.round(n).toLocaleString("cs-CZ") + " Kč" : "—";
 
 export const fmtNum = (n: number, digits = 0): string =>
   n.toLocaleString("cs-CZ", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -54,6 +54,15 @@ export const quarterLabel = (qk: string): string => {
 export const monthLabel = (mk: string): string => {
   const [y, m] = mk.split("-");
   return m ? `${MONTHS_SK[parseInt(m, 10) - 1]} ${y.slice(2)}` : mk;
+};
+
+const MESIACE_CELE = ["január", "február", "marec", "apríl", "máj", "jún", "júl", "august", "september", "október", "november", "december"];
+
+/** „2026-10" → „október 2026". Pre vety, kde „okt 26" alebo ISO tvar znie ako dátum. */
+export const mesiacCely = (mk: string): string => {
+  const [y, m] = (mk || "").split("-");
+  const nazov = MESIACE_CELE[parseInt(m, 10) - 1];
+  return nazov ? `${nazov} ${y}` : mk;
 };
 
 export const monthsBetween = (d1: string, d2: string | Date): number => {
