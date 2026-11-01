@@ -1598,6 +1598,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                   return (
                     <button
                       key={`${u.uid}|${u.trener}`}
+                      data-tesne={uzke ? "" : undefined}
                       onPointerDown={(e) => zacniTah(e, u, u.zaciatok.slice(0, 10), u.zaciatok.slice(11, 16), trvanieMin(u))}
                       onClick={(e) => e.stopPropagation()}
                       title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, podrž a ťahaj: presunúť`}

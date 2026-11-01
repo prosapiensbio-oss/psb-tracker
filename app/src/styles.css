@@ -400,6 +400,8 @@ button {
  * a React na serveri „font-size:11px". Grafy (`<text fontSize>`) a klientske
  * stránky to nezasahuje. Portály (okná mimo .psb-app) a prezentácia majú vlastnú
  * sadzbu. Keď pribudne nová malá veľkosť, zachytí to drobnePismo.test.ts.
+ * Výnimka `data-tesne`: blok udalosti v úzkom týždni na telefóne má 40 px na šírku
+ * a 28 px na výšku; pri 12 px by sa mená lámali uprostred a v súbehu ostalo „J…".
  */
 .psb-app :is(
   [style*="font-size: 8px"], [style*="font-size:8px"],
@@ -410,7 +412,7 @@ button {
   [style*="font-size: 10.5px"], [style*="font-size:10.5px"],
   [style*="font-size: 11px"], [style*="font-size:11px"],
   [style*="font-size: 11.5px"], [style*="font-size:11.5px"]
-) {
+):not([data-tesne]) {
   font-size: 12px !important;
 }
 
