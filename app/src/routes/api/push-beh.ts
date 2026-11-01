@@ -110,7 +110,7 @@ export const Route = createFileRoute("/api/push-beh")({
           const v = await posli(o, {
             titulok: moje.length > 1 ? `Kokpit — ${moje.length} nové veci` : "Kokpit",
             // Odpoveď klienta na fotky nepatrí na zamknutý telefón; celá je v profile.
-            text: (prva.key.startsWith("fotky|odpoved|") ? `${prva.klient}: odpoveď na fotky` : prva.detail).slice(0, 180),
+            text: (prva.key.startsWith("fotky|odpoved|") ? `${prva.client}: odpoveď na fotky` : prva.detail).slice(0, 180),
             url: "/#dashboard",
             znacka: "register",
           }, kluce);
