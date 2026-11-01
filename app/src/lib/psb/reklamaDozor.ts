@@ -511,7 +511,16 @@ export function metrikyDozoru(d: DozorData, dopyty: DopytPreDozor[], dnes: strin
       dopyty: dopyty.filter((x) => jeDopytZReklamy(x) && x.date.slice(0, 10) === den).length,
     });
   }
+  const poslednyVydavok = d.dni.filter((x) => x.spend > 0 && x.den <= dnes).map((x) => x.den).sort().pop() || null;
   return {
+    /** Beží teraz niečo? Keď nie, čísla sú len história posledných 30 dní. */
+    bezi: bezia.length,
+    poslednyVydavok,
+    /**
+     * Jeden dopyt, aj dohodnutý — „za dopyt" a „za dohodnutý úvodný" je tá istá
+     * suma nad tým istým človekom; dva riadky by tvrdili dve merania.
+     */
+    jednaCena: reklamne30.length > 0 && dohodnute30 === reklamne30.length,
     denneRozpocty: denne,
     mesacnePriTomtoTempe: denne * 30,
     minuteMesiac: Math.round(minuteMesiac),

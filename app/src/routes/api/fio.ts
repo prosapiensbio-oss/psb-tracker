@@ -8,6 +8,7 @@ import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
 import { jeKategoriaPrijmu } from "../../lib/psb/kategoriePrijmov";
 import { dnesPraha } from "../../lib/psb/cas";
 import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
+import { poKusoch } from "../../lib/psb/vydavkySPravidlom";
 
 // Import bankového výpisu — dvojkrokovo.
 //
@@ -94,7 +95,26 @@ export const Route = createFileRoute("/api/fio")({
                     MAX(CASE WHEN typ = 'hotovosť' THEN date END) zosit_do
                FROM fio_transactions`,
           ).first<Record<string, string | null>>().catch(() => null);
-          return Response.json({ ok: true, ...(r || {}) });
+          /**
+           * KEDY SA NAPOSLEDY NAOZAJ SŤAHOVALO. `fio` vyššie je posledný
+           * ZAPÍSANÝ riadok — noc bez nového pohybu by vyzerala ako výpadok.
+           * Úspech nesie audit (nočný aj ručný beh), zlyhanie len `automaty`.
+           */
+          const beh = await DB.prepare(
+            "SELECT at, actor FROM vzas_audit WHERE action IN ('import-banka-auto','import-banka') ORDER BY at DESC LIMIT 1",
+          ).first<{ at: string; actor: string | null }>().catch(() => null);
+          const nocny = await DB.prepare(
+            "SELECT kedy, ok, chyba FROM automaty WHERE automat = 'fio-banka' ORDER BY kedy DESC LIMIT 1",
+          ).first<{ kedy: string; ok: number; chyba: string | null }>().catch(() => null);
+          return Response.json(
+            {
+              ok: true, ...(r || {}),
+              stiahnute: beh?.at || null,
+              stiahnuteKto: beh?.actor || null,
+              nocnyChyba: nocny && !nocny.ok ? { kedy: nocny.kedy, chyba: nocny.chyba || "" } : null,
+            },
+            { headers: { "cache-control": "no-store" } },
+          );
         }
         try {
           const [t, p] = await Promise.all([
@@ -140,7 +160,7 @@ export const Route = createFileRoute("/api/fio")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[];
-          stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean };
+          stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean; hromadnePravidlo?: boolean };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
         if (odPlanovaca && b.akcia !== "auto") return unauthorized();
@@ -192,6 +212,8 @@ export const Route = createFileRoute("/api/fio")({
           const now = new Date().toISOString();
           const stmts = [];
           let vydavky = 0, prijmy = 0, zamknute = 0;
+          /** Kto poslal peniaze — Jerry, 5. 10. 2026: „neukázalo sa mi, koho stiahlo". */
+          const novePrijmy: { datum: string; suma: number; kto: string }[] = [];
           for (const r of pohyby) {
             if (jeZamknuty(zamky, r.datum)) { zamknute++; continue; }
             if (uzJeV(existujuce, r)) continue;
@@ -203,7 +225,8 @@ export const Route = createFileRoute("/api/fio")({
                  VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
               ).bind(uid(), r.datum, r.suma, r.protistrana || "", r.poznamka || "", r.typ || "", r.kategoria || "", k, now),
             );
-            if (r.suma < 0) vydavky++; else prijmy++;
+            if (r.suma < 0) vydavky++;
+            else { prijmy++; novePrijmy.push({ datum: r.datum, suma: r.suma, kto: (r.protistrana || r.poznamka || "").slice(0, 60) }); }
           }
           if (stmts.length) await DB.batch(stmts);
           await audit(DB, {
@@ -212,7 +235,7 @@ export const Route = createFileRoute("/api/fio")({
             neu: `${od} – ${doDna}: +${vydavky} výdavkov, +${prijmy} príjmov${zamknute ? `, ${zamknute} v uzavretom mesiaci preskočených` : ""}`,
             actor: odPlanovaca ? "plánovač" : (await currentUser(request)) || undefined,
           });
-          return Response.json({ ok: true, od, do: doDna, vydavky, prijmy, zamknute });
+          return Response.json({ ok: true, od, do: doDna, vydavky, prijmy, zamknute, novePrijmy });
         }
 
         /**
@@ -463,20 +486,44 @@ export const Route = createFileRoute("/api/fio")({
           const zamky = await zamknuteMesiace(DB);
           const kto = (await currentUser(request)) || "jerry";
           const kedy = new Date().toISOString();
-          const otazniky = kluce.map((_, i) => `?${i + 1}`).join(",");
-          const rs = ((await DB.prepare(
-            `SELECT dedup_key, date, category FROM fio_transactions WHERE dedup_key IN (${otazniky}) AND amount_czk < 0`,
-          ).bind(...kluce).all()).results || []) as { dedup_key: string; date: string; category: string | null }[];
           // `zrus` = klik na zelenú fajku omylom; vráti riadok medzi návrhy.
           const zrus = b.zrus === true;
-          const ok = rs.filter((r) => !jeZamknuty(zamky, String(r.date)) && (zrus || r.category || rozdelene.has(r.dedup_key)));
-          if (ok.length) {
-            await DB.batch(ok.map((r) => DB.prepare(
-              "UPDATE fio_transactions SET potvrdene_at = ?2, potvrdil = ?3 WHERE dedup_key = ?1",
-            ).bind(r.dedup_key, zrus ? null : kedy, zrus ? null : kto)));
+          /**
+           * PO KÚSKOCH: D1 pustí do jedného dopytu najviac 100 viazaných
+           * hodnôt, takže „Potvrdiť označené" nad stovkou riadkov padlo celé.
+           * Keď spadne až neskorší kúsok, povie sa, koľko sa zapísalo — tie
+           * riadky potvrdené SÚ a obrazovka ich musí načítať.
+           */
+          let hotovo = 0;
+          let spolu = 0;
+          try {
+            const rs: { dedup_key: string; date: string; category: string | null }[] = [];
+            for (const kus of poKusoch(kluce)) {
+              const r = await DB.prepare(
+                `SELECT dedup_key, date, category FROM fio_transactions WHERE dedup_key IN (${kus.map((_, i) => `?${i + 1}`).join(",")}) AND amount_czk < 0`,
+              ).bind(...kus).all();
+              rs.push(...((r.results || []) as { dedup_key: string; date: string; category: string | null }[]));
+            }
+            const ok = rs.filter((r) => !jeZamknuty(zamky, String(r.date)) && (zrus || r.category || rozdelene.has(r.dedup_key)));
+            spolu = ok.length;
+            for (const kus of poKusoch(ok)) {
+              await DB.batch(kus.map((r) => DB.prepare(
+                "UPDATE fio_transactions SET potvrdene_at = ?2, potvrdil = ?3 WHERE dedup_key = ?1",
+              ).bind(r.dedup_key, zrus ? null : kedy, zrus ? null : kto)));
+              hotovo += kus.length;
+            }
+          } catch (e) {
+            const chyba = `Zapísaných ${hotovo} z ${spolu || kluce.length}, zvyšok nie: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`;
+            await audit(DB, { action: "banka-potvrdenie-chyba", predmet: `${hotovo} výdavkov`, neu: chyba, actor: kto }).catch(() => {});
+            return Response.json({ ok: false, error: chyba, potvrdene: hotovo }, { status: 500 });
           }
-          await audit(DB, { action: zrus ? "banka-potvrdenie-zrusene" : "banka-potvrdene", predmet: `${ok.length} výdavkov`, neu: `${zrus ? "zrušené potvrdenie" : "potvrdené"} ${ok.length} z ${kluce.length}`, actor: kto });
-          return Response.json({ ok: true, potvrdene: ok.length, preskocene: kluce.length - ok.length });
+          await audit(DB, {
+            action: zrus ? "banka-potvrdenie-zrusene" : "banka-potvrdene",
+            predmet: `${hotovo} výdavkov`,
+            neu: `${zrus ? "zrušené potvrdenie" : "potvrdené"} ${hotovo} z ${kluce.length}${b.hromadnePravidlo ? " — hromadne: výdavky so známym pravidlom" : ""}`,
+            actor: kto,
+          });
+          return Response.json({ ok: true, potvrdene: hotovo, preskocene: kluce.length - hotovo });
         }
 
         /**
@@ -495,10 +542,15 @@ export const Route = createFileRoute("/api/fio")({
           const zamky = await zamknuteMesiace(DB);
           const kto = (await currentUser(request)) || "jerry";
           const kedy = new Date().toISOString();
-          const otazniky = stav.map((_, i) => `?${i + 1}`).join(",");
-          const rs = ((await DB.prepare(
-            `SELECT dedup_key, date, category, counterparty FROM fio_transactions WHERE dedup_key IN (${otazniky})`,
-          ).bind(...stav.map((x) => x.kluc)).all()).results || []) as { dedup_key: string; date: string; category: string | null; counterparty: string | null }[];
+          // Po kúskoch ako pri potvrdení — krok späť musí vedieť vrátiť aj
+          // hromadné potvrdenie nad stovkou riadkov (limit D1).
+          const rs: { dedup_key: string; date: string; category: string | null; counterparty: string | null }[] = [];
+          for (const kus of poKusoch(stav.map((x) => x.kluc))) {
+            const r = await DB.prepare(
+              `SELECT dedup_key, date, category, counterparty FROM fio_transactions WHERE dedup_key IN (${kus.map((_, i) => `?${i + 1}`).join(",")})`,
+            ).bind(...kus).all();
+            rs.push(...((r.results || []) as { dedup_key: string; date: string; category: string | null; counterparty: string | null }[]));
+          }
           const podla = new Map(rs.map((x) => [x.dedup_key, x]));
           const prikazy = [];
           let vratene = 0, zamknute = 0;
@@ -520,7 +572,7 @@ export const Route = createFileRoute("/api/fio")({
               }
             }
           }
-          if (prikazy.length) await DB.batch(prikazy);
+          for (const kus of poKusoch(prikazy, 200)) await DB.batch(kus);
           await audit(DB, { action: "banka-krok-spat", predmet: `${vratene} pohybov`, neu: `vrátené ${vratene}${zamknute ? `, ${zamknute} v uzavretom mesiaci` : ""}`, actor: kto });
           return Response.json({ ok: true, vratene, zamknute });
         }

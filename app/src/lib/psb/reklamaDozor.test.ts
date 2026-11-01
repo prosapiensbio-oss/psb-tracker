@@ -157,3 +157,26 @@ describe("metriky pravého stĺpca", () => {
     expect(m.denneRozpocty).toBe(240);
   });
 });
+
+describe("metriky bez bežiacej kampane a s jedným dopytom", () => {
+  const dozor = {
+    kampane: [{ id: "k1", nazov: "A", ciel: "OUTCOME_TRAFFIC", stav: "PAUSED", dennyRozpocet: 0 }],
+    dni: [{ den: "2026-10-27", kampanId: "k1", spend: 7327, kliky: 10, naStranke: 5 }],
+    nastavenie: { stropMesiac: null, cielDopyt: null },
+  };
+  it("jeden dopyt, aj dohodnutý: jedna cena, nie dva riadky s rovnakým číslom", () => {
+    const m = metrikyDozoru(dozor as never, [{ date: "2026-10-12", name: "P", source: "reklama", status: "dohodnuty" }] as never, "2026-11-01");
+    expect(m.cenaZaDopyt30).toBe(7327);
+    expect(m.cenaZaDohodnuty30).toBe(7327);
+    expect(m.jednaCena).toBe(true);
+    expect(m.bezi).toBe(0);
+    expect(m.poslednyVydavok).toBe("2026-10-27");
+  });
+  it("dva dopyty, jeden dohodnutý: dve rôzne ceny", () => {
+    const m = metrikyDozoru(dozor as never, [
+      { date: "2026-10-12", name: "P", source: "reklama", status: "dohodnuty" },
+      { date: "2026-10-13", name: "Q", source: "reklama", status: "novy" },
+    ] as never, "2026-11-01");
+    expect(m.jednaCena).toBe(false);
+  });
+});

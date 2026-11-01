@@ -4,6 +4,7 @@ import type { RegisterItem } from "../../lib/psb/compute";
 import { adsManagerOdkaz } from "../../lib/psb/kampanPlan";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { cenaDopytuZReklamy } from "../../lib/psb/cenaDopytu";
 import { kc, meriaSaDm, metrikyDozoru, suhrnDozoru, type ReklamaPolozka } from "../../lib/psb/reklamaDozor";
 import { dnesPraha } from "../../lib/psb/cas";
 import { C, S, btn } from "../../lib/psb/theme";
@@ -239,7 +240,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
 
   return (
     <Card>
-      <H3>Dozor reklám</H3>
+      {/* Nadpis „Dozor reklám" nesie karta Workspace. */}
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
         Kokpit sa ozve v notifikáciách, keď kampaň beží 7 dní (po „nechať“ 14) alebo minie 1 500 Kč, keď za každých ďalších 1 000 Kč nepríde dopyt z reklamy a keď Meta niečo zamietne.
         {d?.aktualizovane ? ` Naposledy stiahnuté ${new Date(d.aktualizovane).toLocaleString("sk-SK", { timeZone: "Europe/Prague" })}.` : " Ešte nestiahnuté."}
@@ -362,6 +363,18 @@ function useSiroka(min = 1280): boolean {
 export function MetrikyReklamy({ data }: { data: PSBData }) {
   const d = data.reklamaDozor;
   const m = useMemo(() => (d ? metrikyDozoru(d, data.leads || [], dnesPraha()) : null), [d, data.leads]);
+  // To isté číslo, čo má Marketing (`cenaDopytuZReklamy`, od 9/2026) — tu sa
+  // len pomenuje, prečo sa líši od posledných 30 dní.
+  const [kampane, setKampane] = useState<{ mesiac: string; spend: number }[] | null>(null);
+  useEffect(() => {
+    let zive = true;
+    void fetch("/api/meta", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { kampane?: { mesiac: string; spend: number }[] }) => { if (zive) setKampane(j.kampane || []); })
+      .catch(() => { if (zive) setKampane(null); });
+    return () => { zive = false; };
+  }, []);
+  const odSeptembra = useMemo(() => (kampane ? cenaDopytuZReklamy(kampane, data.leads || []) : null), [kampane, data.leads]);
   if (!m) return null;
   const ciel = d?.nastavenie.cielDopyt || null;
   const riadok = (label: string, hodnota: string, pod?: string, farba?: string) => (
@@ -378,10 +391,27 @@ export function MetrikyReklamy({ data }: { data: PSBData }) {
   return (
     <Card>
       <H3>Metriky reklamy</H3>
-      {riadok("Cena za dohodnutý úvodný (30 dní)", m.cenaZaDohodnuty30 !== null ? kc(m.cenaZaDohodnuty30) : "—",
-        `${m.dohodnute30} dohodnutých z ${m.dopyty30} dopytov z reklamy · toto je hlavné meradlo`)}
-      {riadok("Cena za dopyt (30 dní)", m.cenaZaDopyt30 !== null ? kc(m.cenaZaDopyt30) : "—",
-        `${kc(m.minute30)} ÷ ${Sk.dopyty(m.dopyty30)} (${m.dopytySOdkazom30} s odkazom z reklamy)${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)}
+      {m.bezi === 0 && (
+        <div style={{ fontSize: 11.5, color: C.textMuted, margin: "2px 0 6px", lineHeight: 1.5 }}>
+          Teraz nebeží žiadna kampaň. Čísla nižšie sú z posledných 30 dní{m.poslednyVydavok ? `, naposledy sa míňalo ${Number(m.poslednyVydavok.slice(8, 10))}. ${Number(m.poslednyVydavok.slice(5, 7))}.` : ""}
+        </div>
+      )}
+      {m.jednaCena ? (
+        // Dopyty a dohodnuté sú tí istí ľudia: jedno číslo, nie dva riadky s rovnakou sumou.
+        riadok("Cena za dopyt aj dohodnutý úvodný (30 dní)", m.cenaZaDopyt30 !== null ? kc(m.cenaZaDopyt30) : "—",
+          `${kc(m.minute30)} ÷ ${Sk.dopyty(m.dopyty30)} z reklamy, ${m.dopyty30 === 1 ? "aj dohodnutý" : "všetky dohodnuté"}${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)
+      ) : (
+        <>
+          {riadok("Cena za dohodnutý úvodný (30 dní)", m.cenaZaDohodnuty30 !== null ? kc(m.cenaZaDohodnuty30) : "—",
+            `${m.dohodnute30} dohodnutých z ${m.dopyty30} dopytov z reklamy · toto je hlavné meradlo`)}
+          {riadok("Cena za dopyt (30 dní)", m.cenaZaDopyt30 !== null ? kc(m.cenaZaDopyt30) : "—",
+            `${kc(m.minute30)} ÷ ${Sk.dopyty(m.dopyty30)} (${m.dopytySOdkazom30} s odkazom z reklamy)${ciel ? ` · cieľ ${kc(ciel)}` : " · cieľ nezadaný"}`, dopytFarba)}
+        </>
+      )}
+      {odSeptembra && odSeptembra.cena !== null && (
+        riadok("Cena za dopyt od 9/2026 (číslo z Marketingu)", kc(Math.round(odSeptembra.cena)),
+          `${kc(Math.round(odSeptembra.spend))} ÷ ${Sk.dopyty(odSeptembra.dopyty.length)} · iné obdobie než 30 dní vyššie`)
+      )}
       {riadok("Dorazilo na stránku (7 dní)", m.dorazilo7 !== null ? `${m.dorazilo7} %` : "—",
         `${m.naStranke7} z ${m.kliky7} klikov${m.cenaZaNavstevu7 !== null ? ` · ${String(m.cenaZaNavstevu7).replace(".", ",")} Kč za návštevu` : ""}`, dorFarba)}
       {riadok("Od posledného dopytu z reklamy", m.minuteOdPoslednehoDopytu !== null ? kc(m.minuteOdPoslednehoDopytu) : "—",

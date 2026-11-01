@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
@@ -46,6 +46,16 @@ export function oknoMesiacov(data: PSBData, okno: string): string[] {
   return mesiaceVOkne(okno, data.sessions.map((s) => monthKey(s.date)));
 }
 
+/**
+ * Okno lievika: posledných 12 mesiacov po posledný PLNÝ mesiac (kotva dát).
+ * Jedna definícia pre vrchný pás, Prehľad aj kartu „Odkiaľ prišli klienti" —
+ * inak má ten istý nápis na troch obrazovkách tri rôzne čísla.
+ */
+export function oknoLievika(data: PSBData): string[] {
+  const kotva = kotvaDat(data);
+  return oknoMesiacov(data, "12m").filter((x) => !kotva.plny || x <= kotva.plny);
+}
+
 export type Kroky = {
   dopyty: number; uvodne: number; klienti: number; trzba: number;
   /**
@@ -84,6 +94,8 @@ export type Kroky = {
    * nebol podmnožinou menovateľa.
    */
   zUvodnehoKlient: number;
+  /** Úvodné v okne, pred ktorými stojí dopyt z toho istého okna. */
+  uvodneZDopytu: number;
   /**
    * Kto presne za tými číslami je.
    *
@@ -201,19 +213,22 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
   for (const sx of [...data.sessions].filter((x) => x.sessionType === "UVODNE").sort((a, b) => a.date.localeCompare(b.date)))
     if (!uvodneVsetky.has(sx.client)) uvodneVsetky.set(sx.client, sx.date);
   const menaUvodnychVsetky = [...uvodneVsetky.keys()];
+  const menaZDopytu = new Set<string>();
   const naUvodnyRiadky = data.leads.flatMap((l) => {
     if (!v(l.date) || !l.name) return [];
     const kan = najdiKlienta(menaUvodnychVsetky, l.name);
     if (!kan) return [];
     const datumUvodneho = (uvodneVsetky.get(kan) || "").slice(0, 10);
     if (datumUvodneho && datumUvodneho < l.date.slice(0, 10)) return [];
+    menaZDopytu.add(kan);
     return [{ meno: l.name, dopyt: l.date, uvodny: datumUvodneho }];
   });
+  const uvodneZDopytu = [...uvodneMapa.keys()].filter((m) => menaZDopytu.has(m)).length;
 
   const zUvodnehoKlient = novi.filter((c) => uvodneMapa.has(c.name)).length;
 
   return {
-    dopyty, uvodne, klienti: novi.length, trzba, zDopytu, zDopytuUvodny: naUvodnyRiadky.length, zUvodnehoKlient,
+    dopyty, uvodne, klienti: novi.length, trzba, zDopytu, zDopytuUvodny: naUvodnyRiadky.length, zUvodnehoKlient, uvodneZDopytu,
     kto: {
       dopyty: dopytyRiadky
         .map((l) => ({ meno: l.name || "(bez mena)", datum: l.date, zdroj: l.source || "" }))
@@ -245,6 +260,23 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
         }))
         .sort((a, b) => b.datum.localeCompare(a.datum)),
     },
+  };
+}
+
+/**
+ * PREČO SA LIEVIK NEODČÍTAVA OD SEBA.
+ *
+ * 47 dopytov → 37 z nich došlo na úvodný, ale úvodných je 45 a z nich 36 sa
+ * stalo klientom, nových klientov je 38. Nie je to chyba: každá šípka konvertuje
+ * inú množinu (viď `zDopytuUvodny`, `zUvodnehoKlient`). Bez mosta to vyzerá,
+ * akoby sa ľudia medzi krokmi rodili, preto sa rozdiel pomenuje číslom.
+ */
+export function mostLievika(k: Pick<Kroky, "dopyty" | "uvodne" | "klienti" | "zDopytuUvodny" | "zUvodnehoKlient" | "uvodneZDopytu">) {
+  return {
+    /** Prišli na úvodný bez dopytu z tohto okna (odporúčanie, starší dopyt, nezapísaný). */
+    uvodneBezDopytu: Math.max(0, k.uvodne - k.uvodneZDopytu),
+    /** Noví klienti, ktorí v okne nemajú úvodný (iný typ prvého sedenia v exporte). */
+    noviBezUvodneho: Math.max(0, k.klienti - k.zUvodnehoKlient),
   };
 }
 
@@ -381,7 +413,9 @@ export function Lievik({ data, clients, onPoznamka }: {
   /** Uloží dôvod, prečo človek po úvodnom už neprišiel. `false` = neuložilo sa. */
   onPoznamka?: (meno: string, text: string) => Promise<boolean | void> | boolean | void;
 }) {
-  const [okno, setOkno] = useState("2026");
+  // Otvára sa na tom istom okne ako Prehľad a vrchný pás — preklik z Prehľadu
+  // ukáže tie isté čísla (12 mesiacov po posledný plný mesiac).
+  const [okno, setOkno] = useState("12m");
   /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
   const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | "strata" | null>(null);
   /** Ukázať aj tých, ktorým už niekto dôvod zapísal. */
@@ -391,8 +425,9 @@ export function Lievik({ data, clients, onPoznamka }: {
   // iný stav než zvyšok appky.
   const web = useMemo(() => ({ ga4: GA4_MESACNE, dopyty: GSC_DOPYTY }), [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const mesiace = useMemo(() => oknoMesiacov(data, okno), [data, okno]);
+  const mesiace = useMemo(() => (okno === "12m" ? oknoLievika(data) : oknoMesiacov(data, okno)), [data, okno]);
   const k = useMemo(() => krokyZa(data, clients, mesiace), [data, clients, mesiace]);
+  const most = mostLievika(k);
 
   // Rozpad podľa zdroja — len klienti, ktorí v období začali.
   const podlaZdroja = useMemo(() => {
@@ -451,6 +486,14 @@ export function Lievik({ data, clients, onPoznamka }: {
               Do 19. 8. 2026 jediný krok lievika bez prekliku. */}
           <Krok cislo={fmtCZK(k.trzba)} popis="Tržba od nových" konverzia={undefined}
             onClick={k.klienti ? () => setKtori(ktori === "klienti" ? null : "klienti") : undefined} aktivny={ktori === "klienti"} />
+        </div>
+
+        {/* Most medzi krokmi: rozdiely sú pomenované, nie záhada. */}
+        <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, margin: "8px 0 2px" }}>
+          {k.zDopytuUvodny} z {k.dopyty} dopytov došlo na úvodný.
+          {most.uvodneBezDopytu > 0 ? ` Úvodných je ${k.uvodne}, lebo ${most.uvodneBezDopytu} prišlo bez dopytu z tohto obdobia (odporúčanie, starší dopyt).` : ""}
+          {" "}{k.zUvodnehoKlient} z {k.uvodne} úvodných sa stalo klientom.
+          {most.noviBezUvodneho > 0 ? ` Nových klientov je ${k.klienti}, lebo ${most.noviBezUvodneho} nemá v tomto období zapísaný úvodný.` : ""}
         </div>
 
         {ktori && (() => {

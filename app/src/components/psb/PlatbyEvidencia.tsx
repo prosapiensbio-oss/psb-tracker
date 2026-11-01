@@ -81,8 +81,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   };
 
   if (!platby) return null;
-  const zive = platby.filter((x) => !x.zrusene_at);
-  const hotovost = zive.filter((x) => x.sposob === "hotovost").length;
+  const bezNavrhu = nepriradene.filter((n) => !n.rozdelenie && !n.kandidati.length);
 
   return (
     <Card>
@@ -114,18 +113,19 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
       {/* Mesačné porovnanie s PTminderom (rozdiel tržieb) je od 20. 10. 2026
           vypnuté: do PTmindera sa nezapisuje, rozdiel by rástol sám. Peniaze
           sú od 10/2026 z Kokpitu (prepínač vyššie). */}
-      {nepriradene.length > 0 && (
+      {/* Príjmy s návrhom stoja v karte „Bankové príjmy bez klienta" nad touto;
+          tu len tie, ku ktorým appka nevie navrhnúť nikoho. Dovtedy boli tie
+          isté platby na stránke dvakrát. */}
+      {bezNavrhu.length > 0 && (
         <>
           <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700, marginTop: 4 }}>
-            Príjmy z výpisu, ktoré ešte nemajú klienta ({celkom}{celkom > nepriradene.length ? `, tu prvých ${nepriradene.length}` : ""})
+            Príjmy z výpisu bez návrhu ({bezNavrhu.length})
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "3px 0 8px", lineHeight: 1.5 }}>
-            Appka navrhne podľa priezviska v texte — a platiteľa si zapamätá, takže ten istý sa pýta raz.
-            Čo platba klienta nie je (nájom, vrátenie, vlastný prevod), odlož tlačidlom vpravo.
-            {" "}Riadky označené <b style={{ color: C.textDim }}>nevyzerá na klienta</b> sú tu ZÁMERNE — vrátky z e-shopov
-            a vklady sa v kope vo Workspace neukazujú, lebo tam ide o dennú prácu s klientmi, ale celý výpis sa rieši TU.
+            Appka v nich nenašla klienta. Čo platba klienta nie je (nájom, vrátenie, vlastný prevod), odlož tlačidlom vpravo.
+            Sú aj vo Workspace v kroku 3.
           </div>
-          {nepriradene.slice(0, 30).map((n) => {
+          {bezNavrhu.slice(0, 30).map((n) => {
             // Spoločný prevod sa jednému človeku nepredvyplní.
             const v = vyber[n.fioId] ?? (!n.rozdelenie && n.kandidati.length === 1 ? n.kandidati[0] : "");
             return (

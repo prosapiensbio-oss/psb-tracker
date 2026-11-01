@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { chybaZoznamuMien, fakturyZIdokladu, klientiKontaktu, klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby, poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
+import { chybaZoznamuMien, fakturyZIdokladu, klientiKontaktu, klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby, poplatkyPoOdrataniPlatieb, navrhZFaktury } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -527,5 +527,70 @@ describe("správa prebíja odosielateľa — Kateřina Mátlová za Alberta, 29.
   it("správa bez mena nič nemení", () => {
     const v = nepriradene([r({ id: "z", counterparty: "Mátlová, Kateřina", note: "ProSapiens 6h Balíček -10%", amount_czk: 7011 })], [], map, new Set(), mena);
     expect(v[0].kandidati).toEqual(["Katerina Matlova"]);
+  });
+});
+
+describe("faktúra je väzba — návrh z čísla faktúry", () => {
+  const VANKOVA = { cislo: "20261010", klient: "Barbora Vankova", suma: 6990, platbaId: null };
+  const riadok = { id: "v", date: "2026-10-29", amount_czk: 6990, counterparty: "VANKOVA BARBORA", note: "FAKTURA 20261010 PSB · VANKOVA BARBORA · VS 20261010", typ: "" };
+
+  it("VS presne na jednu faktúru a suma sedí = návrh na jeden klik s dôvodom (Vanková 29. 10. 2026)", () => {
+    const [n] = nepriradene([riadok] as never, [], {}, new Set(), ["Barbora Vankova"], [], [VANKOVA]);
+    expect(n.kandidati).toEqual(["Barbora Vankova"]);
+    expect(n.zdrojNavrhu).toBe("faktura");
+    expect(n.faktura?.istota).toBe("jedna");
+    expect(n.faktura?.dovod).toContain("VS 20261010");
+    expect(n.faktura?.dovod).toContain("6");
+  });
+  it("iná suma je len otázka", () => {
+    const n = navrhZFaktury("VS 20261010", 7790, [VANKOVA]);
+    expect(n?.istota).toBe("otazka");
+    expect(n?.dovod).toContain("prišlo");
+  });
+  it("do 2 % ešte sedí, nad nimi nie", () => {
+    expect(navrhZFaktury("20261010", 6990 - 139, [VANKOVA])?.istota).toBe("jedna");
+    expect(navrhZFaktury("20261010", 6990 - 141, [VANKOVA])?.istota).toBe("otazka");
+  });
+  it("dve faktúry v texte sú otázka", () => {
+    const n = navrhZFaktury("20261010 a 20261011", 6990, [VANKOVA, { cislo: "20261011", klient: "Iná Klientka", suma: 6990 }]);
+    expect(n?.istota).toBe("otazka");
+  });
+  it("faktúra kontaktu s dvoma klientmi je otázka", () => {
+    const n = navrhZFaktury("20261010", 6990, [VANKOVA, { cislo: "20261010", klient: "Iná Klientka", suma: 6990 }]);
+    expect(n?.istota).toBe("otazka");
+  });
+  it("faktúra, ktorá už platbu má, je otázka — druhý prevod s tým istým VS sa nezapíše naslepo", () => {
+    expect(navrhZFaktury("20261010", 6990, [{ ...VANKOVA, platbaId: "p1" }])?.istota).toBe("otazka");
+  });
+  it("faktúra bez známej sumy (iDoklad bez čiastky) je otázka", () => {
+    expect(navrhZFaktury("20261010", 6990, [{ cislo: "20261010", klient: "Barbora Vankova" }])?.istota).toBe("otazka");
+  });
+  it("číslo musí sedieť celé: dlhší reťazec číslic nie je tá faktúra", () => {
+    expect(navrhZFaktury("2026101055", 6990, [VANKOVA])).toBeNull();
+  });
+  it("bez čísla faktúry nič", () => {
+    expect(navrhZFaktury("Vankova Barbora", 6990, [VANKOVA])).toBeNull();
+  });
+  it("faktúra za viacerých, na ktorú suma sedí, ide cez rozdelenie, nie cez jeden klik", () => {
+    const f = { cislo: "20261014", klient: "Branislav Široký", suma: 15580, diely: [{ klient: "Branislav Široký", suma: 7790 }, { klient: "Linda Muth", suma: 7790 }] };
+    const [n] = nepriradene([{ ...riadok, amount_czk: 15580, note: "VS 20261014", counterparty: "bobbys cz" }] as never, [], {}, new Set(), [], [], [f]);
+    expect(n.faktura).toBeUndefined();
+    expect(n.rozdelenie?.length).toBe(2);
+  });
+  it("rozdelenie z faktúry platí aj pri naučenom pravidle odosielateľa", () => {
+    const f = { cislo: "20261014", klient: "Branislav Široký", suma: 15580, diely: [{ klient: "Branislav Široký", suma: 7790 }, { klient: "Linda Muth", suma: 7790 }] };
+    const r = { ...riadok, amount_czk: 15580, note: "VS 20261014", counterparty: "bobbys cz" };
+    const [n] = nepriradene([r] as never, [], { [vzorPlatby(r as never)]: "Branislav Široký" }, new Set(), [], [], [f]);
+    expect(n.rozdelenie?.length).toBe(2);
+  });
+  it("faktúra proti pravidlu odosielateľa: obaja na výber a otázka, žiadny jeden klik", () => {
+    const [n] = nepriradene([riadok] as never, [], { [vzorPlatby(riadok as never)]: "Jan Kral" }, new Set(), ["Barbora Vankova", "Jan Kral"], [], [VANKOVA]);
+    expect(n.kandidati).toEqual(["Barbora Vankova", "Jan Kral"]);
+    expect(n.faktura?.istota).toBe("otazka");
+    expect(n.poznamka).toContain("20261010");
+  });
+  it("pravidlo a faktúra sa zhodnú: jeden klik ostáva", () => {
+    const [n] = nepriradene([riadok] as never, [], { [vzorPlatby(riadok as never)]: "Barbora Vankova" }, new Set(), ["Barbora Vankova"], [], [VANKOVA]);
+    expect(n.faktura?.istota).toBe("jedna");
   });
 });

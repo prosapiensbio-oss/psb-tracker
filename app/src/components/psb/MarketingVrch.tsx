@@ -9,7 +9,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Info } from "./ui";
 
-import { krokyZa, oknoMesiacov } from "./MarketingLievik";
+import { krokyZa, oknoLievika, oknoMesiacov } from "./MarketingLievik";
 import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
@@ -107,7 +107,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
   const m = useMemo<Metrika[]>(() => {
     const kotva = kotvaDat(data);
     // Bežiaci mesiac von: má napočítanú len časť dopytov a priemer by klamal.
-    const mesiace = oknoMesiacov(data, "12m").filter((x) => !kotva.plny || x <= kotva.plny);
+    const mesiace = oknoLievika(data);
     const k = krokyZa(data, clients, mesiace);
     const mes = Math.max(1, mesiace.length);
 

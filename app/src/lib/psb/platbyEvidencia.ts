@@ -240,6 +240,8 @@ export type NepriradenaPlatba = {
   zdrojRozdelenia?: "faktura" | "spolocne" | "ptminder";
   /** Veta pre človeka, keď sa návrh s niečím bije (PTminder hovorí inak). */
   poznamka?: string;
+  /** Číslo vydanej faktúry v texte platby — viď `navrhZFaktury`. */
+  faktura?: NavrhFaktury;
 };
 
 /** Diel spoločnej platby: komu a koľko. */
@@ -249,7 +251,25 @@ export type Diel = { klient: string; suma: number };
  * Vystavená faktúra — na párovanie podľa variabilného symbolu.
  * `diely` má len faktúra s položkami za viacerých klientov.
  */
-export type FakturaVzor = { cislo: string; klient: string; diely?: Diel[] };
+export type FakturaVzor = {
+  cislo: string; klient: string; diely?: Diel[];
+  /** Na akú sumu je faktúra; bez nej sa dá len opýtať. */
+  suma?: number;
+  /** Faktúra už má zapísanú konkrétnu platbu. */
+  platbaId?: string | null;
+};
+
+/**
+ * Čo hovorí číslo faktúry v platbe.
+ * `jedna` = návrh na jeden klik; `otazka` = rozhodne človek, nič predvyplnené.
+ */
+export type NavrhFaktury =
+  | { istota: "jedna"; cislo: string; klient: string; suma: number; dovod: string }
+  | { istota: "otazka"; cislo: string; dovod: string };
+
+/** Suma je pri faktúre len kontrola (2 %, ako pri párovaní BTC dokladov). */
+export const TOLERANCIA_FAKTURY = 0.02;
+const kcText = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/\u00a0/g, " ")} Kč`;
 
 /** Cena balíčka klienta — na rozdelenie spoločnej platby, keď PTminder mlčí. */
 export type CenaBalicka = { klient: string; od: string; cena: number };
@@ -336,6 +356,47 @@ export function klientPodlaFaktury(text: string, faktury: FakturaVzor[]): string
   if (!cisla.size) return [];
   const najdene = faktury.filter((f) => cisla.has(f.cislo)).map((f) => f.klient);
   return [...new Set(najdene)];
+}
+
+/**
+ * FAKTÚRA JE VÄZBA (faktura-je-vazba, kokpit-sa-ma-pytat).
+ *
+ * Platba s VS = číslo vydanej faktúry jedného klienta a so sumou, ktorá na ňu
+ * sedí, je jednoznačná a stačí na ňu jeden klik — s dôvodom na očiach. Zapisuje
+ * stále človek a nič sa z toho nenaučí: odosielateľ faktúry je dôkaz o tejto
+ * faktúre, nie o tom, za koho platí nabudúce.
+ *
+ * Všetko ostatné je otázka: viac faktúr v texte, faktúra viacerých klientov,
+ * iná suma, faktúra, ktorá už platbu má.
+ *
+ * Faktúra za viacerých, na ktorú suma sedí, sem nepatrí — tú rieši
+ * `rozdelenieZFaktury`.
+ */
+export const cislaVTexte = (text: string): string[] => [...new Set(text.match(/\d{6,10}/g) || [])];
+
+export function navrhZFaktury(text: string, suma: number, faktury: FakturaVzor[]): NavrhFaktury | null {
+  if (!faktury.length) return null;
+  const cisla = new Set(cislaVTexte(text));
+  if (!cisla.size) return null;
+  const zhody = faktury.filter((f) => cisla.has(f.cislo));
+  if (!zhody.length) return null;
+  const roznych = [...new Set(zhody.map((f) => f.cislo))];
+  if (roznych.length > 1) return { istota: "otazka", cislo: roznych[0], dovod: `V platbe sú čísla viacerých faktúr (${roznych.join(", ")}).` };
+  const cislo = roznych[0];
+  const klienti = [...new Set(zhody.map((f) => normName(f.klient)))];
+  if (klienti.length > 1) return { istota: "otazka", cislo, dovod: `Faktúra ${cislo} patrí viacerým klientom (${[...new Set(zhody.map((f) => f.klient))].join(", ")}).` };
+  const f = zhody[0];
+  if (f.diely && f.diely.length >= 2) {
+    const spolu = f.diely.reduce((n, d) => n + d.suma, 0);
+    return Math.abs(spolu - Math.round(suma)) <= 1 ? null
+      : { istota: "otazka", cislo, dovod: `Faktúra ${cislo} je za viacerých na ${kcText(spolu)}, prišlo ${kcText(suma)}.` };
+  }
+  if (!f.suma) return { istota: "otazka", cislo, dovod: `Faktúra ${cislo} pre ${f.klient} nemá známu sumu — over ju.` };
+  if (Math.abs(f.suma - suma) > Math.max(1, f.suma * TOLERANCIA_FAKTURY)) {
+    return { istota: "otazka", cislo, dovod: `Faktúra ${cislo} pre ${f.klient} je na ${kcText(f.suma)}, prišlo ${kcText(suma)}.` };
+  }
+  if (f.platbaId) return { istota: "otazka", cislo, dovod: `Faktúra ${cislo} pre ${f.klient} už má zapísanú platbu.` };
+  return { istota: "jedna", cislo, klient: f.klient, suma: f.suma, dovod: `VS ${cislo} = faktúra pre ${f.klient} na ${kcText(f.suma)}, suma sedí.` };
 }
 
 /**
@@ -577,7 +638,7 @@ export function klientiKontaktu(klient: string | null | undefined): string[] {
  * ďalší spôsob, ako sa z dvoch možností stane jedna.
  */
 export function fakturyZIdokladu(
-  doklady: { cislo: string; nazov: string }[],
+  doklady: { cislo: string; nazov: string; suma_czk?: number | null }[],
   kontakty: { firma: string; klient: string }[],
   menaKlientov: string[],
 ): FakturaVzor[] {
@@ -594,7 +655,7 @@ export function fakturyZIdokladu(
     if (!d.cislo) continue;
     const zKontaktu = podlaFirmy.get(normName(d.nazov || "")) || [];
     const priamo = zKontaktu.length ? [] : menaKlientov.filter((m) => normName(m) === normName(d.nazov || "")).slice(0, 1);
-    for (const klient of zKontaktu.length ? zKontaktu : priamo) out.push({ cislo: d.cislo, klient });
+    for (const klient of zKontaktu.length ? zKontaktu : priamo) out.push({ cislo: d.cislo, klient, ...(d.suma_czk ? { suma: Number(d.suma_czk) } : {}) });
   }
   return out;
 }
@@ -667,6 +728,7 @@ export function nepriradene(
      * Suma zostáva posledná — je to zhoda čísla, nie dôkaz.
      */
     const podlaFaktury = naucene ? [] : klientPodlaFaktury(text, faktury);
+    let faktura = navrhZFaktury(text, r.amount_czk, faktury);
     const podlaFirmy = naucene || podlaFaktury.length ? [] : klientPodlaFirmy(text, firmy);
     const podlaMena = naucene || podlaFaktury.length || podlaFirmy.length ? [] : najdiKlientaVTexte(text, menaKlientov);
     const podlaSumy = naucene || podlaFaktury.length || podlaFirmy.length || podlaMena.length ? [] : parujPodlaSumy(r, volne);
@@ -705,7 +767,8 @@ export function nepriradene(
     /** Spoločný prevod — viď `navrhniRozdelenie` a `rozdelenieZFaktury`. */
     let rozdelenie: Diel[] | undefined;
     let zdrojRozdelenia: NepriradenaPlatba["zdrojRozdelenia"];
-    const zFaktury = podlaFaktury.length ? rozdelenieZFaktury(text, r.amount_czk, faktury) : null;
+    // Aj keď odosielateľ má pravidlo: kto za koho platí, hovorí faktúra.
+    const zFaktury = rozdelenieZFaktury(text, r.amount_czk, faktury);
     if (zFaktury) { rozdelenie = zFaktury; zdrojRozdelenia = "faktura"; }
     else if (zdrojNavrhu !== "suma") {
       const n = navrhniRozdelenie(r, kandidati, volne, spolocni, ceny);
@@ -741,7 +804,18 @@ export function nepriradene(
      * Keď správa menuje JEDNÉHO iného klienta, ide do návrhu prvý a vedľa
      * neho ostane ten z pravidla; rozhodne človek (nikdy samé priradenie).
      */
-    if (naucene && !rozdelenie) {
+    /**
+     * FAKTÚRA PROTI PRAVIDLU ODOSIELATEĽA. Naučené pravidlo je dôkaz
+     * o platiteľovi, faktúra o tom, za koho sa platí. Keď sa rozchádzajú,
+     * idú do výberu obaja a rozhodne človek.
+     */
+    const klientFaktury = faktura?.istota === "jedna" ? faktura.klient : "";
+    if (naucene && !rozdelenie && klientFaktury && normName(klientFaktury) !== normName(naucene)) {
+      kandidati = [klientFaktury, naucene];
+      poznamka = `Faktúra ${(faktura as NavrhFaktury).cislo} je na ${klientFaktury} — odosielateľ inak platí za ${naucene}.`;
+      faktura = { istota: "otazka", cislo: (faktura as NavrhFaktury).cislo, dovod: poznamka };
+    }
+    if (naucene && !rozdelenie && !poznamka) {
       const kusy = (r.counterparty || "").split("·");
       const sprava = [...kusy.slice(0, -1), (r.note || "").trim() !== (r.counterparty || "").trim() ? r.note || "" : ""].join(" ").trim();
       const zoSpravy = sprava ? najdiKlientaVTexte(sprava, menaKlientov) : [];
@@ -762,6 +836,10 @@ export function nepriradene(
       }
     }
 
+    // Istota platí, len kým sa s ňou nebije nič iné (správa, archív platieb).
+    if (faktura?.istota === "jedna" && (kandidati.length !== 1 || normName(kandidati[0]) !== normName(faktura.klient))) {
+      faktura = { istota: "otazka", cislo: faktura.cislo, dovod: poznamka || faktura.dovod };
+    }
     out.push({
       fioId: r.id,
       datum: r.date.slice(0, 10),
@@ -770,6 +848,7 @@ export function nepriradene(
       kandidati,
       ...(rozdelenie ? { rozdelenie, zdrojRozdelenia } : {}),
       ...(poznamka ? { poznamka } : {}),
+      ...(faktura && !rozdelenie ? { faktura } : {}),
       // Naučené priradenie prebíja odhad: keď už niekto raz povedal, že tento
       // odosielateľ je klient, appka to nemá spochybňovať.
       klientsky: !!naucene || vyzeraNaKlienta(r),

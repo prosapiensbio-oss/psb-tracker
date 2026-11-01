@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PaymentRow, PSBData, SessionRow } from "../../lib/psb/types";
-import { krokyZa } from "./MarketingLievik";
+import { krokyZa, mostLievika } from "./MarketingLievik";
 
 /**
  * Konverzia dopyt → klient.
@@ -357,5 +357,16 @@ describe("šípka úvodný → klient", () => {
     expect(k.uvodne).toBe(1);
     // klienti/uvodne by dalo 200 % — z úvodných sa klientom stala len Petra.
     expect(k.zUvodnehoKlient).toBe(1);
+  });
+});
+
+describe("most lievika", () => {
+  it("47 → 37, 45 → 36, 38: rozdiely sú pomenované číslom", () => {
+    expect(mostLievika({ dopyty: 47, zDopytuUvodny: 37, uvodne: 45, uvodneZDopytu: 36, zUvodnehoKlient: 36, klienti: 38 }))
+      .toEqual({ uvodneBezDopytu: 9, noviBezUvodneho: 2 });
+  });
+  it("nikdy záporné", () => {
+    expect(mostLievika({ dopyty: 1, zDopytuUvodny: 1, uvodne: 1, uvodneZDopytu: 3, zUvodnehoKlient: 2, klienti: 1 }))
+      .toEqual({ uvodneBezDopytu: 0, noviBezUvodneho: 0 });
   });
 });

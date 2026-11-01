@@ -13,7 +13,6 @@ import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, KrokUzavierky, NavFocus } from "./App";
 import { fetchVzasNastavene, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
-import { BtcParovanie } from "./BtcParovanie";
 import { PushOdber } from "./PushOdber";
 import { CAS_BUILDU, kontrolnySubor, verziaServera } from "../../lib/psb/verzia";
 import { BankovyImport } from "./Banka";
@@ -87,7 +86,22 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
       </div>
       <UploadCard data={data} actions={actions} chat={chat} />
 
-      {btc && <BtcParovanie platby={btc.platby} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />}
+      {/* Akcia dokladov k bitcoinu patrí k nákladom — Workspace → Kontrola peňazí
+          (1. 11. 2026, „Upload bez pohybov z banky"). Tu ostáva len počet a cesta. */}
+      {(() => {
+        const bezDokladu = (btc?.platby || []).filter((p) => !(btc?.parovanie[String(p.id)] || []).length).length;
+        return bezDokladu > 0 ? (
+          <div style={{ fontSize: 12, color: C.textMuted, margin: "0 0 10px" }}>
+            Platby bitcoinom bez dokladu: <b style={{ color: C.orange }}>{bezDokladu}</b>
+            {onNavigate && (
+              <>
+                {" · "}
+                <button onClick={() => onNavigate("workspace", "kontroly")} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, cursor: "pointer", fontFamily: "inherit", fontSize: 12, textDecoration: "underline" }}>vybaviť v Kontrole peňazí</button>
+              </>
+            )}
+          </div>
+        ) : null;
+      })()}
 
       {/* Napojenia až za uzávierkou (Jerry, 14. 8.): „upload CSV nech je iba
           o CSV." Kľúč sa vkladá raz za rok, CSV sa nahráva každý týždeň —
@@ -212,6 +226,11 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
   // správania — výpis z PTmindera sa zapíše hneď, výpis z banky otvorí náhľad
   // rovno tu. Dve samostatné obrazovky boli len zbytočné blúdenie.
   const [bankovyText, setBankovyText] = useState("");
+  /** Raz ukázaný náhľad ostáva stáť — jeho výsledok po zápise sa nesmie stratiť. */
+  const [ukazBanku, setUkazBanku] = useState(() => {
+    try { return !!localStorage.getItem("psb-banka-nahlad"); } catch { return false; }
+  });
+  useEffect(() => { if (bankovyText) setUkazBanku(true); }, [bankovyText]);
   // Stav bankových pohybov sa nedá prečítať z PSBData — má vlastnú tabuľku.
   const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
   const [zositStav, setZositStav] = useState<{ pocet: number; posledny: string } | null>(null);
@@ -447,11 +466,10 @@ export function UploadCard({ data, actions, chat, bezBanky = false, zameranie, m
         </div>
       )}
       <input ref={inputRef} type="file" accept=".csv,.txt,.pdf,image/*" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
-      {/* Bez podmienky na `bankovyText`: komponent sa musí objaviť aj vtedy,
-          keď žiadny súbor práve nepribudol, ale v prehliadači zostalo
-          rozrobené zaraďovanie. Ak nemá ani vstup ani rozrobené, nevykreslí
-          sa sám od seba. */}
-      {!bezBanky && (
+      {/* Upload je bez pohybov z banky: tie sa sťahujú samy a dobiehajú v Kontrole
+          peňazí („stiahnuť iné obdobie"). Náhľad sa ukáže, len keď sem niekto
+          pretiahol výpis alebo v prehliadači ostalo rozrobené zaraďovanie. */}
+      {!bezBanky && ukazBanku && (
         <div style={{ marginTop: 12 }}>
           <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
         </div>

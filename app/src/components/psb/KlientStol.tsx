@@ -903,6 +903,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa priradiť"); return; }
     await Promise.all([nacitajPlatby(), nacitajCakajuce()]);
+    oznam("peniaze");
   };
 
   const zrusPlatbu = async (id: string) => {
@@ -1485,19 +1486,22 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             nenašiel (24. 9. 2026), lebo pri klientovi bez údajov tam stálo
             „Ďalších 0 údajov" a nič nenaznačovalo, že je za tým ešte niečo.
             Schovaná akcia, ktorú človek potrebuje, je to isté ako žiadna.
-            Nekričí ale ani teraz: je sivé, malé a na konci stĺpca — a pýta
-            si napísanie mena, takže omylom sa stlačiť nedá. */}
+            Je na konci stĺpca, oddelené od bežných odkazov a červené, aby sa
+            nedalo pomýliť s nimi — a pýta si napísanie mena, takže omylom sa
+            stlačiť nedá. */}
         {!mazemOtvorene ? (
-          <button
-            onClick={() => { setMazemOtvorene(true); setChyba(""); }}
-            style={{
-              marginTop: 10, padding: "5px 9px", borderRadius: 8, fontSize: 11,
-              cursor: "pointer", textAlign: "left",
-              border: `1px solid ${mix(C.border, 70)}`, background: "transparent", color: C.textDim,
-            }}
-          >
-            Zmazať klienta
-          </button>
+          <div style={{ marginTop: 18, paddingTop: 12, borderTop: `1px solid ${mix(C.border, 60)}` }}>
+            <button
+              onClick={() => { setMazemOtvorene(true); setChyba(""); }}
+              style={{
+                padding: "5px 9px", borderRadius: 8, fontSize: 11,
+                cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                border: `1px solid ${mix(C.red, 40)}`, background: "transparent", color: C.red,
+              }}
+            >
+              Zmazať klienta
+            </button>
+          </div>
         ) : (
           <div style={{ marginTop: 10, padding: "9px 10px", borderRadius: 9, border: `1px solid ${mix(C.red, 45)}`, background: mix(C.red, 8) }}>
             <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.5 }}>

@@ -26,6 +26,7 @@ import type { Dlznik } from "./dlznici";
 import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 
 import type { PodlaKlienta } from "./sporneKonanie";
+import type { NavrhFaktury } from "./platbyEvidencia";
 
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
@@ -35,6 +36,12 @@ export type NepriradenaPlatba = {
   rozdelenie?: { klient: string; suma: number }[];
   /** Keď PTminder hovorí iné meno než text platby. */
   poznamka?: string;
+  /** Číslo vydanej faktúry v platbe: návrh na jeden klik, alebo otázka. */
+  faktura?: NavrhFaktury;
+  /** Odkiaľ je návrh — vidieť ho má človek, nie len appka. */
+  dovod?: string;
+  /** Vrátka, e-shop, firma bez väzby — jedným „Nie je klient" je vybavené. */
+  nevyzeraNaKlienta?: boolean;
 };
 /** Klient pred úvodným tréningom alebo tesne po ňom, bez hotovej anamnézy. */
 export type AnamnezaRiadok = {
@@ -173,6 +180,13 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
   ];
 }
 
+/** Riadok z `/api/platby` (`nepriradene`). */
+export type PlatbaZdroj = {
+  fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean;
+  rozdelenie?: { klient: string; suma: number }[]; poznamka?: string;
+  faktura?: NavrhFaktury; zdrojNavrhu?: string;
+};
+
 export type ZdrojeKariet = {
   zmeny: Zmena[];
   /** Aktívni klienti, ktorým nezostala hodina. */
@@ -186,7 +200,7 @@ export type ZdrojeKariet = {
   /** Všetky anamnézy — rozpracované aj hotové. */
   anamnezy?: AnamnezaRiadok[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
-  platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[];
+  platby: PlatbaZdroj[];
   navrhMena: (nazov: string) => string;
   /** „jerry" | „terezka" | null (nevie sa / spoločné prihlásenie). */
   ktoSom: string | null;
@@ -243,8 +257,110 @@ export const popisZmeny = (x: Zmena): string =>
       : x.druh === "pridane" ? `pribudol tréning ${denSK(x.po || x.kedy)}`
         : "premenované";
 
+/**
+ * ODPOVEĎ „PRESUNULI SME" — jedna veta pre štítok pri riadku aj hromadné
+ * tlačidlo. Zmiznutie samo osebe nie je dôkaz zrušenia ani presunu
+ * (zmizlo-z-kalendara, presun-nie-zrusenie), preto hromadne ide len to, čo je
+ * posun, alebo kde appka našla jediný nový termín tej istej hodiny.
+ */
+export const odpovedPresunu = (presun: { zaciatok: string } | null): string =>
+  presun ? `presunuli sme na ${terminSK(presun.zaciatok)}` : "presunuli sme";
+
+export type PresunNaOdpoved = { kluc: string; id: string; poznamka: string; meno: string };
+
+export function hromadnePresuny(
+  zmeny: Zmena[],
+  presuny: Record<string, { zaciatok: string; kandidatov: number } | undefined>,
+): { posuny: PresunNaOdpoved[]; vyzeraNaPresun: PresunNaOdpoved[] } {
+  const riadok = (z: Zmena, poznamka: string): PresunNaOdpoved => ({
+    kluc: klucPolozky("zmeny", z), id: z.id, poznamka,
+    meno: z.klient || z.nazov || "(bez mena)",
+  });
+  return {
+    posuny: zmeny.filter((z) => z.druh === "posunute").map((z) => riadok(z, odpovedPresunu(null))),
+    // „Zmizlo" bez nájdeného termínu sem nikdy nepatrí. Pri viacerých
+    // kandidátoch appka sama hovorí „over, či je to ten" — to je otázka.
+    vyzeraNaPresun: zmeny.flatMap((z) => {
+      const p = presuny[z.id];
+      return z.druh === "zrusene" && p && p.kandidatov === 1 ? [riadok(z, odpovedPresunu(p))] : [];
+    }),
+  };
+}
+
+export type VysledokPoJednom<T> = { hotovo: number; chyby: { polozka: T; chyba: string }[] };
+
+/** Po jednom a do konca: chyba jedného riadku nezhodí ostatné a nezamlčí sa. */
+export async function zapisPoJednom<T>(polozky: T[], zapis: (x: T) => Promise<void>): Promise<VysledokPoJednom<T>> {
+  const v: VysledokPoJednom<T> = { hotovo: 0, chyby: [] };
+  for (const x of polozky) {
+    try { await zapis(x); v.hotovo++; }
+    catch (e) { v.chyby.push({ polozka: x, chyba: e instanceof Error ? e.message : String(e) }); }
+  }
+  return v;
+}
+
 const pocet = (n: number, jeden: string, malo: string, vela: string) =>
   n === 1 ? jeden : n < 5 ? malo : vela;
+
+/** Riadok z `/api/platby` → riadok karty. Jedna cesta pre vlastné aj Terezkine príjmy. */
+function naRiadokPlatby(p: PlatbaZdroj): NepriradenaPlatba {
+  const otazka = p.faktura?.istota === "otazka";
+  return {
+    fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
+    // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
+    // nesmie, to je pravidlo platné všade v appke. Spoločný prevod sa jednému
+    // človeku nepredvyplní — patrí viacerým. Faktúra s inou sumou je otázka.
+    navrh: !p.rozdelenie && !otazka && p.kandidati.length === 1 ? p.kandidati[0] : "",
+    ...(p.rozdelenie ? { rozdelenie: p.rozdelenie } : {}),
+    ...(p.poznamka ? { poznamka: p.poznamka } : {}),
+    ...(p.faktura ? { faktura: p.faktura } : {}),
+    ...(DOVOD_NAVRHU[p.zdrojNavrhu || ""] && !p.faktura ? { dovod: DOVOD_NAVRHU[p.zdrojNavrhu || ""] } : {}),
+    ...(p.klientsky === false ? { nevyzeraNaKlienta: true } : {}),
+  };
+}
+
+const DOVOD_NAVRHU: Record<string, string> = {
+  naucene: "už potvrdený platiteľ",
+  faktura: "číslo faktúry v platbe",
+  firma: "firma alebo IČO klienta",
+  meno: "meno v platbe",
+  "meno+suma": "meno aj suma s archívom",
+  suma: "len suma a deň s archívom — over",
+};
+
+/**
+ * PRÍJMY BEZ KLIENTA U DRUHÉHO TRÉNERA. Peniaze sú podľa trénera klienta
+ * (5. 10. 2026), takže Jerry platbu Terezkinej klientky vo svojom kroku 3
+ * nemal a nikde o nej nevedel — od 5. 10. ich pritom 12 priradil on sám.
+ * Pravidlo ostáva, zmizlo slepé miesto: vidí ich v jednom riadku, v jeho počte
+ * nie sú. Terezke sa peniaze firmy (platby bez návrhu) naopak neukazujú.
+ */
+export function prijmyUInehoTrenera(
+  platby: PlatbaZdroj[],
+  ja: string | null,
+  trenerKlienta: (meno: string) => string,
+): { trener: string; riadky: NepriradenaPlatba[] }[] {
+  if (ja !== "Jerry") return [];
+  const po = new Map<string, NepriradenaPlatba[]>();
+  for (const p of platby) {
+    const kto = p.rozdelenie?.[0]?.klient || (p.kandidati.length === 1 ? p.kandidati[0] : "");
+    const t = (kto && trenerKlienta(kto)) || "Jerry";
+    if (t === ja) continue;
+    po.set(t, [...(po.get(t) || []), naRiadokPlatby(p)]);
+  }
+  return [...po.entries()].map(([trener, riadky]) => ({ trener, riadky }));
+}
+
+/** Rozdelenie anamnéz: čo čaká na trénera, čo na klienta a čo je hotové. */
+export function anamnezyPodlaStavu(riadky: AnamnezaRiadok[]): { naTrenera: AnamnezaRiadok[]; naKlienta: AnamnezaRiadok[]; hotove: AnamnezaRiadok[] } {
+  const out = { naTrenera: [] as AnamnezaRiadok[], naKlienta: [] as AnamnezaRiadok[], hotove: [] as AnamnezaRiadok[] };
+  for (const r of riadky) {
+    if (r.zapisAt) out.hotove.push(r);
+    else if (r.klientVyplnilAt || r.uzBol) out.naTrenera.push(r);
+    else out.naKlienta.push(r);
+  }
+  return out;
+}
 
 export function postavKarty(z: ZdrojeKariet): Karta[] {
   /**
@@ -266,13 +382,6 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
   const mena: NeznamyNazov[] = moje(z.nezname).map((n) => ({ ...n, navrh: z.navrhMena(n.nazov) }));
   // Peniaze nemajú trénera a sú Jerryho. Terezke by boli len šumom.
   /**
-   * V kope sú LEN príjmy od klientov. Vrátka z Alzy, vklad do bankomatu
-   * alebo vratka kaucie sa riešia pri nahrávaní výpisu, kde sa berie celý
-   * účet (Jerry, 23. 9. 2026) — tu by boli votrelci, nad ktorými človek
-   * každý deň znova zastane a zistí, že to nie je klient.
-   * Nezahadzujú sa: obrazovka „Platby z banky" ich ukazuje ďalej.
-   */
-  /**
    * Komu patrí platba z banky: tréner navrhnutého klienta. Platba bez návrhu
    * (appka nevie, kto poslal peniaze) ostáva Jerrymu — peniaze firmy sú jeho.
    */
@@ -283,15 +392,13 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
   const platbyZdroj = z.rozdelPeniaze
     ? z.platby.filter((p) => !ja || trenerPlatby(p) === ja)
     : ja === "Terezka" ? [] : z.platby;
-  const platby: NepriradenaPlatba[] = platbyZdroj.filter((p) => p.klientsky !== false).map((p) => ({
-    fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
-    // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
-    // nesmie, to je pravidlo platné všade v appke.
-    // Spoločný prevod sa jednému človeku nepredvyplní — patrí viacerým.
-    navrh: !p.rozdelenie && p.kandidati.length === 1 ? p.kandidati[0] : "",
-    ...(p.rozdelenie ? { rozdelenie: p.rozdelenie } : {}),
-    ...(p.poznamka ? { poznamka: p.poznamka } : {}),
-  }));
+  // Čo nevyzerá na klienta (vrátka, e-shop), ide dole: je to práca, o ktorej
+  // inak nikto nevie (1. 11. 2026, predtým len v Evidencii), a „Nie je klient"
+  // ju vybaví raz a navždy, takže nezavadzia každý deň.
+  const platby: NepriradenaPlatba[] = [
+    ...platbyZdroj.filter((p) => p.klientsky !== false),
+    ...platbyZdroj.filter((p) => p.klientsky === false),
+  ].map(naRiadokPlatby);
 
   const karty: Karta[] = [];
   /**

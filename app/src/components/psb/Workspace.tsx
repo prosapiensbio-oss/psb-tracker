@@ -16,9 +16,11 @@ import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { balicekPreOs } from "../../lib/psb/klientOsCasu";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { anamnezyPodlaStavu, BEZ_FRONTY, hromadnePresuny, klucPolozky, krokyBety, odpovedPresunu, popisZmeny, postavKarty, prijmyUInehoTrenera, terminSK, rozdelAnamnezy, trenerZPrihlasenia, zapisPoJednom, type AnamnezaRiadok, type PresunNaOdpoved, type VysledokPoJednom, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
 import { BankaUlozene } from "./BankaUlozene";
+import { BtcParovanie } from "./BtcParovanie";
+import { FioStiahnutie } from "./FioStiahnutie";
 import { BankovyImport } from "./Banka";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
 import { Zosit } from "./Zosit";
@@ -39,7 +41,7 @@ import { useMobilRozlozenie } from "./useMobilRozlozenie";
 import { ZdravieKokpitu } from "./ZdravieKokpitu";
 import { KrokDopyty, KrokUzavierka, type KrokUzavierkyKarta, ZdrojeKlientov } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
-import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
+import { AutomatickeBalicky, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, klucVybaveniaBezBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { textNadRamec } from "../../lib/psb/zostatokText";
@@ -263,6 +265,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [hladanieAnamnezy, setHladanieAnamnezy] = useState("");
   /** Pohyb, ktorý sa práve delí medzi viacerých klientov, a jeho diely. */
   const [delim, setDelim] = useState("");
+  /** Platba s faktúrou, pri ktorej človek chce zadať iného klienta než z faktúry. */
+  const [inyPrijem, setInyPrijem] = useState("");
+  /** Riadok „U Terezky čakajú príjmy" v kroku 3 rozbalený. */
+  const [cudziePrijmy, setCudziePrijmy] = useState(false);
   const [diely, setDiely] = useState<{ klient: string; suma: string }[]>([]);
   const [pracujem, setPracujem] = useState("");
   /**
@@ -799,6 +805,33 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   };
 
   /**
+   * „VŠETKY = PRESUNULI SME". Presne to isté, čo klik na štítok pri riadku —
+   * ten istý zápis po jednom (`vysvetli`) s tou istou odpoveďou (`odpovedPresunu`).
+   * Výsledok ostáva stáť a čo zlyhalo, ostane v zozname. Obnova sa oznámi raz,
+   * nie pätnásťkrát (ťažké dopyty naraz zhodili worker). Krok späť ⌘Z vracia
+   * len jednu odpoveď; hromadný zápis sa vracia v Kalendári → Nedávno vybavené.
+   */
+  const [vysledokPresunov, setVysledokPresunov] = useState<VysledokPoJednom<PresunNaOdpoved> | null>(null);
+  const zapisPresuny = async (polozky: PresunNaOdpoved[]) => {
+    const mena = polozky.map((x) => `• ${x.meno}: ${x.poznamka}`).join("\n");
+    if (!window.confirm(`Zapísať ${polozky.length}× „presunuli sme"?\n\n${mena}`)) return;
+    setPracujem("presuny"); setChyba("");
+    const v = await zapisPoJednom(polozky, async (x) => {
+      const j = await posli("/api/kalendar", { akcia: "vysvetli", id: x.id, poznamka: x.poznamka })
+        .catch((e) => ({ ok: false, error: e instanceof Error ? e.message : "spojenie" }));
+      if (!j.ok) throw new Error(j.error || "neuložilo sa");
+      setHotove((s) => new Set([...s, x.kluc]));
+    });
+    setPracujem("");
+    // Druhé tlačidlo nesmie zmazať chybu z prvého: výsledky sa sčítajú.
+    setVysledokPresunov((pred) => ({
+      hotovo: (pred?.hotovo || 0) + v.hotovo,
+      chyby: [...(pred?.chyby || []).filter((c) => !polozky.some((x) => x.id === c.polozka.id)), ...v.chyby],
+    }));
+    if (v.hotovo) oznam("kalendar");
+  };
+
+  /**
    * DÁVKOVÉ POTVRDENIE.
    *
    * Jerry, 28. 9. 2026: „vidím, že si tam môžem najprv povyplňať kto je kto,
@@ -1040,6 +1073,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         );
                     };
                     const { aktualne, archiv } = rozdelAnamnezy(k.polozky as AnamnezaRiadok[], dnesPraha());
+                    const stavy = anamnezyPodlaStavu(aktualne);
                     const najdene = archiv.filter((a) => normName(a.klient).includes(normName(hladanieArchivu)));
                     return (
                       <>
@@ -1048,7 +1082,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                             Nikto nečaká. Klient, ktorý ide na úvodný tréning, sa tu objaví sám.
                           </div>
                         )}
-                        {aktualne.map(riadokAnamnezy)}
+                        {stavy.naTrenera.length > 0 && <NadpisSekcie pocet={stavy.naTrenera.length}>Čaká na trénera</NadpisSekcie>}
+                        {stavy.naTrenera.map(riadokAnamnezy)}
+                        {stavy.naKlienta.length > 0 && <NadpisSekcie pocet={stavy.naKlienta.length}>Čaká na klienta</NadpisSekcie>}
+                        {stavy.naKlienta.map(riadokAnamnezy)}
+                        {stavy.hotove.length > 0 && <NadpisSekcie pocet={stavy.hotove.length}>Hotové</NadpisSekcie>}
+                        {stavy.hotove.map(riadokAnamnezy)}
 
                         {/* ARCHÍV. Jerry, 2. 10. 2026: „staré anamnézy zabaľ do
                             archívu." Karta mala 57 riadkov a všetky hotové —
@@ -1113,7 +1152,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 const zoradene = [...k.polozky].sort((a, b) => poradie(a) - poradie(b)
                   || String(b.pred || b.po || "").localeCompare(String(a.pred || a.po || "")));
                 let predosleP = -1;
-                return zoradene.map((z) => {
+                const hromadne = hromadnePresuny(zoradene.filter((z) => !hotove.has(klucPolozky("zmeny", z))), presuny);
+                return (<>
+                {vysledokPresunov && (
+                  <div style={{ margin: "8px 0", padding: "8px 11px", borderRadius: 8, fontSize: 12.5, color: C.text, background: mix(vysledokPresunov.chyby.length ? C.orange : C.green, 12) }}>
+                    Zapísané ako presun: {vysledokPresunov.hotovo} z {vysledokPresunov.hotovo + vysledokPresunov.chyby.length}.
+                    {vysledokPresunov.chyby.length > 0 && <> Nezapísalo sa: {vysledokPresunov.chyby.map((c) => `${c.polozka.meno} (${c.chyba})`).join(", ")}. Tie ostali v zozname.</>}
+                    {" "}Vrátiť sa dá v Kalendári → Nedávno vybavené.
+                    <button onClick={() => setVysledokPresunov(null)} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>zavrieť</button>
+                  </div>
+                )}
+                {zoradene.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
                 const t = text(kluc);
@@ -1121,11 +1170,22 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 const skupina = poradie(z);
                 const nadpis = skupina !== predosleP ? NADPISY[skupina] : null;
                 predosleP = skupina;
+                const naHromadne = skupina === 1 ? hromadne.vyzeraNaPresun : skupina === 2 ? hromadne.posuny : [];
                 return (
                   <div key={kluc}>
                   {nadpis && (
-                    <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textMuted, margin: "12px 0 5px" }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textMuted, margin: "12px 0 5px" }}>
                       {nadpis}
+                      {naHromadne.length > 1 && (
+                        <button
+                          disabled={!!pracujem}
+                          onClick={() => void zapisPresuny(naHromadne)}
+                          title="Pri každom riadku zapíše to isté, čo jeho vlastné tlačidlo „presunuli sme“"
+                          style={{ ...hlavne(true), fontSize: 11.5, letterSpacing: 0, textTransform: "none" }}
+                        >
+                          {pracujem === "presuny" ? "zapisujem…" : `${skupina === 2 ? "Všetky posuny" : "Všetky"} = presunuli sme (${naHromadne.length})`}
+                        </button>
+                      )}
                     </div>
                   )}
                   <div style={riadok}>
@@ -1175,8 +1235,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           vlastné, má pod tým políčko a to sa posiela
                           tlačidlom. */}
                       {(presun
-                        ? [`presunuli sme na ${terminSK(presun.zaciatok)}`, "klient zrušil", "chyba v zápise"]
-                        : ["klient zrušil", "presunuli sme", "chyba v zápise"]
+                        ? [odpovedPresunu(presun), "klient zrušil", "chyba v zápise"]
+                        : ["klient zrušil", odpovedPresunu(null), "chyba v zápise"]
                       ).map((d) => (
                         <button
                           key={d}
@@ -1242,7 +1302,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   </div>
                   </div>
                 );
-                });
+                })}
+                </>);
               })()}
 
               {k.druh === "mena" && k.polozky.map((n) => {
@@ -1319,14 +1380,39 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           <div style={{ minWidth: 80, fontSize: 13, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
                           <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>
                             {p.text.slice(0, 96)}
-                            {p.poznamka && <div style={{ color: C.orange, marginTop: 2 }}>{p.poznamka}</div>}
+                            {p.nevyzeraNaKlienta && <span style={{ color: C.textDim }}> · nevyzerá na klienta</span>}
+                            {p.dovod && !!t && <span style={{ color: C.textDim }}> · {p.dovod}</span>}
+                            {/* Dôvod je vidieť stále, nie v bublinke: pri peniazoch
+                                človek potvrdzuje to, čo vidí (kokpit-sa-ma-pytat). */}
+                            {p.faktura && (
+                              <div style={{ color: p.faktura.istota === "jedna" ? C.green : C.orange, marginTop: 2 }}>{p.faktura.dovod}</div>
+                            )}
+                            {p.poznamka && !p.faktura && <div style={{ color: C.orange, marginTop: 2 }}>{p.poznamka}</div>}
                             {p.rozdelenie && !delenie && (
                               <div style={{ color: C.accentLight, marginTop: 2 }}>
                                 jeden prevod za viacerých: {p.rozdelenie.map((d) => `${d.klient} ${kc(d.suma)}`).join(" + ")}
                               </div>
                             )}
                           </div>
-                          {!delenie && (
+                          {/* FAKTÚRA JE VÄZBA: VS sedí na jednu faktúru a suma tiež, stačí
+                              jeden klik. Zapisuje človek a nič sa z toho nenaučí (server). */}
+                          {!delenie && p.faktura?.istota === "jedna" && inyPrijem !== p.fioId && (() => {
+                            const klient = p.faktura.klient;
+                            return (
+                              <>
+                                <ProfilKlienta meno={klient} onKlient={naStol} />
+                                <button onClick={() => void (async () => {
+                                  const j = await vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient, zapamataj: false });
+                                  if (j?.navrh) setPonukaBalicka({ ...j.navrh, klient });
+                                })()} disabled={pracujem === kluc} style={hlavne(true)}>
+                                  {pracujem === kluc ? "…" : `Priradiť k ${klient} (faktúra ${p.faktura.cislo})`}
+                                </button>
+                                <button onClick={() => setInyPrijem(p.fioId)} style={vedlajsie}>Iný klient</button>
+                                <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "nieKlient", fioId: p.fioId })} style={vedlajsie}>Nie je klient</button>
+                              </>
+                            );
+                          })()}
+                          {!delenie && (p.faktura?.istota !== "jedna" || inyPrijem === p.fioId) && (
                             <>
                               <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
                               {mena.includes(t.trim()) && <ProfilKlienta meno={t.trim()} onKlient={naStol} />}
@@ -1772,6 +1858,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {!polozky.length && <VsetkoVybavene text="Všetko vybavené — náklady sedia a staré zaradenia sú vysvetlené." />}
             </>
           )}
+          {/* Bitcoinové platby bez dokladu cez VŠETKY mesiace. Patria k nákladom,
+              nie k nahrávaniu súborov (z Uploadu presunuté 1. 11. 2026). Krok
+              Alza v uzávierke ukazuje len svoj mesiac. */}
+          {btcUzavierky && (
+            <div style={{ marginTop: 16 }}>
+              <BtcParovanie platby={btcUzavierky.platby} faktury={btcUzavierky.faktury} parovanie={btcUzavierky.parovanie} onSparuj={btcUzavierky.onSparuj} />
+            </div>
+          )}
         </>
       );
     }
@@ -1896,12 +1990,26 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
         && (!trenerKroku || x.trener === trenerKroku)).length;
       const sumaOtazok = otazkyPlatieb(data.dlhy, data.anomalyAck).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
-      const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok;
+      const cudzie = prijmyUInehoTrenera(zdroje?.platby || [], trenerKroku, (m) => clients[m]?.primaryTrainer || "")
+        .map((x) => ({ ...x, riadky: x.riadky.filter((p) => !hotove.has(klucPolozky("platby", p))) }))
+        .filter((x) => x.riadky.length);
+      const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok && !cudzie.length;
       return (
         <>
-          <FioPrijmy onZapisane={poZapise} />
+          <div style={{ padding: "6px 0 10px" }}><FioStiahnutie onZapisane={poZapise} /></div>
           <OtazkyPlatieb dlhy={data.dlhy} acks={data.anomalyAck || {}} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} onKlient={naStol} />
           {sekcieKresli}
+          {cudzie.map((x) => (
+            <div key={x.trener} style={{ margin: "10px 0" }}>
+              <button onClick={() => setCudziePrijmy((v) => !v)} aria-expanded={cudziePrijmy}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "block", width: "100%", textAlign: "left", fontSize: 12.5, color: C.textMuted }}>
+                <span style={{ display: "inline-block", width: 14 }}>{cudziePrijmy ? "▾" : "▸"}</span>
+                U {x.trener === "Terezka" ? "Terezky" : x.trener} čaká na klienta: <b style={{ color: C.text }}>{x.riadky.length}</b> {x.riadky.length === 1 ? "príjem" : x.riadky.length < 5 ? "príjmy" : "príjmov"} · {kc(x.riadky.reduce((a, p) => a + p.suma, 0))}
+                {" — "}{x.riadky.map((p) => p.navrh || (p.faktura?.istota === "jedna" ? p.faktura.klient : "")).filter(Boolean).slice(0, 3).join(", ")}
+              </button>
+              {cudziePrijmy && obsahKarty({ druh: "platby", nadpis: "", podnadpis: "", polozky: x.riadky })}
+            </div>
+          ))}
           <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
           <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} onKlient={naStol} />
           {prazdne && <VsetkoVybavene text="Všetko vybavené — každá platba má klienta, nikto nedlží a o balíčkoch netreba nič rozhodnúť." />}
@@ -1946,7 +2054,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           polozky={zive.map((x) => ({
             kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
             nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
+            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : x.druh === "anamnezy" ? anamnezyPodlaStavu(x.polozky as AnamnezaRiadok[]).naTrenera.length : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
           }))}
           aktivna={Math.min(i, zive.length - 1)}
           onVyber={(j, smer) => prepni(smer, j)}
