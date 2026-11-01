@@ -115,6 +115,29 @@ describe("zdieľanie bežiaceho dopytu", () => {
     await f.pust();
   });
 
+  it("automatický import a balíčky pri štarte pamäť nezhodia; zmenu hlási volajúci cez oznam", async () => {
+    const f = falosny();
+    const z = vytvorZdielanie(f.fetch, { zdielane: zoznam });
+    void z.fetch("/api/a");
+    await f.pust();
+    void z.fetch("/api/platby", { method: "POST", body: JSON.stringify({ akcia: "btc-import", platby: [] }) });
+    void z.fetch("/api/balicky", { method: "POST", body: JSON.stringify({ akcia: "automaticky" }) });
+    await f.pust();
+    void z.fetch("/api/a");
+    expect(f.volania.filter((v) => v.url === "/api/a")).toHaveLength(1);
+    // Zmena: volajúci zavolá `oznam` → `zabudni`, čítanie ide na server.
+    z.zabudni();
+    void z.fetch("/api/a");
+    expect(f.volania.filter((v) => v.url === "/api/a")).toHaveLength(2);
+    // Iná akcia na tej istej adrese je zápis ako každý iný.
+    await f.pust();
+    void z.fetch("/api/balicky", { method: "POST", body: JSON.stringify({ akcia: "ukonci" }) });
+    await f.pust();
+    void z.fetch("/api/a");
+    expect(f.volania.filter((v) => v.url === "/api/a")).toHaveLength(3);
+    await f.pust();
+  });
+
   it("stav Metricoolu je POST, ale nič nezapisuje — zdieľanie nerozhodí", async () => {
     const f = falosny();
     const z = vytvorZdielanie(f.fetch, { zdielane: zoznam });

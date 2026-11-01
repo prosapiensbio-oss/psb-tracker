@@ -59,6 +59,22 @@ const ZDIELANE = new Set([
 const jeCitanieCezPost = (url: string, init?: RequestInit): boolean =>
   url === "/api/metricool" && typeof init?.body === "string" && init.body.includes('"akcia":"stav"');
 
+/**
+ * POST, KTORÝ IDE SÁM PRI ŠTARTE A SKORO VŽDY NIČ NEZMENÍ (kontrola po
+ * nasadení, 1. 11. 2026): bitcoinový import a automatické balíčky. Zahodili
+ * zdieľanú pamäť uprostred načítania, a `/api/vzas-settings`, `/api/fio`
+ * a `/api/faktury` išli preto druhýkrát, hoci nevzniklo nič.
+ *
+ * Bezpečné je to preto, že obaja volajúci hlásia zmenu sami: `oznam("peniaze")`
+ * pri `nove`, `oznam("klienti")` pri `vznikli` (App.tsx), a `oznam` pamäť zahodí.
+ * Nová adresa sem smie, len keď platí to isté.
+ */
+const jeTichyPostPriStarte = (url: string, init?: RequestInit): boolean =>
+  typeof init?.body === "string" && (
+    (url === "/api/platby" && init.body.includes('"akcia":"btc-import"'))
+    || (url === "/api/balicky" && init.body.includes('"akcia":"automaticky"'))
+  );
+
 const adresa = (input: RequestInfo | URL): string =>
   typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 
@@ -79,7 +95,7 @@ export function vytvorZdielanie(zaklad: FetchLike, volby: { teraz?: () => number
     const url = adresa(input);
     const m = metoda(input, init);
     if (m !== "GET" && m !== "HEAD") {
-      if (jeCitanieCezPost(url, init)) return zaklad(input, init);
+      if (jeCitanieCezPost(url, init) || jeTichyPostPriStarte(url, init)) return zaklad(input, init);
       zabudni();
       return zaklad(input, init).finally(zabudni);
     }

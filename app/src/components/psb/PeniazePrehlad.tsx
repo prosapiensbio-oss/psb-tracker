@@ -8,12 +8,13 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
   MATYAS, VZAS_MONTHS, VZAS_MONTH_LABELS, VZAS_TARGETS,
-  breakEvenRad, byCommitment, jarekCalc, pnlCalc, salaryCalc, vzasVerzia,
+  breakEvenRad, byCommitment, jarekCalc, pnlCalc, PRIJMY_INE, salaryCalc, vzasVerzia,
 } from "../../lib/psb/vzas";
 import { popisPoplatku, smerDlhu } from "../../lib/psb/prehladPasma";
 import { PristrojeMriezka, type Pasmo, type Pristroj } from "./Prehlad";
 import { Card, H3, Info } from "./ui";
 import * as Sk from "../../lib/psb/sklonovanie";
+import { dlznici } from "../../lib/psb/dlznici";
 
 /**
  * PENIAZE NA JEDNEJ OBRAZOVKE — skúška v bete.
@@ -138,6 +139,10 @@ export function PeniazePrehlad({ data, onNavigate }: {
     [data.dlhy],
   );
   const nezaplatene = dlhy.reduce((a, x) => a + x.suma, 0);
+  // Dnes počíta ľudí, tu sú riadky položky: pomenované oboje, aby 15 a 16 pri
+  // tej istej sume nevyzeralo ako chyba (kontrola po nasadení, 1. 11. 2026).
+  const dlzniciPocet = useMemo(() => dlznici(data.dlhy).length, [data.dlhy]);
+  const ludiaAPolozky = `${Sk.ludia(dlzniciPocet)} · ${Sk.polozky(dlhy.length)}`;
   const zisk = v.p.hrubyZisk[v.i];
   const trzby = v.p.prijmy[v.i];
   const beMes = v.be[v.i];
@@ -164,7 +169,8 @@ export function PeniazePrehlad({ data, onNavigate }: {
       id: "pp-trzby",
       label: "Tržby",
       hodnota: fmtCZK(trzby),
-      podnadpis: "prijaté peniaze",
+      // Tabuľka Tržby sú len platby klientov; tu je celý príjem z P&L.
+      podnadpis: PRIJMY_INE[v.i] > 0 ? `prijaté peniaze · z toho iné príjmy ${fmtCZK(PRIJMY_INE[v.i])}` : "prijaté peniaze",
       pasmo: trzby >= beMes ? "ok" : "zle",
       poznamka: `Break-even mesiaca je ${fmtCZK(beMes)}.`,
       vysvetlenie: "Prijaté platby, nie súčet cien sedení. Pri každom piatom sedení je cena nulová, lebo platba visí na balíčku zaplatenom dopredu.",
@@ -226,7 +232,7 @@ export function PeniazePrehlad({ data, onNavigate }: {
       id: "pp-nezaplatene",
       label: "Nezaplatené",
       hodnota: fmtCZK(nezaplatene),
-      podnadpis: `${dlhy.length} ${dlhy.length === 1 ? "položka" : dlhy.length < 5 ? "položky" : "položiek"} · obaja tréneri`,
+      podnadpis: `${ludiaAPolozky} · obaja tréneri`,
       pasmo: nezaplatene === 0 ? "ok" : nezaplatene > 30000 ? "zle" : "pozor",
       poznamka: nezaplatene === 0
         ? "Nikto nič nedlhuje."
@@ -279,7 +285,7 @@ export function PeniazePrehlad({ data, onNavigate }: {
         <Card id="pp-zoznam-nezaplatene">
           <H3>
             <Info
-              label={`Nezaplatené · ${Sk.polozky(dlhy.length)} · ${fmtCZK(nezaplatene)}`}
+              label={`Nezaplatené · ${ludiaAPolozky} · ${fmtCZK(nezaplatene)}`}
               text="Predaný balíček alebo úvodný tréning, ku ktorému nie je platba — z archívu aj z Kokpitu (jedno pravidlo „zaplatený“). Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
             />
             <button

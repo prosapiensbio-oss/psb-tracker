@@ -1071,7 +1071,7 @@ export function Dashboard({
     () => ({ trzby: stats.monthCash, klienti: stats.active, dopyty: lievikMes.dopyty, novi: lievikMes.novi, zisk: zisk?.v ?? 0 }),
     [stats.monthCash, stats.active, lievikMes.dopyty, lievikMes.novi, zisk],
   );
-  const odMinule = useZmenyOdMinule(snapHodnoty, !!stats.lastMonth);
+  const odMinule = useZmenyOdMinule(snapHodnoty, !!stats.lastMonth, trainer);
   const zmeny = useMemo<Zmena[]>(() => {
     if (!odMinule) return [];
     const p = odMinule.predtym;
@@ -1451,7 +1451,8 @@ export function Dashboard({
    * nemali existovať, nový balíček vzniká prvou hodinou — skôr hodiny bez
    * platby; celé sa to môže zrušiť a nezaplatené dať úplne navrch").
    */
-  const nezaplateneBlok = (
+  const menaDlznikov = useMemo(() => nezaplateneNaKarte.map((p) => p.meno), [nezaplateneNaKarte]);
+  const nezaplateneBlok = (hodinyDlznikov: Map<string, string>) => (
     <>
         {/* NEZAPLATENÉ — poplatky, ktoré v PTminderi stále stoja otvorené.
             V PTminderi sa poplatok po zaplatení zmaže, takže tu netreba nič
@@ -1467,14 +1468,14 @@ export function Dashboard({
                 o peniazoch. Jerry, 31. 8. 2026. */}
             <H3 style={{ marginBottom: 8 }}>
               <Info
-                text="Predané balíčky a úvodné tréningy, ku ktorým zatiaľ neprišla platba — jedno pravidlo „zaplatený“ pre celý Kokpit. Keď klient zaplatí a platba sa priradí (banka, zošit, bitcoin), z prehľadu zmizne sama. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček vzniká prvým tréningom a klient z neho čerpá, platba príde neskôr."
+                text="Predané balíčky a úvodné tréningy, ku ktorým zatiaľ neprišla platba — jedno pravidlo „zaplatený“ pre celý Kokpit. Počet sú ľudia; jeden človek môže dlžiť za viac položiek. Keď klient zaplatí a platba sa priradí (banka, zošit, bitcoin), z prehľadu zmizne sama. Kto dlží, nie je zároveň v Balíček dojde: nezaplatený balíček hodiny nedáva, takže „minuté hodiny“ tu neznamenajú ďalší predaj. Stav hodín je v riadku."
                 /* Suma červeno, tou istou farbou ako odznaky pri menách nižšie.
                    Nadpis a zoznam tak hovoria jednou farbou o jednej veci —
                    inak nadpis vyzeral ako neutrálny popisok a červené pilulky
                    pod ním ako niečo iné. Nie je to pilulka, len text: pilulka
                    vo veľkosti H3 by nadpis roztiahla a prebila by odznaky,
                    ktoré nesú konkrétne čísla. */
-                label={<>Nezaplatené ({nezaplateneNaKarte.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneNaKarte.reduce((a, p) => a + p.spolu, 0))}</span></>}
+                label={<>Nezaplatené · {Sk.ludia(nezaplateneNaKarte.length)} · <span style={{ color: C.red }}>{fmtCZK(nezaplateneNaKarte.reduce((a, p) => a + p.spolu, 0))}</span></>}
               />
             </H3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
@@ -1493,6 +1494,7 @@ export function Dashboard({
                         ? `${fmtDMY(p.polozky[0].datum)} · ${p.polozky[0].popis.split(" - from ")[0] || "poplatok"}`
                         : `${p.polozky.map((x) => fmtCZK(x.suma)).join(" + ")} · od ${fmtDMY(p.najstarsi)}`}
                       {p.platiZaNeho ? ` · platí ${p.platiZaNeho}` : ""}
+                      {hodinyDlznikov.has(normName(p.meno)) ? ` · ${hodinyDlznikov.get(normName(p.meno))}` : ""}
                     </span>
                   </button>
                   {/* Jerry, 1. 10. 2026: „Danielka je v mínuse 9 400, ale
@@ -1747,6 +1749,7 @@ export function Dashboard({
         // Bez „napísať" — správy idú z Workspace, krok SMS; klik na meno
         // otvorí profil (Jerry, 4. 10. 2026).
         hore={nezaplateneBlok}
+        dlznici={menaDlznikov}
       >
         {(uzVZozname) => {
         // Klient je na karte raz: kto je v zozname vyššie, ten tam má platnosť

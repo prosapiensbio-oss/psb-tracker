@@ -198,16 +198,34 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
 const SNAP_KEY = "psb-prehlad-snapshot";
 
 type Snapshot = { ts: number; hodnoty: Record<string, number> };
+type Uloziste = Pick<Storage, "getItem" | "setItem">;
 
 export type Zmena = { label: string; z: number; na: number; fmt: (n: number) => string; dobreHore: boolean };
 
-function nacitajSnapshot(): Snapshot | null {
+/**
+ * Porovnáva sa LEN TEN ISTÝ FILTER TRÉNERA (kontrola po nasadení, 1. 11. 2026).
+ * Snímka bola jedna: po prepnutí z Jerryho na Obaja hlásil riadok „klienti +34“,
+ * čo je rozdiel filtra, nie novinka. Každý filter má vlastnú snímku.
+ */
+const klucSnimky = (filter: string) => `${SNAP_KEY}|${filter}`;
+
+/** Vráti stav pre riadok a snímku obnoví, keď je stará. Čistá kvôli testu. */
+export function porovnajSoSnimkou(uloziste: Uloziste, filter: string, hodnoty: Record<string, number>, teraz: number): { ts: number; predtym: Record<string, number> } | null {
+  let stary: Snapshot | null = null;
   try {
-    const s = JSON.parse(localStorage.getItem(SNAP_KEY) || "null");
-    return s && typeof s.ts === "number" && s.hodnoty ? s : null;
+    const s = JSON.parse(uloziste.getItem(klucSnimky(filter)) || "null");
+    stary = s && typeof s.ts === "number" && s.hodnoty ? s : null;
   } catch {
-    return null;
+    stary = null;
   }
+  if (!stary || teraz - stary.ts > 12 * 3600_000) {
+    try {
+      uloziste.setItem(klucSnimky(filter), JSON.stringify({ ts: teraz, hodnoty }));
+    } catch {
+      /* ignore */
+    }
+  }
+  return stary ? { ts: stary.ts, predtym: stary.hodnoty } : null;
 }
 
 /**
@@ -215,23 +233,18 @@ function nacitajSnapshot(): Snapshot | null {
  * za pol dňa — inak by dve otvorenia po sebe zmazali všetko, čo sa medzitým
  * stalo, a riadok by bol navždy prázdny.
  */
-export function useZmenyOdMinule(hodnoty: Record<string, number>, pripravene: boolean) {
+export function useZmenyOdMinule(hodnoty: Record<string, number>, pripravene: boolean, filter: string) {
   const [stav, setStav] = useState<{ ts: number; predtym: Record<string, number> } | null>(null);
   useEffect(() => {
     if (!pripravene) return;
-    const stary = nacitajSnapshot();
-    const teraz = Date.now();
-    if (stary) setStav({ ts: stary.ts, predtym: stary.hodnoty });
-    if (!stary || teraz - stary.ts > 12 * 3600_000) {
-      try {
-        localStorage.setItem(SNAP_KEY, JSON.stringify({ ts: teraz, hodnoty }));
-      } catch {
-        /* ignore */
-      }
+    try {
+      setStav(porovnajSoSnimkou(localStorage, filter, hodnoty, Date.now()));
+    } catch {
+      setStav(null);
     }
     // Zámerne bez `hodnoty` v závislostiach: snapshot sa porovná a uloží raz pri
-    // otvorení, nie pri každom prepočte modelu.
-  }, [pripravene]); // eslint-disable-line react-hooks/exhaustive-deps
+    // otvorení a pri prepnutí filtra, nie pri každom prepočte modelu.
+  }, [pripravene, filter]); // eslint-disable-line react-hooks/exhaustive-deps
   return stav;
 }
 
@@ -452,7 +465,7 @@ export function PrehladPanel({
           </span>
           <span style={{ fontSize: 13, color: C.textMuted }}>
             zisk <b style={{ color: uzavrety.zisk >= 0 ? C.text : C.red, fontWeight: 700 }}>{fmtCZK(uzavrety.zisk)}</b>
-            {" · "}tržby <b style={{ color: C.text, fontWeight: 700 }}>{fmtCZK(uzavrety.trzby)}</b>
+            {" · "}príjmy <b style={{ color: C.text, fontWeight: 700 }}>{fmtCZK(uzavrety.trzby)}</b>
             {" · "}break-even {fmtCZK(uzavrety.be)}
           </span>
           {onUzavrety && <span style={{ fontSize: 12, color: C.textDim }}>→</span>}

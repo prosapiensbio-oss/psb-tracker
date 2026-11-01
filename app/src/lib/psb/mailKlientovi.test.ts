@@ -242,7 +242,7 @@ describe("hodiny, čo padli na staršie tréningy", () => {
 
   it("dlhý zoznam sa na osi neroztiahne", () => {
     const v = vetaPrevzatych({ prevzate: 4, prevzateDni: ["2026-07-01", "2026-07-03", "2026-07-08", "2026-07-10"] });
-    expect(v).toBe("4 h padly na tréninky 1. 7., 3. 7. a dalších 2");
+    expect(v).toBe("4 h padly na tréninky 1. 7., 3. 7. a další 2");
   });
 
   it("bez dátumov zostane pri starej vete, nie pri prázdne", () => {

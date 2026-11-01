@@ -1471,7 +1471,14 @@ export function PSBApp() {
       .catch(() => {});
   }, []);
 
+  /**
+   * Odtlačok posledných nahratí. Závislosť na samotnom `data.uploadLog` púšťala
+   * `/api/marketing` dvakrát pri každom štarte (prázdny zoznam, potom `/api/data`)
+   * a znova pri každej obnove dát, lebo pole je zakaždým nové (1. 11. 2026).
+   */
+  const odtlacokNahrati = JSON.stringify((data.uploadLog || []).slice(0, 3));
   useEffect(() => {
+    if (!dataHotove) return;
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: Record<string, never[]> & { gadsValuta?: string }) => {
@@ -1495,7 +1502,7 @@ export function PSBApp() {
       .catch(() => {});
     // Znova po každom nahratí (zmení sa `uploadLog`) — inak krok uzávierky
     // „Metricool" ostal neodškrtnutý až do obnovenia stránky (5. 10. 2026).
-  }, [data.uploadLog]);
+  }, [dataHotove, odtlacokNahrati]);
 
 /**
  * Ktoré faktúry dokopy tvoria jednu platbu.
@@ -1563,6 +1570,16 @@ function skupinaFaktur(
   // podľa kategórie a mesiaca a zapíšu sa do P&L; staršie mesiace zostávajú
   // z Excelu, aby sa dali oboje porovnať.
   useEffect(() => {
+    /**
+     * ČAKÁ NA `/api/data` (kontrola po nasadení, 1. 11. 2026). Prechod číta
+     * `peniazeOd`, ktorý prichádza až z `/api/data`, a od neho závisia Iné príjmy
+     * v P&L (`prijemDoPnl`). Keď Fio dobehlo prvé, október mal príjmy 249 969,
+     * keď druhé, 251 062 (o tringelt 114 a dobrytextil 979) — podľa toho, ktorý
+     * dopyt vyhral, a nič to už neprepočítalo. Rovnaký zisk ukazovala Dnes aj
+     * Uzávierka. `data.peniazeOd` v závislostiach je pre prípad, že prvé
+     * `/api/data` zlyhalo a dáta prišli až s neskoršou obnovou.
+     */
+    if (!dataHotove) return;
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
       .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string; potvrdene?: boolean; vlozene?: string }[]; pravidla?: PravidloNaKontrolu[] }) => {
@@ -1928,7 +1945,7 @@ function skupinaFaktur(
         if (nastavRucnePrijmy(rucnePrijmy)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
-  }, [btcNakupy, btcParovanie, pohybSplits, penazVerzia]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dataHotove, data.peniazeOd, btcNakupy, btcParovanie, pohybSplits, penazVerzia]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala

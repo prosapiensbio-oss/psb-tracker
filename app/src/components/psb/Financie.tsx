@@ -6,7 +6,7 @@ import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, mix, S } from "../../lib/psb/theme";
-import { pravidelneNaklady, predikciaNakladov, vzasVerzia } from "../../lib/psb/vzas";
+import { pravidelneNaklady, predikciaNakladov, PRIJMY_INE, VZAS_MONTHS, vzasVerzia } from "../../lib/psb/vzas";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
 import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
@@ -273,6 +273,14 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
       <BtcKontrola data={data} />
 
       <Card>
+        {/* Tabuľka sú platby klientov; P&L, Dnes a Uzávierka majú navyše Iné
+            príjmy. Bez vety vyzerá rozdiel 1 093 Kč v októbri ako chyba. */}
+        {data.peniazeOd && VZAS_MONTHS.some((m, i) => m >= (data.peniazeOd as string) && PRIJMY_INE[i] > 0) && (
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>
+            Sú tu platby klientov. P&amp;L, Dnes a Uzávierka k nim pripočítavajú iné príjmy (tringelt, predaj produktu):{" "}
+            {VZAS_MONTHS.map((m, i) => (m >= (data.peniazeOd as string) && PRIJMY_INE[i] > 0 ? `${monthLabel(m)} ${fmtCZK(PRIJMY_INE[i])}` : "")).filter(Boolean).join(", ")}.
+          </div>
+        )}
         <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payments Recorded (prijaté) a Payroll by Session (vyfakturované, aj rozpis po trénerovi). Sedenia za 0 Kč sa počítajú do počtu, nie do súm.</div>
         {focusMonth && (
           <div style={{ marginBottom: 10 }}>

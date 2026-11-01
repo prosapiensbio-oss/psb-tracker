@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { jeKontrolaPenazi, jeReklamaDozoru, klucSuhrnuReklam } from "./kontrolaPenazi";
+import { jeKontrolaPenazi, jeReklamaDozoru, klucSuhrnuReklam, rozpisKontrolyPenazi } from "./kontrolaPenazi";
 
 describe("kontrola peňazí ide do Workspace (Jerry, 27. 10. 2026)", () => {
   it("náklady, dvojité zápisy, pravidlá a príjmy áno; výpis z banky a bitcoin nie", () => {
@@ -20,5 +20,17 @@ describe("reklamy: jedna notifikácia na Dnes (Jerry, 27. 10. 2026)", () => {
     expect(jeReklamaDozoru("reklamy-suhrn|x")).toBe(false);
     expect(klucSuhrnuReklam(["b", "a"])).toBe(klucSuhrnuReklam(["a", "b"]));
     expect(klucSuhrnuReklam(["a"])).not.toBe(klucSuhrnuReklam(["a", "b"]));
+  });
+});
+
+describe("odznak Kontroly peňazí a text pod ním", () => {
+  it("84 výdavkov + 1 platba mesiaca = 85 a text to povie", () => {
+    const r = rozpisKontrolyPenazi({ vydavky: 84, platby: 1, kontroly: 0 });
+    expect(r.spolu).toBe(85);
+    expect(r.text).toBe("84 výdavkov na potvrdenie · 1 platba mesiaca");
+  });
+  it("prázdne časti sa nepíšu", () => {
+    expect(rozpisKontrolyPenazi({ vydavky: 0, platby: 0, kontroly: 2 })).toEqual({ spolu: 2, text: "2 náklady nesedia" });
+    expect(rozpisKontrolyPenazi({ vydavky: 0, platby: 0, kontroly: 0 })).toEqual({ spolu: 0, text: "" });
   });
 });

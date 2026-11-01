@@ -1,3 +1,4 @@
+import { rozdelDojdeADlh } from "../../lib/psb/dojdeADlh";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import type { NavFocus } from "./App";
@@ -2363,7 +2364,9 @@ export function odtrenovaneMimoExportu(
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, onVypis, matchTrener, children, poslednyReport, hore }: {
+const BEZ_DLZNIKOV: string[] = [];
+
+export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, onVypis, matchTrener, children, poslednyReport, hore, dlznici = BEZ_DLZNIKOV }: {
   udalosti: KalUdalost[];
   /**
    * Objednané tréningy ĎALEKO dopredu — len klient a deň.
@@ -2403,8 +2406,13 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
    * v „Balíček dojde" aj v „Končí platnosť").
    */
   children?: React.ReactNode | ((uzVZozname: Set<string>) => React.ReactNode);
-  /** Sekcia NAD zoznamom — v bete nezaplatené (Jerry, 4. 10. 2026). */
-  hore?: React.ReactNode;
+  /**
+   * Sekcia NAD zoznamom — nezaplatené (Jerry, 4. 10. 2026). Dostane stav hodín
+   * dlžníkov, ktorí by inak stáli v zozname (`rozdelDojdeADlh`).
+   */
+  hore?: (hodinyDlznikov: Map<string, string>) => React.ReactNode;
+  /** Kto dlží — v zozname nie je, je v Nezaplatené so stavom hodín v riadku. */
+  dlznici?: string[];
   /** Posledný import balíčkov — pri pohľade „PTminder" hovorí, k akej chvíli
    *  ten stav platí. Bez neho je potvrdené číslo bez dátumu, čiže na nič. */
   poslednyReport?: { date: string; filename: string } | null;
@@ -2555,7 +2563,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
    * nedochádza nič. Kalendár triedi podľa projekcie (po objednaných),
    * PTminder podľa toho, čo naozaj stojí v poslednom reporte.
    */
-  const riadky = useMemo(() => {
+  const riadkyVsetky = useMemo(() => {
     if (zdroj === "karta") {
       return vsetky.filter((r) => r.zostava <= 1).sort((a, b) => a.zostava - b.zostava || a.meno.localeCompare(b.meno));
     }
@@ -2606,10 +2614,11 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
         return (a.dojde || "9999").localeCompare(b.dojde || "9999") || a.meno.localeCompare(b.meno);
       });
   }, [vsetky, zdroj]);
+  const { riadky, hodinyDlznikov } = useMemo(() => rozdelDojdeADlh(riadkyVsetky, dlznici), [riadkyVsetky, dlznici]);
 
   return (
     <Card style={style}>
-      {hore && <div style={{ marginBottom: 18 }}>{hore}</div>}
+      {hore && <div style={{ marginBottom: 18 }}>{hore(hodinyDlznikov)}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
@@ -2759,7 +2768,12 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
           ))}
         </div>
       )}
-      {typeof children === "function" ? children(new Set(riadky.map((r) => r.meno))) : children}
+      {hodinyDlznikov.size > 0 && (
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+          {Sk.ludia(hodinyDlznikov.size)} s minutými hodinami dlží za balíček — sú v Nezaplatené vyššie, so stavom hodín v riadku.
+        </div>
+      )}
+      {typeof children === "function" ? children(new Set(riadkyVsetky.map((r) => r.meno))) : children}
     </Card>
   );
 }
