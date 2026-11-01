@@ -44,7 +44,10 @@ export const Route = createFileRoute("/api/ponuky")({
           const n = await nacitajPonuku(DB, p.token);
           const casy = n?.casy || [];
           const o = oknoCasov(casy);
-          const volne = volneCasy(casy, await obsadeneVOkne(DB, o.od, o.do, p.token), teraz);
+          // Výpadok dopytu nesmie vyzerať ako „všetko voľné" (obsadeneVOkne chybu púšťa von).
+          const obsadene = await obsadeneVOkne(DB, o.od, o.do, p.token).catch(() => null);
+          if (!obsadene) return chyba("Kalendár sa teraz nedá prečítať, skús to o chvíľu.", 503);
+          const volne = volneCasy(casy, obsadene, teraz);
           von.push({
             token: p.token, klient: p.klient, telefon: p.telefon, typ: p.typ, platiDo: p.plati_do,
             vybranyId: p.vybrany_id, vybranyZaciatok: p.vybrany_zaciatok || null, vybraneAt: p.vybrane_at, zruseneAt: p.zrusene_at, kto: p.kto, createdAt: p.created_at,
@@ -97,7 +100,8 @@ export const Route = createFileRoute("/api/ponuky")({
         if (casy.some((c) => c.zaciatok <= teraz)) return chyba("Niektorý termín je už v minulosti.");
         // Server overí to isté, čo obrazovka: ponuka do obsadeného času nevznikne.
         const o = oknoCasov(casy);
-        const obsadene = await obsadeneVOkne(DB, o.od, o.do);
+        const obsadene = await obsadeneVOkne(DB, o.od, o.do).catch(() => null);
+        if (!obsadene) return chyba("Kalendár sa teraz nedá prečítať, skús to o chvíľu.", 503);
         const zrazka = casy.find((c) => obsadene.some((x) => x.trener === c.trener && prekryva(c, x)));
         if (zrazka) return chyba(`Termín ${zrazka.zaciatok.slice(8, 10)}. ${zrazka.zaciatok.slice(5, 7)}. o ${zrazka.zaciatok.slice(11, 16)} je už v kalendári obsadený.`, 409);
 

@@ -1033,7 +1033,7 @@ function KontrolaWebu() {
 function NapojenieMailu() {
   type Stav = {
     nastavene: { host: string; port: number; user: string; od: string; heslo: string; ignoruj: string };
-    posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number; uzBoli?: number;
+    posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number; uzBoli?: number; zostava?: number;
       pridane: string[]; doplnene: string[]; preskocene: { predmet: string; preco: string }[]; chyba: string };
     poslednyUspech: null | { kedy: string; precitanych: number; pridanych: number };
     dopytovZMailu: number; poslednyDopyt: string | null;
@@ -1131,7 +1131,7 @@ function NapojenieMailu() {
             v Dopytoch dvakrát), takže sa sem nerátá. */}
         Priamo mailom (nie cez formulár) prišlo {stav.dopytovZMailu} {stav.dopytovZMailu === 1 ? "dopyt" : "dopytov"}
         {stav.poslednyDopyt ? `, posledný ${fmtDMY(stav.poslednyDopyt)}` : ""}.
-        {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}, už evidovaných ${p.uzBoli ?? 0}.` : " Zatiaľ nikdy nebežalo."}
+        {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}, už evidovaných ${p.uzBoli ?? 0}.${p.zostava ? ` Ďalších ${p.zostava} sa nezmestilo — prečíta ich ďalší beh.` : ""}` : " Zatiaľ nikdy nebežalo."}
         {p?.chyba ? ` Chyba: ${p.chyba}` : ""}
         {/* Pri chybe sa hlási aj posledný úspech. Poštový server vie odmietnuť
             prihlásenie aj so správnym heslom (krátke stlmenie po sérii

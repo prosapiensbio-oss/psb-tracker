@@ -8,7 +8,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
-import { stiahniSpravy, testSpojenia } from "../../lib/psb/imap";
+import { stiahniSpravy, testSpojenia, type KurzorSchranky } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
 import { adresyMailu } from "../../lib/psb/mime";
 import { deriveClients } from "../../lib/psb/compute";
@@ -247,10 +247,16 @@ export const Route = createFileRoute("/api/mail-dopyty")({
 
         const zaciatok = new Date();
         try {
-          const spravy = await stiahniSpravy({
+          // Kurzor patrí k dátumu „čítať od": keď ho Jerry v Údajoch zmení,
+          // chce čítať odznova a kurzor sa nepoužije.
+          const kurzorR = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'mail_kurzor'").first<{ value: string }>();
+          let kurzor: (KurzorSchranky & { od?: string }) | null = null;
+          try { kurzor = JSON.parse(JSON.parse(kurzorR?.value || '""') || "null"); } catch { /* prvý beh */ }
+          const { spravy, kurzor: novyKurzor, zostava } = await stiahniSpravy({
             host: n.host, port: n.port, user: n.user, heslo: n.heslo,
             odKedy: new Date(`${n.od}T00:00:00Z`),
             limit: Number(b.limit) || 40,
+            kurzor: kurzor?.od === n.od ? kurzor : null,
           });
 
           const pridane: string[] = [];
@@ -344,8 +350,14 @@ export const Route = createFileRoute("/api/mail-dopyty")({
             // Vyradené sa ukazujú zámerne: keď filter vyhodí skutočný dopyt,
             // má sa to dať zbadať. Tichý filter je horší než žiadny.
             preskocene: preskocene.slice(0, 30),
+            // Správy, ktoré sa do tohto behu nezmestili — prečíta ich ďalší.
+            zostava,
             chyba: "",
           };
+          // Až po spracovaní: beh, ktorý spadol, začne od toho istého miesta
+          // (zápis dopytu je idempotentný podľa kľúča).
+          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('mail_kurzor',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(JSON.stringify(JSON.stringify({ ...novyKurzor, od: n.od }))).run();
           await stav(DB, vysledok);
           if (pridane.length || doplnene.length) {
             await audit(DB, {

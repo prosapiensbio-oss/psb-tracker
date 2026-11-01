@@ -23,17 +23,29 @@ import { priebehBalickov } from "./vypisHodin";
 import { navrhNovehoBalicka, type NavrhNovehoBalicka } from "./workspaceKroky";
 import { sBtcZlavou } from "./btcZlavaBalicka";
 import { pokracovaniePredplatneho, type PokracovaniePredplatneho } from "./pokracovaniePredplatneho";
+import type { PSBData } from "./types";
 import { jeUkonceny } from "./ukoncenieBalicka";
 import { klucNezaplateneho } from "./zostatokKokpitu";
+
+/**
+ * Dáta a odvodení klienti — najdrahšia časť behu (loadData + deriveClients).
+ * Akcia `automaticky` ich načíta raz a podá obom návrhom; znova len vtedy, keď
+ * medzi nimi niečo zapísala (deriveClients dáta nemení, overené na ostrých).
+ */
+export type ZakladBalickov = { data: PSBData; clients: ReturnType<typeof deriveClients> };
+
+export async function nacitajZakladBalickov(DB: D1Database): Promise<ZakladBalickov> {
+  const data = await loadData(DB);
+  return { data, clients: deriveClients(data) };
+}
 
 /**
  * Předplatné, ktorým včera skončil mesiac — ďalší vznikne sám v deň po konci
  * (`pokracovaniePredplatneho`, Jerry 22. 10. 2026). Cena so zľavou za
  * bitcoin rovnako ako pri balíčku z prvého tréningu.
  */
-export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: string): Promise<PokracovaniePredplatneho[]> {
-  const data = await loadData(DB);
-  const clients = deriveClients(data);
+export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: string, zaklad?: ZakladBalickov): Promise<PokracovaniePredplatneho[]> {
+  const { data, clients } = zaklad ?? await nacitajZakladBalickov(DB);
   const bal = await DB.prepare(
     "SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at, poznamka FROM balicky",
   ).all();
@@ -58,9 +70,8 @@ export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: strin
   return out;
 }
 
-export async function navrhyNovychBalickov(DB: D1Database, dnes: string): Promise<NavrhNovehoBalicka[]> {
-  const data = await loadData(DB);
-  const clients = deriveClients(data);
+export async function navrhyNovychBalickov(DB: D1Database, dnes: string, zaklad?: ZakladBalickov): Promise<NavrhNovehoBalicka[]> {
+  const { data, clients } = zaklad ?? await nacitajZakladBalickov(DB);
   const [bal, kal] = await DB.batch([
     DB.prepare("SELECT klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, zrusene_at, poznamka FROM balicky"),
     DB.prepare("SELECT klient, trener, zaciatok, koniec, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL"),

@@ -39,6 +39,8 @@ export type VstupZdravia = {
   behy: BehAutomatu[];
   /** Pády v prehliadači za posledných 7 dní. */
   chybyPrehliadaca: { kedy: string; sprava: string }[];
+  /** Voliteľné sekcie dát, ktoré `loadData` nevedel načítať — vyzerali by ako prázdne. */
+  chybySekcii?: string[];
   /** Rozdiely medzi dvoma zdrojmi o tom istom. */
   rozpory: { nazov: string; pocet: number | null; detail?: string }[];
 };
@@ -60,6 +62,7 @@ export const MENA_AUTOMATOV: Record<string, string> = {
   "meta-reklamy": "Meta — reklamy",
   "meta-dozor": "Meta — dozor",
   "fio-banka": "Banka — pohyby z Fio",
+  "balicky-automaticky": "Automatické balíčky",
   "strazca-vyberu": "Strážca výberov (Peniaze manažér)",
 };
 
@@ -114,6 +117,14 @@ export function sekciaChyb(v: VstupZdravia): SekciaZdravia {
     stav: n === 0 ? "ok" : "pozor",
     detail: n ? v.chybyPrehliadaca.slice(0, 3).map((c) => `${c.kedy.slice(0, 16)} · ${c.sprava}`).join(" | ") : undefined,
   }];
+  if (v.chybySekcii?.length) {
+    riadky.push({
+      nazov: "Dáta, ktoré sa nenačítali",
+      hodnota: `${v.chybySekcii.length}`,
+      stav: "pozor",
+      detail: `${v.chybySekcii.join(", ")} — obrazovky ich ukazujú ako prázdne.`,
+    });
+  }
   return { nadpis: "Spadlo niečo?", riadky, stav: spolu(riadky) };
 }
 

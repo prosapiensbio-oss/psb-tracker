@@ -20,13 +20,14 @@
   "observability": { "enabled": true },
   // Každé tri hodiny = snímka kalendára (00, 03, 06 … 21 UTC).
   // 4:40 UTC = Metricool (bežiaci mesiac, prvý týždeň aj predošlý).
+  // 4:15 UTC = automatické balíčky (po banke 4:10, pred rannou dávkou 4:30).
   // 3:30 UTC = novinky v algoritmoch a text webu. Raz denne a v noci:
   // oficiálne blogy pridávajú pár správ týždenne a nikto na ne ráno nečaká.
   // 4:30 a 5:30 UTC = ranná dávka, pustí sa tá, čo je v Prahe 6:30 (leto / zima).
   // 6:45 UTC = strážca výberov; môže zazvoniť, tak až po konci nočného ticha.
   // Dobeh kalendára xx:30 vynecháva 3:30–5:30 (kolízie s nočnými behmi) a ide
   // v tej dobe o 3:15 a 5:00. Dve práce v jednej minúte stráži cronRozvrh.test.ts.
-  "triggers": { "crons": ["0 */3 * * *", "30 0-2,6-23 * * *", "15 3 * * *", "0 5 * * *", "30 3 * * *", "50 3 * * *", "55 3 * * *", "0 4 * * *", "5 4 * * *", "30 4 * * *", "30 5 * * *", "20 4 * * *", "40 4 * * *", "10 4 * * *", "45 6 * * *"] },
+  "triggers": { "crons": ["0 */3 * * *", "30 0-2,6-23 * * *", "15 3 * * *", "0 5 * * *", "30 3 * * *", "50 3 * * *", "55 3 * * *", "0 4 * * *", "5 4 * * *", "15 4 * * *", "30 4 * * *", "30 5 * * *", "20 4 * * *", "40 4 * * *", "10 4 * * *", "45 6 * * *"] },
   // Priame prepojenie na Kokpit. Cez verejnú adresu to nejde — worker volajúci
   // *.workers.dev iného workera dostane 404.
   "services": [{ "binding": "KOKPIT", "service": "kokpit" }]

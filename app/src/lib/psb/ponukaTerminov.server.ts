@@ -29,13 +29,16 @@ export async function nacitajPonuku(DB: D1Database, token: string): Promise<{ p:
  * (zmiznutá udalosť nie je obsadený čas) a termíny, ktoré si už niekto
  * vybral z INEJ ponuky. Vlastná ponuka sa vynechá — jej vybraný termín
  * už stojí v kalendári ako udalosť.
+ *
+ * CHYBA DOPYTU IDE VON. Prázdny výsledok by tu znamenal „všetko voľné" —
+ * klient by si vybral obsadený čas. Volajúci povie „skúste neskôr".
  */
 export async function obsadeneVOkne(DB: D1Database, od: string, doDna: string, okremTokenu = ""): Promise<Obsadene[]> {
   const [udalosti, vybrane] = await Promise.all([
     DB.prepare(
       `SELECT trener, zaciatok, COALESCE(koniec, zaciatok) AS koniec FROM kal_udalosti
         WHERE zmizla_at IS NULL AND zaciatok >= ?1 AND zaciatok < ?2`,
-    ).bind(od, doDna).all().then((x) => (x.results || []) as unknown as Obsadene[]).catch(() => [] as Obsadene[]),
+    ).bind(od, doDna).all().then((x) => (x.results || []) as unknown as Obsadene[]),
     // Vybraté v rozmedzí obsadí len zvolenú hodinu, nie celé rozmedzie.
     DB.prepare(
       `SELECT c.id, c.trener, c.zaciatok, c.koniec, p.vybrany_zaciatok FROM ponuky_terminov p
@@ -43,8 +46,7 @@ export async function obsadeneVOkne(DB: D1Database, od: string, doDna: string, o
         WHERE p.token != ?1 AND c.zaciatok >= ?2 AND c.zaciatok < ?3`,
     ).bind(okremTokenu, od, doDna).all()
       .then((x) => ((x.results || []) as unknown as (CasPonuky & { vybrany_zaciatok: string | null })[])
-        .map((r) => vybranyUsek(r, r.vybrany_zaciatok)) as Obsadene[])
-      .catch(() => [] as Obsadene[]),
+        .map((r) => vybranyUsek(r, r.vybrany_zaciatok)) as Obsadene[]),
   ]);
   return [...udalosti, ...vybrane];
 }

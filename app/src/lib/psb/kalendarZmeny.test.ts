@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ohlasitZmenu, sparujZmeny, tenIstyClovek, type SurovaZmena, najdiPresun } from "./kalendarZmeny";
+import { holyUid, ohlasitZmenu, prenosRucnych, sparujZmeny, tenIstyClovek, type SurovaZmena, najdiPresun, zmizlaPoKonci } from "./kalendarZmeny";
 
 /**
  * Michal Knapčok, 11. 8.: „mal tréning v stredu o 15, zrušil, program to
@@ -184,5 +184,75 @@ describe("zmiznutá hodina, ktorá sa inde objavila", () => {
 
   test("udalosť bez známeho prvého videnia sa neberie — nie je z čoho súdiť", () => {
     expect(najdiPresun(zmena, [u("2026-09-22T16:00", null)])).toBe(null);
+  });
+});
+
+describe("zmizlaPoKonci — UTC proti pražskému času", () => {
+  test("leto (CEST, +2): tréning do 10:00 zmizol o 11:00 v Prahe = 09:00 UTC", () => {
+    expect(zmizlaPoKonci("2026-07-15T09:00:00.000Z", "2026-07-15T10:00")).toBe(true);
+    // Reťazce by tvrdili opak: „…T09:00" < „…T10:00".
+    expect("2026-07-15T09:00:00.000Z" > "2026-07-15T10:00").toBe(false);
+  });
+  test("leto: zmizol o 09:30 v Prahe (07:30 UTC), tréning ešte bežal", () => {
+    expect(zmizlaPoKonci("2026-07-15T07:30:00.000Z", "2026-07-15T10:00")).toBe(false);
+  });
+  test("zima (CET, +1): hranica je o hodinu inde než v lete", () => {
+    expect(zmizlaPoKonci("2026-01-15T09:30:00.000Z", "2026-01-15T10:00")).toBe(true);
+    expect(zmizlaPoKonci("2026-01-15T08:30:00.000Z", "2026-01-15T10:00")).toBe(false);
+  });
+  test("bez časov nie je o čom hovoriť", () => {
+    expect(zmizlaPoKonci(null, "2026-01-15T10:00")).toBe(false);
+    expect(zmizlaPoKonci("2026-01-15T09:30:00.000Z", null)).toBe(false);
+  });
+});
+
+describe("prenosRucnych — presun priamo v Googli", () => {
+  const r = (uid: string, zaciatok: string, x: Partial<{ typ_rucne: number | null; klient_rucne: number | null; zmizla_at: string | null }> = {}) => ({
+    uid, zaciatok, zmizla_at: null, typ_rucne: null, klient_rucne: 0, ...x,
+  });
+  const nova = (uid: string, zaciatok: string) => ({ uid, zaciatok });
+
+  test("holyUid berie posledný oddeľovač", () => {
+    expect(holyUid("abc@google.com|2026-11-02T09:00")).toBe("abc@google.com");
+  });
+  test("jednorazová udalosť presunutá na iný deň si nesie ručné polia", () => {
+    const stara = r("a|2026-11-02T09:00", "2026-11-02T09:00", { typ_rucne: 1, klient_rucne: 1 });
+    const novy = nova("a|2026-11-04T17:00", "2026-11-04T17:00");
+    const m = prenosRucnych([novy], [stara], new Set([novy.uid]));
+    expect(m.get(novy.uid)).toBe(stara);
+  });
+  test("bez ručných polí sa nič neprenáša", () => {
+    const novy = nova("a|2026-11-04T17:00", "2026-11-04T17:00");
+    expect(prenosRucnych([novy], [r("a|2026-11-02T09:00", "2026-11-02T09:00")], new Set([novy.uid])).size).toBe(0);
+  });
+  test("cudzie UID sa nepreberá", () => {
+    const novy = nova("b|2026-11-04T17:00", "2026-11-04T17:00");
+    expect(prenosRucnych([novy], [r("a|2026-11-02T09:00", "2026-11-02T09:00", { klient_rucne: 1 })], new Set([novy.uid])).size).toBe(0);
+  });
+  test("udalosť, ktorá v súbore ostala, nie je zmiznutá", () => {
+    const stara = r("a|2026-11-02T09:00", "2026-11-02T09:00", { klient_rucne: 1 });
+    const novy = nova("a|2026-11-09T09:00", "2026-11-09T09:00");
+    const m = prenosRucnych([nova(stara.uid, stara.zaciatok), novy], [stara], new Set([stara.uid, novy.uid]));
+    expect(m.size).toBe(0);
+  });
+  test("skôr zmiznutá udalosť sa nepočíta — prenáša sa len práve zmiznutá", () => {
+    const novy = nova("a|2026-11-04T17:00", "2026-11-04T17:00");
+    const m = prenosRucnych([novy], [r("a|2026-11-02T09:00", "2026-11-02T09:00", { klient_rucne: 1, zmizla_at: "2026-10-30T00:00:00Z" })], new Set([novy.uid]));
+    expect(m.size).toBe(0);
+  });
+  test("séria posunutá o hodinu: páruje sa v rámci dňa", () => {
+    const s1 = r("a|2026-11-02T09:00", "2026-11-02T09:00", { typ_rucne: 1 });
+    const s2 = r("a|2026-11-09T09:00", "2026-11-09T09:00");
+    const n1 = nova("a|2026-11-02T10:00", "2026-11-02T10:00");
+    const n2 = nova("a|2026-11-09T10:00", "2026-11-09T10:00");
+    const m = prenosRucnych([n1, n2], [s1, s2], new Set([n1.uid, n2.uid]));
+    expect(m.get(n1.uid)).toBe(s1);
+    expect(m.has(n2.uid)).toBe(false);
+  });
+  test("nejednoznačný stav sa neháda", () => {
+    const s1 = r("a|2026-11-02T09:00", "2026-11-02T09:00", { typ_rucne: 1 });
+    const s2 = r("a|2026-11-03T09:00", "2026-11-03T09:00", { typ_rucne: 1 });
+    const n1 = nova("a|2026-11-05T10:00", "2026-11-05T10:00");
+    expect(prenosRucnych([n1], [s1, s2], new Set([n1.uid])).size).toBe(0);
   });
 });

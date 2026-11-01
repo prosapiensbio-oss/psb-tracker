@@ -26,6 +26,7 @@
 # Použitie:
 #   ./scripts/nasad.sh              build + nasadenie + overenie
 #   ./scripts/nasad.sh --bez-buildu  keď je build už hotový
+#   ./scripts/nasad.sh --len-strom   len stráž pracovného stromu (volá hotovo.sh)
 
 set -uo pipefail
 
@@ -35,6 +36,43 @@ ucet="ec175e983db96989b58758532245e031"
 worker="kokpit"
 adresa="https://kokpit.prosapiensbio.workers.dev"
 pokusov=6
+
+# ── Stráž pracovného stromu ──────────────────────────────────────────────────
+#
+# Nasadzuje sa to, čo leží na disku, nie to, čo je v gite. V tom istom repe
+# commitujú súbežné session: rozrobený súbor by odišiel naostro bez commitu
+# a strom pozadu za origin/main by mlčky zobral späť cudziu hotovú opravu
+# (a CI ju o chvíľu vráti — verzia by skákala). Nasadiť PRED pushom smie:
+# vlastné commity navyše sú v poriadku, chýbať nesmie nič z origin/main.
+straz_stromu() {
+  local spinave
+  spinave=$(git status --porcelain -- "$(git rev-parse --show-toplevel)/app" "$(git rev-parse --show-toplevel)/cron")
+  if [ -n "$spinave" ]; then
+    echo "✗ Pracovný strom nie je čistý — nasadil by sa kód, ktorý nie je v commite:"
+    echo "$spinave" | head -15 | sed 's/^/    /'
+    echo "  Commitni to (git add <súbor>) alebo nasadzuj z čistého worktree."
+    return 1
+  fi
+  if ! git fetch -q origin main 2>/dev/null; then
+    echo "✗ Nedá sa zistiť stav origin/main (git fetch zlyhal) — bez toho sa nevie, či nie si pozadu."
+    return 1
+  fi
+  local pozadu
+  pozadu=$(git rev-list --count HEAD..origin/main)
+  if [ "$pozadu" != "0" ]; then
+    echo "✗ HEAD je o $pozadu commitov pozadu za origin/main — nasadenie by vrátilo cudzie hotové zmeny:"
+    git log --oneline -5 HEAD..origin/main | sed 's/^/    /'
+    echo "  Najprv: git pull --rebase origin main (alebo rebase svojej vetvy) a potom znova."
+    return 1
+  fi
+  echo "✓ pracovný strom: čistý a nie je pozadu za origin/main"
+}
+
+# `--migracia-hotova` len zapisuje do evidencie, nič nenasadzuje.
+if [ "${1:-}" != "--migracia-hotova" ]; then
+  straz_stromu || exit 1
+fi
+[ "${1:-}" = "--len-strom" ] && exit 0
 
 # Token žije v ~/.zshrc a tento shell profil nečíta.
 if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then

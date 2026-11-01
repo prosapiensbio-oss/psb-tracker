@@ -92,3 +92,89 @@ describe("citajIcal — výkon (regres z 10. 9. 2026)", () => {
     }
   });
 });
+
+describe("INTERVAL počíta týždne od začiatku týždňa (WKST), nie od DTSTART", () => {
+  const OD = Date.parse("2026-09-01T00:00:00Z");
+  const DO = Date.parse("2026-10-20T00:00:00Z");
+  const ics = (rrule: string) => `BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:s1
+DTSTART;TZID=Europe/Prague:20260902T090000
+DTEND;TZID=Europe/Prague:20260902T100000
+RRULE:${rrule}
+SUMMARY:Séria
+END:VEVENT
+END:VCALENDAR`;
+
+  test("každé 2 týždne Po a St so začiatkom v stredu", () => {
+    // 2. 9. 2026 je streda. Týždeň od 31. 8. je „párny": po ňom až týždeň od 14. 9.
+    const dni = citajIcal(ics("FREQ=WEEKLY;WKST=MO;INTERVAL=2;BYDAY=MO,WE"), OD, DO).map((u) => u.zaciatok.slice(0, 10));
+    expect(dni).toEqual(["2026-09-02", "2026-09-14", "2026-09-16", "2026-09-28", "2026-09-30", "2026-10-12", "2026-10-14"]);
+  });
+
+  test("WKST=SU posúva hranicu týždňa, podľa RFC 5545", () => {
+    // Nedeľa 6. 9. už patrí do ďalšieho týždňa, teda vynechaného.
+    const dni = citajIcal(ics("FREQ=WEEKLY;WKST=SU;INTERVAL=2;BYDAY=SU,WE"), OD, Date.parse("2026-09-25T00:00:00Z")).map((u) => u.zaciatok.slice(0, 10));
+    expect(dni).toEqual(["2026-09-02", "2026-09-13", "2026-09-16"]);
+  });
+
+  test("jeden deň a týždenný rytmus sa nezmenili", () => {
+    expect(citajIcal(ics("FREQ=WEEKLY;INTERVAL=2;BYDAY=WE"), OD, DO).map((u) => u.zaciatok.slice(0, 10)))
+      .toEqual(["2026-09-02", "2026-09-16", "2026-09-30", "2026-10-14"]);
+    expect(citajIcal(ics("FREQ=WEEKLY;WKST=MO;INTERVAL=1;BYDAY=WE"), OD, Date.parse("2026-09-20T00:00:00Z")).map((u) => u.zaciatok.slice(0, 10)))
+      .toEqual(["2026-09-02", "2026-09-09", "2026-09-16"]);
+  });
+
+  test("COUNT ráta len skutočné výskyty", () => {
+    expect(citajIcal(ics("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=3"), OD, DO).map((u) => u.zaciatok.slice(0, 10)))
+      .toEqual(["2026-09-02", "2026-09-14", "2026-09-16"]);
+  });
+});
+
+describe("TZID iné než Praha sa prepočíta", () => {
+  const OD = Date.parse("2026-01-01T00:00:00Z");
+  const DO = Date.parse("2026-12-31T00:00:00Z");
+  const jedna = (pasmo: string, zac: string, kon: string) => `BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:x
+DTSTART;TZID=${pasmo}:${zac}
+DTEND;TZID=${pasmo}:${kon}
+SUMMARY:Cesta
+END:VEVENT
+END:VCALENDAR`;
+
+  test("New York: leto +6 h", () => {
+    const [u] = citajIcal(jedna("America/New_York", "20260715T100000", "20260715T110000"), OD, DO);
+    expect(u.zaciatok).toBe("2026-07-15T16:00");
+    expect(u.koniec).toBe("2026-07-15T17:00");
+    expect(u.uid).toBe("x|2026-07-15T16:00");
+  });
+  test("Kaliningrad bez letného času: v zime −1 h, v lete rovnako ako Praha", () => {
+    expect(citajIcal(jedna("Europe/Kaliningrad", "20260115T100000", "20260115T110000"), OD, DO)[0].zaciatok).toBe("2026-01-15T09:00");
+    expect(citajIcal(jedna("Europe/Kaliningrad", "20260715T100000", "20260715T110000"), OD, DO)[0].zaciatok).toBe("2026-07-15T10:00");
+  });
+  test("Brusel a Viedeň sú to isté ako Praha", () => {
+    expect(citajIcal(jedna("Europe/Brussels", "20260715T100000", "20260715T110000"), OD, DO)[0].zaciatok).toBe("2026-07-15T10:00");
+    expect(citajIcal(jedna("Europe/Vienna", "20260115T100000", "20260115T110000"), OD, DO)[0].zaciatok).toBe("2026-01-15T10:00");
+  });
+  test("neznáme pásmo: čas ostáva, ako stojí, a nič nespadne", () => {
+    expect(citajIcal(jedna("Central European Standard Time", "20260715T100000", "20260715T110000"), OD, DO)[0].zaciatok).toBe("2026-07-15T10:00");
+  });
+  test("pražské a bez pásma sa neprepočítavajú", () => {
+    expect(citajIcal(jedna("Europe/Prague", "20260715T100000", "20260715T110000"), OD, DO)[0].zaciatok).toBe("2026-07-15T10:00");
+  });
+  test("séria v New Yorku: BYDAY platí tam, aj keď je v Prahe už ďalší deň", () => {
+    const ics = `BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:ny
+DTSTART;TZID=America/New_York:20260706T200000
+DTEND;TZID=America/New_York:20260706T210000
+RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=3
+EXDATE;TZID=America/New_York:20260713T200000
+SUMMARY:Séria
+END:VEVENT
+END:VCALENDAR`;
+    // Pondelok 20:00 v New Yorku = utorok 2:00 v Prahe; výnimka 13. 7. vypadne.
+    expect(citajIcal(ics, OD, DO).map((u) => u.zaciatok)).toEqual(["2026-07-07T02:00", "2026-07-21T02:00"]);
+  });
+});

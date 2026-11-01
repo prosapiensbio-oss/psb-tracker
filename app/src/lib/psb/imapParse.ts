@@ -22,6 +22,34 @@ export type ImapSprava = {
 
 /** Mesiace v tvare, aký chce IMAP SEARCH SINCE (01-Jan-2026). */
 const MESIACE = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Kam až sa schránka dočítala. UID platí len v rámci jedného UIDVALIDITY. */
+export type KurzorSchranky = { uid: number; validity: string };
+
+/** `[UIDVALIDITY n]` z odpovede na SELECT; prázdne, keď ho server neposlal. */
+export const uidValidity = (selectOdpoved: string): string =>
+  /\[UIDVALIDITY (\d+)\]/i.exec(selectOdpoved)?.[1] || "";
+
+/**
+ * Ktoré správy z výsledku SEARCH čítať.
+ *
+ * Do 1. 11. 2026 sa bralo vždy najnovších `limit` — keď ich medzi dvoma behmi
+ * prišlo viac, tie staršie sa neprečítali nikdy. Teraz: keď je nových viac než
+ * `limit`, berú sa od NAJSTARŠEJ neprečítanej a zvyšok počká na ďalší beh
+ * (strop na beh ostáva, kvôli limitu CPU). Keď sa nové zmestia, správanie je
+ * ako doteraz: posledných `limit`, takže panel v Údajoch ukazuje aj nedávno
+ * vyradené a dopyt sa dá dohľadať.
+ */
+export function vyberUidy(uids: string[], limit: number, kurzor = 0): { vybrane: string[]; zostava: number; novyKurzor: number } {
+  const zoradene = [...uids].map(Number).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
+  const nove = zoradene.filter((n) => n > kurzor);
+  const vybrane = nove.length > limit ? nove.slice(0, limit) : zoradene.slice(-limit);
+  return {
+    vybrane: vybrane.map(String),
+    zostava: Math.max(0, nove.length - limit),
+    novyKurzor: Math.max(kurzor, vybrane[vybrane.length - 1] ?? 0),
+  };
+}
+
 export function imapDatum(d: Date): string {
   return `${String(d.getUTCDate()).padStart(2, "0")}-${MESIACE[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
 }

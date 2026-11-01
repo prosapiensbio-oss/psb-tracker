@@ -52,6 +52,17 @@ const uid = () => crypto.randomUUID();
  * nevyrobí dlžníkom.
  */
 export async function loadData(DB: D1Database): Promise<PSBData> {
+  /**
+   * Voliteľná sekcia smie byť prázdna, nie NEMÁ. Chýbajúci stĺpec by ju inak
+   * potichu vyprázdnil na týždne (rozbor Kokpitu, 1. 11. 2026): chyba ide do
+   * logu workera a meno sekcie do `data.chybySekcii` → Zdravie Kokpitu.
+   */
+  const chybySekcii: string[] = [];
+  const volitelna = (sekcia: string) => (e: unknown) => {
+    console.error(`loadData: sekcia ${sekcia} sa nenačítala`, e);
+    chybySekcii.push(sekcia);
+    return { results: [] as unknown[] };
+  };
   const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
@@ -60,18 +71,18 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     DB.prepare("SELECT * FROM client_overrides").all(),
     DB.prepare("SELECT * FROM anomaly_ack").all(),
     DB.prepare("SELECT * FROM upload_log ORDER BY date DESC LIMIT 40").all(),
-    DB.prepare("SELECT * FROM leads ORDER BY date DESC").all().catch(() => ({ results: [] })),
+    DB.prepare("SELECT * FROM leads ORDER BY date DESC").all().catch(volitelna("dopyty (leads)")),
     // Otvorené závery z debát — do registra sa dostanú tie, ktorým prešiel
     // termín overenia. Bez toho by rozhodnutie žilo len v Jarvisovom prompte
     // a nikto by sa k nemu nevrátil, kým sa naň sám nespýta.
     DB.prepare("SELECT id, datum, tema, zaver, preco, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'")
-      .all().catch(() => ({ results: [] })),
+      .all().catch(volitelna("závery Jarvisa")),
     // Text sa zámerne NEČÍTA — rešerš má 8 000 znakov a do kontextu každej
     // správy nepatrí. Jarvis dostane prehľad a text si vytiahne SQL dopytom,
     // keď ho naozaj potrebuje.
     DB.prepare(
       "SELECT id, nazov, o_com, zdroj, obnovovat_po_dnoch, overene_at, LENGTH(text) AS znakov FROM jarvis_vedomosti",
-    ).all().catch(() => ({ results: [] })),
+    ).all().catch(volitelna("vedomosti Jarvisa")),
     // Nezaplatené poplatky z PTminderu. Tabuľka je zrkadlo exportu: čo v nej
     // je, to je otvorené (viď migráciu 0063).
     DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky ORDER BY datum DESC")
@@ -107,7 +118,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * skôr či neskôr rozídu.
      */
     DB.prepare("SELECT klient, datum, oblasti_json, posun, poznamka, zdroj FROM klient_merania ORDER BY datum")
-      .all().catch(() => ({ results: [] })),
+      .all().catch(volitelna("pocitovka (klient_merania)")),
     // Nočná kontrola webu (migrácia 0102): POSLEDNÝ STAV KAŽDEJ KONTROLY,
     // nie posledný beh. Časti bežia každá vo vlastnom čase, takže „posledný
     // beh" by do registra pustil len tú, ktorá bežala naposledy, a rozbitý
@@ -118,7 +129,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
          JOIN (SELECT kluc, MAX(beh) beh FROM web_kontroly GROUP BY kluc) p
            ON p.kluc = w.kluc AND p.beh = w.beh
         ORDER BY w.kluc`,
-    ).all().catch(() => ({ results: [] })),
+    ).all().catch(volitelna("kontroly webu")),
   ]);
 
   const sessionsPtminder: SessionRow[] = (sessions.results as any[]).map((r) => ({
@@ -359,14 +370,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // PTmindera pred 3. 1. 2025; bez stĺpcov padne dopyt na starý tvar.
     const ptk = await DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od, lekcie_pred, prvy_trening FROM ptminder_klienti")
       .all().catch(() => DB.prepare("SELECT meno, vytvoreny, registracia, neaktivny_od FROM ptminder_klienti").all())
-      .catch(() => ({ results: [] }));
+      .catch(volitelna("klienti z PTmindera"));
     data.ptminderKlienti = Object.fromEntries((ptk.results as any[]).map((r) => [String(r.meno), {
       vytvoreny: r.vytvoreny || "", registracia: r.registracia || "", neaktivnyOd: r.neaktivny_od || "",
       lekciePred: Number(r.lekcie_pred) || 0, prvyTrening: r.prvy_trening || "",
     }]));
     const hist = await DB.prepare(
       "SELECT klient, nazov, druh, stav, hodiny, zostatok, od, do, pridane, platba FROM ptminder_historia",
-    ).all().catch(() => ({ results: [] }));
+    ).all().catch(volitelna("história balíčkov z PTmindera"));
     data.historiaBalickov = (hist.results as any[]).map((r) => ({
       client: r.klient, status: "", package: r.nazov,
       remaining: Number(r.zostatok) || 0,
@@ -489,12 +500,13 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
        FROM vzas_audit a JOIN klient_fakturacia f ON f.klient = a.payment_id
       WHERE a.action = 'fakturacne-udaje' AND a.actor LIKE 'klient%' AND a.at >= ?1
       GROUP BY a.payment_id`,
-  ).bind(odHranice).all().catch(() => ({ results: [] }))).results as any[]).map((r) => ({
+  ).bind(odHranice).all().catch(volitelna("fakturačné údaje od klientov"))).results as any[]).map((r) => ({
     klient: String(r.klient || ""), at: String(r.at || ""),
     firma: String(r.firma || ""), ico: String(r.ico || ""), dic: String(r.dic || ""),
     ulica: String(r.ulica || ""), psc: String(r.psc || ""), mesto: String(r.mesto || ""), email: String(r.email || ""),
   }));
 
+  if (chybySekcii.length) data.chybySekcii = chybySekcii;
   return data;
 }
 

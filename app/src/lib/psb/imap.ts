@@ -19,10 +19,10 @@
 
 import { connect } from "cloudflare:sockets";
 
-import { imapDatum, rozoberOdpoved } from "./imapParse";
-import type { ImapSprava } from "./imapParse";
+import { imapDatum, rozoberOdpoved, uidValidity, vyberUidy } from "./imapParse";
+import type { ImapSprava, KurzorSchranky } from "./imapParse";
 
-export type { ImapSprava } from "./imapParse";
+export type { ImapSprava, KurzorSchranky } from "./imapParse";
 export { imapDatum, rozoberOdpoved, dekoduj, dekodujTelo } from "./imapParse";
 
 const TE = new TextEncoder();
@@ -105,23 +105,25 @@ const uvodzovky = (s: string) => `"${String(s).replace(/([\\"])/g, "\\$1")}"`;
  * Stiahne správy doručené od daného dňa.
  *
  * `limit` je poistka proti tomu, aby prvý beh nad starou schránkou nezožral
- * celý procesorový čas workera: berú sa najnovšie správy, zvyšok počká na
- * ďalší beh.
+ * celý procesorový čas workera. Čo sa nezmestí, počká na ďalší beh: `kurzor`
+ * hovorí, kam až sa čítalo (`vyberUidy`), a volajúci si ten vrátený uloží až
+ * po spracovaní správ — beh, ktorý spadol, sa zopakuje od toho istého miesta.
  */
 export async function stiahniSpravy(opts: {
   host: string; port?: number; user: string; heslo: string;
-  odKedy: Date; priecinok?: string; limit?: number;
-}): Promise<ImapSprava[]> {
+  odKedy: Date; priecinok?: string; limit?: number; kurzor?: KurzorSchranky | null;
+}): Promise<{ spravy: ImapSprava[]; kurzor: KurzorSchranky; zostava: number }> {
   const s = new Spojenie(opts.host, opts.port || 993);
   try {
     await s.privitanie();
     await s.prikaz(`LOGIN ${uvodzovky(opts.user)} ${uvodzovky(opts.heslo)}`);
-    await s.prikaz(`SELECT ${uvodzovky(opts.priecinok || "INBOX")}`);
+    const validity = uidValidity(await s.prikaz(`SELECT ${uvodzovky(opts.priecinok || "INBOX")}`));
+    // Iné UIDVALIDITY = server prečísloval schránku, starý kurzor neznamená nič.
+    const odUid = opts.kurzor && opts.kurzor.validity === validity ? opts.kurzor.uid : 0;
     const hladaj = await s.prikaz(`UID SEARCH SINCE ${imapDatum(opts.odKedy)}`);
     const riadok = /^\* SEARCH([\d ]*)/m.exec(hladaj);
     const uids = (riadok?.[1] || "").trim().split(/\s+/).filter(Boolean);
-    if (!uids.length) return [];
-    const vybrane = uids.slice(-(opts.limit || 40));
+    const { vybrane, zostava, novyKurzor } = vyberUidy(uids, opts.limit || 40, odUid);
     const out: ImapSprava[] = [];
     for (const uid of vybrane) {
       const r = await s.prikaz(
@@ -129,9 +131,8 @@ export async function stiahniSpravy(opts: {
       );
       out.push({ uid, ...rozoberOdpoved(r) });
     }
-    return out;
+    return { spravy: out, kurzor: { uid: novyKurzor, validity }, zostava };
   } finally {
     await s.zavri();
   }
 }
-

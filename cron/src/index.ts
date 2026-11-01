@@ -60,6 +60,22 @@ const fioBanka = (env: Env) =>
     }),
   );
 
+/**
+ * Automatické balíčky (1. 11. 2026). Dovtedy vznikali len pri otvorení appky,
+ * takže klient bez balíčka čakal, kým niekto otvorí Kokpit. Beží raz denne po
+ * banke, vlastným spúšťačom: je to tá istá práca, akú robí prehliadač, a ťažká
+ * práca patrí do vlastnej požiadavky (limit CPU, 29. 8. 2026). Stav zapisuje
+ * `ohlas` do automaty; opakovať je to bezpečné (index z migrácie 0130).
+ */
+const automatickeBalicky = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/balicky?cron=1", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "automaticky" }),
+    }),
+  );
+
 const zavolaj = (env: Env, cesta = "/api/kalendar?cron=1") =>
   env.KOKPIT.fetch(
     // Adresa musí byť SKUTOČNÁ, hoci požiadavka ide prepojením a von nikdy
@@ -321,6 +337,10 @@ export default {
       ctx.waitUntil(ohlas(env, "fio-banka", fioBanka(env)));
       return;
     }
+    if (event.cron === "15 4 * * *") {  // po banke (4:10), pred rannou dávkou
+      ctx.waitUntil(ohlas(env, "balicky-automaticky", automatickeBalicky(env)));
+      return;
+    }
     if (event.cron === "45 6 * * *") {  // 08:45 v lete, 07:45 v zime — po banke a rannej dávke
       ctx.waitUntil(ohlas(env, "strazca-vyberu", strazcaVyberu(env)));
       return;
@@ -463,6 +483,15 @@ export default {
         return r;
       }));
       return new Response(`Fio: ${text}`, { status: 200 });
+    }
+    // `?balicky=1` založí automatické balíčky hneď a zapíše beh ako nočný.
+    if (q.get("balicky") === "1") {
+      let text = "";
+      await ohlas(env, "balicky-automaticky", automatickeBalicky(env).then(async (r) => {
+        text = `${r.status} ${(await r.clone().text()).slice(0, 400)}`;
+        return r;
+      }));
+      return new Response(`Automatické balíčky: ${text}`, { status: 200 });
     }
     if (q.get("push") === "1") {
       const r = await rannePush(env, q.get("vynutit") === "1");

@@ -39,11 +39,18 @@ export const Route = createFileRoute("/api/anomaly")({
         if (key.startsWith("zaver|")) {
           const id = key.slice(6);
           const realna = ack && note && !note.startsWith("odlozene|");
-          if (realna) {
-            await DB.prepare("UPDATE jarvis_zavery SET stav = 'vybavene', vysledok = COALESCE(NULLIF(vysledok, ''), ?2) WHERE id = ?1 AND stav = 'otvoreny'")
-              .bind(id, note.slice(0, 800)).run().catch(() => null);
-          } else if (!ack) {
-            await DB.prepare("UPDATE jarvis_zavery SET stav = 'otvoreny' WHERE id = ?1 AND stav = 'vybavene'").bind(id).run().catch(() => null);
+          try {
+            if (realna) {
+              await DB.prepare("UPDATE jarvis_zavery SET stav = 'vybavene', vysledok = COALESCE(NULLIF(vysledok, ''), ?2) WHERE id = ?1 AND stav = 'otvoreny'")
+                .bind(id, note.slice(0, 800)).run();
+            } else if (!ack) {
+              await DB.prepare("UPDATE jarvis_zavery SET stav = 'otvoreny' WHERE id = ?1 AND stav = 'vybavene'").bind(id).run();
+            }
+          } catch (e) {
+            // Odpoveď je zapísaná, ale Jarvis by záver viedol ako otvorený a appka
+            // by hlásila „hotovo". Opakovanie je bezpečné (ack aj UPDATE sú idempotentné).
+            console.error("anomaly: jarvis_zavery sa nezapísal", e);
+            return Response.json({ ok: false, error: "Záver sa v Jarvisovej pamäti nezapísal — skús to znova." }, { status: 500 });
           }
         }
         await audit(DB, { action: ack ? "skrytie-signalu" : "vratenie-signalu", predmet: key, reason: note || undefined, actor: kto || undefined });

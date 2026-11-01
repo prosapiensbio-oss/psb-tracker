@@ -138,6 +138,8 @@ export type VolbyStranky = {
   anamnezaUrl?: string | null;
   /** `true` = klient práve odoslal odpoveď; namiesto poľa sa poďakuje. */
   odpovedPoslana?: boolean;
+  /** Odpoveď sa neuložila — klient to vidí a jeho text ostáva v poli (nie v adrese). */
+  odpovedChyba?: string;
   /**
    * Fotky pred a po z úvodného — adresy obrázkov (Jerry, 28. 10. 2026:
    * „odfotíme klienta v rámci diagnostiky, počas tréningu ho narovnáme
@@ -324,9 +326,9 @@ ${cennikHtml()}
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
-  : `<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
+  : `${v.odpovedChyba !== undefined ? `<div style="margin-top:22px;border-left:3px solid #B4432F;background:#FBF3F1;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Vaši odpověď se nepodařilo uložit. Text máte níže — zkuste ho prosím odeslat znovu.</div>` : ""}<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
 <div style="font-size:15.5px;line-height:1.6;color:#3C4C42">Napište mi pár slov — co Vás překvapilo, co bolí, na co se ptáte. Nemusíte psát nic.</div>
-<textarea name="odpoved" rows="4" maxlength="1000" placeholder="pár slov stačí…" style="width:100%;box-sizing:border-box;margin-top:12px;padding:13px 14px;border:1px solid #DCE3DD;border-radius:12px;font-family:inherit;font-size:15px;color:#1A2E24;line-height:1.6;resize:vertical"></textarea>
+<textarea name="odpoved" rows="4" maxlength="1000" placeholder="pár slov stačí…" style="width:100%;box-sizing:border-box;margin-top:12px;padding:13px 14px;border:1px solid #DCE3DD;border-radius:12px;font-family:inherit;font-size:15px;color:#1A2E24;line-height:1.6;resize:vertical">${esc(v.odpovedChyba || "")}</textarea>
 <div style="margin-top:12px"><button type="submit" style="border:0;background:#1A2E24;color:#FFFFFF;border-radius:32px;padding:13px 26px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Odeslat ${esc(tr.krstne)}</button></div>
 <div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(tr.krstne)}, nikam jinam.</div>
 </form>`}

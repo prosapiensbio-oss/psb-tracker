@@ -118,6 +118,27 @@ export function jeNahladOdkazu(ua: string): boolean {
 }
 
 /**
+ * Hlási sa to samo ako robot? Úzky zoznam, NIE `jeNahladOdkazu`: tá za človeka
+ * berie len prehliadač („Mozilla/…"), kdežto kalendár v telefóne sa hlási
+ * `iOS/18.0 … dataaccessd` a vstavaný prehliadač Viberu či Telegramu nesie ich
+ * meno — a za tým je živý klient. „bot" len ako celé slovo a menovite: Android
+ * s názvom „CUBOT X18" je telefón.
+ */
+export function jeZjavnyRobot(ua: string): boolean {
+  return /\bbot\b|Googlebot|bingbot|Applebot|Twitterbot|Facebot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterestbot|YandexBot|DuckDuckBot|AhrefsBot|SemrushBot|PetalBot|GPTBot|ClaudeBot|Bytespider|crawler|spider|facebookexternalhit|SkypeUriPreview|GoogleOther|HeadlessChrome|^WhatsApp\/|^curl\/|^Wget\/|python-requests|python-urllib/i.test(ua || "");
+}
+
+/**
+ * Počíta sa stiahnutie feedu `.ics` do „odoberá"? Všetko okrem náhľadu trénera
+ * (`?nahlad=1`) a zjavného robota — inak by jeden `curl` prepísal „iPhone" na
+ * „iný" a stav odberu by klamal. Google Kalendár robotom nie je, on feed odoberá.
+ */
+export function pocitaSaStiahnutie(ua: string, nahlad: boolean): boolean {
+  if (nahlad) return false;
+  return !jeZjavnyRobot(ua);
+}
+
+/**
  * Veta o stave odberu pre dlaždicu v profile. Rozlišuje, kde sa to zaseklo:
  * stránku neotvoril / otvoril, ale kalendár si nepridal (a pri Androide
  * prečo) / odoberá.

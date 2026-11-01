@@ -13,6 +13,7 @@ import { NotFound } from "@higgsfield/quanta/not-found";
 
 import appCss from "../styles.css?url";
 import { reportHiggsfieldError } from "../lib/higgsfield-error-reporting";
+import { zapniHlasenieChyb } from "../lib/psb/hlasenieChyb";
 // Page metadata (browser <title>/favicon + social og: tags) committed into the
 // repo by the marketplace meta API and read at BUILD time — no runtime fetch.
 // Editing it via the app settings UI rewrites this file and redeploys the app.
@@ -237,6 +238,9 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Chyby, ktoré koreňová hranica nevidí (obsluha kliknutia, časovač, promise).
+  useEffect(() => zapniHlasenieChyb(), []);
 
   useEffect(() => {
     if (!__HF_DESIGN_INSPECTOR__) {

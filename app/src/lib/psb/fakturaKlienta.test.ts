@@ -115,3 +115,17 @@ describe("notifikácia: klient vyplnil fakturačné údaje", () => {
     expect(notifikacieFaktur([{ ...riadok, at: "2026-09-20T10:00:00.000Z" }], "2026-10-28")).toEqual([]);
   });
 });
+
+describe("odpoveď klienta po úvodnom sa neuložila", () => {
+  const stranka = { druh: "po" as const, trener: "Jerry", kedy: null, logoUrl: "/l.svg" };
+  it("klient to vidí a text mu ostane, escapovaný", () => {
+    const h = uvodnaStrankaHtml({ ...stranka, odpovedChyba: "bolí <koleno>" });
+    expect(h).toContain("nepodařilo uložit");
+    expect(h).toContain("bolí &lt;koleno&gt;</textarea>");
+    expect(h).not.toContain("Děkuji, přečtu si to.");
+  });
+  it("bez chyby žiadna hláška, po uložení poďakovanie", () => {
+    expect(uvodnaStrankaHtml(stranka)).not.toContain("nepodařilo uložit");
+    expect(uvodnaStrankaHtml({ ...stranka, odpovedPoslana: true })).toContain("Děkuji, přečtu si to.");
+  });
+});
