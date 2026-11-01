@@ -17,6 +17,7 @@ import { fakturaPodlaTokenu, PREDPONA_FAKTURY } from "../lib/psb/fakturaOdkaz.se
 import { fakturaStranka } from "../lib/psb/fakturaStranka";
 import { fakturaDoPdf } from "../lib/psb/fakturaPdf.server";
 import { fakturaPodlaId } from "./api/vydane-faktury";
+import { jeZjavnyRobot } from "../lib/psb/kalendarMobil";
 import { audit } from "../lib/psb/audit.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
@@ -151,6 +152,15 @@ export const Route = createFileRoute("/v/$token")({
         const r = await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
           .bind(token).first<{ klient: string; balickov: number | null }>();
         if (!r) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
+
+        /**
+         * NÁHĽAD ODKAZU NEDOSTANE VÝPIS (1. 11. 2026). Správa v telefóne či
+         * WhatsApp si odkaz stiahne sama: stálo to celý `loadData` + celú
+         * kartu, do náhľadu sa mohli dostať hodiny a suma a do `otvorene` sa
+         * to započítalo, akoby klient stránku otvoril. Človek sem nikdy nepríde
+         * (`jeZjavnyRobot`), jeho čísla sa nemenia.
+         */
+        if (jeZjavnyRobot(request.headers.get("user-agent") || "")) return prec("Výpis hodin ProSapiens — otevřete odkaz v prohlížeči.", 200);
 
         const data = await loadData(DB);
         const c = deriveClients(data)[r.klient];

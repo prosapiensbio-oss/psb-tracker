@@ -118,19 +118,24 @@ export function jeNahladOdkazu(ua: string): boolean {
 }
 
 /**
- * Počíta sa stiahnutie feedu `.ics` do „odoberá"?
- *
- * Nie cez `jeNahladOdkazu`: tá za človeka berie len prehliadač („Mozilla/…"),
- * kdežto feed sťahuje práve kalendár v telefóne (`iOS/18.0 … dataaccessd`)
- * a Google (`Google-Calendar-Importer`). Preto opačne: počíta sa všetko okrem
- * náhľadu trénera (`?nahlad=1`) a toho, čo sa samo prezradí ako robot —
- * inak by jeden `curl` prepísal „iPhone" na „iný" a stav odberu by klamal.
+ * Hlási sa to samo ako robot? Úzky zoznam, NIE `jeNahladOdkazu`: tá za človeka
+ * berie len prehliadač („Mozilla/…"), kdežto kalendár v telefóne sa hlási
+ * `iOS/18.0 … dataaccessd` a vstavaný prehliadač Viberu či Telegramu nesie ich
+ * meno — a za tým je živý klient. „bot" len ako celé slovo a menovite: Android
+ * s názvom „CUBOT X18" je telefón.
+ */
+export function jeZjavnyRobot(ua: string): boolean {
+  return /\bbot\b|Googlebot|bingbot|Applebot|Twitterbot|Facebot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterestbot|YandexBot|DuckDuckBot|AhrefsBot|SemrushBot|PetalBot|GPTBot|ClaudeBot|Bytespider|crawler|spider|facebookexternalhit|SkypeUriPreview|GoogleOther|HeadlessChrome|^WhatsApp\/|^curl\/|^Wget\/|python-requests|python-urllib/i.test(ua || "");
+}
+
+/**
+ * Počíta sa stiahnutie feedu `.ics` do „odoberá"? Všetko okrem náhľadu trénera
+ * (`?nahlad=1`) a zjavného robota — inak by jeden `curl` prepísal „iPhone" na
+ * „iný" a stav odberu by klamal. Google Kalendár robotom nie je, on feed odoberá.
  */
 export function pocitaSaStiahnutie(ua: string, nahlad: boolean): boolean {
   if (nahlad) return false;
-  const u = ua || "";
-  if (/Google-Calendar-Importer/i.test(u)) return true;
-  return !/bot\b|bot\/|crawler|spider|facebookexternalhit|WhatsApp|Slack|Telegram|Discord|Viber|Skype|GoogleOther|HeadlessChrome|curl|wget|python/i.test(u);
+  return !jeZjavnyRobot(ua);
 }
 
 /**

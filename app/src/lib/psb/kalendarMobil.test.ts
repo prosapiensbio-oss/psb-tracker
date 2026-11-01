@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, pocitaSaStiahnutie, platformaZAgenta, stavOdberu, telefonZAdresy, teloStrankyKalendara, zalom } from "./kalendarMobil";
+import { feedKlienta, jeNahladOdkazu, jeZjavnyRobot, odoberaKalendar, platformaStranky, pocitaSaStiahnutie, platformaZAgenta, stavOdberu, telefonZAdresy, teloStrankyKalendara, zalom } from "./kalendarMobil";
 
 const T = { Jerry: { krstne: "Filip", telefon: "+420 111 222 333" }, Terezka: { krstne: "Terezka", telefon: "+420 702 147 704" } } as Record<string, { krstne: string; telefon: string }>;
 const tr = (t: string) => T[t] || T.Jerry;
@@ -142,5 +142,25 @@ describe("pocitaSaStiahnutie — kto sa ráta do odberu", () => {
     for (const ua of ["curl/8.7.1", "Wget/1.21", "python-requests/2.31", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "facebookexternalhit/1.1", "WhatsApp/2.23.20.0 A", "Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/120.0"]) {
       expect(pocitaSaStiahnutie(ua, false)).toBe(false);
     }
+  });
+});
+
+describe("jeZjavnyRobot — klient s peniazmi nesmie dostať stránku pre robota", () => {
+  it("živí ľudia, aj vo vstavaných prehliadačoch", () => {
+    for (const ua of [
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+      "Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36",
+      "Mozilla/5.0 (Linux; Android 10; CUBOT X18 Plus) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
+      "Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36 Telegram-Android/11.2.2",
+      "Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36 Viber/23.1",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/FBIOS;FBAV/480.0]",
+    ]) expect(jeZjavnyRobot(ua)).toBe(false);
+  });
+  it("náhľady odkazov a skúšky", () => {
+    for (const ua of [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0",
+      "WhatsApp/2.23.20.0 A", "TelegramBot (like TwitterBot)", "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "curl/8.7.1",
+    ]) expect(jeZjavnyRobot(ua)).toBe(true);
   });
 });
