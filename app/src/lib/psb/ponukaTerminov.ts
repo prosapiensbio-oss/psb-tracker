@@ -89,6 +89,33 @@ export function platiDo(casy: { zaciatok: string }[]): string {
   return posledny ? nedelaTyzdna(posledny) : "";
 }
 
+/**
+ * Namiesto mena je v políčku telefónne číslo. Leon Box, 1. 11. 2026: človek bez
+ * profilu nebol v zozname, tak sa do „Komu" napísalo číslo. Ponuka vznikla bez
+ * telefónu (SMS sa nedala poslať) a stránka by klienta oslovila „+420".
+ */
+export const menoJeCislo = (s: string): boolean => !/\p{L}/u.test(s) && s.replace(/\D/g, "").length >= 6;
+
+/**
+ * Kedy k ponuke odišla SMS — podľa auditu `sms-ponuka` (predmet „meno · číslo").
+ * Tomu istému človeku patrí SMS najbližšej ponuke pred ňou, inak by staršia
+ * ponuka tvrdila „odišla" o správe, ktorá išla s novšou.
+ */
+export function smsKPonukam(
+  ponuky: { token: string; klient: string; created_at: string }[],
+  sms: { at: string; predmet: string }[],
+): Record<string, string | null> {
+  const von: Record<string, string | null> = {};
+  for (const p of ponuky) {
+    const dalsia = ponuky.filter((x) => x.klient === p.klient && x.created_at > p.created_at).map((x) => x.created_at).sort()[0];
+    const odisla = sms
+      .filter((m) => m.predmet.startsWith(`${p.klient} · `) && m.at >= p.created_at && (!dalsia || m.at < dalsia))
+      .map((m) => m.at).sort()[0];
+    von[p.token] = odisla || null;
+  }
+  return von;
+}
+
 /** Stav ponuky pre stránku aj zoznam v Kokpite. */
 export function stavPonuky(p: { plati_do: string; vybrany_id: string | null; zrusene_at: string | null }, dnes: string, volnych: number):
   "vybrane" | "zrusene" | "vyprsala" | "obsadene" | "caka" {

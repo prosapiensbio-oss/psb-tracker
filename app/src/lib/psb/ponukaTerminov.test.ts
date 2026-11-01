@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { denCz, icsTerminu, jeRozmedzie, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, stavPonuky, textSmsPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi, zaciatokPoKliku } from "./ponukaTerminov";
+import { denCz, icsTerminu, jeRozmedzie, menoJeCislo, nedelaTyzdna, platiDo, prahaNaUtcIcs, prekryva, prekryvVPonuke, smsKPonukam, stavPonuky, textSmsPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi, zaciatokPoKliku } from "./ponukaTerminov";
 
 // Jerry, 7. 10. 2026: „vytukal by som si všetky termíny, ktoré ponúkam,
 // poslal by som mu odkaz… klikol by na ten, ktorý chce."
@@ -122,5 +122,24 @@ describe("zaciatokPoKliku", () => {
     expect(zaciatokPoKliku(h(19, 30), zak)).toEqual({ dovod: "V tomto čase je už tréning alebo iný termín." });
     expect(zaciatokPoKliku(h(20, 30), { ...zak, doMax: h(20, 30) })).toHaveProperty("dovod");
     expect(zaciatokPoKliku(h(12), { ...zak, vMinulosti: () => true })).toEqual({ dovod: "Tento čas už bol." });
+  });
+});
+
+describe("ponuka človeku bez profilu (Leon Box, 1. 11. 2026)", () => {
+  it("číslo v políčku na meno sa pozná, meno s číslicou nie", () => {
+    expect(menoJeCislo("+420 776 192 222")).toBe(true);
+    expect(menoJeCislo("776192222")).toBe(true);
+    expect(menoJeCislo("Leon Box")).toBe(false);
+    expect(menoJeCislo("Leon 2")).toBe(false);
+    expect(menoJeCislo("")).toBe(false);
+  });
+  it("SMS patrí ponuke, po ktorej odišla; novšia ponuka bez SMS ostane bez nej", () => {
+    const pon = [
+      { token: "a", klient: "Leon Box", created_at: "2026-10-25T10:53:31Z" },
+      { token: "b", klient: "Leon Box", created_at: "2026-11-01T15:26:39Z" },
+      { token: "c", klient: "Iný Človek", created_at: "2026-10-25T10:00:00Z" },
+    ];
+    const r = smsKPonukam(pon, [{ at: "2026-10-25T10:53:50Z", predmet: "Leon Box · +420776192222" }]);
+    expect(r).toEqual({ a: "2026-10-25T10:53:50Z", b: null, c: null });
   });
 });

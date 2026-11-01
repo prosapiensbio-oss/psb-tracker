@@ -5,8 +5,9 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { KALENDAR_TRENERA, pripravCas } from "../../lib/psb/nahodTrening";
-import { DLZKA_TRENINGU, platiDo, prekryva, prekryvVPonuke, stavPonuky, volneCasy } from "../../lib/psb/ponukaTerminov";
+import { DLZKA_TRENINGU, menoJeCislo, platiDo, prekryva, prekryvVPonuke, smsKPonukam, stavPonuky, volneCasy } from "../../lib/psb/ponukaTerminov";
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, type RiadokPonuky } from "../../lib/psb/ponukaTerminov.server";
+import { cisloPreBranu } from "../../lib/psb/sms";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
 /**
@@ -39,6 +40,11 @@ export const Route = createFileRoute("/api/ponuky")({
         if (!ponuky) return chyba("Ponuky nemajú tabuľky (migrácia 0100).", 500);
         const origin = new URL(request.url).origin;
         const dnes = dnesPraha(), teraz = terazPraha();
+        // Odišla SMS? Výpadok dopytu nesmie vyzerať ako „neodišla" — vtedy zoznam mlčí.
+        const smsRiadky = ((await DB.prepare("SELECT at, payment_id FROM vzas_audit WHERE action = 'sms-ponuka' AND at >= ?1").bind(od).all().catch(() => null))?.results || null) as { at: string; payment_id: string }[] | null;
+        const smsKedy = smsRiadky ? smsKPonukam(ponuky, smsRiadky.map((x) => ({ at: x.at, predmet: x.payment_id }))) : null;
+        // Čísla aj ľudí, ktorí ešte nemajú profil — aby sa dali nájsť znova.
+        const kontakty = ((await DB.prepare("SELECT klient, telefon FROM klient_fakturacia WHERE telefon <> ''").all().catch(() => null))?.results || []) as { klient: string; telefon: string }[];
         const von = [];
         for (const p of ponuky) {
           const n = await nacitajPonuku(DB, p.token);
@@ -53,9 +59,10 @@ export const Route = createFileRoute("/api/ponuky")({
             vybranyId: p.vybrany_id, vybranyZaciatok: p.vybrany_zaciatok || null, vybraneAt: p.vybrane_at, zruseneAt: p.zrusene_at, kto: p.kto, createdAt: p.created_at,
             casy, volnych: volne.length, stav: stavPonuky(p, dnes, volne.length),
             url: verejnyOdkaz(`/t/${p.token}`, origin),
+            smsKedy: smsKedy ? smsKedy[p.token] : undefined,
           });
         }
-        return Response.json({ ok: true, ponuky: von }, { headers: { "cache-control": "no-store" } });
+        return Response.json({ ok: true, ponuky: von, kontakty }, { headers: { "cache-control": "no-store" } });
       },
 
       POST: async ({ request }) => {
@@ -77,6 +84,7 @@ export const Route = createFileRoute("/api/ponuky")({
         if (b.akcia !== "vytvor") return chyba("neznáma akcia");
         const klient = String(b.klient || "").replace(/\s+/g, " ").trim().slice(0, 120);
         if (!klient) return chyba("Komu? Chýba meno.");
+        if (menoJeCislo(klient)) return chyba("Do „Komu" patrí meno — číslo daj do políčka na telefón pod ním.");
         const telefon = String(b.telefon || "").trim().slice(0, 40) || null;
         const typ = b.typ === "uvodny" ? "uvodny" : "trening";
         const vstup = Array.isArray(b.casy) ? (b.casy as Record<string, unknown>[]) : [];
@@ -113,7 +121,20 @@ export const Route = createFileRoute("/api/ponuky")({
             .bind(c.id, token, c.trener, c.zaciatok, c.koniec)),
         ]);
         await audit(DB, { action: "ponuka-vytvorena", predmet: klient, neu: { token, terminov: casy.length, platiDo: platiDo(casy) }, actor: kto || undefined });
-        return Response.json({ ok: true, token, url: verejnyOdkaz(`/t/${token}`, new URL(request.url).origin), platiDo: platiDo(casy) });
+        /**
+         * ČÍSLO NOVÉHO ČLOVEKA SA NESMIE STRATIŤ S PONUKOU (Leon Box, 1. 11. 2026).
+         * Stálo len pri ponuke, takže o týždeň ho nebolo kde nájsť. Uloží sa ku
+         * kontaktom, ale existujúce číslo neprepíše. Ponuku to nezhodí — už stojí.
+         */
+        let upozornenie = "";
+        if (telefon && cisloPreBranu(telefon)) {
+          await DB.prepare(
+            `INSERT INTO klient_fakturacia (klient, telefon, updated_at) VALUES (?1,?2,?3)
+             ON CONFLICT(klient) DO UPDATE SET telefon = excluded.telefon, updated_at = excluded.updated_at WHERE telefon = ''`,
+          ).bind(klient, telefon, new Date().toISOString()).run()
+            .catch((e) => { upozornenie = `Ponuka je hotová, ale číslo sa k menu neuložilo: ${String(e).slice(0, 160)}`; });
+        }
+        return Response.json({ ok: true, token, url: verejnyOdkaz(`/t/${token}`, new URL(request.url).origin), platiDo: platiDo(casy), ...(upozornenie ? { upozornenie } : {}) });
       },
     },
   },
