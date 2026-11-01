@@ -189,7 +189,7 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   Skript iba číta. Keď hlási zlyhanie, over najprv kontrolu samotnú — dvakrát
   sa mýlila ona, nie appka (natvrdo napísaný kľúč; „dve úlohy o jednom človeku"
   označené za duplicitu).
-- **Definícia klienta je JEDNA: `jeKlient` v MarketingLievik.tsx** (prišiel
+- **Definícia klienta je JEDNA: `jeKlient` v compute.ts** (prišiel
   znova, alebo zaplatil nad úvodný viac než 500 Kč). Revízia 18. 8. 2026 našla
   štyri mäkšie lokálne kópie („má platbu" — spĺňal ju každý, kto prišiel na
   platený úvodný): Kampane, Platená cesta, Kohorty, dlaždica Dopyty. Všetky už
@@ -1187,6 +1187,8 @@ Stav pri spustení 22. 9. 2026: 54 klientov sedí do hodiny, **2 rozdiely**
 (Markéta Lozias, Veronika Stoklasková), 11 sa porovnať nedá.
 
 ## Súbežný chod potrebuje meradlo, nie druhú tabuľku
+
+*(História: súbežný chod skončil 20.–29. 10. 2026; `porovnanieDochadzky.ts` ani karta „Vydrží kalendár sám?“ už neexistujú.)*
 
 Jerry, 22. 9. 2026: „nemohli by sme postaviť spôsob, kde by ešte stále
 fungoval PTminder, ale súčasne by tam bola už aj samostatná evidencia,
@@ -2470,7 +2472,7 @@ vybavené". SMS sa posielajú LEN z kroku 2 (z Dnes a Kalendára preč).
 
 - **Nezaplatený balíček z Kokpitu ide do mínusu** (`nezaplateneZKokpitu`,
   počíta `loadData` raz → `data.nezaplateneKokpit`, `data.dlhKokpit`).
-  Platby sa kladú na balíčky od najstaršieho; čiastočná platba = nezaplatené.
+  Platby sa kladú na balíčky od najstaršieho; čiastočná platba = nezaplatené (od 17. 10. 2026 dáva `bezHodinZDlhov` hodiny už od 30 % sumy — pravidlo pre Lozias).
   Kartu, os aj dlh (zoznam dlžníkov, profil, QR za odkazom) rozhoduje to isté.
 - **Poistka z PTmindera** (`zaplateneVPtminderi`): kým beží PTminder, jeho
   platba alebo členstvo bez otvoreného poplatku = zaplatené. Bez nej by
@@ -2580,7 +2582,7 @@ Workspace sa vybavuje, ostatné záložky sa pozerajú a ukazujú naň.
   klientov a Chýba v PTminderi.
 - **Upload**: bez zošita, pohybov z banky a uzávierky. Ostáva nahrávanie
   súborov, ktoré inde miesto nemajú (iDoklad, Alza, Klienti, cenník…),
-  BTC párovanie a nastavenia. Zoznam všetkých mesiacov so zámkom/odomknutím
+  nastavenia (BTC párovanie je od 1. 11. 2026 v Kontrole peňazí). Zoznam všetkých mesiacov so zámkom/odomknutím
   (`Uzavierky`) je zbalený pod kartou Uzávierka mesiaca.
 - **Tréningy → Prehľad**: náročnosť len na čítanie (stĺpce „N", farby už
   správne — nízke je dobré).
@@ -2816,7 +2818,7 @@ neho tabuľka `platby`. Celý export ostáva v `data.paymentsPtminder`.
   nepriradený klientsky príjem). Pri meraní 6. 10. mal september v Kokpite
   190 026 proti 324 849 — chýbal zošit od 28. 8., bitcoin a 10 príjmov.
   Pevný dátum ako pri dochádzke by tržby zrazil o tretinu.
-- Rozhoduje SERVER (`akcia: "peniaze-od"`), tlačidlo len pýta. Späť sa dá vždy.
+- Rozhoduje SERVER (`akcia: "peniaze-od"`), tlačidlo len pýta. *(História: od 28. 10. 2026 je prepínač preč a `platby.ts` ho odmieta — peniaze od 10/2026 idú vždy z Kokpitu.)*
 - Od prepnutia sa ručný príjem (split `prijem`) do P&L nepripočíta — úvodný
   v hotovosti je platba klienta, inak by bol dvakrát.
 - **Bitcoin sa berie SÁM z BTC knihy** (`btcNaPlatby`, `akcia: "btc-import"`;
@@ -3233,3 +3235,65 @@ Za apríl – september si Jerry vybral +29 % nad nárok; s hodinami navyše za
   firmy — inak by každé odloženie rezervu znížilo.
 - **Stratový mesiac:** nárok sa nemení; čo firma nevyplatí, je kladný dlh
   firmy voči trénerovi. O ňom aj o starom dlhu sa rozhodne v decembri.
+
+## Rozbor a veľká oprava (1. 11. 2026)
+
+Jerry: „spravil detailný rozbor celého kokpitu… a oprav všetko naraz“. Rozbor:
+`rozbor-kokpitu.html` mimo repa, 9 balíkov opráv, nasadené 1. 11. (verzia 2277,
+b76aef4). Čo z toho musí vedieť ďalšia session:
+
+**Bezpečnosť**
+- Nové tajomstvo vo `vzas_settings` patrí do `TAJNE_KLUCE` (`lib/psb/tajneKluce.ts`).
+  Prehliadaču ide len `nastavene` (áno/nie), audit ho skryje sám, Jarvis (`bezpecnySql`)
+  a export ho nevidia. Hodnota sa ukáže len raz po vygenerovaní.
+- Plánovač nemá verejnú adresu (`workers_dev: false`) a `fetch` chce `x-cron-token`.
+  **Nasadzuje sa osobitne:** `cd cron && ../app/node_modules/.bin/wrangler deploy`,
+  appka prvá. `nasad.sh` ho nenasadí. Token plánovača sa porovnáva len cez
+  `jeOdPlanovaca` (`cronToken.server.ts`), stráži test.
+- Session: `users.session_ver`; verzia 0 = pôvodný tvar cookie, nikoho to neodhlási.
+  „Odhlásiť všade“ je v Uzávierke → Kontá. Zdieľané heslo s menom konta neprejde;
+  záchrana je „Zabudnuté heslo“ (prihlási ako `app`). `PSB_SESSION_SECRET` sa nemení
+  bezhlavo: zhodí aj odkazy `/v/fa…` na poslaných faktúrach.
+
+**Plánovač a notifikácie**
+- Nočné ticho 21:30–7:00 (`tichyCas.ts`): beh nič nepošle a nič nezapíše. Ranná dávka
+  ide o 6:30 Prahy celý rok: spúšťače 4:30 a 5:30 UTC, pustí sa ten pravý.
+- Stav behu berie `vyhodnotBeh` (`vysledokBehu.ts`): `ok:false` aj vnútri `vysledky`
+  je zlyhanie. Rozvrh bez kolízií stráži `cronRozvrh.test.ts`. `?push=1` je ranná
+  dávka, `?pushbeh=1` bežný beh notifikácií; oba sa dajú volať len s tokenom.
+- Automatické balíčky beží aj plánovač (4:15 UTC, `POST /api/balicky?cron=1`), nielen
+  prehliadač. Duplicitu stráži index z migrácie 0130.
+
+**Hodiny a peniaze**
+- Riadok `balicky` pre os mapuje len `balicekPreOs` (`klientOsCasu.ts`) — inak sa stratí
+  poznámka „zostatok prevzatý“. Číslo nadpisu odkazu je `zostatokNaOdkaze`.
+- Po konci platnosti: `koniec` osi = karta; `platnostSkoncila` hovorí, že nula nie je
+  dochodený balíček. Riadok si mínus nechá, do nového balíčka sa neprenáša.
+- Cena nového balíčka v QR = `ponukaNovehoBalicka` + `sBtcZlavou`, nie posledný riadok.
+- BTC: pre kľúč platby stačí akýkoľvek riadok (aj zrušený), položka sa znova neotvára.
+- Text zostatku len cez `zostatokText.ts`; mínus sa neoreže („2 h nad rámec“).
+- Skončený mesiac je plný (`kotvaDat`), odhad je vždy za mesiac po bežiacom.
+
+**Kalendár a zápisy**
+- `overIcal` + `prudkyPokles` (>50 % a ≥10): zlý súbor sa odmietne a nič nezmizne;
+  po 48 h sa pokles prijme sám. Presun v Googli prenesie ručný druh aj klienta
+  (`prenosRucnych`). `jeNahladOdkazu` sa nehodí na `.ics` ani `/v/` — tam `jeZjavnyRobot`.
+- `/v/` naďalej číta celý `loadData`: jeden klient nejde bezpečne (`deriveClients`
+  kanonizuje naprieč a odkaz číta aj cudzích, platí za). Roboti dostanú krátku stránku.
+- `data.chybySekcii` ukazuje v Zdraví Kokpitu sekciu `loadData`, ktorá zlyhala.
+
+**Texty**
+- Rod klienta: `rodKlienta`/`podlaRodu`, pri neistote neutrálna veta, nikdy mužský tvar.
+  3. pád trénera: `trenerovi()`. Počty: `import * as Sk from sklonovanie`.
+- `sms-odoslana` = výhradne SMS o hodinách; iný druh do `DRUHY_SMS_MIMO_HODIN`. Nová
+  šablóna SMS do `smsSablony.ts` s testom dĺžky. Zápis dopytu z webu len `zapisDopytZWebu`.
+- Písmo pod 12 px v `.psb-app` prebíja `styles.css`; výnimka `data-tesne`. Stráži
+  `drobnePismo.test.ts`.
+
+**Workspace a mobil**
+- `RadKariet` (rad stojí) namiesto `NekonecnyRad`; švih a šípky idú dokola ďalej.
+  Na telefóne jedno rolovanie stránky, poloha sa pamätá po kartách.
+- `spolocnyDopyt.ts` zdieľa bežiace čítania; `oznam()` a každý non-GET ich zahodí.
+- Výdavky so známym pravidlom sa potvrdzujú 1 klikom s potvrdením, nikdy samy. Príjem
+  s VS = faktúra je návrh na 1 klik (`navrhZFaktury`) a nič sa z neho nenaučí.
+- V Uploade ostal len počet BTC dokladov a odkaz; párovanie je v Kontrole peňazí.

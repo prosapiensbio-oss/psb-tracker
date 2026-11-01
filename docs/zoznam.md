@@ -17,6 +17,8 @@ Stav k **27. 10. 2026** (overené v D1: ponuku termínov si klienti vybrali už 
 **Veci s dátumom** (sem patrí všetko, čo sa nedá urobiť skôr, aby to
 nezapadlo medzi úlohami bez termínu):
 
+- **2. 11. 2026** — ranná dávka notifikácií má prvýkrát odísť o 6:30 Prahy (05:30Z, `ranne-push` v `automaty`) a automatické balíčky prvýkrát z plánovača (04:15Z). Overiť.
+- **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
   merania webu — 27. 10. 2026" nižšie).
 
@@ -762,3 +764,5 @@ načítanie je teraz 429 kB a najťažšie v ňom je naše písmo
 - **Ambiguózne meno v kalendári sa nemá auto-priradiť** — hotové 22. 9.
   (kal_mapovanie.cas + vedome).
 - **Dve klientky „Marketa"** — tým istým zásahom.
+
+- **1. 11. 2026, rozbor a veľká oprava:** 9 balíkov nasadených (verzia 2277), podrobne v CLAUDE.md „Rozbor a veľká oprava“.

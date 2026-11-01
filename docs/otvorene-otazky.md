@@ -1,5 +1,7 @@
 # Otvorené úlohy a otázky
 
+> **ARCHÍV (stav k 26. 8. 2026). Živý zoznam je `docs/zoznam.md`.**
+
 **Stav k 26. 8. 2026.** Predchádzajúci zoznam (13. 8.) je v archíve dole.
 
 Tento súbor drží to, čo čaká na **Jerryho**. Čo je na mne, je v druhej časti.
