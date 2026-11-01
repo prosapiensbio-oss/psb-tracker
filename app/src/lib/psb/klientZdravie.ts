@@ -220,7 +220,7 @@ export function zdravieKlienta(
 
   const zaver = tón === "dobre"
     ? "Nič nenaznačuje odchod."
-    : `${zle >= 2 ? "Pozor" : "Stojí za pohľad"}: ${zlé.join(" a ")} ${zlé.length > 1 ? "sa zhoršili" : "sa zhoršilo"}${dobré.length ? `, ale ${dobré.join(" a ")} drží` : ""}.`;
+    : `${zle >= 2 ? "Pozor" : "Stojí za pohľad"}: zhoršenie — ${zlé.join(" a ")}${dobré.length ? `, ale ${dobré.join(" a ")} drží` : ""}.`;
 
   return { signaly, zaver, tón };
 }

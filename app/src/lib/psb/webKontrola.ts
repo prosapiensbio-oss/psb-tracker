@@ -193,7 +193,7 @@ export function skontrolujStranku(url: string, html: string, js: string): NalezK
   }
 
   if (!problemy.length) {
-    return { kluc, nazov, stav: "ok", detail: `${ciel} · ${vid.length} polí na obrazovke, ${skr.length} v plugine, všetky povinné kryté, prepínače sa párujú ${pravidlo}` };
+    return { kluc, nazov, stav: "ok", detail: `${ciel} · polí na obrazovke: ${vid.length}, ${skr.length} v plugine, všetky povinné kryté, prepínače sa párujú ${pravidlo}` };
   }
   const tvrde = problemy.some((p) => !p.startsWith("cieľ "));
   return { kluc, nazov, stav: tvrde ? "chyba" : "varovanie", detail: problemy.join(" · ") };
