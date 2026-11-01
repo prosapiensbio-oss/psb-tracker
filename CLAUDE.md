@@ -3313,3 +3313,8 @@ b76aef4). Čo z toho musí vedieť ďalšia session:
   telefóne. Pri `premenovane` nesú `pred` a `po` názvy, nie čas (`dniZmeny`) — výpočet
   týždňa z názvu zhodil celú appku.
 
+**Rozhodnutia Jerryho po rozbore (1. 11.)**
+- Klientom sa všade tyká (stránky, SMS, výpisový mail). Výnimka: mail s faktúrou má prepínač, firma má predvolené vykanie; PDF faktúry je formálne. Nový klientsky text patrí do `tykanie.test.ts`.
+- Zrušený automatický balíček sa na ten istý deň neobnoví (`zruseneAutomaty`); ďalší tréning na inom dátume založí podľa pravidla. Kto ruší balíček v kóde a má vzniknúť znova, pridá `ZNACKA_POSUNU_ZA_DOPLNENIE`.
+- Vrátenie za nákup vedený ako výplata patrí do tej istej výplaty (Dual Trade 979 Kč, Chata 11 000 Kč). Prevod na rezervný účet je `rezerva`. Papiež: doplnenie 3 h ostáva (oznámená dovolenka). Terezke sa záložky neskrývajú. Odhad pod break-even ostáva červený.
+

@@ -455,7 +455,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - [ ] **Dva staré administrátorské účty STÁLE SÚ** — Nika Pastorová
   (pastorova@emglare.com) a Admin Systedo (admin@systedo.cz). Administrátori sú
   stále traja.
-- [ ] **Zmazať Slider Revolution a WPBakery** — od 26. 10. vypnuté, ale
+- [x] *(Jerry 1. 11. 2026: zmazané; `/wp-content/plugins/revslider/readme.txt` aj `js_composer` vracajú 404.)* **Zmazať Slider Revolution a WPBakery** — od 26. 10. vypnuté, ale
   nainštalované, a Wordfence ich 27. 10. označil ako ZRANITEĽNÉ. Keďže na
   hostingu nie je ani jeden FTP účet, je to najpravdepodobnejšia cesta, ktorou
   sa 19. 10. dostal dnu backdoor.
