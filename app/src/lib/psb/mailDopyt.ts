@@ -42,7 +42,7 @@ export type MailVysledok =
  * niektoré čítačky predmet pri mailto ponechajú, iné doň vlepia odpoveď.
  */
 export function jeZiadostOHistoriu(predmet: string): boolean {
-  return /cel[áa]\s+hist[óo]ri[ae].{0,10}tr[ée]ning/i.test(predmet || "");
+  return /cel[áa]\s+hist[óo]ri[ae].{0,10}tr[ée]nin[gk]/i.test(predmet || "");
 }
 
 /** Technické adresy, ktoré nikdy nie sú dopyt. */

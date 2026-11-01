@@ -149,7 +149,7 @@ export const casHHMM = (s: string) => `${Number(s.slice(11, 13))}:${s.slice(14, 
  */
 export function textSmsPonuky(oslovenie: string, url: string, podpis: string): string {
   const o = vokativ(oslovenie.trim());
-  return bezDiakritiky(`${o ? `${o}, p` : "P"}osilam volne terminy, vyberte si: ${url} ${podpis}`).trim();
+  return bezDiakritiky(`Ahoj${o ? ` ${o}` : ""}, posilam volne terminy, vyber si: ${url} ${podpis}`).trim();
 }
 
 /**

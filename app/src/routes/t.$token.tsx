@@ -33,7 +33,7 @@ const krstne = oslovenieKlienta;
  */
 const skusteNeskor = (e: unknown) => {
   console.error("/t/: stránka ponuky sa nedá poskladať", e);
-  return zle("Termíny se teď nepodařilo načíst. Zkuste to prosím za chvíli.", 503);
+  return zle("Termíny se teď nepodařilo načíst. Zkus to prosím za chvíli.", 503);
 };
 
 async function stav(DB: NonNullable<ReturnType<typeof bindings>["DB"]>, token: string, chyba?: string) {
@@ -67,7 +67,7 @@ export const Route = createFileRoute("/t/$token")({
         if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return zle("Tento odkaz neplatí.");
         let x: Awaited<ReturnType<typeof stav>>;
         try { x = await stav(DB, token); } catch (e) { return skusteNeskor(e); }
-        if (!x) return zle("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.");
+        if (!x) return zle("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.");
         const url = new URL(request.url);
         // „Přidat do kalendáře" — udalosť pre telefón klienta.
         if (url.searchParams.get("ics") && x.s.druh === "vybrane") {
@@ -78,9 +78,9 @@ export const Route = createFileRoute("/t/$token")({
           }), { headers: { "content-type": "text/calendar; charset=utf-8", "content-disposition": "attachment; filename=trenink.ics", "cache-control": "no-store" } });
         }
         const chyba = url.searchParams.get("chyba") === "obsazeno"
-          ? "Tento termín si mezitím vybral někdo jiný. Vyberte prosím jiný."
+          ? "Tento termín si mezitím vybral někdo jiný. Vyber si prosím jiný."
           : url.searchParams.get("chyba") === "zapis"
-            ? "Termín se nepodařilo zapsat do kalendáře. Zkuste to prosím znovu, nebo napište."
+            ? "Termín se nepodařilo zapsat do kalendáře. Zkus to prosím znovu, nebo napiš."
             : undefined;
         const s = chyba && x.s.druh === "vyber" ? { ...x.s, chyba } : x.s;
         return html(ponukaStrankaHtml({ token, oslovenie: krstne(x.p.klient), trener: x.trener, logoUrl: `${url.origin}/znacka-napis-tmava.svg`, stav: s, typ: x.p.typ }));

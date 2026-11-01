@@ -51,8 +51,8 @@ export const Route = createFileRoute("/d/$token")({
         if (s.stav === "pouzity" || !s.kolo) return html(dotaznikHotovo({ uzPredtym: true }));
         const f = new URLSearchParams(await request.text().catch(() => ""));
         const v = await ulozOdpoved(DB, token, s.kolo, rozoberFormular(f)).catch(() => null);
-        if (v === null) return html(dotaznikStranka({ chyba: "Odpověď se nepodařilo uložit — zkuste to prosím znovu." }), 500);
-        if (v === "prazdne") return html(dotaznikStranka({ chyba: "Nevyplnili jste nic — stačí odpovědět aspoň na jednu otázku." }));
+        if (v === null) return html(dotaznikStranka({ chyba: "Odpověď se nepodařilo uložit — zkus to prosím znovu." }), 500);
+        if (v === "prazdne") return html(dotaznikStranka({ chyba: "Nic tu není vyplněné — stačí odpovědět aspoň na jednu otázku." }));
         // 303 → GET: obnovenie stránky po odoslaní neodošle formulár druhýkrát.
         return new Response(null, { status: 303, headers: { location: `/d/${encodeURIComponent(token)}?hotovo=1`, "cache-control": "no-store" } });
       },

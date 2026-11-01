@@ -51,7 +51,8 @@ import {
 } from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
 import { SmsKlientovi } from "./SmsKlientovi";
-import { bezDiakritiky, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { textSmsPoUvodnom, textSmsPredUvodnym } from "../../lib/psb/smsSablony";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
@@ -2468,10 +2469,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       setUvOdkaz(r.odkaz);
       // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov namiesto 160
       // a z jednej správy by boli tri.
-      setUvText(bezDiakritiky(uvDruh === "po"
-        ? `Dekujeme za ucast na uvodni lekci. Termin dalsiho treninku, souhrn i doporucene cteni najdete zde: ${r.odkaz}`
-        : `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`,
-      ));
+      setUvText(uvDruh === "po" ? textSmsPoUvodnom(item.oKom || "", r.odkaz) : textSmsPredUvodnym(item.oKom || "", r.odkaz));
     } catch {
       setUvChyba("Odkaz sa nepodarilo vyrobiť — skús znova.");
     } finally {

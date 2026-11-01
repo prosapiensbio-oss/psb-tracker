@@ -283,26 +283,47 @@ export const czk = (n: number) => `${Math.round(n).toLocaleString("sk-SK").repla
  */
 export const tempoSK = (zaMesiac: number): string => zaMesiac.toFixed(1).replace(".", ",");
 
-const mesiacovSK = (n: number) => `${n} ${n === 1 ? "mesiac" : n < 5 ? "mesiace" : "mesiacov"}`;
+const mesiacovCZ = (n: number) => `${n} ${n === 1 ? "měsíc" : n < 5 ? "měsíce" : "měsíců"}`;
 
 /**
- * „zostáva 1 h", „zostávajú 2 h", „zostáva 5 h".
+ * Posledná slovenčina na povrchu. Popisy riadkov nesú názvy produktov
+ * z PTmindera a tie sú miešané — „Doplnenie členstva" prechádza
+ * `nazovProduktu` zámerne nezmenené (je to interný presun zostatku, nie
+ * predaj). Na českej stránke aj v maili to klient čítal po slovensky, takže tu
+ * stojí slovníček pre POVRCH: v dátach ani v appke sa nič neprepisuje.
  *
- * Sloveso sa v slovenčine pri dvoch až štyroch mení a mail, ktorý číta
- * zákazník, si to nemôže dovoliť zle. Tú istú vetu používa aj SMS.
+ * Bez `\b` zámerne: v JS regexe nie je medzi „é" a medzerou hranica slova
+ * (é nie je `\w`), takže `/\bzaplatené\b/` nenašlo nič.
  */
-export const zostavaHodin = (n: number): string => `${n >= 2 && n <= 4 ? "zostávajú" : "zostáva"} ${n} h`;
+export const cesky = (t: string) =>
+  t
+    .replace(/doplnenie\s+členstva/gi, "Doplnění hodin")
+    .replace(/prenesené\s+hodiny/gi, "Přenesené hodiny")
+    .replace(/zaplatené/g, "zaplaceno")
+    .replace(/vrátené/g, "vráceno")
+    .replace(/koniec\s+platnosti/gi, "konec platnosti")
+    .replace(/tréning/g, "trénink")
+    .replace(/hodín/g, "hodin");
+
+/**
+ * „zbývá 1 h", „zbývají 2 h", „zbývá 5 h".
+ *
+ * Sloveso sa v češtine pri dvoch až štyroch mení a mail, ktorý číta
+ * zákazník, si to nemôže dovoliť zle.
+ */
+export const zostavaHodin = (n: number): string => `${n >= 2 && n <= 4 ? "zbývají" : "zbývá"} ${n} h`;
 
 /**
  * Predmet žiadosti o históriu — podľa NEHO Kokpit žiadosť spozná pri čítaní
- * schránky (`jeZiadostOHistoriu` v mailDopyt.ts). Meniť ich treba spolu.
+ * schránky (`jeZiadostOHistoriu` v mailDopyt.ts). Meniť ich treba spolu — a tá
+ * musí poznať aj staré slovenské znenie z mailov, ktoré už u klientov sú.
  */
-export const PREDMET_HISTORIE = "Celá história tréningov a platieb";
+export const PREDMET_HISTORIE = "Celá historie tréninků a plateb";
 export const ADRESA_HISTORIE = "info@prosapiens.cz";
 
 const mailtoHistoria = (klient: string): string => {
   const subject = encodeURIComponent(`${PREDMET_HISTORIE} — ${klient}`);
-  const body = encodeURIComponent("Dobrý den, prosím o celou historii mých tréninků a plateb.");
+  const body = encodeURIComponent("Ahoj, prosím o celou historii mých tréninků a plateb.");
   return `mailto:${ADRESA_HISTORIE}?subject=${subject}&amp;body=${body}`;
 };
 
@@ -315,9 +336,9 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   const skoncil = doslo && !!v.platnostSkoncila;
 
   const predmet = v.uplna
-    ? "Tvoje tréningy a platby — ProSapiens"
-    : skoncil ? "Balíček skončil — výpis" : doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
-  const nadpis = v.uplna ? "Celá história" : skoncil ? "Balíček skončil" : doslo ? "Balíček dochodený" : "Tvoja dochádzka";
+    ? "Tvoje tréninky a platby — ProSapiens"
+    : skoncil ? "Balíček skončil — výpis" : doslo ? "Balíček dochozený — výpis a platba" : "Tvoje docházka v ProSapiens";
+  const nadpis = v.uplna ? "Celá historie" : skoncil ? "Balíček skončil" : doslo ? "Balíček dochozený" : "Tvoje docházka";
   const dnesnaHodina = !!v.dnes && !!posledny && posledny.slice(0, 10) === v.dnes;
   /**
    * Hodiny NAD RÁMEC balíčka. Tie sa nesmú schovať za „dochodený": klient
@@ -328,18 +349,18 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   // Pri úplnej histórii sa nehovorí o dochodenom balíčku — klient si pýtal
   // prehľad; stav balíčka aj tak vidí na konci osi.
   const uvod = v.uplna
-    ? "posielam celú históriu tréningov aj platieb."
+    ? "posílám celou historii tréninků i plateb."
     : navyse
-    ? `${dnesnaHodina ? "dnes si mal" : "mal si"} ${navyse === 1 ? "hodinu" : `${navyse} hodiny`} nad rámec balíčka — ${navyse === 1 ? "je" : "sú"} v ďalšej platbe.`
+    ? `${dnesnaHodina ? "i s dneškem máš" : "máš"} ${navyse === 1 ? "hodinu" : navyse < 5 ? `${navyse} hodiny` : `${navyse} hodin`} nad rámec balíčka — ${navyse === 1 ? "je" : "jsou"} v další platbě.`
     : skoncil
-      ? "tvoj posledný balíček už skončil."
+      ? "tvůj poslední balíček už skončil."
     : doslo
       ? dnesnaHodina
-        ? "dnes si mal poslednú hodinu z balíčka."
+        ? "dnes proběhla poslední hodina z balíčka."
         : posledny
-          ? `balíček máš dochodený — posledná hodina bola ${denSK(posledny)}.`
-          : "balíček máš dochodený."
-      : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posielam ti prehľad tréningov.";
+          ? `balíček máš dochozený — poslední hodina byla ${denSK(posledny)}.`
+          : "balíček máš dochozený."
+      : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posílám ti přehled tréninků.";
 
   /**
    * OS KONČÍ TÝM, ČO KLIENTA ZAUJÍMA — koľko mu zostáva.
@@ -354,7 +375,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       ? v.os
       : [...v.os, {
         den: "",
-        popis: skoncil ? "Balíček skončil" : v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
+        popis: skoncil ? "Balíček skončil" : v.zostatok <= 0 ? "Balíček dochozený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
         druh: "balicekDo" as const,
       }]),
     // Najbližší termín je posledný bod osi, lebo ňou naozaj je — os ide
@@ -362,20 +383,20 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     ...(v.dalsi ? [{
       den: v.dalsi.slice(0, 10),
       cas: v.dalsi.length > 10 ? v.dalsi.slice(11, 16) : undefined,
-      popis: "Najbližší tréning",
+      popis: "Nejbližší trénink",
       druh: "dalsi" as const,
     }] : []),
   ];
 
   /** Tri čísla, ktoré o klientovi niečo hovoria. „0 h zostáva" medzi ne nepatrí. */
   const staty: [string, string][] = [
-    [`${v.hodinSpolu} h`, "odtrénované spolu"],
+    [`${v.hodinSpolu} h`, "odtrénováno celkem"],
     // Úplná história je odpoveď aj na „koľko som u vás nechal" — tempo by tu
     // bolo vata, zaplatená suma je to, čo si klient pýtal.
     ...(v.uplna && v.zaplateneSpolu
-      ? [[czk(v.zaplateneSpolu), "zaplatené spolu"] as [string, string]]
-      : v.tempo ? [[tempoSK(v.tempo), "tréningov mesačne"] as [string, string]] : []),
-    ...(v.mesiacov ? [[mesiacovSK(v.mesiacov), v.odkedy ? `chodíš od ${denSK(v.odkedy)}` : "chodíš u nás"] as [string, string]] : []),
+      ? [[czk(v.zaplateneSpolu), "zaplaceno celkem"] as [string, string]]
+      : v.tempo ? [[tempoSK(v.tempo), "tréninků měsíčně"] as [string, string]] : []),
+    ...(v.mesiacov ? [[mesiacovCZ(v.mesiacov), v.odkedy ? `chodíš od ${denSK(v.odkedy)}` : "chodíš u nás"] as [string, string]] : []),
   ];
 
   // ── textová podoba: to isté, len bez ozdôb ────────────────────────────
@@ -390,21 +411,21 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     v.odkaz || null,
     uvod,
     "",
-    v.uplna ? "Tréningy a platby:" : "Ako sa míňal balíček:",
+    v.uplna ? "Tréninky a platby:" : "Jak se čerpal balíček:",
     ...os.map((b) => {
       const cislo = b.druh !== "trening" ? "" : [
         b.zostatok != null ? `${b.zostatok} h${b.zDoplnenia ? " · doplnění" : ""}` : "",
         b.dlh ? `−${b.dlh}` : "",
       ].filter(Boolean).join(", ");
       const kedy = b.den ? `${denSK(b.den)}${b.cas ? ` · ${b.cas}` : ""} — ` : "";
-      return `  ${kedy}${b.popis}${cislo ? ` (${cislo})` : ""}`;
+      return `  ${kedy}${cesky(b.popis)}${cislo ? ` (${cislo})` : ""}`;
     }),
     "",
     ...staty.map(([cislo, popis]) => `${popis}: ${cislo}`),
     v.platba
-      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}${rozpisTextom(v)}\nÚčet ${v.platba.ucet}, ${v.platba.vs ? `variabilný symbol ${v.platba.vs}` : `do poznámky uveď: ${v.platba.sprava}`}`
+      ? `\n${cesky(v.platba.popis)}: ${czk(v.platba.suma)}${rozpisTextom(v)}\nÚčet ${v.platba.ucet}, ${v.platba.vs ? `variabilní symbol ${v.platba.vs}` : `do poznámky uveď: ${v.platba.sprava}`}`
       : null,
-    v.uplna ? null : `\nChceš celú históriu tréningov a platieb? Napíš na ${ADRESA_HISTORIE}.`,
+    v.uplna ? null : `\nChceš celou historii tréninků a plateb? Napiš na ${ADRESA_HISTORIE}.`,
     "",
     v.trener,
     "ProSapiens Biomechanic",
@@ -445,7 +466,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     return `<tr>
       ${lavy}
       <td style="padding:0 0 ${posledna ? 0 : 13}px 6px">
-        <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(b.popis)}</div>
+        <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(cesky(b.popis))}</div>
         ${b.den ? `<div style="font-size:12px;color:${F.slabsia};line-height:1.35">${denKratko(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>` : ""}
       </td>
       <td width="56" valign="top" style="padding:0 0 ${posledna ? 0 : 13}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
@@ -482,7 +503,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   <tr><td>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.karta};border-radius:14px">
       <tr><td style="padding:20px 22px">
-        <div style="font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:${F.slaba};padding-bottom:14px">${v.uplna ? "Tréningy a platby" : "Ako sa míňal balíček"}</div>
+        <div style="font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:${F.slaba};padding-bottom:14px">${v.uplna ? "Tréninky a platby" : "Jak se čerpal balíček"}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${riadkyOsi}</table>
       </td></tr>
     </table>
@@ -492,7 +513,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.platba};border-radius:14px">
       <tr>
         <td style="padding:20px 22px;font-size:14px;color:${F.platbaText};line-height:1.7">
-          ${esc(v.platba.popis)}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
+          ${esc(cesky(v.platba.popis))}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
           ${esc(rozpisTextom(v).trim())}${rozpisTextom(v) ? "<br>" : ""}
           <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>${v.platba.vs ? `variabilní symbol: ${esc(v.platba.vs)}` : `do poznámky: ${esc(v.platba.sprava)}`}</span>
         </td>
@@ -512,13 +533,13 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       musela byť podpísaná a aj tak by ju otvárali antivírusy — mailto
       nič neposiela, kým klient sám nestlačí Odoslať.
     -->
-    <a href="${mailtoHistoria(v.klient)}" style="display:inline-block;background:${F.karta};border:1px solid ${F.linka};border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;color:${F.text};text-decoration:none">Chcem celú históriu tréningov a platieb</a>
+    <a href="${mailtoHistoria(v.klient)}" style="display:inline-block;background:${F.karta};border:1px solid ${F.linka};border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;color:${F.text};text-decoration:none">Chci celou historii tréninků a plateb</a>
   </td></tr>
-  <tr><td align="center" style="font-size:11px;color:${F.slabsia};padding-bottom:2px">jedným klikom si ju vyžiadaš mailom — pošleme ti ju v tomto istom prehľade</td></tr>`}
+  <tr><td align="center" style="font-size:11px;color:${F.slabsia};padding-bottom:2px">jedním klikem si ji vyžádáš mailem — pošleme ti ji ve stejném přehledu</td></tr>`}
 
   <tr><td style="padding:24px 4px 0;font-size:15px;color:${F.biela}">${esc(v.trener)}</td></tr>
   <tr><td style="padding:16px 4px 0;font-size:11.5px;color:${F.slabsia}">
-    ProSapiens Biomechanic${posledny ? ` · posledný tréning ${denSK(posledny)}` : ""}
+    ProSapiens Biomechanic${posledny ? ` · poslední trénink ${denSK(posledny)}` : ""}
   </td></tr>
 
 </table>

@@ -53,7 +53,7 @@ function sChybou<F extends (...a: any[]) => Promise<Response>>(f: F): F {
     } catch (e) {
       console.error("odkaz /v/:", e);
       return new Response(
-        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ProSapiens</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 20px;color:#1A2E24;line-height:1.5"><h1 style="font-size:20px">Stránku se teď nepodařilo načíst</h1><p>Zkuste to prosím za chvíli znovu. Pokud to nepůjde, ozvěte se nám.</p></body>`,
+        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ProSapiens</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 20px;color:#1A2E24;line-height:1.5"><h1 style="font-size:20px">Stránku se teď nepodařilo načíst</h1><p>Zkus to prosím za chvíli znovu. Pokud to nepůjde, ozvi se nám.</p></body>`,
         { status: 503, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } },
       );
     }
@@ -135,7 +135,7 @@ export const Route = createFileRoute("/v/$token")({
           const url = new URL(request.url);
           if (url.searchParams.get("pdf") === "1") {
             const { BROWSER, ASSETS } = bindings();
-            if (!BROWSER) return prec("PDF se teď nedá připravit — zkuste to prosím za chvíli.", 503);
+            if (!BROWSER) return prec("PDF se teď nedá připravit — zkus to prosím za chvíli.", 503);
             const pdf = await fakturaDoPdf(BROWSER, ASSETS, fa, url.origin);
             return new Response(pdf, {
               headers: {
@@ -168,7 +168,7 @@ export const Route = createFileRoute("/v/$token")({
          * to započítalo, akoby klient stránku otvoril. Človek sem nikdy nepríde
          * (`jeZjavnyRobot`), jeho čísla sa nemenia.
          */
-        if (jeZjavnyRobot(request.headers.get("user-agent") || "")) return prec("Výpis hodin ProSapiens — otevřete odkaz v prohlížeči.", 200);
+        if (jeZjavnyRobot(request.headers.get("user-agent") || "")) return prec("Výpis hodin ProSapiens — otevři odkaz v prohlížeči.", 200);
 
         const data = await loadData(DB);
         const c = deriveClients(data)[r.klient];

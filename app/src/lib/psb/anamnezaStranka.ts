@@ -100,7 +100,7 @@ function otazkaHtml(o: Otazka): string {
       <label class="v"><input type="radio" name="${esc(o.id)}" value="Ne"><span>Ne</span></label>
     </div>
     <div data-ked="${esc(o.id)}" data-hodnoty="Ano" hidden style="margin-top:9px">
-      <input type="text" name="${esc(o.id)}_popis" placeholder="co přesně vám zakázal?">
+      <input type="text" name="${esc(o.id)}_popis" placeholder="co přesně ti zakázal?">
     </div>`;
   } else if (o.typ === "oblasti") {
     // Zaškrtnutá oblasť si otvorí VLASTNÚ stupnicu. Jerry, 30. 9. 2026:
@@ -115,7 +115,7 @@ function otazkaHtml(o: Otazka): string {
         </div>
       </div>`).join("");
   } else if (o.typ === "dlhy") {
-    vnutro = `<textarea name="${esc(o.id)}" placeholder="napište pár vět…"></textarea>`;
+    vnutro = `<textarea name="${esc(o.id)}" placeholder="napiš pár vět…"></textarea>`;
   } else {
     vnutro = `<input type="${o.typ === "cislo" ? "number" : "text"}" name="${esc(o.id)}">`;
   }
@@ -143,14 +143,14 @@ export function strankaHtml(v: VstupStranky): string {
         <h1 style="margin-top:10px">Máme to</h1>
         <p class="lead">Díky${krstne ? `, ${krstne}` : ""}. Vidíme se na úvodním tréninku${v.uvodny ? ` — ${esc(v.uvodny)}` : ""}.</p>
       </div>`
-    : `<noscript><div class="pomoc">Prohlížeč má vypnutý JavaScript, takže vidíte všechny otázky. Vyplňte jen ty, které se vás týkají.</div></noscript>
+    : `<noscript><div class="pomoc">Prohlížeč má vypnutý JavaScript, takže vidíš všechny otázky. Vyplň jen ty, které se tě týkají.</div></noscript>
       <form method="post" id="f">
         <div class="viem">
           <b>${esc(v.klient)}</b><br>
           <span>${[v.kontakt.email, v.kontakt.telefon, narText].filter(Boolean).map(esc).join(" · ")}</span>
           ${v.uvodny ? `<br><span>úvodní trénink: ${esc(v.uvodny)}</span>` : ""}
           <details class="oprava">
-            <summary>Nesedí něco? <u>Opravte nás.</u></summary>
+            <summary>Nesedí něco? <u>Oprav nás.</u></summary>
             <div class="poly">
               <label>Jméno a příjmení<input type="text" name="oprava_meno" value="${esc(v.klient)}" autocomplete="name"></label>
               <label>E-mail<input type="email" name="oprava_email" value="${esc(v.kontakt.email || "")}" autocomplete="email" inputmode="email"></label>
@@ -173,7 +173,7 @@ export function strankaHtml(v: VstupStranky): string {
         </div>
         ${v.chyba ? `<div class="chyba">${esc(v.chyba)}</div>` : ""}
         <button type="submit" id="odoslat">Odeslat</button>
-        <div class="pata">ProSapiens Biomechanic<br>Odpovědi vidí jen tým, který vás trénuje.</div>
+        <div class="pata">ProSapiens Biomechanic<br>Odpovědi vidí jen tým, který tě trénuje.</div>
       </form>`;
 
   return `<!doctype html><html lang="cs"><head>
@@ -181,12 +181,12 @@ export function strankaHtml(v: VstupStranky): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="format-detection" content="telephone=no">
-<title>Než přijdete — ProSapiens</title>
+<title>Než přijdeš — ProSapiens</title>
 <style>${STYL}</style>
 ${v.hotovo ? "" : `<noscript><style>[hidden]{display:block!important}</style></noscript>`}
 </head><body><div class="obal">
 <div class="znacka">ProSapiens Biomechanic</div>
-${v.hotovo ? "" : `<h1>Než přijdete</h1><p class="lead">${esc(sekcia.pozn || "")}</p>`}
+${v.hotovo ? "" : `<h1>Než přijdeš</h1><p class="lead">${esc(sekcia.pozn || "")}</p>`}
 ${telo}
 </div>
 <script>

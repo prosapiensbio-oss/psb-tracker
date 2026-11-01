@@ -57,8 +57,8 @@ describe("formulár", () => {
 describe("blok na stránke po úvodnom", () => {
   it("bez údajov sa pýta a formulár je zavretý", () => {
     const h = blokFakturyHtml({ klient: "Jan Novák", udaje: null });
-    expect(h).toContain("Chcete platit fakturou?");
-    expect(h).toContain('<summary class="fa-tlacidlo">Chcete platit fakturou?</summary>');
+    expect(h).toContain("Chceš platit fakturou?");
+    expect(h).toContain('<summary class="fa-tlacidlo">Chceš platit fakturou?</summary>');
     expect(h).not.toContain('<details id="faktura" open');
   });
   it("s chybou je formulár otvorený, s hláškou a s tým, čo klient napísal", () => {
@@ -77,7 +77,7 @@ describe("blok na stránke po úvodnom", () => {
     expect(h).toContain("IČO 27074358");
     expect(h).toContain("Změnit údaje");
     expect(h).toContain('<details id="faktura" open');
-    expect(h).not.toContain("Chcete platit fakturou?");
+    expect(h).not.toContain("Chceš platit fakturou?");
   });
   it("samotný e-mail ešte nie sú fakturačné údaje", () => {
     expect(udajeHotove({ firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "", email: "a@b.cz" })).toBe(false);
@@ -90,9 +90,9 @@ describe("blok na stránke po úvodnom", () => {
   it("je tretie tlačidlo pod „Potvrdit termín“ a „Zavolat“, len po úvodnom", () => {
     const zaklad = { trener: "Jerry", kedy: null, logoUrl: "/l.svg" } as const;
     const po = uvodnaStrankaHtml({ ...zaklad, druh: "po", faktura: { klient: "Jan", udaje: null } });
-    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Filipovi"));
-    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Souhrn z dnešní lekce"));
-    expect(uvodnaStrankaHtml({ ...zaklad, druh: "po" })).not.toContain("Chcete platit fakturou?");
+    expect(po.indexOf("Chceš platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Filipovi"));
+    expect(po.indexOf("Chceš platit fakturou?")).toBeGreaterThan(po.indexOf("Souhrn z dnešní lekce"));
+    expect(uvodnaStrankaHtml({ ...zaklad, druh: "po" })).not.toContain("Chceš platit fakturou?");
   });
 });
 
@@ -144,13 +144,13 @@ describe("okno na zmenu údajov cez odkaz", () => {
   it("zamknutý blok údaje ukáže, ale formulár nie", () => {
     const h = blokFakturyHtml({ klient: "Jan", zamknute: true, udaje: { firma: "Firma s.r.o.", ico: "27074358", dic: "", ulica: "Hlavní 1", psc: "60200", mesto: "Brno", email: "a@b.cz" } });
     expect(h).toContain("Firma s.r.o.");
-    expect(h).toContain("Změnu údajů nám prosím napište.");
+    expect(h).toContain("Změnu údajů nám prosím napiš.");
     expect(h).not.toContain("<form");
     expect(h).not.toContain('name="akcia"');
   });
   it("zamknutý blok bez údajov formulár tiež nekreslí", () => {
     const h = blokFakturyHtml({ klient: "Jan", zamknute: true, udaje: null });
     expect(h).not.toContain("<form");
-    expect(h).toContain("Chcete platit fakturou?");
+    expect(h).toContain("Chceš platit fakturou?");
   });
 });

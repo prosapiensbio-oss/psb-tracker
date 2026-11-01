@@ -58,7 +58,7 @@ export function feedKlienta(
       `DTSTART:${prahaNaUtcIcs(u.zaciatok)}`,
       `DTEND:${prahaNaUtcIcs(koniec)}`,
       "SUMMARY:Trénink ProSapiens",
-      `DESCRIPTION:${esc(`Trénink s ${u.trener === "Terezka" ? "Terezkou" : "Filipem"}. Změna termínu? Napište: ${t.telefon}. Termín se upravuje u nás — změny se vám objeví samy.`)}`,
+      `DESCRIPTION:${esc(`Trénink s ${u.trener === "Terezka" ? "Terezkou" : "Filipem"}. Změna termínu? Napiš: ${t.telefon}. Termín se upravuje u nás — změny se ti objeví samy.`)}`,
       "LOCATION:ProSapiens Biomechanic",
       // Pripomienky: deň vopred a dve hodiny pred tréningom.
       "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Zítra trénink ProSapiens", "TRIGGER:-P1D", "END:VALARM",
@@ -184,32 +184,32 @@ export function teloStrankyKalendara(v: {
     `<a class="volba${v.telefon === t ? " zvolena" : ""}" href="?telefon=${t}#telefon">${nazov}<small>${pod}</small></a>`;
   const iphone = `
 <a class="btn" href="${escH(v.webcal)}">Přidat do kalendáře</a>
-<p class="mala">Telefon se zeptá „Odebírat kalendář?" — stačí potvrdit. V kalendáři uvidíte jen své tréninky.</p>
-<div class="rada">V dalším okně vypněte <b>„Odstranit upozornění"</b>, jinak vás telefon na trénink neupozorní.</div>`;
+<p class="mala">Telefon se zeptá „Odebírat kalendář?" — stačí potvrdit. V kalendáři uvidíš jen své tréninky.</p>
+<div class="rada">V dalším okně vypni <b>„Odstranit upozornění"</b>, jinak tě telefon na trénink neupozorní.</div>`;
   const mail = `mailto:?subject=${encodeURIComponent("Tréninky do kalendáře")}&body=${encodeURIComponent(`Otevřít na počítači: ${v.kratka}`)}`;
   // Michal Knapčok, 15. 10. 2026: Android v telefóne, odkaz otvoril na
   // MacBooku a stará stránka ho poslala do Apple Calendar. Na počítači je
   // Google Kalendár na webe presne tá cesta, ktorá funguje — hneď navrchu.
   const androidNaPocitaci = `
-<p style="margin-top:18px">Jste na počítači — to je pro Android nejlepší cesta. Klepněte níže a v Google Kalendáři potvrďte <b>Přidat</b>. Buďte přihlášeni stejným Google účtem jako v telefonu — tréninky se do telefonu dostanou samy, poprvé do několika hodin.</p>
+<p style="margin-top:18px">Jsi na počítači — to je pro Android nejlepší cesta. Klepni níže a v Google Kalendáři potvrď <b>Přidat</b>. Použij stejný Google účet jako v telefonu — tréninky se do telefonu dostanou samy, poprvé do několika hodin.</p>
 <a class="btn" href="${escH(v.google)}">Přidat do Google Kalendáře</a>
-<p class="mala">Nepoužívejte Kalendář na Macu (Apple) — do telefonu s Androidem se z něj tréninky nedostanou. V kalendáři uvidíte jen své tréninky.</p>`;
+<p class="mala">Nepoužívej Kalendář na Macu (Apple) — do telefonu s Androidem se z něj tréninky nedostanou. V kalendáři uvidíš jen své tréninky.</p>`;
   const android = v.naPocitaci ? androidNaPocitaci : `
 <p style="margin-top:18px">Na Androidu přidá tréninky jen Google Kalendář <b>na webu</b> — aplikace v mobilu odkaz neumí přijmout. Jsou dvě cesty:</p>
 <h2>1 · Na počítači — zdarma, minuta</h2>
-<p>Otevřete na počítači tuto adresu a klepněte na „Přidat přes Google Kalendář“. Buďte přihlášeni stejným Google účtem jako v mobilu — tréninky se do mobilu dostanou samy, poprvé do několika hodin.</p>
+<p>Otevři na počítači tuto adresu a klepni na „Přidat přes Google Kalendář“. Použij stejný Google účet jako v mobilu — tréninky se do mobilu dostanou samy, poprvé do několika hodin.</p>
 <div class="adresa">${escH(v.kratka.replace(/^https?:\/\//, ""))}</div>
 <a class="btn" href="${escH(mail)}">Poslat si odkaz do e-mailu</a>
-<a class="druha" href="${escH(v.google)}">Jste právě na počítači? Přidat přes Google Kalendář</a>
+<a class="druha" href="${escH(v.google)}">Jsi právě na počítači? Přidat přes Google Kalendář</a>
 <h2>2 · Přímo v mobilu — aplikace ICSx⁵</h2>
-<p>Je placená (jednorázově kolem 50 Kč). Nainstalujte ji, vraťte se sem a klepněte na „Přidat přes ICSx⁵“.</p>
+<p>Je placená (jednorázově kolem 50 Kč). Nainstaluj ji, vrať se sem a klepni na „Přidat přes ICSx⁵“.</p>
 <a class="btn svetle" href="https://play.google.com/store/apps/details?id=at.bitfire.icsdroid">Otevřít Google Play</a>
 <a class="btn svetle" href="${escH(v.webcal)}">Přidat přes ICSx⁵</a>
-<p class="mala">V kalendáři uvidíte jen své tréninky.</p>`;
+<p class="mala">V kalendáři uvidíš jen své tréninky.</p>`;
   return `${v.logo}
-<h1>Vaše tréninky v kalendáři</h1>
-<p>${o ? `${escH(o)}, j` : "J"}edním klepnutím se vám tréninky objeví v kalendáři v mobilu. Když se termín změní, změní se i u vás — sám.</p>
-<div class="otazka" id="telefon">Jaký máte telefon?</div>
+<h1>Tvoje tréninky v kalendáři</h1>
+<p>${o ? `${escH(o)}, j` : "J"}edním klepnutím se ti tréninky objeví v kalendáři v mobilu. Když se termín změní, změní se i u tebe — sám.</p>
+<div class="otazka" id="telefon">Jaký máš telefon?</div>
 <div class="volby">${volba("iphone", "iPhone", "Apple")}${volba("android", "Android", "Samsung, Xiaomi, Pixel…")}</div>
 ${v.telefon === "iphone" ? iphone : v.telefon === "android" ? android : ""}
 <a class="druha" style="margin-top:22px" href="sms:${escH(v.telefonTrenera.replace(/[^\d+]/g, ""))}">Nejde to? Napsat ${escH(v.komu)}</a>`;

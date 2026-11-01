@@ -77,7 +77,7 @@ export function kalendarPonukyHtml(moznosti: { c: CasPonuky; zaciatky: string[] 
   const pravidla = volby.map((v) => `.kal:has(#${v.id}:checked) .v-${v.id}{display:flex}`).join("");
   return `
 <div class="kal-nadpis">V kalendáři</div>
-<p class="kal-veta">Světle je, kdy můžete začít. Klepnutím na čas nahoře nebo na hodinové okno se váš výběr ukáže tmavě.</p>
+<p class="kal-veta">Světle je, kdy můžeš začít. Klepnutím na čas nahoře nebo na hodinové okno se tvůj výběr ukáže tmavě.</p>
 ${tyzdne.map(tyzden).join("")}
 <style>${pravidla}</style>`;
 }
@@ -89,8 +89,8 @@ export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener:
   const t = TRENERI[v.trener] ? v.trener : "Jerry";
   const tr = TRENERI[t];
   const komu = trenerovi(t);
-  const smsNehodi = `sms:${cislo(tr.telefon)}?&body=${encodeURIComponent("Dobrý den, z poslaných termínů se mi nehodí žádný. Šlo by to jindy?")}`;
-  const nadpisUvod = v.typ === "uvodny" ? "Váš úvodní trénink" : "Volné termíny pro vás";
+  const smsNehodi = `sms:${cislo(tr.telefon)}?&body=${encodeURIComponent("Ahoj, z poslaných termínů se mi nehodí žádný. Šlo by to jindy?")}`;
+  const nadpisUvod = v.typ === "uvodny" ? "Tvůj úvodní trénink" : "Volné termíny pro tebe";
   let telo = "";
 
   if (v.stav.druh === "vyber") {
@@ -110,7 +110,7 @@ export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener:
     const [, m, d] = v.stav.platiDo.split("-").map(Number);
     telo = `
 <h1>${esc(nadpisUvod)}</h1>
-<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yberte si, kdy můžete začít — trénink trvá hodinu. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
+<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yber si, kdy můžeš začít — trénink trvá hodinu. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
 ${v.stav.chyba ? `<p class="chyba">${esc(v.stav.chyba)}</p>` : ""}
 <form method="post" class="kal">
 ${dni.map((den) => `
@@ -128,8 +128,8 @@ ${kalendarPonukyHtml(moznosti, volby)}
     telo = `
 <div class="hotovo">
 <div class="fajka">✓</div>
-<h1>Máte zarezervováno</h1>
-<p class="veta">Těšíme se na vás. Kdyby se něco změnilo, stačí napsat.</p>
+<h1>Máš zarezervováno</h1>
+<p class="veta">Těšíme se na tebe. Kdyby se něco změnilo, stačí napsat.</p>
 <div class="kedy">${esc(denCz(c.zaciatok))}<br>${esc(casHHMM(c.zaciatok))}–${esc(casHHMM(c.koniec))}<small>${esc(t === "Terezka" ? "Terezka" : "Filip")} · ProSapiens Biomechanic</small></div>
 <a class="tlacidlo tmave" href="/t/${esc(v.token)}?ics=1">Přidat do kalendáře</a>
 <a class="nehodi" href="sms:${esc(cislo(tr.telefon))}">Napsat ${esc(komu)}</a>
@@ -140,7 +140,7 @@ ${kalendarPonukyHtml(moznosti, volby)}
       : "Tato nabídka termínů už neplatí.";
     telo = `
 <h1>${esc(veta)}</h1>
-<p class="veta">Napište ${esc(komu)} a pošle vám nové.</p>
+<p class="veta">Napiš ${esc(komu)} a pošle ti nové.</p>
 <div class="spodok"><a class="tlacidlo" href="${esc(smsNehodi)}">Napsat ${esc(komu)}</a></div>`;
   }
 

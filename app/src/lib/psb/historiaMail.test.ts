@@ -39,7 +39,7 @@ describe("historiaPreMail — automat skladá to isté, čo panel", () => {
 
   it("výsledok prejde rovno do mailu", () => {
     const m = mailKlientovi(v);
-    expect(m.predmet).toBe("Tvoje tréningy a platby — ProSapiens");
+    expect(m.predmet).toBe("Tvoje tréninky a platby — ProSapiens");
     expect(m.text).toContain("8 090 Kč");
   });
 });

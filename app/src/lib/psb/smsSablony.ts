@@ -16,23 +16,44 @@ import { bezDiakritiky } from "./sms";
 /** „Kateřina" → „Katerino". 5. pád a bez diakritiky — jedno miesto pre všetky SMS. */
 export const oslovenieDoSms = (meno: string): string => bezDiakritiky(oslovenieKlienta(meno));
 
+/** „Ahoj Katerino," — bez známeho mena len „Ahoj,". Klientom sa tyká (Jerry, 1. 11. 2026). */
+const ahoj = (meno: string): string => {
+  const o = oslovenieDoSms(meno);
+  return `Ahoj${o ? ` ${o}` : ""},`;
+};
+
 /** Anamnéza. Kto už bol na tréningu, nedostane vetu „pred úvodní lekci". */
-export function textSmsAnamnezy(url: string, uzBol: boolean): string {
+export function textSmsAnamnezy(url: string, uzBol: boolean, meno = ""): string {
   return bezDiakritiky(uzBol
-    ? `Dobry den, prosime Vas jeste o kratky dotaznik k treninku: ${url} Dekujeme, ProSapiens Biomechanic`
-    : `Dobry den, pred uvodni lekci Vas prosime o kratky dotaznik: ${url} Dekujeme, ProSapiens Biomechanic`);
+    ? `${ahoj(meno)} prosime te jeste o kratky dotaznik k treninku: ${url} Diky, ProSapiens Biomechanic`
+    : `${ahoj(meno)} pred uvodni lekci te prosime o kratky dotaznik: ${url} Diky, ProSapiens Biomechanic`);
+}
+
+/**
+ * Pred úvodným — Dashboard, Kalendár aj skúšobná dávka berú to isté znenie.
+ * Stav (termín, cena) nesie stránka za odkazom, nie správa.
+ */
+export const textSmsPredUvodnym = (meno: string, url: string): string =>
+  bezDiakritiky(`${ahoj(meno)} vitej v ProSapiens Biomechanic. Termin, adresu i co si vzit k uvodni lekci najdes tady: ${url}`);
+
+/**
+ * Po úvodnom. `co` je výpočet toho, čo stránka naozaj ukáže — termín a fotky sa
+ * menujú, len keď tam sú. S fotkami „cteni" namiesto „doporucene cteni": s dlhším
+ * oslovením by ten variant prerástol do dvoch správ.
+ */
+export function textSmsPoUvodnom(meno: string, url: string, co: { termin?: boolean; fotky?: boolean } = { termin: true }): string {
+  const zoznam = [co.termin ? "termin dalsiho treninku" : "", co.fotky ? "fotky pred a po" : "", "souhrn"].filter(Boolean).join(", ");
+  return bezDiakritiky(`${ahoj(meno)} diky za uvodni lekci. ${zoznam.charAt(0).toUpperCase()}${zoznam.slice(1)} i ${co.fotky ? "" : "doporucene "}cteni najdes tady: ${url}`);
 }
 
 /** Kalendár v mobile. Klient bez mena dostane vetu bez oslovenia. */
 export function textSmsKalendara(meno: string, url: string, podpis: string): string {
-  const o = oslovenieDoSms(meno);
-  return bezDiakritiky(`${o ? `${o}, v` : "V"}ase treninky si muzete dat do kalendare v mobilu - pripomene vam je sam: ${url} ${podpis}`).trim();
+  return bezDiakritiky(`${ahoj(meno)} treninky si muzes dat do kalendare v mobilu - pripomene ti je sam: ${url} ${podpis}`).trim();
 }
 
 /** Odkaz s fotkami. */
 export function textSmsFotiek(meno: string, url: string, podpis: string): string {
-  const o = oslovenieDoSms(meno);
-  return bezDiakritiky(`Ahoj${o ? ` ${o}` : ""}, posilam ti srovnani tvych fotek: ${url}${podpis ? ` ${podpis}` : ""}`);
+  return bezDiakritiky(`${ahoj(meno)} posilam ti srovnani tvych fotek: ${url}${podpis ? ` ${podpis}` : ""}`);
 }
 
 /** Hromadná správa: `{meno}` je krstné meno v 5. páde bez diakritiky. */

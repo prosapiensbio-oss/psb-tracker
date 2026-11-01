@@ -109,12 +109,12 @@ export function vstupZFormulara(f: Record<string, string>): { ok: true; v: Vstup
 export const rucnaAdresaFirmy = (v: VstupFaktury): boolean => !!(v.nazov && v.ulica && v.psc && v.mesto);
 
 const HLASKY: Record<ChybaFaktury, string> = {
-  ico: "IČO nesedí — má 8 číslic, zkontrolujte ho prosím.",
-  dic: "DIČ zadejte ve tvaru CZ12345678, nebo pole nechte prázdné.",
-  email: "Zkontrolujte prosím e-mail — na něj fakturu pošleme.",
+  ico: "IČO nesedí — má 8 číslic, zkontroluj ho prosím.",
+  dic: "DIČ zadej ve tvaru CZ12345678, nebo pole nech prázdné.",
+  email: "Zkontroluj prosím e-mail — na něj fakturu pošleme.",
   adresa: "Pro fakturu na jméno potřebujeme jméno, ulici, PSČ a město.",
-  ares: "Toto IČO jsme v registru firem nenašli. Zkontrolujte ho, nebo adresu firmy vyplňte ručně níže.",
-  nedostupne: "Registr firem teď neodpovídá. Zkuste to prosím za chvíli, nebo adresu firmy vyplňte ručně níže.",
+  ares: "Toto IČO jsme v registru firem nenašli. Zkontroluj ho, nebo adresu firmy vyplň ručně níže.",
+  nedostupne: "Registr firem teď neodpovídá. Zkus to prosím za chvíli, nebo adresu firmy vyplň ručně níže.",
 };
 export const hlaskaFaktury = (c: string | null | undefined): string => HLASKY[c as ChybaFaktury] || "";
 
@@ -218,9 +218,9 @@ export function blokFakturyHtml(b: BlokFaktury): string {
       u.email,
     ].filter(Boolean) : [];
     return `<details id="faktura">
-<summary class="fa-tlacidlo">${riadky.length ? "Fakturační údaje ✓" : "Chcete platit fakturou?"}</summary>
+<summary class="fa-tlacidlo">${riadky.length ? "Fakturační údaje ✓" : "Chceš platit fakturou?"}</summary>
 <div style="border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px;background:#F6F8F6;font-size:14.5px;line-height:1.6;color:#3C4C42">
-${riadky.length ? `Fakturu vystavíme na:<br>${riadky.map(esc).join("<br>")}<br><br>Změnu údajů nám prosím napište.` : "Napište nám fakturační údaje a fakturu Vám vystavíme."}
+${riadky.length ? `Fakturu vystavíme na:<br>${riadky.map(esc).join("<br>")}<br><br>Změnu údajů nám prosím napiš.` : "Napiš nám fakturační údaje a fakturu ti vystavíme."}
 </div>
 </details>`;
   }
@@ -252,7 +252,7 @@ ${chyba ? `<div role="alert" style="margin-bottom:6px;border-left:3px solid #B45
 </div>
 <div class="jen-firma">
 ${pole("IČO", "ico", hod("ico"), { ph: "např. 12345678", pomoc: "Název a adresu firmy doplníme z registru sami.", mod: "numeric" })}
-${pole("DIČ", "dic", hod("dic"), { ph: "CZ12345678", pomoc: "Jen pokud jste plátce DPH." })}
+${pole("DIČ", "dic", hod("dic"), { ph: "CZ12345678", pomoc: "Jen pokud jsi plátce DPH." })}
 <details${b.chyba === "ares" || b.chyba === "nedostupne" ? " open" : ""} style="margin-top:14px">
 <summary style="font-size:14px;color:#2D7D5A;font-weight:600;cursor:pointer">Firma není v registru? Vyplnit adresu ručně</summary>
 ${adresaPolia("f_", hod, "Název firmy", "Firma s.r.o.")}
@@ -263,7 +263,7 @@ ${adresaPolia("o_", hod, "Jméno a příjmení", "Jan Novák")}
 </div>
 ${pole("E-mail pro fakturu", "email", hod("email"), { ph: "jmeno@firma.cz", typ: "email", auto: "email" })}
 <button type="submit" style="display:block;width:100%;margin-top:20px;padding:15px;border:0;border-radius:32px;background:#2D7D5A;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer">Uložit fakturační údaje</button>
-<div style="margin-top:10px;font-size:12.5px;color:#5B6B60;text-align:center;line-height:1.55">Údaje uvidí jen Váš trenér a použijí se jen na faktury od ProSapiens Biomechanic.</div>
+<div style="margin-top:10px;font-size:12.5px;color:#5B6B60;text-align:center;line-height:1.55">Údaje uvidíme jen my a použijeme je jen na faktury od ProSapiens Biomechanic.</div>
 </form>`;
 
   const zavriet = `<button type="button" aria-label="Zavřít" onclick="this.closest('details').open=false" style="flex-shrink:0;width:32px;height:32px;border:0;border-radius:16px;background:rgba(26,46,36,0.07);color:#1A2E24;font-size:16px;line-height:1;cursor:pointer;font-family:inherit">✕</button>`;
@@ -294,16 +294,16 @@ ${formular}
 </div>`);
   }
 
-  return obal("Chcete platit fakturou?", `<div style="border:2px solid #2D7D5A;border-radius:18px;padding:18px 18px 16px;background:#F3F9F5">
+  return obal("Chceš platit fakturou?", `<div style="border:2px solid #2D7D5A;border-radius:18px;padding:18px 18px 16px;background:#F3F9F5">
 <div style="display:flex;gap:12px;align-items:flex-start">
 <span style="font-size:24px;line-height:1" role="img" aria-label="faktura">🧾</span>
 <div style="flex-grow:1;min-width:0">
-<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:19px;line-height:1.3;color:#1A2E24">Chcete platit fakturou?</div>
-<div style="margin-top:6px;font-size:15px;line-height:1.6;color:#3C4C42">Vyplňte fakturační údaje — fakturu Vám pak vystavíme na firmu nebo na jméno a pošleme e-mailem. Zabere to minutu.</div>
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:19px;line-height:1.3;color:#1A2E24">Chceš platit fakturou?</div>
+<div style="margin-top:6px;font-size:15px;line-height:1.6;color:#3C4C42">Vyplň fakturační údaje — fakturu ti pak vystavíme na firmu nebo na jméno a pošleme e-mailem. Zabere to minutu.</div>
 </div>
 ${zavriet}</div>
 ${formular}
-<div style="margin-top:9px;font-size:12.5px;color:#5B6B60;text-align:center">Platíte převodem na účet nebo hotově? Nic vyplňovat nemusíte.</div>
+<div style="margin-top:9px;font-size:12.5px;color:#5B6B60;text-align:center">Platíš převodem na účet nebo hotově? Nic vyplňovat nemusíš.</div>
 </div>`);
 }
 
