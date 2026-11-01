@@ -26,6 +26,29 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  faktura_polozky: {
+    potvrdene_at: "potvrdenie kategórie v uzávierke — pri importe faktúry je len návrh",
+    potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at, nie pri importe",
+  },
+  klient_odkazy: {
+    balickov: "rozsah histórie má v stĺpci predvolenú 1; mení sa až voľbou v Kokpite",
+  },
+  report_akcie: {
+    stav: "návrh akcie vzniká bez odpovede — stav prichádza až s rozhodnutím človeka",
+    stav_at: "kedy padlo rozhodnutie o návrhu — pri založení ešte nepadlo",
+    kto: "kto rozhodol o návrhu — pri založení ešte nikto nerozhodol",
+  },
+  kal_zdroje: {
+    posledne_ok: "výsledok sťahovania — pri pripojení kalendára sa ešte nesťahoval",
+    posledna_chyba: "výsledok sťahovania — pri pripojení kalendára sa ešte nesťahoval",
+  },
+  strizna_nahrate: {
+    nahrate_kedy: "video vzniká ako rozpracované; čas sa zapíše až po dokončení nahrávania",
+    stiahnute_kedy: "čas stiahnutia do Strižne — pri začatí nahrávania ešte nenastal",
+  },
+  dotaznik_odkazy: {
+    pouzity: "odkaz vzniká nepoužitý (predvolená 0); označí ho až odoslanie dotazníka",
+  },
   fio_transactions: {
     potvrdene_at: "potvrdenie výdavku v uzávierke — pri importe je kategória len návrh",
     potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at",
@@ -98,12 +121,36 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   },
 };
 
-/** SQL žije v reťazcoch — mimo nich by sa chytal bežný JavaScript. */
+/**
+ * SQL žije v reťazcoch — mimo nich by sa chytal bežný JavaScript.
+ *
+ * Skutočný prechod znakmi, nie regulárny výraz: slovenské úvodzovky v komentári
+ * („takto") končia ASCII `"` a regulárny výraz od nej čítal zvyšok súboru
+ * posunutý, takže test o stĺpcoch rozhodoval náhodne podľa komentárov.
+ * Vnútro `${...}` v šablóne sa berie ako text, čo na zoznamy stĺpcov stačí.
+ */
 function retazce(zdroj: string): string[] {
   const out: string[] = [];
-  const re = /`([^`]*)`|"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/gs;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(zdroj))) out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  let i = 0;
+  const n = zdroj.length;
+  while (i < n) {
+    const c = zdroj[i];
+    if (c === "/" && zdroj[i + 1] === "/") { i = zdroj.indexOf("\n", i); if (i < 0) break; continue; }
+    if (c === "/" && zdroj[i + 1] === "*") { i = zdroj.indexOf("*/", i + 2); if (i < 0) break; i += 2; continue; }
+    if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < n && zdroj[j] !== c) {
+        if (zdroj[j] === "\\") j++;
+        // Obyčajný reťazec sa nelomí; nájdený koniec riadku = apostrof v texte JSX, nie reťazec.
+        else if (c !== "`" && zdroj[j] === "\n") break;
+        j++;
+      }
+      if (j < n && zdroj[j] === c) { out.push(zdroj.slice(i + 1, j)); i = j + 1; continue; }
+      i++;
+      continue;
+    }
+    i++;
+  }
   return out;
 }
 
@@ -112,7 +159,7 @@ function zapisyVSubore(zdroj: string) {
   const upd = new Set<string>();
   for (const lit of retazce(zdroj)) {
     if (!/\b(INSERT|UPDATE)\b/i.test(lit)) continue;
-    for (const m of lit.matchAll(/INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(\w+)\s*\(([^)]*)\)/gis)) {
+    for (const m of lit.matchAll(/INSERT\s+(?:OR\s+(?:REPLACE|IGNORE)\s+)?INTO\s+(\w+)\s*\(([^)]*)\)/gis)) {
       for (const c of m[2].split(",")) {
         const s = c.trim().replace(/[`"]/g, "");
         if (/^\w+$/.test(s)) ins.add(`${m[1]}.${s}`);
@@ -133,12 +180,30 @@ function subory(): { meno: string; zdroj: string }[] {
   for (const f of readdirSync(apiDir)) {
     if (f.endsWith(".ts")) out.push({ meno: `api/${f}`, zdroj: readFileSync(join(apiDir, f), "utf8") });
   }
-  out.push({ meno: "db.server.ts", zdroj: readFileSync(join(import.meta.dir, "db.server.ts"), "utf8") });
+  // Serverové pomocníky (lib/psb/*.server.ts) — db.server.ts bol jediný, ale
+  // zápisy žijú aj v ostatných (faktúry, platby, kalendár…).
+  for (const f of readdirSync(import.meta.dir)) {
+    if (f.endsWith(".server.ts")) out.push({ meno: f, zdroj: readFileSync(join(import.meta.dir, f), "utf8") });
+  }
+  // Verejné stránky klienta: tu sa píše bez prihlásenia a chyba sa nemá komu ohlásiť.
+  const routesDir = join(import.meta.dir, "../../routes");
+  for (const t of ["u", "v", "a", "f", "t", "d", "k"]) {
+    const f = `${t}.$token.tsx`;
+    out.push({ meno: `routes/${f}`, zdroj: readFileSync(join(routesDir, f), "utf8") });
+  }
   return out;
 }
 
 describe("čo sa dá upraviť, musí sa dať aj založiť", () => {
   const vsetky = subory();
+
+  it("číta aj serverové pomocníky a verejné stránky — zoznam sa nesmie potichu zúžiť", () => {
+    const mena = vsetky.map((s) => s.meno);
+    expect(mena).toContain("db.server.ts");
+    expect(mena).toContain("routes/t.$token.tsx");
+    expect(mena.filter((m) => m.endsWith(".server.ts")).length).toBeGreaterThan(5);
+    expect(retazce(`// „x"\nconst a = "INSERT"; /* „y" */ const b = 'c';`)).toEqual(["INSERT", "c"]);
+  });
 
   it("nájde vôbec nejaké zápisy — inak by test bol zelený omylom", () => {
     const spolu = vsetky.reduce((n, s) => n + zapisyVSubore(s.zdroj).ins.size, 0);
