@@ -19,6 +19,7 @@ import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { fetchWeekEntries, saveWeekEntry } from "../../lib/psb/client";
+import type { BezBalicka } from "../../lib/psb/bezBalicka";
 import type { ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 import { C, mix } from "../../lib/psb/theme";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
@@ -300,7 +301,7 @@ export function TyzdenKalendara({ den, trener, zvyraznenia }: { den: string; tre
 
 /* ───────────────────────── 2 · SMS PRE KLIENTOV ──────────────────────────── */
 
-export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPocet }: {
+export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezHodin, onNetrebaPisat, onPocet }: {
   clients: Record<string, ClientAgg>;
   dlhy: Record<string, number>;
   udalosti: UdalostKroku[];
@@ -308,6 +309,10 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
   platby: PlatbaRiadokKroku[];
   /** Čie: „Jerry", „Terezka" alebo `null` = všetci. */
   trener: string | null;
+  /** Kto nemá na čo chodiť — bez tréningu po odpovedi „netreba písať“ tu už nie je. */
+  bezHodin: BezBalicka[];
+  /** Zapíše „netreba písať“; riadok zmizne, keď sa ho `bezHodin` zbaví. */
+  onNetrebaPisat?: (meno: string) => void;
   onPocet?: (n: number) => void;
 }) {
   const [odoslane, setOdoslane] = useState<Record<string, string> | null>(null);
@@ -364,10 +369,10 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
     for (const b of balicky) posun(b.klient, b.created_at || `${b.platnost_od}T00:00:00.000Z`);
     const vsetky = zoznamSms(
       Object.values(clients).filter((c) => !trener || c.primaryTrainer === trener),
-      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes,
+      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes, bezHodin,
     );
     return vsetky;
-  }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz]);
+  }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz, bezHodin]);
 
   useEffect(() => { if (!odoslaneChyba) onPocet?.(riadky.length); }, [riadky.length, onPocet, odoslaneChyba]);
 
@@ -411,6 +416,13 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
                   zostatok={r.zostatok}
                   onOdoslane={() => setTeraz((s) => ({ ...s, [r.meno]: new Date().toISOString() }))}
                 />
+                {r.lenBezBalicka && onNetrebaPisat && (
+                  <button
+                    type="button" onClick={() => onNetrebaPisat(r.meno)}
+                    title="Vrátí sa, keď znova príde na tréning bez balíčka. Balíček to nezakladá."
+                    style={{ marginTop: 8, padding: "4px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}
+                  >netreba písať</button>
+                )}
               </div>
             )}
           </div>

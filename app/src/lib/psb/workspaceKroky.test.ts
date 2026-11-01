@@ -122,6 +122,48 @@ describe("zoznam SMS", () => {
   });
 });
 
+describe("zoznam SMS: kto nemá na čo chodiť", () => {
+  const dnes = "2026-11-01";
+  const c = (name: string, extra: Partial<{ status: string; lastSession: string; packageRemaining: number; packageTotal: number }> = {}) => ({
+    name, status: "Aktívny", primaryTrainer: "Terezka", membership: "", packageRemaining: 0, packageTotal: 0, lastSession: "2026-10-20", ...extra,
+  });
+  const bez = (meno: string, extra: Partial<{ objednanych: number; vMinuse: number }> = {}) =>
+    ({ meno, dovod: "hodiny minuté" as const, objednanych: 0, vMinuse: 0, ...extra });
+
+  it("karta 0/0 bez dlhu do zoznamu smie len zo zoznamu Bez balíčka", () => {
+    expect(zoznamSms([c("Regina Obrovska")], {}, {}, {}, new Set(), dnes)).toHaveLength(0);
+    const [r] = zoznamSms([c("Regina Obrovska")], {}, {}, {}, new Set(), dnes, [bez("Regina Obrovska")]);
+    expect(r.stav).toBe("nula");
+    expect(r.veta).toBe("na nule — hodiny minuté");
+    expect(r.lenBezBalicka).toBe(true);
+  });
+  it("meno sa páruje bez diakritiky", () => {
+    expect(zoznamSms([c("Svetopluk Stoklasko")], {}, {}, {}, new Set(), dnes, [bez("Svetopluk Stokláško")])).toHaveLength(1);
+  });
+  it("termín je silnejší než stav Neaktívny", () => {
+    const n = c("Spiaci", { status: "Neaktívny", lastSession: "2026-03-01" });
+    expect(zoznamSms([n], {}, {}, {}, new Set(["spiaci"]), dnes)).toHaveLength(0);
+    const [r] = zoznamSms([n], {}, {}, {}, new Set(["spiaci"]), dnes, [bez("Spiaci", { objednanych: 2 })]);
+    expect(r.veta).toContain("obj. 2");
+  });
+  it("mínus z osi ide do riadku, po SMS zmizne, bez termínu a po 60 dňoch tam nie je", () => {
+    const [m] = zoznamSms([c("Štigut")], {}, {}, {}, new Set(), dnes, [bez("Štigut", { vMinuse: 2 })]);
+    expect([m.stav, m.zostatok]).toEqual(["minus", -2]);
+    expect(zoznamSms([c("Štigut")], {}, { "Štigut": "2026-10-20T08:33:00.000Z" }, { "Štigut": "2026-10-20T07:30:00.000Z" }, new Set(), dnes, [bez("Štigut")])).toHaveLength(0);
+    expect(zoznamSms([c("Dávny", { lastSession: "2026-06-01" })], {}, {}, {}, new Set(), dnes, [bez("Dávny")])).toHaveLength(0);
+  });
+  it("kto má balíček alebo dlh, nie je lenBezBalicka a zostáva, ako bol", () => {
+    const [a] = zoznamSms([c("Šnirych", { packageTotal: 3 })], {}, {}, {}, new Set(), dnes, [bez("Šnirych", { objednanych: 9 })]);
+    expect(a.lenBezBalicka).toBeUndefined();
+    const [d] = zoznamSms([c("Dlžník")], { "Dlžník": 1100 }, {}, {}, new Set(), dnes, [bez("Dlžník")]);
+    expect(d.stav).toBe("dlh");
+    expect(d.lenBezBalicka).toBeUndefined();
+  });
+  it("platné hodiny ostávajú mimo aj so skončenou platnosťou — tých vybavuje Platnosť v kroku 3", () => {
+    expect(zoznamSms([c("Skončil", { packageRemaining: 3, packageTotal: 6 })], {}, {}, {}, new Set(), dnes, [bez("Skončil")])).toHaveLength(0);
+  });
+});
+
 describe("platba z banky k dlžníkovi", () => {
   const nepr = [
     { fioId: "a", datum: "2026-10-06", suma: 6990, text: "Martin Vaško", kandidati: ["Martin Vaško"] },

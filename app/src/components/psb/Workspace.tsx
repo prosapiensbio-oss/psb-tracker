@@ -432,6 +432,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
+  /**
+   * „BEZ BALÍČKA" V KROKU SMS (1. 11. 2026). Karta sa v krokoch nekreslí, kto je
+   * na nule, patrí do SMS — ale zoznam tam vôbec nedoputoval. Odpoveď „netreba
+   * písať" je ten istý zápis, aký mala karta (`klucVybaveniaBezBalicka`).
+   */
+  const bezHodinPreSms = useMemo(
+    () => bezBalicka.filter((x) => !data.anomalyAck?.[klucVybaveniaBezBalicka(x)] && !hotove.has(klucPolozky("bezBalicka", x))),
+    [bezBalicka, data.anomalyAck, hotove],
+  );
   const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
     : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
   const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: true, ja: trenerKroku }) : karty), [poKrokoch, karty, trenerKroku]);
@@ -2008,7 +2017,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
           }}
           onNavigate={onNavigate}
           onZmena={() => oznam("klienti")}
-          VsetkyDopyty={<Dopyty leads={data.leads || []} clients={clients} refresh={async () => { oznam("klienti"); }} />}
+          VsetkyDopyty={<Dopyty data={data} leads={data.leads || []} clients={clients} refresh={async () => { oznam("klienti"); }} />}
         />
       );
     }
@@ -2089,6 +2098,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
           <KrokSms
             clients={clients} dlhy={dlhyPodlaMena} udalosti={kalUdalosti || []}
             balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} onPocet={setPocetSms}
+            bezHodin={bezHodinPreSms}
+            onNetrebaPisat={(meno) => {
+              const x = bezHodinPreSms.find((b) => b.meno === meno);
+              if (x) void vybavBezBalicka(klucPolozky("bezBalicka", x), x);
+            }}
           />
           {/* Hromadná správa úplne dole, zabalená (Jerry, 5. 10. 2026: „pre
               všetkých klientov alebo pre tých, ktorých vyberiem"). */}

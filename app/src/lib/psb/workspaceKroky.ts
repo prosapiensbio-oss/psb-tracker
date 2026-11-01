@@ -13,6 +13,7 @@
  * prípadoch (Dan Kouřil, Kateřina Matlová, Daniela Šašinková).
  */
 import type { DlhPolozka } from "./zaplatene";
+import type { BezBalicka } from "./bezBalicka";
 import { CENNIK, platnostDo, type Sablona } from "./cennik";
 import { UVODNY } from "./uvodnaStranka";
 import { fmtCZK, normName } from "./format";
@@ -433,6 +434,12 @@ export type RiadokSms = {
   zostatok: number;
   dlh: number;
   veta: string;
+  /**
+   * V zozname je len preto, že nemá na čo chodiť (`bezAktivnehoBalicka`):
+   * žiadny balíček, žiadny dlh. Iba pri ňom sa dá povedať „netreba písať“ —
+   * inak by riadok stál až do konca okna, aj keď to tréner s klientom vyriešil.
+   */
+  lenBezBalicka?: boolean;
 };
 
 /**
@@ -445,6 +452,15 @@ export type RiadokSms = {
  *
  * `zmena` je posledný okamih, keď sa klientovi pohol stav (tréning, platba,
  * balíček). SMS odoslaná PO ňom znamená, že klient už vie, čo stránka hovorí.
+ *
+ * `bezHodin` (kontrola 1. 11. 2026): zoznam „Bez balíčka“ sa vo Workspace od
+ * 5. 10. nekreslí ako karta — pravidlo znelo „kto je na nule, patrí do SMS“.
+ * Lenže toto sito chcelo `packageTotal > 0`, a kto dobral doplnenie alebo mu
+ * balíček v Kokpite skončil, má kartu 0/0: Stoklasko, Regina Obrovska, Štigut
+ * a Stoklásková neboli na obrazovke nikde. Kto je v tom zozname, prejde aj
+ * bez balíčka a termín v kalendári je silnejší než stav „Neaktívny“ (to isté
+ * pravidlo ako `patriDoZoznamu`). Okno „trénoval za 60 dní alebo má termín“
+ * a „po odoslaní zmizne“ platí rovnako ako pre ostatných.
  */
 export function zoznamSms(
   clients: KlientPreSms[],
@@ -453,20 +469,27 @@ export function zoznamSms(
   zmena: Record<string, string>,
   objednane: Set<string>,
   dnes: string,
+  bezHodin: Pick<BezBalicka, "meno" | "dovod" | "objednanych" | "vMinuse">[] = [],
 ): RiadokSms[] {
   const out: RiadokSms[] = [];
+  const bezPodlaMena = new Map(bezHodin.map((x) => [normName(x.meno), x]));
   for (const c of clients) {
-    if (c.status === "Neaktívny") continue;
+    const bez = bezPodlaMena.get(normName(c.name));
+    if (c.status === "Neaktívny" && !bez) continue;
     const dlh = Math.round(dlhy[c.name] || 0);
     const maBalicek = c.packageTotal > 0;
-    if (!maBalicek && dlh <= 0) continue;
-    const zostatok = Math.round(c.packageRemaining * 100) / 100;
+    if (!maBalicek && dlh <= 0 && !bez) continue;
+    const naKarte = Math.round(c.packageRemaining * 100) / 100;
+    // Karta 0/0 mínus nenesie; ten istý počet, aký stojí v profile, dáva os.
+    const zostatok = naKarte === 0 && bez && bez.vMinuse > 0 ? -bez.vMinuse : naKarte;
     if (zostatok > 0 && dlh <= 0) continue;
     const nedavno = !!c.lastSession && dniMedzi(c.lastSession, dnes) <= NAVRAT_PO_DNOCH;
     if (!nedavno && !objednane.has(normName(c.name))) continue;
     const sms = odoslane[c.name];
     if (sms && (!zmena[c.name] || sms > zmena[c.name])) continue;
-    const stav: RiadokSms["stav"] = zostatok < 0 ? "minus" : zostatok === 0 && maBalicek ? "nula" : "dlh";
+    const lenBezBalicka = !maBalicek && dlh <= 0 && !!bez;
+    const stav: RiadokSms["stav"] = zostatok < 0 ? "minus" : zostatok === 0 && (maBalicek || lenBezBalicka) ? "nula" : "dlh";
+    const terminov = bez?.objednanych ? ` · obj. ${bez.objednanych}` : "";
     out.push({
       meno: c.name,
       trener: c.primaryTrainer,
@@ -476,10 +499,11 @@ export function zoznamSms(
       // Bez slovesa v minulom čase — „mal/mala" by sa pri mene pomýlilo
       // (to isté pravidlo ako text SMS od 2. 10. 2026).
       veta: stav === "minus"
-        ? `trénuje bez krytia${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
+        ? `trénuje bez krytia${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}${terminov}`
         : stav === "nula"
-          ? `na nule — balíček minutý${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}`
+          ? `na nule — ${lenBezBalicka ? bez?.dovod : "balíček minutý"}${dlh ? ` · dlh ${fmtCZK(dlh)}` : ""}${terminov}`
           : `dlh ${fmtCZK(dlh)}`,
+      ...(lenBezBalicka ? { lenBezBalicka } : {}),
     });
   }
   return out.sort((a, b) => a.zostatok - b.zostatok || b.dlh - a.dlh || a.meno.localeCompare(b.meno, "cs"));
