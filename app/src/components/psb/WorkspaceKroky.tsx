@@ -795,6 +795,7 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene,
   onVybavene: () => void;
   onKlient?: (meno: string) => void;
 }) {
+  const [ukazNedavne, setUkazNedavne] = useState(false);
   const [velkost, setVelkost] = useState<Record<string, string>>({});
   const [bezi, setBezi] = useState("");
   const [chyba, setChyba] = useState("");
@@ -865,12 +866,23 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene,
           </div>
         );
       })}
+      {/* Stena pätnástich mien nad zoznamom, ktorý človek rieši, je šum: rozhodovať
+          o nich netreba. Počet stačí, mená na požiadanie (rozbor, 1. 11. 2026). */}
       {nedavno.length > 0 && (
         <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
-          Za 14 dní vznikli prvým tréningom sami: {nedavno.map((b, i) => (
+          Za 14 dní vzniklo prvým tréningom samo:{" "}
+          <button type="button" aria-expanded={ukazNedavne} onClick={() => setUkazNedavne((v) => !v)}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, color: C.textMuted, textDecoration: "underline" }}>
+            {nedavno.length} {nedavno.length === 1 ? "klient" : nedavno.length < 5 ? "klienti" : "klientov"} ({ukazNedavne ? "skryť" : "ukázať"})
+          </button>
+          {ukazNedavne && (
+            <div style={{ marginTop: 4 }}>
+              {nedavno.map((b, i) => (
             <span key={String(b.id ?? i)}>{i > 0 ? " · " : ""}<MenoKlienta meno={b.klient} onKlient={onKlient} style={{ color: C.textDim, fontSize: 11.5 }} /> ({nazovProduktu(b.nazov)}, {fmtDMY(b.platnost_od)})</span>
-          ))}.
-          Zmeniť ich ide v profile klienta.
+          ))}.{" "}
+              Zmeniť ich ide v profile klienta.
+            </div>
+          )}
         </div>
       )}
     </>
@@ -888,7 +900,9 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene,
  * a úvodní klienti bez zdroja — to je jej krok mesačnej uzávierky. Pod tým
  * celý zoznam dopytov, ten istý ako v Marketingu, zabalený.
  */
-export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, VsetkyDopyty }: {
+export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, VsetkyDopyty, onPocet }: {
+  /** Koľko toho čaká — odznak na rade kariet. */
+  onPocet?: (n: number) => void;
   leads: { id: string; date: string; name: string; source: string; status: string; email: string; telefon: string; odpovedaneAt: string; dovod: string; druh: string; note: string }[];
   clients: Record<string, ClientAgg>;
   /** Úvodní klienti uzatváraného mesiaca bez zdroja (krok uzávierky „Odkiaľ prišli"). */
@@ -925,6 +939,8 @@ export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, Vse
     return l.status !== "novy" || !!l.odpovedaneAt;
   });
   const dniOd = (d: string) => Math.max(0, Math.round((Date.now() - Date.parse(`${d}T00:00:00Z`)) / 86400000));
+  const pocetCakajucich = cakaju.length + bezVysledku.length + bezZdroja.mena.length;
+  useEffect(() => { onPocet?.(pocetCakajucich); }, [pocetCakajucich, onPocet]);
 
   const ozvalaSom = async (id: string) => {
     setBezi(id); setChyba("");
@@ -1070,7 +1086,9 @@ const nazovMesiaca = (mk: string) => {
  *  • FIO tu od 29. 10. 2026 nie je: banka sa sťahuje sama každú noc
  *    a výdavky sa potvrdzujú týždenne v Kontrole peňazí.
  */
-export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [], reportVstup }: {
+export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [], reportVstup, onPocet }: {
+  /** Koľko krokov chýba v nezamknutom mesiaci — odznak na rade kariet. */
+  onPocet?: (n: number) => void;
   mesiac: string;
   /** Mesačný a kvartálny report pod zámkom (Jerry, 8. 10. 2026). */
   reportVstup?: (mesiac: string, druh?: "mesiac" | "kvartal") => { mesiace: MesiacReportu[]; extra: ExtraReportu };
@@ -1143,6 +1161,8 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
   const kto = (id: string) => (id === "zdroje" ? "Terezka" : id === "otazky" ? "obaja" : "Jerry");
   const viditelne = kroky.filter((k) => !trener || kto(k.id) === trener || kto(k.id) === "obaja");
   const hotovych = viditelne.filter((k) => k.hotovo).length;
+  const chybaKrokov = zamknuty === false ? viditelne.length - hotovych : 0;
+  useEffect(() => { onPocet?.(chybaKrokov); }, [chybaKrokov, onPocet]);
 
   /**
    * METRICOOL JEDNÝM ŤUKNUTÍM (Jerry, 8. 10. 2026). Kokpit je pripojený

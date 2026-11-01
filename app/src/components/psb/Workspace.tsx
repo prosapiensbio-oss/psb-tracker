@@ -7,15 +7,15 @@ import { bezDiakritiky } from "../../lib/psb/sms";
 import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EditorKarta } from "./EditorKarta";
 import { ReklamaPracovisko } from "./ReklamaDozor";
-import { NekonecnyRad } from "./NekonecnyRad";
+import { RadKariet } from "./RadKariet";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { anamnezyNaVybavenie, BEZ_FRONTY, indexKartyPoZmene, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
 import { BankaUlozene } from "./BankaUlozene";
 import { BankovyImport } from "./Banka";
@@ -55,7 +55,7 @@ import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import type { PSBData } from "../../lib/psb/types";
 import { KlientStol, RozdelitPlatbu } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
-import { Card } from "./ui";
+import { Card, KostraObrazovky } from "./ui";
 import { useUzke } from "./useUzke";
 import { typZNazvu } from "../../lib/psb/kalendar";
 
@@ -122,6 +122,22 @@ function textSmsAnamnezy(url: string, uzBol: boolean): string {
     ? `Dobry den, prosime Vas jeste o kratky dotaznik k Vasemu treninku: ${url} Dekujeme, ProSapiens Biomechanic`
     : `Dobry den, pred uvodni lekci Vas prosime o kratky dotaznik: ${url} Dekujeme, ProSapiens Biomechanic`);
 }
+
+/**
+ * POSLEDNÉ ZOZNAMY KOPY — návrat do Workspace nezačína prázdnom.
+ *
+ * Workspace sa pri odchode zo záložky odmontuje a `/api/kalendar` + platby +
+ * balíčky trvajú 2–3 s; dovtedy bolo na obrazovke nič a v menu ešte staré
+ * zvýraznenie (rozbor Kokpitu, 1. 11. 2026). Návrat preto hneď ukáže to, čo
+ * človek videl naposledy, a na pozadí si prečíta čerstvé. Keď pri odchode niečo
+ * vybavil, pamäť sa zahodí (`hotove` žije len v komponente, takže by sa vybavený
+ * riadok na sekundu vrátil) a ukáže sa kostra.
+ */
+const pamatKopy: {
+  zdroje: { zmeny: Zmena[]; presuny: Record<string, { zaciatok: string; kandidatov: number }>; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null;
+  balicky: BalicekRiadok[];
+  platby: PlatbaRiadok[];
+} = { zdroje: null, balicky: [], platby: [] };
 
 export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
   clients: Record<string, ClientAgg>;
@@ -191,8 +207,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Hlási von, kde vo Workspace človek stojí — aby to stopa pohybu vedela. */
   onKde?: (kde: { karta: string; klient: string }) => void;
 }) {
-  const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
-  const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
+  const [balicky, setBalicky] = useState<BalicekRiadok[]>(pamatKopy.balicky);
+  const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>(pamatKopy.platby);
   /**
    * WORKSPACE PO KROKOCH — naostro od 5. 10. 2026 (Jerry: „postav to
    * v Kokpite"). Do toho dňa sa to skúšalo len v bete. Premenná ostáva, aby
@@ -223,8 +239,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const [platbyRozbalene, setPlatbyRozbalene] = useState(true);
   const [pocetSms, setPocetSms] = useState<number | null>(null);
-  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; presuny: Record<string, { zaciatok: string; kandidatov: number }>; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
+  const [pocetDopytov, setPocetDopytov] = useState(0);
+  const [pocetUzavierky, setPocetUzavierky] = useState(0);
+  const [zdroje, setZdroje] = useState<typeof pamatKopy.zdroje>(pamatKopy.zdroje);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
+  const hotoveRef = useRef(hotove);
+  hotoveRef.current = hotove;
+  useEffect(() => () => { if (hotoveRef.current.size) pamatKopy.zdroje = null; }, []);
   const [texty, setTexty] = useState<Record<string, string>>({});
   /**
    * Na ktorej karte človek stál — aj po odchode z Workspace a návrate
@@ -233,6 +254,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [i, setIRaw] = useState(() => {
     try { return Number(sessionStorage.getItem("psb-workspace-karta") || 0) || 0; } catch { return 0; }
   });
+  const iRef = useRef(i);
+  iRef.current = i;
   const setI = useCallback((v: number | ((x: number) => number)) => {
     setIRaw((x) => {
       const n = typeof v === "function" ? v(x) : v;
@@ -303,9 +326,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
-    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], presuny: k?.presuny || {}, nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) });
+    const noveZdroje = { zmeny: (k?.zmeny || []) as Zmena[], presuny: k?.presuny || {}, nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) };
+    setZdroje(noveZdroje);
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
+    // Čo sa nenačítalo (null), sa nepamätá — návrat by chybu vydával za „nič nečaká".
+    if (k && p && b && vp) Object.assign(pamatKopy, { zdroje: noveZdroje, balicky: b.balicky || [], platby: vp.platby || [] });
   }, []);
   /**
    * Zápis v kroku zmení balíčky aj hodiny: Workspace si načíta svoje zoznamy
@@ -441,6 +467,33 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const idKarty = useCallback((x: Karta): string => (x.druh === "krok" ? `krok:${x.krok}` : x.druh), []);
 
+  /**
+   * OTVORENÁ KARTA JE MENO, NIE PORADIE.
+   *
+   * Index platil len pre ten zoznam, v ktorom vznikol. Kopa sa ale mení pod
+   * rukou — karta bez položiek zmizne, filter Jerryho/Terezkine pridá Dopyty
+   * a uberie Kontrolu, a po obnovení stránky sa zoznam skladá postupne.
+   * Rovnaké číslo potom ukázalo inú kartu (Jerry, mobil: „preskočilo mi to
+   * o jednu, na Uzávierku"). `indexKartyPoZmene` drží kartu podľa mena.
+   */
+  const ziveRef = useRef(zive);
+  ziveRef.current = zive;
+  const predosleKarty = useRef<string[]>([]);
+  useLayoutEffect(() => {
+    const kluce = zive.map(idKarty);
+    const stare = predosleKarty.current;
+    predosleKarty.current = kluce;
+    if (!kluce.length) return;
+    let ulozena: string | null = null;
+    if (!stare.length) { try { ulozena = sessionStorage.getItem("psb-workspace-karta-id"); } catch { /* bez úložiska podľa čísla */ } }
+    setI((x) => indexKartyPoZmene(stare, kluce, x, ulozena));
+  }, [zive, idKarty, setI]);
+  useEffect(() => {
+    const x = zive[Math.min(i, zive.length - 1)];
+    if (!x) return;
+    try { sessionStorage.setItem("psb-workspace-karta-id", idKarty(x)); } catch { /* bez úložiska len v pamäti */ }
+  }, [i, zive, idKarty]);
+
   // Späť/dopredu: skok na konkrétnu kartu a hlásenie, kde človek stojí.
   useEffect(() => {
     if (!otvorKartu) return;
@@ -523,14 +576,29 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const menejPohybu = typeof window !== "undefined"
     && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+  /**
+   * Kam sa práve ide. Rad kariet to ukáže hneď s klikom — karta sa vymení až
+   * o 150 ms (odlet) a dovtedy by svietila tá stará (mobil: obsah sa prepol
+   * skôr ako zvýraznenie).
+   */
+  const [cielPrepnutia, setCielPrepnutia] = useState<number | null>(null);
   const prepni = useCallback((smer: 1 | -1, ciel?: number) => {
-    if (zive.length < 2 || bezi.current) return;
-    const dalsi = (x: number) => (ciel ?? (x + smer + zive.length)) % zive.length;
-    if (menejPohybu) { setI(dalsi); return; }
+    const teraz = ziveRef.current;
+    if (teraz.length < 2 || bezi.current) return;
+    const kam = (ciel ?? (iRef.current + smer + teraz.length)) % teraz.length;
+    // Kým karta doletí, kopa sa môže zmeniť — cieľ je karta, nie jej poradie.
+    const cielovaKarta = idKarty(teraz[kam]);
+    const dalsi = () => {
+      const j = ziveRef.current.findIndex((x) => idKarty(x) === cielovaKarta);
+      return j >= 0 ? j : Math.min(kam, Math.max(0, ziveRef.current.length - 1));
+    };
+    if (menejPohybu) { setI(dalsi()); return; }
     bezi.current = true;
+    setCielPrepnutia(kam);
     setPrechod({ smer, faza: "von" });
     setTimeout(() => {
-      setI(dalsi);
+      setI(dalsi());
+      setCielPrepnutia(null);
       // „dnu" posadí kartu na druhú stranu BEZ prechodu; až ďalší snímok ju
       // pustí späť na nulu, a to už s prechodom. Bez tých dvoch rámcov by
       // prehliadač obe zmeny zlial do jednej a karta by nikam nešla.
@@ -553,7 +621,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       requestAnimationFrame(() => requestAnimationFrame(uvolni));
       setTimeout(uvolni, 400);
     }, 150);
-  }, [zive.length, menejPohybu]);
+  }, [menejPohybu, setI, idKarty]);
 
   /**
    * Prepínanie dvoma prstami po trackpade. Rozhodovanie je v `gestoKariet.ts`,
@@ -568,6 +636,41 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // Prepína sa radom kariet hore (ťuk) a švihom — rad kariet je tá overená
   // náhrada, bez ktorej sa šípky 28. 9. 2026 skryť nesmeli.
   const mobil = useMobilRozlozenie();
+  /**
+   * NA TELEFÓNE ROLUJE STRÁNKA, NIE KARTA (rozbor, 1. 11. 2026: plocha karty
+   * 489 px z 812, rolovanie v okne v okne, a SMS s piatimi riadkami s prázdnom
+   * pod sebou). Karta má výšku podľa obsahu, takže poloha rolovania je jedna
+   * pre všetky — „Workspace drží prácu" ju preto pamätá po kartách.
+   */
+  const idAktivnej = k ? `${k.druh}|${k.druh === "krok" ? k.krok : ""}` : "";
+  const polohyKariet = useRef(new Map<string, number>());
+  const idAktivnejRef = useRef(idAktivnej);
+  useEffect(() => {
+    if (!mobil) return;
+    const pamataj = () => { polohyKariet.current.set(idAktivnejRef.current, window.scrollY); };
+    window.addEventListener("scroll", pamataj, { passive: true });
+    return () => window.removeEventListener("scroll", pamataj);
+  }, [mobil]);
+  useLayoutEffect(() => {
+    if (idAktivnejRef.current === idAktivnej) return;
+    idAktivnejRef.current = idAktivnej;
+    if (mobil) window.scrollTo(0, polohyKariet.current.get(idAktivnej) || 0);
+  }, [idAktivnej, mobil]);
+  /**
+   * NAJPRV KARTA, NA KTOREJ ČLOVEK STOJÍ. Ostatné sa postavia hneď potom a už
+   * ostanú (`Workspace drží prácu`) — ale nie v tom istom prekreslení: všetkých
+   * desať naraz (profil, editor, banka, uzávierka) je to, čo po kliku držalo
+   * obrazovku prázdnu. `navstivene` drží kartu, na ktorú človek skočil skôr.
+   */
+  const [vsetkyPostavene, setVsetkyPostavene] = useState(false);
+  const navstivene = useRef(new Set<string>());
+  if (idAktivnej) navstivene.current.add(idAktivnej);
+  const maZdroje = !!zdroje;
+  useEffect(() => {
+    if (!maZdroje || vsetkyPostavene) return;
+    const t = setTimeout(() => startTransition(() => setVsetkyPostavene(true)), 300);
+    return () => clearTimeout(t);
+  }, [maZdroje, vsetkyPostavene]);
   const poistka = useRef(0 as unknown as ReturnType<typeof setTimeout>);
   /**
    * V EDITORE SA GESTOM NEPREPÍNA (Jerry, 12. 10. 2026: „keď pracujem
@@ -833,7 +936,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     oznam("peniaze");
   };
 
-  if (!zdroje) return null;
+  if (!zdroje) return <KostraObrazovky />;
 
   const vybavenych = hotove.size;
   /** Koho vybralo prihlásenie; null = appka nevie, kto sedí pri appke. */
@@ -865,6 +968,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const dalsie = zive.length > 1
     ? [1, 2].slice(0, Math.min(2, zive.length - 1)).map((o) => zive[(i + o) % zive.length])
     : [];
+
+  /** Otázky kroku Platby mimo sekcií — pýta sa ich obrazovka aj odznak na rade. */
+  const otazkyKrokuPlatby = () => {
+    const autoOtazok = balicky.filter((b) => b.id && !b.zrusene_at && /^automaticky/i.test(String(b.poznamka || ""))
+      && /návrat/i.test(String(b.poznamka || "")) && !data.anomalyAck?.[`balicek-sedi|${b.id}`]
+      && (!trenerKroku || clients[b.klient]?.primaryTrainer === trenerKroku)).length;
+    const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
+      && (!trenerKroku || x.trener === trenerKroku)).length;
+    const sumaOtazok = otazkyPlatieb(data.dlhy, data.anomalyAck).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
+    return { spolu: autoOtazok + platnostOtazok + sumaOtazok };
+  };
 
   /**
    * OBSAH JEDNEJ KARTY. Vytiahnuté do funkcie, aby ho krok v bete vedel
@@ -1789,6 +1903,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       const mena = ((zdroje?.focus as { skupina?: { mena?: string[] } } | undefined)?.skupina?.mena) || [];
       return (
         <KrokDopyty
+          onPocet={setPocetDopytov}
           leads={(data.leads || []) as never}
           clients={clients}
           bezZdroja={{
@@ -1806,6 +1921,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       return (
         <>
         <KrokUzavierka
+          onPocet={setPocetUzavierky}
           mesiac={mesiacUzavierky}
           kroky={krokyUzavierky?.(mesiacUzavierky) || []}
           prekazky={prekazkyUzavierky?.(mesiacUzavierky) || []}
@@ -1899,13 +2015,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
        * len dve rozhodnutia — končiaca platnosť a „sedí?" po návrate — a obe
        * menia, čo klient dlží, takže patria k párovaniu platieb.
        */
-      const autoOtazok = balicky.filter((b) => b.id && !b.zrusene_at && /^automaticky/i.test(String(b.poznamka || ""))
-        && /návrat/i.test(String(b.poznamka || "")) && !data.anomalyAck?.[`balicek-sedi|${b.id}`]
-        && (!trenerKroku || clients[b.klient]?.primaryTrainer === trenerKroku)).length;
-      const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
-        && (!trenerKroku || x.trener === trenerKroku)).length;
-      const sumaOtazok = otazkyPlatieb(data.dlhy, data.anomalyAck).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
-      const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok;
+      const prazdne = !sekcie.length && !otazkyKrokuPlatby().spolu;
       return (
         <>
           <FioPrijmy onZapisane={poZapise} />
@@ -1941,25 +2051,53 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     );
   };
 
+  /**
+   * ODZNAK NA RADE KARIET. Pravidlo 1 hore: „vidno, koľko toho ešte je — v karte
+   * aj v kope." SMS a Anamnézy ho nemali, hoci v nich čakala práca (rozbor,
+   * 1. 11. 2026) — počet tam nie je v `polozky`. Karty, ktoré si počet rátajú
+   * samy (SMS, Dopyty, Uzávierka), ho hlásia cez `onPocet`, aby existovala
+   * jedna definícia; do toho, kým sa postavia (~300 ms), odznak chýba.
+   */
+  const pocetKarty = (x: Karta): number => {
+    if (x.druh === "krok") {
+      if (x.krok === "kontroly") return kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length;
+      if (x.krok === "sms") return pocetSms ?? 0;
+      if (x.krok === "dopyty") return pocetDopytov;
+      if (x.krok === "uzavierka") return pocetUzavierky;
+      const sekcii = x.sekcie.reduce((a, y) => a + zostava(y), 0);
+      return x.krok === "platby" ? sekcii + otazkyKrokuPlatby().spolu : sekcii;
+    }
+    if (x.druh === "anamnezy") return anamnezyNaVybavenie(x.polozky as AnamnezaRiadok[], dnesPraha());
+    if (x.druh === "reklamy") return (register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length;
+    return BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x);
+  };
+
+  /** Rad kariet — na telefóne sa lepí pod horný riadok, lebo roluje celá stránka. */
+  const radKariet = (
+    <RadKariet
+      polozky={zive.map((x) => ({ kluc: idKarty(x), nadpis: x.nadpis, pocet: pocetKarty(x) }))}
+      aktivna={cielPrepnutia ?? Math.min(i, zive.length - 1)}
+      onVyber={(j, smer) => prepni(smer, j)}
+      // Na počítači `auto`: keď sa všetky karty do riadku s filtrom nevojdú, filter
+      // sa zalomí pod ne — radšej o riadok viac než karty za okrajom.
+      style={mobil ? undefined : { flex: "1 1 auto" }}
+    />
+  );
+
   return (
     // Celá šírka obrazovky, nie 1200 px ako zvyšok appky. Karta je pracovná
     // plocha — čím širšia, tým viac riadkov sa vybaví bez rolovania, a vpravo
     // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
     // trik: 100vw a posun o polovicu rozdielu doľava.
-    <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: "0 20px", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
-        {/* NAVÁDZAČ KARIET — nekonečný rad (Jerry, 6. 10. 2026: „ide to
-            dokola, vedľa Klienta je 1 · Kalendár… ako nekonečný rad").
-            Klik na názov preskočí na kartu kratšou cestou. */}
-        <NekonecnyRad
-          polozky={zive.map((x) => ({
-            kluc: x.druh === "krok" ? `krok|${x.krok}` : x.druh,
-            nadpis: x.nadpis,
-            pocet: x.druh === "krok" ? (x.krok === "kontroly" ? kontrolaPenazi.length + vydavkyNaPotvrdenie + platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).length : x.sekcie.reduce((a, y) => a + zostava(y), 0)) : BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x),
-          }))}
-          aktivna={Math.min(i, zive.length - 1)}
-          onVyber={(j, smer) => prepni(smer, j)}
-        />
+    // `--jarvis-miesto`: šírka, ktorú si vyhradil otvorený panel Jarvisa (Assistant).
+    <div style={{ width: "calc(100vw - var(--jarvis-miesto, 0px))", marginLeft: "calc(50% - 50vw + var(--jarvis-miesto, 0px) / 2)", padding: mobil ? "0 10px" : "0 20px", boxSizing: "border-box" }}>
+      {mobil && (
+        <div style={{ position: "sticky", top: 59, zIndex: 30, margin: "-16px -10px 8px", padding: "6px 10px", background: mix(C.bg, 96), backdropFilter: "blur(10px)" }}>
+          {radKariet}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: mobil ? 8 : 14, marginBottom: mobil ? 10 : 14, flexWrap: "wrap" }}>
+        {!mobil && radKariet}
         <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
           {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
         </div>
@@ -1996,10 +2134,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
           flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
           obsah a `overflow` sa nikdy nezapne. */}
-      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)", touchAction: "pan-y" }}>
-        {dalsie.map((d, j) => (
+      {/* Na telefóne výška podľa obsahu a roluje stránka — pevná výška tam dávala
+          okno v okne a prázdno pod riedkymi kartami (rozbor, 1. 11. 2026). Bočné
+          šípky, kvôli ktorým vznikla, na telefóne nie sú. */}
+      {/* `clip`: karta pri prepnutí letí o 52 px do strany a telefón by z toho spravil
+          vodorovné rolovanie celej stránky, ktoré mu ostane aj po dolete.
+          `minHeight`: švih počúva táto plocha — pod krátkou kartou (SMS) by bola
+          obrazovka hluchá a švih by prepol len raz a ďalej nič. */}
+      <div ref={kopa} style={{ position: "relative", height: mobil ? undefined : "min(72vh, 660px)", minHeight: mobil ? "calc(100dvh - 250px)" : undefined, overflowX: mobil ? "clip" : undefined, touchAction: "pan-y" }}>
+        {!mobil && dalsie.map((d, j) => (
           <div
-            key={d.druh}
+            key={idKarty(d)}
             aria-hidden="true"
             style={{
               position: "absolute",
@@ -2056,12 +2201,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           key={`${kk.druh}|${kk.druh === "krok" ? kk.krok : ""}`}
           aria-hidden={!aktivna}
           style={{
-            position: "absolute", top: 0, bottom: 0, left: mobil ? 0 : uzke ? 30 : 46, right: mobil ? 0 : uzke ? 30 : 46,
+            ...(mobil
+              // Skrytá karta na telefóne nesmie stránke pridať výšku, ale ostáva
+              // načítaná — „Workspace drží prácu".
+              ? (aktivna ? { position: "relative" as const } : { position: "absolute" as const, top: 0, left: 0, right: 0, height: 0, overflow: "hidden" })
+              : { position: "absolute" as const, top: 0, bottom: 0, left: uzke ? 30 : 46, right: uzke ? 30 : 46 }),
             zIndex: aktivna ? 1 : 0, visibility: aktivna ? "visible" : "hidden",
             ...(aktivna ? pohybKarty(prechod) : {}),
           }}
         >
-          <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Card style={{ marginBottom: 0, height: mobil ? undefined : "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{kk.nadpis}</div>
               {!BEZ_FRONTY.includes(kk.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(kk)} zostáva</div>}
@@ -2076,8 +2225,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
                   takže rolovať musí karta, inak sa spodok profilu nedá
                   dosiahnuť (Jerry, 30. 9. 2026). */}
-              <div style={{ flexGrow: 1, minHeight: 0, overflowY: kk.druh === "editor" ? "hidden" : kk.druh === "klient" && !uzke ? "visible" : "auto", display: kk.druh === "klient" || kk.druh === "editor" ? "flex" : "block", flexDirection: "column" }}>
-              {kk.druh === "krok" ? kresliKrok(kk) : obsahKarty(kk)}
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: mobil ? undefined : kk.druh === "editor" ? "hidden" : kk.druh === "klient" && !uzke ? "visible" : "auto", display: kk.druh === "klient" || kk.druh === "editor" ? "flex" : "block", flexDirection: "column" }}>
+              {vsetkyPostavene || navstivene.current.has(`${kk.druh}|${kk.druh === "krok" ? kk.krok : ""}`)
+                ? (kk.druh === "krok" ? kresliKrok(kk) : obsahKarty(kk))
+                : null}
               </div>
             </div>
             {aktivna && (
@@ -2154,14 +2305,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
           {zive.map((x, j) => (
             <button
-              key={x.druh}
+              key={idKarty(x)}
               onClick={() => (j === i ? undefined : prepni(j > i ? 1 : -1, j))}
               aria-label={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} (${zostava(x)} zostáva)`}
               title={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} · ${zostava(x)} zostáva`}
               style={{
                 width: j === i ? 11 : 8, height: j === i ? 11 : 8, borderRadius: "50%",
                 border: "none", padding: 0, cursor: "pointer",
-                background: j === i ? C.accent : j < i ? mix(C.green, 60) : mix(C.border, 160),
+                // `mix` nad 100 % nie je platná farba — bodky tak neboli vidno.
+                background: j === i ? C.accent : j < i ? mix(C.green, 60) : C.border,
               }}
             />
           ))}

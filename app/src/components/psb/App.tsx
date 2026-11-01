@@ -2,7 +2,7 @@ import { mzdoveHodiny } from "../../lib/psb/mzdoveHodiny";
 import { jeNehmotny } from "../../lib/psb/fakturaRiadky";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import type { SporneKonanie } from "../../lib/psb/sporneKonanie";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { mzdaZaskoku } from "../../lib/psb/zaskok";
@@ -87,7 +87,8 @@ import { C, S, mix, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
-import { Icon } from "./ui";
+import { Icon, KostraObrazovky } from "./ui";
+import { PosuvnyRad } from "./PosuvnyRad";
 import { Login } from "./Login";
 import { Dashboard } from "./Dashboard";
 import { Treningy } from "./Treningy";
@@ -302,7 +303,9 @@ const MKT_ALIAS: Record<string, string> = { algoritmus: "kanaly", dosah: "obsah"
 /** Staré adresy tabov → nové. Nikdy sa nemažú (pravidlo z 10. 8.). */
 /** Staré adresy tabov → nové. „udaje" sa 29. 8. 2026 vrátilo ako vlastná
  *  záložka (Upload), preto tu už nie je. */
-const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac" };
+// Mená zo záložiek v adrese: `#firma` nebola záložka a klik na odkaz neurobil nič;
+// `#btc` píše appka sama (cestaZoStavu) a po obnovení stránky pristál na Dnes.
+const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac", firma: "tracker", dnes: "dashboard", peniaze: "vzas", btc: "btc", bitcoin: "btc" };
 
 const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
@@ -421,6 +424,28 @@ export function PSBApp() {
   peniazeOdRef.current = data.peniazeOd || "";
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
+  /**
+   * KLIK NA ZÁLOŽKU SA PREJAVÍ HNEĎ (rozbor Kokpitu, 1. 11. 2026: po kliku na
+   * Workspace 2–3 s prázdno a v menu ešte svieti „Dnes").
+   *
+   * `active` sa zmení v tom istom prekreslení ako zvyšok miesta (stopa pohybu ho
+   * číta celé naraz). Obsah záložky ide až po ňom: najprv sa NAMAĽUJE nové
+   * zvýraznenie a kostra, potom sa stavia ťažká obrazovka. Samotné
+   * `useDeferredValue` na to nestačí — odložené prekreslenie stihne začať ešte
+   * pred maľovaním (zmerané: 808 ms bez jediného snímku), preto
+   * `requestAnimationFrame` + časovač. Druhý časovač je poistka pre skrytú
+   * záložku, kde rAF nebeží (tá istá pasca ako 28. 9. 2026 pri kope kariet).
+   */
+  const [obsahZalozky, setObsahZalozky] = useState(active);
+  useEffect(() => {
+    if (obsahZalozky === active) return;
+    let hotovo = false;
+    const postav = () => { if (!hotovo) { hotovo = true; startTransition(() => setObsahZalozky(active)); } };
+    let t1: ReturnType<typeof setTimeout> | undefined;
+    const r = requestAnimationFrame(() => { t1 = setTimeout(postav, 0); });
+    const t2 = setTimeout(postav, 120);
+    return () => { hotovo = true; cancelAnimationFrame(r); if (t1) clearTimeout(t1); clearTimeout(t2); };
+  }, [active, obsahZalozky]);
   // Fotky označené v profile klienta → Workspace → Editor (lib/psb/doEditora.ts).
   useEffect(() => {
     const na = () => { setActive("workspace"); setWorkspaceKartu("editor"); };
@@ -3249,14 +3274,18 @@ function skupinaFaktur(
               robia. Rad záložiek je mapa obrazoviek; toto tam robilo zmätok.
               Tvar aj rozmery kopírujú „+ Zápis", aby dvojica držala spolu. */}
           <button
-            onClick={() => navigate("jarvis")}
-            title="Otvoriť Jarvisa vo veľkom — s dokumentmi a staršími debatami"
+            // Jediný vstup na počítači (rozbor, 1. 11. 2026: hlavička aj plávajúce
+            // tlačidlo robili to isté z dvoch miest). Otvorí panel vedľa práce;
+            // do veľkého rozloženia vedie ⤢ v jeho hlavičke.
+            onClick={() => { if (active === "jarvis") return; if (chat.floatingOpen) chat.setFloatingOpen(false); else chat.otvorPrazdny(); }}
+            title="Jarvis vedľa práce — ⤢ v jeho hlavičke ho otvorí vo veľkom, s dokumentmi a staršími debatami"
+            aria-pressed={chat.floatingOpen || active === "jarvis"}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
               padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-              border: `1px solid ${active === "jarvis" ? mix(C.accent, 55) : C.border}`,
-              background: active === "jarvis" ? mix(C.accent, 12) : "transparent",
-              color: active === "jarvis" ? C.accentLight : C.textMuted,
+              border: `1px solid ${active === "jarvis" || chat.floatingOpen ? mix(C.accent, 55) : C.border}`,
+              background: active === "jarvis" || chat.floatingOpen ? mix(C.accent, 12) : "transparent",
+              color: active === "jarvis" || chat.floatingOpen ? C.accentLight : C.textMuted,
             }}
           >
             <Icon name="sparkles" /> Jarvis
@@ -3353,13 +3382,13 @@ function skupinaFaktur(
       </>)}
       {/* Na telefóne miesto pod spodnou lištou, aby ju obsah nezakrýval. */}
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto", paddingBottom: mobil ? "calc(96px + env(safe-area-inset-bottom))" : 16 }}>
-        {FIRMA_IDS.includes(active) && (
-          <div style={{ display: "flex", gap: 6, marginBottom: mobil ? 10 : 14, flexWrap: mobil ? "nowrap" : "wrap", overflowX: mobil ? "auto" : undefined, scrollbarWidth: mobil ? "none" : undefined }}>
-            {FIRMA_SEKCIE.map((s) => {
+        {FIRMA_IDS.includes(active) && (() => {
+          const tlacidla = FIRMA_SEKCIE.map((s) => {
               const on = s.tab === active && (!s.sekcia || s.sekcia === trackerSection);
               return (
                 <button
                   key={s.id}
+                  data-aktivna={on ? "1" : undefined}
                   onClick={() => { setActive(s.tab); setFirmaSub(s.tab); if (s.sekcia) setTrackerSection(s.sekcia); }}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 7, flex: "none",
@@ -3373,9 +3402,13 @@ function skupinaFaktur(
                   <Icon name={s.icon} /> {s.label}
                 </button>
               );
-            })}
-          </div>
-        )}
+            });
+          // Telefón: Výsledky stoja za okrajom a rad to musí povedať.
+          return mobil
+            ? <PosuvnyRad zmena={`${active}|${trackerSection}`} style={{ marginBottom: 10 }}>{tlacidla}</PosuvnyRad>
+            : <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>{tlacidla}</div>;
+        })()}
+        {obsahZalozky !== active ? <KostraObrazovky /> : (<>
         {active === "dashboard" && (
           <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerNaDnes} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} onVypisKlientovi={(m) => { setVypisPredvolba(m); setActive("workspace"); }} />
         )}
@@ -3450,6 +3483,7 @@ function skupinaFaktur(
         {active === "udaje" && (
           <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />
         )}
+        </>)}
 
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>

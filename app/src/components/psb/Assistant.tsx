@@ -4,7 +4,7 @@ import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } fr
 import { fmtDMY, jeMesiac } from "../../lib/psb/format";
 import { navrhZTokenu } from "../../lib/psb/kampanPlan";
 import type { NavrhKampane } from "./KampanForm";
-import { jePlatnyCiel, jeVonkajsiOdkaz, menoOdkazu, naPlnuAdresu } from "../../lib/psb/odkazy";
+import { jePlatnyCiel, jeVonkajsiOdkaz, mdOdkaz, menoOdkazu, naPlnuAdresu } from "../../lib/psb/odkazy";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
@@ -214,7 +214,15 @@ function oznac(text: string, hladat: string, key: number) {
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
 function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string, jeKlient?: (meno: string) => boolean, onKampan?: (n: NavrhKampane) => void) {
   return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|(?:https?:\/\/|(?:www\.)?(?:prosapiens\.cz|instagram\.com)\/)[^\s)»"]+)/g).map((p, j) => {
+    const parts = line.split(/(\*\*\[[^\]]+\]\([^\s)]+\)\*\*|\[[^\]]+\]\([^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|(?:https?:\/\/|(?:www\.)?(?:prosapiens\.cz|instagram\.com)\/)[^\s)»"]+)/g).map((p, j) => {
+      // [text](adresa) — Jarvis v reklamnej debate píše odkazy po markdownovsky
+      // a na obrazovke z toho ostávali hranaté zátvorky a surová adresa, tučné
+      // **[text](adresa)** bez možnosti kliknúť vôbec (rozbor, 1. 11. 2026).
+      const md = mdOdkaz(p);
+      if (md) {
+        const a = <a key={j} href={md.url} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", fontWeight: 600, wordBreak: "break-word" }}>{md.text} ↗</a>;
+        return md.tucne ? <strong key={j}>{a}</strong> : a;
+      }
       // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
       // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
       // aj tak musí naklikať štyri obrazovky.
@@ -278,10 +286,15 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
         // 17. 8. hlásil, že prekliky chýbajú — pritom tam boli.
         const popis = ig
           ? "otvoriť na Instagrame ↗"
-          : `${plna.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")} ↗`;
+          // Parametre (`?utm_source=…`) sa nečítajú a robili z odkazu dva riadky.
+          : `${plna.replace(/^https?:\/\/(www\.)?/, "").replace(/[?#].*$/, "").replace(/\/$/, "")} ↗`;
         return <a key={j} href={plna} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", fontWeight: 600, wordBreak: "break-word" }}>{popis}</a>;
       }
-      if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
+      if (p.startsWith("**") && p.endsWith("**")) {
+        const vnutri = naPlnuAdresu(p.slice(2, -2));
+        if (vnutri) return <strong key={j}><a href={vnutri} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", wordBreak: "break-word" }}>{vnutri.replace(/^https?:\/\/(www\.)?/, "").replace(/[?#].*$/, "").replace(/\/$/, "")} ↗</a></strong>;
+        return <strong key={j}>{p.slice(2, -2)}</strong>;
+      }
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
       if (p.startsWith("«") && p.endsWith("»")) {
         // Tvar «Richardom Matlom|Richard Matl»: vľavo to, čo sa ZOBRAZÍ,
@@ -361,6 +374,8 @@ export function useAssistantChat(
    * predošlé volanie.
    */
   const abortRef = useRef<AbortController | null>(null);
+  /** História práve načítaná z databázy — tá sa späť neukladá. */
+  const uzVDatabaze = useRef<unknown>(null);
   // Vetva sa pozná až pri prvom uložení nového rozhovoru — preto ref, nie state:
   // state by sa do efektu dostal až o render neskôr a prvý zápis by ju minul.
   const vetvaRef = useRef(false);
@@ -438,7 +453,12 @@ export function useAssistantChat(
       // Len keď sa do nej medzitým nezačalo písať.
       if (pevny) {
         const c = zoz.find((x) => x.id === pevny.id);
-        if (c?.messages?.length) setMsgs((m) => (m.length ? m : opravStratene(c.messages)));
+        if (c?.messages?.length) setMsgs((m) => {
+          if (m.length) return m;
+          const nacitane = opravStratene(c.messages);
+          uzVDatabaze.current = nacitane;
+          return nacitane;
+        });
         return;
       }
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(zoz.slice(0, 50))); } catch { /* ignore */ }
@@ -452,6 +472,10 @@ export function useAssistantChat(
   // medzitým drží aktuálny stav pre prípad zavretia okna.
   useEffect(() => {
     if (!msgs.length) return;
+    // Práve načítaná história pevnej debaty (Reklama · Jarvis) sa neukladá späť:
+    // každé otvorenie appky posielalo celú debatu POSTom a menilo jej dátum,
+    // hoci sa v nej nič nestalo (rozbor, 1. 11. 2026).
+    if (msgs === uzVDatabaze.current) return;
     let zaznam: SavedChat | null = null;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
@@ -1415,24 +1439,39 @@ export function Assistant({ chat, onClientClick, onNavigate, bezSpustaca = false
     window.addEventListener("pointerup", up);
   }
 
-  if (!open) {
-    if (bezSpustaca) return null;
-    // Odsadenie zdola kvôli odznaku platformy: sedí napevno vpravo dole a má
-    // najvyšší možný z-index, takže sa prekryť nedá — Jarvis sa mu teda uhne.
-    // Nie je to naša značka a potláčať ju nebudeme.
-    return (
-      <button onClick={() => chat.otvorPrazdny()} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť Jarvisa">
-        <Spark /> Jarvis
-      </button>
-    );
-  }
+  /**
+   * PANEL SI VYHRADÍ MIESTO, NEPREKRÝVA PRÁCU (rozbor Kokpitu, 1. 11. 2026:
+   * zakryl meno v Evidencii). Obsah appky sa odsunie doľava o šírku panela —
+   * `--jarvis-miesto` číta aj Workspace, ktorý ide na celú šírku okna.
+   * Keď by obsahu ostalo menej než 760 px (kde sa tabuľky začnú lámať), panel
+   * prekrýva vedome: je to okno na jednu otázku a ✕ je hneď po ruke. Na telefóne
+   * je to tak vždy.
+   */
+  useEffect(() => {
+    if (!open || bezSpustaca) return;
+    const miesto = Math.min(size.w, window.innerWidth - 32) + 32;
+    if (window.innerWidth - miesto < 760) return;
+    document.documentElement.style.setProperty("--jarvis-miesto", `${miesto}px`);
+    document.body.style.paddingRight = `${miesto}px`;
+    return () => {
+      document.documentElement.style.removeProperty("--jarvis-miesto");
+      document.body.style.paddingRight = "";
+    };
+  }, [open, size.w, bezSpustaca]);
+
+  // Vstup je v hlavičke appky (počítač) alebo v lište dole (telefón) — plávajúce
+  // tlačidlo zakrývalo obsah a robilo to isté z druhého miesta (1. 11. 2026).
+  if (!open) return null;
 
   return (
     <div className="psb-card" style={{ position: "fixed", right: 20, bottom: bezSpustaca ? "calc(84px + env(safe-area-inset-bottom))" : 20, zIndex: 61, width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
       <div onPointerDown={startResize} title="Potiahni pre zmenu veľkosti" style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22, cursor: "nwse-resize", zIndex: 2, padding: 4 }}>
         <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
       </div>
-      <ChatHeader chat={chat} extra={<button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>} />
+      <ChatHeader chat={chat} extra={<>
+        {onNavigate && <button onClick={() => { setOpen(false); onNavigate("jarvis"); }} title="Vo veľkom — s dokumentmi a staršími debatami" aria-label="Otvoriť Jarvisa vo veľkom" style={iconBtn}>⤢</button>}
+        <button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>
+      </>} />
       <ChatConversation chat={chat} autoFocus={open} onClientClick={onClientClick} onNavigate={onNavigate} />
     </div>
   );

@@ -390,3 +390,7 @@ button {
   color: var(--c-textDim);
 }
 
+
+/* Kostra sa ukáže až po chvíli — rýchla obrazovka nesmie preblikávať sivými pruhmi. */
+.psb-kostra { animation: psb-kostra-nabeh 0.15s ease-out 0.12s both; }
+@keyframes psb-kostra-nabeh { from { opacity: 0; } to { opacity: 1; } }

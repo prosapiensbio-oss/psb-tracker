@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { klucSkrytia, skryteDo } from "../../lib/psb/kontrolaDat";
 import { adresaStranky } from "../../lib/psb/odkazy";
 import { C, mix, S, badge } from "../../lib/psb/theme";
+import { PosuvnyRad } from "./PosuvnyRad";
 
 // Scrolls a horizontally-overflowing container to its right edge on mount/update
 // so charts open showing the most recent data (user scrolls left into the past).
@@ -141,6 +142,29 @@ export function Toolbar({ children }: { children: ReactNode }) {
  * nadpisy rodín. Kto hľadá „koľko to stálo", pozerá do rodiny Výsledok
  * a nemusí prejsť Mailer.
  */
+/**
+ * Kostra namiesto prázdna, kým sa obrazovka stavia alebo číta dáta. Prázdna
+ * plocha po kliku vyzerá ako chyba a človek klikne znova (rozbor, 1. 11. 2026).
+ */
+export function KostraObrazovky() {
+  const pruh = (sirka: string, vyska = 12) => (
+    <div style={{ width: sirka, maxWidth: "100%", height: vyska, borderRadius: 6, background: mix(C.border, 55) }} />
+  );
+  return (
+    <div className="psb-kostra" role="status" aria-label="Načítavam" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", gap: 8 }}>{pruh("90px", 24)}{pruh("70px", 24)}{pruh("110px", 24)}</div>
+      <Card style={{ marginBottom: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+          {pruh("38%", 18)}
+          {pruh("62%")}
+          <div style={{ height: 6 }} />
+          {["88%", "74%", "81%", "66%", "78%"].map((x) => <div key={x}>{pruh(x)}</div>)}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export function SubTabs({
   tabs,
   value,
@@ -153,7 +177,6 @@ export function SubTabs({
   // Telefón: jeden posuvný rad namiesto zalomených riadkov — tri vrstvy
   // záložiek zjedli pol obrazovky, kým sa ukázal obsah (Jerry, 9. 10. 2026).
   const mobil = useMobilRozlozenie();
-  const rad = mobil ? { flexWrap: "nowrap" as const, overflowX: "auto" as const, scrollbarWidth: "none" as const, WebkitOverflowScrolling: "touch" as const } : {};
   // Rodiny v poradí, v akom prišli. Bez `skupina` sa správa ako predtým.
   const skupiny: { nazov: string; polozky: typeof tabs }[] = [];
   for (const t of tabs) {
@@ -165,9 +188,7 @@ export function SubTabs({
   const maSkupiny = skupiny.some((s) => s.nazov);
 
   if (maSkupiny) {
-    return (
-      <div style={{ display: "flex", gap: 18, marginBottom: 12, flexWrap: "wrap", alignItems: "center", ...rad }}>
-        {skupiny.map((sk, i) => (
+    const rodiny = skupiny.map((sk, i) => (
           <div key={sk.nazov || i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: mobil ? "nowrap" : "wrap", flex: mobil ? "none" : undefined }}>
             {sk.nazov && (
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: C.textDim, textTransform: "uppercase", marginRight: 2 }}>
@@ -177,6 +198,7 @@ export function SubTabs({
             {sk.polozky.map((t) => (
               <button
                 key={t.id}
+                data-aktivna={value === t.id ? "1" : undefined}
                 onClick={() => onChange(t.id)}
                 style={{
                   padding: "7px 14px", borderRadius: 8,
@@ -191,16 +213,19 @@ export function SubTabs({
               </button>
             ))}
           </div>
-        ))}
+    ));
+    if (mobil) return <PosuvnyRad zmena={value} gap={18} style={{ marginBottom: 12 }}>{rodiny}</PosuvnyRad>;
+    return (
+      <div style={{ display: "flex", gap: 18, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        {rodiny}
       </div>
     );
   }
 
-  return (
-    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", ...rad }}>
-      {tabs.map((t) => (
+  const tlacidla = tabs.map((t) => (
         <button
           key={t.id}
+          data-aktivna={value === t.id ? "1" : undefined}
           onClick={() => onChange(t.id)}
           style={{
             flex: mobil ? "none" : undefined,
@@ -216,7 +241,12 @@ export function SubTabs({
         >
           {t.label}
         </button>
-      ))}
+  ));
+  // Telefón: čo sa nezmestí, stojí za okrajom — rad to musí povedať.
+  if (mobil) return <PosuvnyRad zmena={value} gap={8} style={{ marginBottom: 12 }}>{tlacidla}</PosuvnyRad>;
+  return (
+    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      {tlacidla}
     </div>
   );
 }

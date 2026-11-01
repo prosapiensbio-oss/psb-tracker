@@ -1,7 +1,7 @@
 // Workspace — jedna karta = jeden DRUH práce, a patrí tomu, kto je prihlásený.
 import { describe, expect, it } from "bun:test";
 
-import { BEZ_FRONTY, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
+import { anamnezyNaVybavenie, BEZ_FRONTY, indexKartyPoZmene, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
 
 const zmena = (o: Partial<Zmena> & { id: string; trener: string }): Zmena => ({
   id: o.id, druh: o.druh ?? "zrusene", klient: o.klient ?? "Martin Vaško", nazov: null,
@@ -261,5 +261,44 @@ describe("beta: peniaze podľa trénera klienta", () => {
     // Dopyty len Terezke, uzávierka obom (Terezka v nej má svoje kroky).
     expect(ids(krokyBety(k, { mesacne: true, ja: "Terezka" }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka"]);
     expect(ids(krokyBety(k, { mesacne: true, ja: "Jerry" }))).toEqual(["kalendar", "sms", "platby", "uzavierka", "kontroly"]);
+  });
+});
+
+describe("výber karty po zmene zoznamu (preskok na Uzávierku, 1. 11. 2026)", () => {
+  const jerry = ["krok:kalendar", "krok:sms", "krok:platby", "krok:uzavierka", "krok:kontroly", "klient"];
+  const vsetko = ["krok:kalendar", "krok:sms", "krok:platby", "krok:dopyty", "krok:uzavierka", "krok:kontroly", "klient"];
+  it("pribudla karta pred otvorenou: ostávam na tej istej, nie na susednej", () => {
+    expect(indexKartyPoZmene(jerry, vsetko, 3)).toBe(4);
+    expect(vsetko[indexKartyPoZmene(jerry, vsetko, 3)]).toBe("krok:uzavierka");
+  });
+  it("ubudla karta pred otvorenou: to isté opačne", () => {
+    expect(indexKartyPoZmene(vsetko, jerry, 5)).toBe(4);
+  });
+  it("otvorená karta zmizla: ostávam na jej mieste, nie za koncom", () => {
+    expect(indexKartyPoZmene(["a", "b", "c"], ["a", "c"], 1)).toBe(1);
+    expect(indexKartyPoZmene(["a", "b", "c"], ["a", "b"], 2)).toBe(1);
+  });
+  it("zoznam sa nezmenil: ostáva index, teda nič sa neprekresľuje", () => {
+    expect(indexKartyPoZmene(jerry, jerry, 2)).toBe(2);
+  });
+  it("po obnovení stránky platí meno karty, nie číslo spred zmeny kopy", () => {
+    expect(indexKartyPoZmene([], vsetko, 3, "krok:uzavierka")).toBe(4);
+    expect(indexKartyPoZmene([], jerry, 3, "krok:dopyty")).toBe(3);
+    expect(indexKartyPoZmene([], jerry, 99, null)).toBe(5);
+  });
+  it("prázdny zoznam (ešte sa nenačítal) index nemení", () => {
+    expect(indexKartyPoZmene(jerry, [], 3)).toBe(3);
+  });
+});
+
+describe("odznak na karte Anamnézy", () => {
+  const r = (x: Partial<AnamnezaRiadok>): AnamnezaRiadok => ({ klient: "K", trener: "Jerry", uvodny: null, stav: "ceka", odkaz: null, klientVyplnilAt: null, zapisAt: null, uzBol: false, ...x });
+  it("počíta len to, čo čaká — hotová stojí na karte ešte 14 dní, ale práca to nie je", () => {
+    expect(anamnezyNaVybavenie([
+      r({ stav: "ceka", uvodny: "2026-11-02" }),
+      r({ stav: "klient_vyplnil", uvodny: "2026-11-03" }),
+      r({ stav: "hotova", uvodny: "2026-10-30", zapisAt: "2026-10-30" }),
+      r({ stav: "hotova", uvodny: "2026-01-10", zapisAt: "2026-01-10" }),
+    ], "2026-11-01")).toBe(2);
   });
 });
