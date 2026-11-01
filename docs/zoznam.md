@@ -19,6 +19,7 @@ nezapadlo medzi úlohami bez termínu):
 
 - **2. 11. 2026** — ranná dávka notifikácií má prvýkrát odísť o 6:30 Prahy (05:30Z, `ranne-push` v `automaty`) a automatické balíčky prvýkrát z plánovača (04:15Z). Overiť.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
+- **28. 11. 2026** — zrušiť predplatné PTmindera (Settings → Plans & Billing → Cancel Subscription), ak dovtedy neprišlo rozhodnutie o vrátení €90,97 z 1. 11. Ďalšia platba je 1. 12. Po zrušení prístup hneď končí a dáta sa po 3 mesiacoch vymažú; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
 - **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
   merania webu — 27. 10. 2026" nižšie).
 
