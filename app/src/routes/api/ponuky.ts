@@ -84,7 +84,7 @@ export const Route = createFileRoute("/api/ponuky")({
         if (b.akcia !== "vytvor") return chyba("neznáma akcia");
         const klient = String(b.klient || "").replace(/\s+/g, " ").trim().slice(0, 120);
         if (!klient) return chyba("Komu? Chýba meno.");
-        if (menoJeCislo(klient)) return chyba("Do „Komu" patrí meno — číslo daj do políčka na telefón pod ním.");
+        if (menoJeCislo(klient)) return chyba("Do „Komu“ patrí meno — číslo daj do políčka na telefón pod ním.");
         const telefon = String(b.telefon || "").trim().slice(0, 40) || null;
         const typ = b.typ === "uvodny" ? "uvodny" : "trening";
         const vstup = Array.isArray(b.casy) ? (b.casy as Record<string, unknown>[]) : [];
