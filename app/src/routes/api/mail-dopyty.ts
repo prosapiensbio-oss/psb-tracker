@@ -16,7 +16,7 @@ import { loadData } from "../../lib/psb/db.server";
 import { mailKlientovi } from "../../lib/psb/mailKlientovi";
 import { normName } from "../../lib/psb/format";
 import { posliMail } from "../../lib/psb/smtp.server";
-import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
+import { pushTrenerovi } from "../../lib/psb/ponukaTerminov.server";
 
 /**
  * Schránka info@prosapiens.cz ako zdroj dopytov.
@@ -30,7 +30,7 @@ import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
  *
  * AKO
  *
- * Worker sa raz za pár hodín pripojí na IMAP (`cloudflare:sockets`), prečíta
+ * Worker sa ráno a večer pripojí na IMAP (`cloudflare:sockets`), prečíta
  * hlavičky nových správ a tie, ktoré vyzerajú ako dopyt, zapíše do `leads`.
  * Nič nemaže a nič neoznačuje ako prečítané — v schránke po ňom nezostane
  * stopa.
@@ -42,14 +42,6 @@ import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
  * informáciu o tom, z ktorej reklamy človek prišiel. Dopĺňa sa len to, čo je
  * prázdne.
  */
-
-/** VAPID kľúče — tie isté, aké používa ranná dávka. */
-async function klucePush(DB: D1Database) {
-  const rs = await DB.prepare("SELECT key, value FROM vzas_settings WHERE key IN ('vapid_public','vapid_private')").all();
-  const m: Record<string, string> = {};
-  for (const r of rs.results as { key: string; value: string }[]) m[r.key] = r.value;
-  return { verejny: m.vapid_public || "", sukromny: m.vapid_private || "", kontakt: "mailto:prosapiensbio@gmail.com" };
-}
 
 type Nast = { host: string; port: number; user: string; heslo: string; od: string; ignoruj: string[]; vlastne: string[] };
 
@@ -204,10 +196,10 @@ export const Route = createFileRoute("/api/mail-dopyty")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
 
         /**
-         * RÁNO A VEČER, NIE KAŽDÚ HODINU.
+         * RÁNO A VEČER, NIE PRI KAŽDOM BEHU PLÁNOVAČA.
          *
-         * Plánovač volá každú hodinu a rozvrh sa mu meniť nedá (beží mimo
-         * tohto repa), tak sa rozhodne tu: mimo okna sa na schránku vôbec
+         * Plánovač volá každé tri hodiny; rozhodne sa tu (`mailOkno.ts`): číta
+         * prvý beh od 7:00 a prvý beh od 20:00, inak sa na schránku vôbec
          * nesiaha. Ručné „Stiahnuť teraz" z obrazovky sa tým NEOBMEDZUJE —
          * to je človek, ktorý vie, prečo klikol.
          */
@@ -217,7 +209,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
           let poslednyBeh: string | null = null;
           try { poslednyBeh = JSON.parse(JSON.parse(r?.value || '""') || "null")?.kedy ?? null; } catch { /* prvý beh */ }
           if (!jeCasCitat(new Date(), poslednyBeh)) {
-            return Response.json({ ok: true, preskocene: `mimo okna — číta sa ${najblizsieOkno(new Date())}` });
+            return Response.json({ ok: true, preskocene: `v tomto okne už čítané — ďalšie ${najblizsieOkno(new Date())}` });
           }
         }
         let b: Record<string, unknown> = {};
@@ -293,21 +285,13 @@ export const Route = createFileRoute("/api/mail-dopyty")({
                 continue;
               }
               preskocene.push({ predmet: `${v.historia.meno} si pýta celú históriu`, preco: `automat sa stiahol (${auto.preco}) — poslaná notifikácia` });
-              try {
-                const k = await klucePush(DB);
-                if (k.verejny && k.sukromny) {
-                  const odbery = (await DB.prepare("SELECT endpoint, p256dh, auth, kto FROM push_odbery").all())
-                    .results as unknown as (Odber & { kto: string })[];
-                  for (const o of odbery) {
-                    if ((o.kto || "").trim().toLowerCase() !== "jerry") continue;
-                    await posliPush(o, {
-                      titulok: "Žiadosť o históriu",
-                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb (${auto.preco}). Pošleš ju zo stola klienta — voľba „celá história + platby".`,
-                      url: "/#workspace", znacka: `historia-${v.historia.email}`,
-                    }, k);
-                  }
-                }
-              } catch { /* push nesmie zhodiť čítanie schránky */ }
+              // Večerné čítanie je v zime o 22:00, teda v nočnom tichu: pushTrenerovi
+              // to pošle ráno. Chybu si nechá pre seba, čítanie schránky nezhodí.
+              await pushTrenerovi(DB, "Jerry", {
+                titulok: "Žiadosť o históriu",
+                text: `${v.historia.meno} si pýta celú históriu tréningov a platieb (${auto.preco}). Pošleš ju zo stola klienta — voľba „celá história + platby".`,
+                url: "/#workspace", znacka: `historia-${v.historia.email}`,
+              });
               continue;
             }
             const d = v.dopyt;

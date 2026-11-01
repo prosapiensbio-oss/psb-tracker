@@ -1,56 +1,65 @@
+import { posunDen, terazPraha } from "./cas";
+
 /**
  * KEDY SA ČÍTA SCHRÁNKA.
  *
- * Plánovač búcha na `/api/mail-dopyty?cron=1` každú hodinu. Dopyt mailom
- * príde párkrát za mesiac, takže dvadsaťštyri prihlásení denne kupuje
- * niekoľko hodín rýchlejšiu odpoveď — a platí sa za ne. 28. 9. 2026 nás
- * Websupport prestal púšťať na IMAP aj SMTP (webmail pritom heslo bral),
- * a séria neúspešných prihlásení každú hodinu taký zámok len predlžuje.
+ * Plánovač búcha na `/api/mail-dopyty?cron=1` každé tri hodiny (`0 *\/3 * * *`,
+ * v UTC). Dopyt mailom príde párkrát za mesiac, takže časté prihlasovanie kupuje
+ * len niekoľko hodín rýchlejšiu odpoveď — a platí sa zaň. 28. 9. 2026 nás
+ * Websupport prestal púšťať na IMAP aj SMTP (webmail pritom heslo bral) a séria
+ * neúspešných prihlásení taký zámok len predlžuje.
  *
- * Jerry v ten deň: „kľudne nech mail číta každý večer a ráno." Okná sú
- * preto dve, každé hodinu dlhé, v pražskom čase — appku aj Jerryho zaujíma
- * miestny čas, nie UTC, a v lete a v zime je to iný posun.
+ * Jerry v ten deň: „kľudne nech mail číta každý večer a ráno."
  *
- * ROZHODUJE SA TU, NIE V PLÁNOVAČI. Plánovač beží vo vlastnom workeri mimo
- * tohto repa; keby sa rozvrh písal tam, v Kokpite by nebolo vidieť, prečo
- * sa schránka číta práve takto, a jedno miesto by o druhom nevedelo.
+ * OKNO NIE JE JEDNA HODINA, ALE ÚSEK OD ZAČIATKU PO ĎALŠIE OKNO. Hodinové okná
+ * 7:00 a 20:00 sa s trojhodinovým rozvrhom v UTC stretli len raz denne: v zime
+ * o 7:00 (20:00 na mriežke nie je), v lete o 20:00 (7:00 nie je). Od zmeny času
+ * 25. 10. 2026 sa preto čítalo len ráno. Teraz číta PRVÝ beh od 7:00 a PRVÝ beh
+ * od 20:00, nech padne kedykoľvek:
+ *
+ *   zima   7:00 a 22:00      (6:00 a 21:00 UTC)
+ *   leto   8:00 a 20:00      (6:00 a 18:00 UTC)
+ *
+ * Každý úsek číta raz, zlyhanie sa v ňom neopakuje: Dovecot po sérii prihlásení
+ * odmieta aj správne heslo. Ručné „Stiahnuť teraz" sa počíta tiež, zapisuje ten
+ * istý `mail_stav`.
+ *
+ * ROZHODUJE SA TU, NIE V PLÁNOVAČI. Keby sa rozvrh písal tam, v Kokpite by nebolo
+ * vidieť, prečo sa schránka číta práve takto.
  */
 
 /** Začiatky okien v pražskom čase: ráno o 7:00, večer o 20:00. */
 export const OKNA_HODIN = [7, 20] as const;
 
-const PASMO = "Europe/Prague";
-
 /** Hodina v pražskom čase (0–23). */
-export function hodinaVPrahe(kedy: Date, pasmo = PASMO): number {
-  const f = new Intl.DateTimeFormat("en-GB", { timeZone: pasmo, hour: "2-digit", hour12: false });
-  return Number(f.format(kedy));
+export function hodinaVPrahe(kedy: Date): number {
+  return Number(terazPraha(kedy).slice(11, 13));
 }
 
-/** Deň a hodina naraz — kľúč okna, do ktorého beh patrí („2026-09-28|7"). */
-function kluc(kedy: Date, pasmo: string): string {
-  const d = new Intl.DateTimeFormat("en-CA", { timeZone: pasmo, year: "numeric", month: "2-digit", day: "2-digit" });
-  return `${d.format(kedy)}|${hodinaVPrahe(kedy, pasmo)}`;
+/** Do ktorého okna čas patrí („2026-09-28|7"). Po polnoci je to ešte včerajší večer. */
+export function oknoCitania(kedy: Date): string {
+  const den = terazPraha(kedy).slice(0, 10);
+  const h = hodinaVPrahe(kedy);
+  if (h < OKNA_HODIN[0]) return `${posunDen(den, -1)}|${OKNA_HODIN[1]}`;
+  return `${den}|${h < OKNA_HODIN[1] ? OKNA_HODIN[0] : OKNA_HODIN[1]}`;
 }
 
 /**
  * Má sa teraz čítať?
  *
- * `poslednyBeh` je čas posledného pokusu (úspešného aj nie). V jednom okne
- * sa číta RAZ: plánovač môže v tej istej hodine zavolať viackrát a dvojité
- * prihlásenie je presne to, čomu sa vyhýbame.
+ * `poslednyBeh` je čas posledného pokusu (úspešného aj nie). Číta sa len vtedy,
+ * keď patrí do skoršieho okna než teraz.
  */
-export function jeCasCitat(kedy: Date, poslednyBeh: string | null, pasmo = PASMO): boolean {
-  if (!OKNA_HODIN.includes(hodinaVPrahe(kedy, pasmo) as (typeof OKNA_HODIN)[number])) return false;
+export function jeCasCitat(kedy: Date, poslednyBeh: string | null): boolean {
   if (!poslednyBeh) return true;
   const predtym = new Date(poslednyBeh);
   if (Number.isNaN(predtym.getTime())) return true;
-  return kluc(kedy, pasmo) !== kluc(predtym, pasmo);
+  return oknoCitania(kedy) !== oknoCitania(predtym);
 }
 
-/** Text pre obrazovku: kedy sa bude čítať nabudúce. */
-export function najblizsieOkno(kedy: Date, pasmo = PASMO): string {
-  const h = hodinaVPrahe(kedy, pasmo);
+/** Text pre odpoveď behu: od kedy sa bude čítať nabudúce. */
+export function najblizsieOkno(kedy: Date): string {
+  const h = hodinaVPrahe(kedy);
   const dalsia = OKNA_HODIN.find((x) => x > h);
-  return dalsia ? `dnes o ${dalsia}:00` : `zajtra o ${OKNA_HODIN[0]}:00`;
+  return dalsia ? `dnes od ${dalsia}:00` : `zajtra od ${OKNA_HODIN[0]}:00`;
 }
