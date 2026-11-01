@@ -2804,6 +2804,7 @@ export function GuillermoKarta() {
   const cakajuce = platby.filter((v) => String(v.datum).slice(0, 10) > odKedy && !zaradene.has(String(v.datum).slice(0, 10)));
 
   const [chybaG, setChybaG] = useState("");
+  const [opravaNakupov, setOpravaNakupov] = useState(false);
   const ulozKotvu = async () => {
     const n = Number(stav);
     if (!Number.isFinite(n)) return;
@@ -2920,12 +2921,25 @@ export function GuillermoKarta() {
               <span style={{ fontSize: 12, color: C.textMuted, minWidth: 82 }}>{z.datum.split("-").reverse().join(". ")}</span>
               <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{z.hodiny} sedení</span>
               {z.suma_czk ? <span style={{ fontSize: 12, color: C.textMuted }}>{Math.round(z.suma_czk).toLocaleString("cs-CZ")} Kč</span> : null}
-              <button onClick={async () => { const j = await posli({ akcia: "guillermo-zmaz", id: z.id }).catch(() => ({ ok: false, error: "spojenie" })); if (!j.ok) { setChybaG(j.error || "Zmazanie neprešlo."); return; } await nacitaj(); }}
-                style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
-                zmazať
-              </button>
+              {/* Karta je na pozeranie; mazanie je až za „opraviť záznamy", červené
+                  a s otázkou — omylom zmazaný nákup je o sedenia menej. */}
+              {opravaNakupov && (
+                <button onClick={async () => {
+                  if (!window.confirm(`Zmazať nákup ${z.hodiny} sedení z ${z.datum.split("-").reverse().join(". ")}?`)) return;
+                  const j = await posli({ akcia: "guillermo-zmaz", id: z.id }).catch(() => ({ ok: false, error: "spojenie" }));
+                  if (!j.ok) { setChybaG(j.error || "Zmazanie neprešlo."); return; }
+                  await nacitaj();
+                }}
+                  style={{ marginLeft: "auto", background: "none", border: "none", color: C.red, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                  zmazať
+                </button>
+              )}
             </div>
           ))}
+          <button onClick={() => setOpravaNakupov((v) => !v)}
+            style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+            {opravaNakupov ? "hotovo" : "opraviť záznamy"}
+          </button>
         </div>
       )}
     </Card>

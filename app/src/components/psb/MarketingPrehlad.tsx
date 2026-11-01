@@ -9,7 +9,7 @@ import { diagnozaLievika, pasmoZoSkore } from "../../lib/psb/prehladPasma";
 import { reklamaSuhrn } from "../../lib/psb/reklama";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { jeKlient, krokyZa, oknoMesiacov } from "./MarketingLievik";
+import { jeKlient, krokyZa, mostLievika, oknoLievika } from "./MarketingLievik";
 import { SOURCES } from "./Klienti";
 import { PristrojeMriezka, type Pristroj } from "./Prehlad";
 import { Card, H3, Info } from "./ui";
@@ -73,7 +73,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
     // dopytov a stiahol by každý priemer nadol (kotva dát, tá istá zásada
     // ako vo vrchnom páse Marketingu).
     const kotva = kotvaDat(data);
-    const mesiace = oknoMesiacov(data, "12m").filter((x) => !kotva.plny || x <= kotva.plny);
+    const mesiace = oknoLievika(data);
     const okno = new Set(mesiace);
     const mes = Math.max(1, mesiace.length);
     const k = krokyZa(data, clients, mesiace);
@@ -124,6 +124,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
   }, [data, clients, kampane, marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { k, mes, reklama } = v;
+  const most = mostLievika(k);
   const naDopyt = pct(k.zDopytuUvodny, k.dopyty);
   const naKlienta = pct(k.zUvodnehoKlient, k.uvodne);
   const zDopytuPct = pct(k.zDopytu, k.dopyty);
@@ -178,7 +179,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
       id: "mp-klient",
       label: "Úvodný → klient",
       hodnota: naKlienta === null ? "—" : `${Math.round(naKlienta)} %`,
-      podnadpis: `${k.zUvodnehoKlient} z ${k.uvodne} úvodných`,
+      podnadpis: `${k.zUvodnehoKlient} z ${k.uvodne} úvodných${most.uvodneBezDopytu ? ` · ${most.uvodneBezDopytu} úvodných bez dopytu z tohto obdobia` : ""}`,
       pasmo: naKlienta === null ? "nevie" : naKlienta >= 60 ? "ok" : naKlienta >= 40 ? "pozor" : "zle",
       poznamka: "Kto príde a nekúpi, rozhodol sa na tréningu — nie v reklame.",
       vysvetlenie: "Podiel úvodných tréningov, z ktorých sa stal platiaci klient (definícia jeKlient: prišiel znova, alebo zaplatil nad úvodný viac než 500 Kč).",
@@ -188,7 +189,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
       id: "mp-novi",
       label: "Noví klienti / mes.",
       hodnota: cislo1(noviMes),
-      podnadpis: `${v.noviKlienti.length} za ${mes} mes.`,
+      podnadpis: `${v.noviKlienti.length} za ${mes} mes.${most.noviBezUvodneho ? ` · ${k.zUvodnehoKlient} z úvodných + ${most.noviBezUvodneho} bez úvodného v tomto okne` : ""}`,
       pasmo: "ok",
       poznamka: "Výstup celého marketingu. Odchody sú v Klienti → Fluktuácia.",
       vysvetlenie: "Noví platiaci klienti, ktorí prišli prvýkrát v okne. Vrátení po pauze sa nepočítajú — tých marketing nepriviedol.",
@@ -207,7 +208,7 @@ export function MarketingPrehlad({ data, clients, onNavigate }: {
       poznamka: cd.cena === null
         ? "Od septembra sa ešte nikto neozval z reklamy — cena sa nedá počítať."
         : "Cieľ zatiaľ zámerne nie je — teraz je dobrý každý dopyt, reklamy sa ladia.",
-      vysvetlenie: "Iba PLATENÁ cesta a len od septembra 2026, keď reklama prvýkrát žiadala o dopyt (formulár od 8. 9., UTM od 14. 9.). Staršie boosty kupovali dosah, nie dopyty, a do tejto ceny nepatria.",
+      vysvetlenie: "Iba PLATENÁ cesta a len od septembra 2026, keď reklama prvýkrát žiadala o dopyt (formulár od 8. 9., UTM od 14. 9.). Staršie boosty kupovali dosah, nie dopyty, a do tejto ceny nepatria. Dozor reklám ukazuje vedľa toho aj posledných 30 dní — iné obdobie, preto iné číslo.",
       dobreHore: false,
       kam: onNavigate ? () => onNavigate("marketing", "naklady") : undefined,
     },
