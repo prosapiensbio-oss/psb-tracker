@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { otvorNahlad } from "../../lib/psb/nahladOkno";
+import { adresaNahladu, otvorNahlad, SIRKA_TELEFONU } from "../../lib/psb/nahladOkno";
 
 import { vychodiskovaSprava, type CisloKarty } from "../../lib/psb/fotkyStranka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
@@ -74,13 +74,25 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 8, fontSize: 12.5 }}>
           <code style={{ padding: "4px 8px", borderRadius: 6, background: C.bg, color: C.text, wordBreak: "break-all" }}>{hotovo.url}</code>
           <button type="button" onClick={() => void doSchranky(hotovo.url)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>kopírovať</button>
-          <a href={hotovo.nahlad} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, hotovo.nahlad)} style={{ color: C.accentLight }}>pozrieť, čo uvidí</a>
+          <a href={hotovo.nahlad} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, hotovo.nahlad)} style={{ color: C.accentLight }}>na celú obrazovku</a>
         </div>
-        <div style={{ marginTop: 12 }}>
-          <SmsKlientovi
-            meno={meno} trener={trener} vlozene druhAuditu="fotky"
-            predvolenyText={textSmsFotiek(meno, hotovo.url, podpis)}
-          />
+        {/* Obsah odkazu rovno tu, bez kliku (Jerry, 1. 11. 2026) — vidno ho skôr, než odíde SMS.
+            `sandbox` bez allow-forms: je to stránka klienta s jeho formulármi a odtiaľto
+            sa cez ňu nesmie omylom zapísať odpoveď ani súhlas za neho. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start", marginTop: 12 }}>
+          <div style={{ flex: "1 1 300px", maxWidth: SIRKA_TELEFONU, minWidth: 0 }}>
+            <div style={nadpis}>Takto to uvidí klient</div>
+            <iframe
+              src={adresaNahladu(hotovo.nahlad)} title="Obsah odkazu pre klienta" sandbox="allow-scripts"
+              style={{ display: "block", width: "100%", height: "min(640px, 70vh)", border: `1px solid ${C.border}`, borderRadius: 12, background: "#fff" }}
+            />
+          </div>
+          <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+            <SmsKlientovi
+              meno={meno} trener={trener} vlozene druhAuditu="fotky"
+              predvolenyText={textSmsFotiek(meno, hotovo.url, podpis)}
+            />
+          </div>
         </div>
         <button type="button" onClick={onZrus} style={{ marginTop: 10, background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>
       </div>

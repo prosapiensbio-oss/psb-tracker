@@ -29,6 +29,13 @@ describe("editor fotiek a videa", () => {
       expect(styl.includes("<!--")).toBe(false);
     }
   });
+  it("poradie skupín: Rozrobené, Čiary a kresba, Popis, potom ostatné (Jerry, 1. 11. 2026)", () => {
+    const foto = citaj("../public/editor/foto.html");
+    const skupiny = [...foto.matchAll(/data-skupina="([a-z]+)"/g)].map((m) => m[1]);
+    expect(skupiny.slice(0, 3)).toEqual(["navrhy", "ciary", "popis"]);
+    expect(skupiny).toContain("kartoteka");
+    expect(skupiny).toContain("fotky");
+  });
   it("v Kokpite nie sú ukážkové figúrky ani vymyslený klient", () => {
     const foto = citaj("../public/editor/foto.html");
     expect(foto.includes("figurka(")).toBe(false);

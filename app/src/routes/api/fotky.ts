@@ -24,6 +24,7 @@ import { vyplneneCisla } from "../../lib/psb/fotkyStranka";
  *   popis = text k jednej fotke (šifrovaný), pri nahratí aj v poli „popis"
  *   POST { akcia: "odkaz", klient, trener, fotky: [{id, cisla}], sprava, dalej } → odkaz `/f/<token>` pre klienta
  *   POST { akcia: "zrus-odkaz", token }
+ *   POST { akcia: "suhlas-osobne", klient, dano } → osobný súhlas klienta s fotkami (platí aj na hotové fotky)
  *
  * Fotka je v R2 (väzba STORAGE) ZAŠIFROVANÁ kľúčom anamnézy; bez neho sa
  * nedá ani nahrať, ani pozrieť — radšej nič než čitateľná fotka tela
@@ -46,6 +47,17 @@ async function maSuhlas(DB: NonNullable<Env["DB"]>, klient: string): Promise<boo
   ).bind(klient).first<{ suhlasy_json: string }>().catch(() => null);
   if (!r?.suhlasy_json) return false;
   try { return suhlasFotky(JSON.parse(r.suhlasy_json)); } catch { return false; }
+}
+
+/**
+ * Osobný súhlas je súhlas KLIENTA, nie jednej fotky (Jerry, 1. 11. 2026: „aj keď
+ * sú fotky hotové a zaškrtnem to, musí to byť vnímané, že s tým proste súhlasil").
+ * Dovtedy žil len ako značka pri novo nahratej fotke, takže zaškrtnutie bez
+ * nahratia nezapísalo nič a po obnovení stránky bolo políčko zase prázdne.
+ */
+async function suhlasOsobny(DB: NonNullable<Env["DB"]>, klient: string): Promise<{ kto: string | null; kedy: string } | null> {
+  return DB.prepare("SELECT kto, kedy FROM klient_fotky_suhlas WHERE klient = ?1").bind(klient)
+    .first<{ kto: string | null; kedy: string }>().catch(() => null);
 }
 
 export const Route = createFileRoute("/api/fotky")({
@@ -103,12 +115,13 @@ export const Route = createFileRoute("/api/fotky")({
 
         const klient = kus(q.get("klient"), 120);
         if (!klient) return chyba("chýba klient");
-        const [fotky, poznamky, suhlas] = await Promise.all([
+        const [fotky, poznamky, suhlas, osobny] = await Promise.all([
           DB.prepare("SELECT id, klient, den, pohlad, sirka, vyska, suhlas, kto, created_at, typ, popis, kluc_ciste, edit_json IS NOT NULL AS ma_edit FROM klient_fotky WHERE klient = ?1 ORDER BY den DESC, created_at")
             .bind(klient).all().then((x) => x.results as Record<string, unknown>[]).catch(() => null),
           DB.prepare("SELECT den, text FROM klient_fotky_poznamky WHERE klient = ?1").bind(klient).all()
             .then((x) => x.results as { den: string; text: string }[]).catch(() => null),
           maSuhlas(DB, klient),
+          suhlasOsobny(DB, klient),
         ]);
         // Tabuľky chýbajú = migrácia neprebehla. Povedať to, nie tváriť sa prázdne.
         if (fotky === null || poznamky === null) return chyba("Kartotéka nemá tabuľky (migrácia 0098).", 500);
@@ -159,6 +172,7 @@ export const Route = createFileRoute("/api/fotky")({
           odkazy,
           odpovede,
           suhlas,
+          suhlasOsobne: osobny,
           ulozisko: !!STORAGE,
           sifra: !!ANAMNEZA_KLUC,
           // Ktoré fotky ukazuje stránka po úvodnom (/u/) — kartotéka pri nich povie „na stránke po úvodnom".
@@ -202,9 +216,19 @@ export const Route = createFileRoute("/api/fotky")({
           // Súhlas: z anamnézy, alebo ho tréner potvrdí za klienta, ktorý
           // súhlasil osobne. Bez jedného z nich sa fotka neuloží.
           const zAnamnezy = await maSuhlas(DB, klient);
+          const zapisany = zAnamnezy ? null : await suhlasOsobny(DB, klient);
           const osobne = form.get("suhlasOsobne") === "1";
-          if (!zAnamnezy && !osobne) {
+          if (!zAnamnezy && !zapisany && !osobne) {
             return chyba("Klient nemá v anamnéze súhlas s fotkami. Potvrď, že súhlasil osobne, alebo mu pošli anamnézu.", 403);
+          }
+          // Potvrdenie pri ukladaní z editora platí ďalej — druhýkrát sa nepýta.
+          if (!zAnamnezy && !zapisany) {
+            try {
+              await DB.prepare("INSERT OR IGNORE INTO klient_fotky_suhlas (klient, kto, kedy) VALUES (?1,?2,?3)").bind(klient, kto, new Date().toISOString()).run();
+            } catch (e) {
+              return chyba(`Súhlas sa nezapísal: ${String(e).slice(0, 200)}`, 500);
+            }
+            await audit(DB, { action: "fotky-suhlas-osobne", predmet: klient, neu: "dal", actor: kto || undefined });
           }
 
           // Prepísanie hotového porovnania (návrat k editu) — to isté id, ten istý
@@ -298,6 +322,20 @@ export const Route = createFileRoute("/api/fotky")({
         }
 
         const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+        // ── OSOBNÝ SÚHLAS KLIENTA S FOTKAMI ──
+        if (b.akcia === "suhlas-osobne") {
+          const klient = kus(b.klient, 120);
+          if (!klient) return chyba("chýba klient");
+          try {
+            if (b.dano) await DB.prepare("INSERT OR IGNORE INTO klient_fotky_suhlas (klient, kto, kedy) VALUES (?1,?2,?3)").bind(klient, kto, new Date().toISOString()).run();
+            else await DB.prepare("DELETE FROM klient_fotky_suhlas WHERE klient = ?1").bind(klient).run();
+          } catch (e) {
+            return chyba(`Súhlas sa nezapísal: ${String(e).slice(0, 200)}`, 500);
+          }
+          await audit(DB, { action: "fotky-suhlas-osobne", predmet: klient, neu: b.dano ? "dal" : "zrušený", actor: kto || undefined });
+          return Response.json({ ok: true });
+        }
 
         // ── ODKAZ S FOTKAMI PRE KLIENTA ──
         if (b.akcia === "odkaz") {

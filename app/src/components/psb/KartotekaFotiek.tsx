@@ -5,7 +5,7 @@ import { dnesPraha } from "../../lib/psb/cas";
 import { posliDoEditora, upravVEditore } from "../../lib/psb/doEditora";
 import { PoslaneKlientovi, PoslatKlientovi, type OdkazFotiek, type OdpovedFotky } from "./FotkyKlientovi";
 import { OpravitText } from "./OpravitText";
-import { pocuvaj } from "../../lib/psb/obnovaSignal";
+import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { fotenia, jeFotkaTela, MAX_STRANA, nazovPohladu, porovnania, POHLADY, VIDEO, type Fotka } from "../../lib/psb/kartoteka";
 import { denZFotky } from "../../lib/psb/exifDatum";
 import { PLATNO } from "../../lib/psb/porovnaniePredPo";
@@ -34,6 +34,8 @@ type Odpoved = {
   fotky?: Fotka[]; poznamky?: Record<string, string>;
   odkazy?: OdkazFotiek[]; odpovede?: OdpovedFotky[];
   suhlas?: boolean; ulozisko?: boolean; sifra?: boolean;
+  /** Osobný súhlas KLIENTA (nie jednej fotky) — kto ho potvrdil a kedy. */
+  suhlasOsobne?: { kto: string | null; kedy: string } | null;
   /** Id porovnaní, ktoré ukazuje stránka po úvodnom (/u/). */
   uvodny?: string[];
 };
@@ -74,7 +76,6 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   const [hlaska, setHlaska] = useState("");
   const [den, setDen] = useState(() => dnesPraha());
   const [pohlad, setPohlad] = useState<string>("bok");
-  const [osobne, setOsobne] = useState(false);
   const [nahravam, setNahravam] = useState<string | null>(null);
   /**
    * ÚVODNÝ TRÉNING — FOTKY PRED A PO (Jerry, 28. 10. 2026: „pri prvom fotení
@@ -119,6 +120,14 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   const [skladam, setSkladam] = useState(false);
   const oznacNaPoslanie = (id: string) => setNaPoslanie((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
   useEffect(() => { setVyber([]); setNaPoslanie([]); setSkladam(false); }, [meno]);
+
+  // Správa o úspechu odíde sama, chyba ostáva (pamäť „Tichá chyba“) — stojí
+  // pripnutá hore a inak by zakrývala lištu výberu do editora.
+  useEffect(() => {
+    if (!hlaska || chyba) return;
+    const t = setTimeout(() => setHlaska(""), 6000);
+    return () => clearTimeout(t);
+  }, [hlaska, chyba]);
 
   const nacitaj = useCallback(async () => {
     const j = (await fetch(`/api/fotky?klient=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
@@ -171,6 +180,19 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
     return true;
   };
 
+  /**
+   * Súhlas sa zapíše hneď pri zaškrtnutí, nie až s ďalšou fotkou — platí pre
+   * klienta, teda aj na to, čo je už hotové, a editor sa naň už nepýta.
+   */
+  const zapisSuhlas = async (dano: boolean) => {
+    if (!dano && !window.confirm(`Zrušiť osobný súhlas pre ${meno}? Nové fotky sa neuložia; tie už uložené ostanú, kým ich nezmažeš.`)) return;
+    if (await posli({ akcia: "suhlas-osobne", klient: meno, dano })) {
+      setHlaska(dano ? "Súhlas je zapísaný — platí aj na fotky, ktoré už sú hotové." : "Osobný súhlas je zrušený.");
+      await nacitaj();
+      oznam("fotky");
+    }
+  };
+
   /** Nahratie jednej alebo viacerých fotiek — po jednej, aby sa dalo povedať, koľko prešlo. */
   const nahraj = async (subory: FileList | null) => {
     if (!subory || !subory.length) return;
@@ -195,7 +217,6 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
         fd.append("pohlad", pohlad);
         fd.append("sirka", String(sirka));
         fd.append("vyska", String(vyska));
-        if (osobne) fd.append("suhlasOsobne", "1");
         fd.append("subor", blob, "fotka.jpg");
         const j = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd })
           .then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
@@ -272,7 +293,6 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
       fd.append("popis", "Úvodní lekce — před a po");
       fd.append("sirka", String(PLATNO.sirka));
       fd.append("vyska", String(PLATNO.vyska));
-      if (osobne) fd.append("suhlasOsobne", "1");
       fd.append("subor", subor, "pred-a-po.jpg");
       const j = await fetch("/api/fotky", { method: "POST", credentials: "same-origin", body: fd })
         .then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" })) as { ok?: boolean; id?: string; error?: string };
@@ -313,7 +333,7 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
   /** Najstaršie fotenie — od neho je všetko ďalšie „potom". */
   const prveFotenie = fs.length ? fs.reduce((a, f) => (f.den < a ? f.den : a), fs[0].den) : "";
   const porov = porovnania(fs);
-  const mozeNahrat = !!d.ulozisko && !!d.sifra && (d.suhlas || osobne);
+  const mozeNahrat = !!d.ulozisko && !!d.sifra && (d.suhlas || !!d.suhlasOsobne);
   const obrazok = (f: Fotka) => `/api/fotky?id=${encodeURIComponent(f.id)}`;
 
   const nalepka = (txt: string, farba: string) => (
@@ -332,11 +352,113 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
+      {/* Správa stojí pripnutá hore: tlačidlá sú po celej karte a pod dlhým „Z editora"
+          by chyba zo zápisu popisu či mazania ostala mimo obrazovky. */}
+      {(chyba || hlaska) && (
+        <div role="status" style={{ position: "sticky", top: 0, zIndex: 6, display: "flex", gap: 10, alignItems: "baseline", padding: "8px 12px", borderRadius: 9, background: C.surface, border: `1px solid ${chyba ? C.red : mix(C.green, 60)}`, fontSize: 12.5, color: chyba ? C.red : C.green }}>
+          <span style={{ flexGrow: 1 }}>{chyba || hlaska}</span>
+          <button type="button" aria-label="Zavrieť správu" onClick={() => { setChyba(""); setHlaska(""); }} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>✕</button>
+        </div>
+      )}
+
+      {/* ── Z EDITORA ── porovnania predtým/potom a videá (Workspace → Editor) */}
+      {zEditora.length > 0 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Z editora</span>
+            {zEditora.some((f) => f.pohlad !== VIDEO) && !skladam && (
+              <span style={{ fontSize: 11.5, color: C.textDim }}>· krúžkom označ porovnania, ktoré pošleš klientovi</span>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 130 : 170}px, 1fr))`, gap: 8 }}>
+            {zEditora.map((f) => (
+              <div key={f.id} style={{ position: "relative", border: `${naPoslanie.includes(f.id) ? 2 : 1}px solid ${naPoslanie.includes(f.id) ? C.accent : C.border}`, borderRadius: 10, overflow: "hidden", background: C.card }}>
+                <button
+                  type="button"
+                  onClick={() => (f.pohlad === VIDEO ? void prehraj(f) : setZvacsena(f))}
+                  style={{ display: "block", width: "100%", padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: C.text }}
+                >
+                  {f.pohlad === VIDEO ? (
+                    <div style={{ aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, fontSize: 34, color: C.accentLight }}>▶</div>
+                  ) : (
+                    <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
+                  )}
+                  <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}{f.maCiste ? " · aj čisté" : ""}</div>
+                  {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
+                </button>
+                {/* Text a mazanie priamo na dlaždici (Jerry, 12. 10. 2026: „chýba upraviť/vložiť text, vymazať"). */}
+                {textNa === f.id && (
+                  <div style={{ padding: "0 8px 8px" }}>
+                    <textarea
+                      autoFocus value={textKoncept} onChange={(e) => setTextKoncept(e.target.value)} rows={4}
+                      placeholder="Čo je na porovnaní vidieť — klient to uvidí pod fotkou."
+                      style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, lineHeight: 1.5, resize: "vertical" }}
+                    />
+                    <div style={{ display: "flex", gap: 10, marginTop: 5 }}>
+                      <button type="button" onClick={async () => { if (await posli({ akcia: "popis", id: f.id, text: textKoncept })) { setTextNa(null); setHlaska("Popis uložený."); await nacitaj(); } }} style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>uložiť</button>
+                      <button type="button" onClick={() => setTextNa(null)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
+                    </div>
+                    <div style={{ marginTop: 6 }}><OpravitText maly text={textKoncept} onOpravene={setTextKoncept} /></div>
+                  </div>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 9px", borderTop: `1px solid ${mix(C.border, 80)}` }}>
+                  {f.maEdit && (
+                    <button type="button" onClick={() => upravVEditore(meno, f.id)} title="Otvoriť v editore s čiarami a kresbou — uloženie ho prepíše, upraviť sa dá kedykoľvek znova"
+                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>✎ upraviť v editore</button>
+                  )}
+                  {f.pohlad !== VIDEO && textNa !== f.id && (
+                    <button type="button" onClick={() => { setTextNa(f.id); setTextKoncept(f.popis || ""); }}
+                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>{f.popis ? "✎ upraviť text" : "+ vložiť text"}</button>
+                  )}
+                  <button type="button" onClick={() => void zmaz(f)}
+                    style={{ background: "none", border: "none", padding: 0, color: C.red, fontFamily: "inherit", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>zmazať</button>
+                </div>
+                {!f.maEdit && f.pohlad !== VIDEO && (
+                  <div style={{ padding: "0 9px 8px", fontSize: 11, color: C.textDim, lineHeight: 1.45 }}>
+                    Uložené skôr, než editor ukladal svoj stav — čiary sa nedajú otvoriť znova. Nové porovnanie: označ dve fotky nižšie → Do editora.
+                  </div>
+                )}
+                {f.pohlad !== VIDEO && (
+                  <button
+                    type="button" onClick={() => oznacNaPoslanie(f.id)}
+                    aria-pressed={naPoslanie.includes(f.id)}
+                    title={naPoslanie.includes(f.id) ? "Nepridávať do odkazu" : "Pridať do odkazu pre klienta"}
+                    style={rohove("left", C.accent, naPoslanie.includes(f.id))}
+                  >{naPoslanie.includes(f.id) ? "✓" : ""}</button>
+                )}
+              </div>
+            ))}
+          </div>
+          {naPoslanie.length > 0 && !skladam && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setSkladam(true)} style={{ padding: "8px 14px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 22), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                ✉ Poslať klientovi ({naPoslanie.length})
+              </button>
+              <button type="button" onClick={() => setNaPoslanie([])} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť výber</button>
+            </div>
+          )}
+          {skladam && (
+            <div style={{ marginTop: 10 }}>
+              <PoslatKlientovi
+                meno={meno} trener={trener}
+                fotky={naPoslanie.map((id) => zEditora.find((f) => f.id === id)).filter((f): f is Fotka => !!f)}
+                onZrus={() => { setSkladam(false); setNaPoslanie([]); }}
+                onHotovo={() => void nacitaj()}
+                onOtvorFotku={(f) => setZvacsena(f)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── POSLANÉ KLIENTOVI ── kedy, či otvoril, súhlas a jeho odpovede */}
+      <PoslaneKlientovi odkazy={d.odkazy || []} odpovede={d.odpovede || []} onZmena={() => void nacitaj()} />
+
       {/* ── NAHRATIE ── */}
       <div style={{ padding: 14, borderRadius: 12, background: C.surface, border: `1px solid ${mix(C.border, 120)}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>{prveFotenie ? "Nahrať ďalšie fotky" : "Prvé fotenie"}</span>
-          {d.suhlas ? nalepka("súhlas z anamnézy", C.green) : nalepka("bez súhlasu v anamnéze", C.orange)}
+          {d.suhlas ? nalepka("súhlas z anamnézy", C.green) : d.suhlasOsobne ? nalepka("súhlas osobne", C.green) : nalepka("bez súhlasu v anamnéze", C.orange)}
         </div>
         {!d.ulozisko && (
           <div style={{ fontSize: 12.5, color: C.orange, marginTop: 8, lineHeight: 1.55 }}>
@@ -346,12 +468,18 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
         {!d.sifra && (
           <div style={{ fontSize: 12.5, color: C.orange, marginTop: 8 }}>Chýba šifrovací kľúč — bez neho sa fotky neukladajú.</div>
         )}
-        {!d.suhlas && (
+        {!d.suhlas && d.suhlasOsobne && (
+          <div style={{ marginTop: 10, fontSize: 12.5, color: C.textMuted, lineHeight: 1.5 }}>
+            Klient súhlasil s fotkami osobne{d.suhlasOsobne.kto ? ` — potvrdil ${d.suhlasOsobne.kto}` : ""}, {denCz(dnesPraha(new Date(d.suhlasOsobne.kedy)))}. Platí aj na fotky, ktoré už sú hotové.{" "}
+            <button type="button" onClick={() => void zapisSuhlas(false)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>zrušiť</button>
+          </div>
+        )}
+        {!d.suhlas && !d.suhlasOsobne && (
           <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 10, fontSize: 12.5, color: C.textMuted, lineHeight: 1.5, cursor: "pointer" }}>
-            <input type="checkbox" checked={osobne} onChange={(e) => setOsobne(e.target.checked)} style={{ marginTop: 3, accentColor: C.accent }} />
+            <input type="checkbox" checked={false} onChange={() => void zapisSuhlas(true)} style={{ marginTop: 3, accentColor: C.accent }} />
             <span>
               Klient súhlasil s fotkami osobne. <span style={{ color: C.textDim }}>Jeho anamnéza súhlas s fotkami nemá
-              (staré z Google Forms sa naň nepýtali). Pri fotke sa zapíše, že súhlas bol osobný a kto ho potvrdil.</span>
+              (staré z Google Forms sa naň nepýtali). Zapíše sa hneď a platí aj na fotky, ktoré už sú hotové — aj s tým, kto ho potvrdil.</span>
             </span>
           </label>
         )}
@@ -462,9 +590,6 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
           Fotky sú zašifrované a nikde sa nezverejňujú — vidí ich len prihlásený tréner. Viac fotiek naraz dostane
           zvolený pohľad; zmeniť sa dá pri každej.
         </div>
-        {(chyba || hlaska) && (
-          <div style={{ fontSize: 12.5, marginTop: 8, color: chyba ? C.red : C.green }}>{chyba || hlaska}</div>
-        )}
       </div>
 
       {/* ── PREDTÝM A TERAZ ── */}
@@ -493,99 +618,6 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
           </div>
         </div>
       )}
-
-      {/* ── Z EDITORA ── porovnania predtým/potom a videá (Workspace → Editor) */}
-      {zEditora.length > 0 && (
-        <div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Z editora</span>
-            {zEditora.some((f) => f.pohlad !== VIDEO) && !skladam && (
-              <span style={{ fontSize: 11.5, color: C.textDim }}>· krúžkom označ porovnania, ktoré pošleš klientovi</span>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${uzke ? 130 : 170}px, 1fr))`, gap: 8 }}>
-            {zEditora.map((f) => (
-              <div key={f.id} style={{ position: "relative", border: `${naPoslanie.includes(f.id) ? 2 : 1}px solid ${naPoslanie.includes(f.id) ? C.accent : C.border}`, borderRadius: 10, overflow: "hidden", background: C.card }}>
-                <button
-                  type="button"
-                  onClick={() => (f.pohlad === VIDEO ? void prehraj(f) : setZvacsena(f))}
-                  style={{ display: "block", width: "100%", padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: C.text }}
-                >
-                  {f.pohlad === VIDEO ? (
-                    <div style={{ aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, fontSize: 34, color: C.accentLight }}>▶</div>
-                  ) : (
-                    <img src={obrazok(f)} alt={`predtým / potom ${denCz(f.den)}`} loading="lazy" style={{ display: "block", width: "100%", aspectRatio: "1 / 1", objectFit: "cover", background: C.bg }} />
-                  )}
-                  <div style={{ padding: "6px 9px", fontSize: 11.5, color: C.textMuted }}>{nazovPohladu(f.pohlad)} · {denCz(f.den)}{f.maCiste ? " · aj čisté" : ""}</div>
-                  {f.popis && <div style={{ padding: "0 9px 8px", fontSize: 12, color: C.text, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{f.popis}</div>}
-                </button>
-                {/* Text a mazanie priamo na dlaždici (Jerry, 12. 10. 2026: „chýba upraviť/vložiť text, vymazať"). */}
-                {textNa === f.id && (
-                  <div style={{ padding: "0 8px 8px" }}>
-                    <textarea
-                      autoFocus value={textKoncept} onChange={(e) => setTextKoncept(e.target.value)} rows={4}
-                      placeholder="Čo je na porovnaní vidieť — klient to uvidí pod fotkou."
-                      style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, lineHeight: 1.5, resize: "vertical" }}
-                    />
-                    <div style={{ display: "flex", gap: 10, marginTop: 5 }}>
-                      <button type="button" onClick={async () => { if (await posli({ akcia: "popis", id: f.id, text: textKoncept })) { setTextNa(null); setHlaska("Popis uložený."); await nacitaj(); } }} style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.accent}`, background: mix(C.accent, 18), color: C.accentLight, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>uložiť</button>
-                      <button type="button" onClick={() => setTextNa(null)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
-                    </div>
-                    <div style={{ marginTop: 6 }}><OpravitText maly text={textKoncept} onOpravene={setTextKoncept} /></div>
-                  </div>
-                )}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 9px", borderTop: `1px solid ${mix(C.border, 80)}` }}>
-                  {f.maEdit && (
-                    <button type="button" onClick={() => upravVEditore(meno, f.id)} title="Otvoriť v editore s čiarami a kresbou — uloženie ho prepíše, upraviť sa dá kedykoľvek znova"
-                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>✎ upraviť v editore</button>
-                  )}
-                  {f.pohlad !== VIDEO && textNa !== f.id && (
-                    <button type="button" onClick={() => { setTextNa(f.id); setTextKoncept(f.popis || ""); }}
-                      style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>{f.popis ? "✎ upraviť text" : "+ vložiť text"}</button>
-                  )}
-                  <button type="button" onClick={() => void zmaz(f)}
-                    style={{ background: "none", border: "none", padding: 0, color: C.red, fontFamily: "inherit", fontSize: 12, cursor: "pointer", marginLeft: "auto" }}>zmazať</button>
-                </div>
-                {!f.maEdit && f.pohlad !== VIDEO && (
-                  <div style={{ padding: "0 9px 8px", fontSize: 11, color: C.textDim, lineHeight: 1.45 }}>
-                    Uložené skôr, než editor ukladal svoj stav — čiary sa nedajú otvoriť znova. Nové porovnanie: označ dve fotky nižšie → Do editora.
-                  </div>
-                )}
-                {f.pohlad !== VIDEO && (
-                  <button
-                    type="button" onClick={() => oznacNaPoslanie(f.id)}
-                    aria-pressed={naPoslanie.includes(f.id)}
-                    title={naPoslanie.includes(f.id) ? "Nepridávať do odkazu" : "Pridať do odkazu pre klienta"}
-                    style={rohove("left", C.accent, naPoslanie.includes(f.id))}
-                  >{naPoslanie.includes(f.id) ? "✓" : ""}</button>
-                )}
-              </div>
-            ))}
-          </div>
-          {naPoslanie.length > 0 && !skladam && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => setSkladam(true)} style={{ padding: "8px 14px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 22), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                ✉ Poslať klientovi ({naPoslanie.length})
-              </button>
-              <button type="button" onClick={() => setNaPoslanie([])} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť výber</button>
-            </div>
-          )}
-          {skladam && (
-            <div style={{ marginTop: 10 }}>
-              <PoslatKlientovi
-                meno={meno} trener={trener}
-                fotky={naPoslanie.map((id) => zEditora.find((f) => f.id === id)).filter((f): f is Fotka => !!f)}
-                onZrus={() => { setSkladam(false); setNaPoslanie([]); }}
-                onHotovo={() => void nacitaj()}
-                onOtvorFotku={(f) => setZvacsena(f)}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── POSLANÉ KLIENTOVI ── kedy, či otvoril, súhlas a jeho odpovede */}
-      <PoslaneKlientovi odkazy={d.odkazy || []} odpovede={d.odpovede || []} onZmena={() => void nacitaj()} />
 
       {/* ── VÝBER DO EDITORA ── drží sa pri vrchu, kým sa označuje */}
       {fs.length > 1 && (

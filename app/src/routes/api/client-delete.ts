@@ -92,6 +92,7 @@ export const Route = createFileRoute("/api/client-delete")({
           ["klient_fotky", "klient"],
           // Poznámky k foteniu patria k fotkám — fotky ostávajú, tak aj ony.
           ["klient_fotky_poznamky", "klient"],
+          ["klient_fotky_suhlas", "klient"],
           ["editor_navrhy", "klient"],
         ];
 

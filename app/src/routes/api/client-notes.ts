@@ -99,12 +99,15 @@ export const Route = createFileRoute("/api/client-notes")({
            * zhodiť celú históriu.
            */
           const kluc = (bindings() as { ANAMNEZA_KLUC?: string }).ANAMNEZA_KLUC;
-          const [poslane, odpovedeFotky] = await Promise.all([
+          const [poslane, odpovedeFotky, osobnySuhlas] = await Promise.all([
             DB.prepare("SELECT token, fotky_json, kto, vytvorene_at, otvorene_at, suhlas, suhlas_at, zrusene_at FROM fotky_odkazy WHERE klient = ?1 ORDER BY vytvorene_at DESC LIMIT 20")
               .bind(name).all().then((x) => x.results as R[]).catch(() => [] as R[]),
             DB.prepare("SELECT id, text, vytvorene_at FROM fotky_odpovede WHERE klient = ?1 ORDER BY vytvorene_at DESC LIMIT 30")
               .bind(name).all().then((x) => x.results as R[]).catch(() => [] as R[]),
+            DB.prepare("SELECT kto, kedy FROM klient_fotky_suhlas WHERE klient = ?1")
+              .bind(name).first<R>().catch(() => null),
           ]);
+          if (osobnySuhlas) historia.push({ id: "fotky-osobny-suhlas", kedy: String(osobnySuhlas.kedy), odkial: "fotky", text: "súhlasil s fotkami osobne", autor: String(osobnySuhlas.kto || "") });
           for (const r of poslane) {
             let pocet = 0;
             try { pocet = (JSON.parse(String(r.fotky_json)) as unknown[]).length; } catch { /* 0 */ }

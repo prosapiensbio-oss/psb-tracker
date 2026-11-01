@@ -64,6 +64,7 @@
       <button class="tl" id="ulozitNavrh" title="Uloží len do Rozrobených (pracovná verzia, ukladá sa aj sama). Do profilu klienta ukladá tlačidlo dole.">💾 do rozrobených</button>
       <span class="ulozene" id="stavUlozenia"></span>
     </div>
+    <!-- Poradie: Rozrobené, Čiary a kresba, Popis, potom všetko ostatné (Jerry, 1. 11. 2026). -->
     <div class="skupiny">
       <details data-skupina="navrhy">
         <summary><span class="sipka">▸</span>Rozrobené<span class="stav" id="stavNavrhy"></span></summary>
@@ -73,6 +74,55 @@
           <button class="tl" id="novyNavrh">+ nový prázdny</button>
         </div>
       </details>
+      <details data-skupina="ciary">
+        <summary><span class="sipka">▸</span>Čiary, uhly a kresba<span class="stav" id="stavCiary"></span></summary>
+        <div class="obsah">
+          <button class="tl" id="kreslit">✎ kresliť čiary</button>
+          <div class="prepinac" id="nastroj">
+            <button data-v="ciara" class="on">／ čiara</button>
+            <button data-v="uhol">∠ uhol</button>
+            <button data-v="sipka">➚ šípka</button>
+            <button data-v="kresba">〰 voľná kresba</button>
+            <button data-v="detail" title="Vyznač miesto — vedľa sa objaví jeho zväčšenina">◎ krúžok</button>
+          </div>
+          <div class="prepinac" id="riadokHrubka" hidden>
+            <span id="hrubkaKresby" style="display:contents">
+              <button data-v="2">tenká</button><button data-v="4" class="on">stredná</button><button data-v="7">hrubá</button>
+            </span>
+          </div>
+          <div class="prepinac" id="farbaCiar">
+            <button data-v="#ff8a1f" class="on">oranžová</button>
+            <button data-v="#ffffff">biela</button>
+            <button data-v="#38e07b">zelená</button>
+            <button data-v="#ff4d4d">červená</button>
+          </div>
+          <div id="vybranaInfo" class="napoveda" hidden style="font-size:13px;color:var(--text)"></div>
+          <div class="tlacidla">
+            <button class="tl" id="zmazVybranu" disabled>zmazať vybranú</button>
+            <button class="tl" id="zmazVsetky" disabled>zmazať všetky</button>
+          </div>
+          <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
+          <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
+          <div id="uholNapoveda" class="napoveda" hidden style="color:var(--accentLight);font-size:13px">Prvé rameno je hotové — teraz ťahaj <b>druhé rameno</b>; začne samo vo vrchole.</div>
+          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. <b>∠ uhol</b>: potiahni prvé rameno (od konca k vrcholu), potom druhé — začne vo vrchole. <b>Koniec</b> čiary, šípky či ramena chytíš a posunieš vždy, aj keď je skupina zavretá; <b>ťah po čiare</b> posunie celý útvar. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť. <b>◎ Krúžok</b>: ťahom vyznač miesto (ťuknutie = stredný krúžok), vedľa sa objaví jeho zväčšenina — tú chytíš kdekoľvek a odložíš (aj do druhej polovice), za <b>bodku na okraji</b> ju zväčšíš; malý krúžok tiež posunieš a za jeho bodku zmeníš veľkosť vyznačeného miesta. Zmaže sa ako čiara (vyber a Delete).</div>
+        </div>
+      </details>
+
+      <!-- Popis k fotke ako jedna zo skupín, nie stále otvorený (Jerry, 12. 10. 2026). -->
+      <details data-skupina="popis">
+        <summary><span class="sipka">▸</span>Popis k fotke<span class="stav" id="stavPopis"></span></summary>
+        <div class="obsah popis-fotky">
+          <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
+          <div class="tlacidla" style="align-items:center">
+            <button class="tl" id="opravitPopis" type="button" title="Oprava pravopisu, diakritiky, čiarok a gramatiky — jazyk aj obsah ostanú">✓ opraviť text</button>
+            <button class="tl" id="cestinaPopis" type="button" title="Preklad do češtiny (stránka pre klienta je po česky) a zároveň oprava chýb">⇄ do češtiny</button>
+            <button class="tl" id="povodnyPopis" type="button" hidden>↶ vrátiť pôvodné</button>
+            <span id="opravaStav" class="napoveda" style="margin:0"></span>
+          </div>
+          <div class="napoveda">Uloží sa s porovnaním ku klientovi a klient ho uvidí pod fotkou v odkaze. Každé porovnanie má svoj — pri nových fotkách začína prázdny.</div>
+        </div>
+      </details>
+
       <details data-skupina="kartoteka" open>
         <summary><span class="sipka">▸</span>Kartotéka klienta<span class="stav" id="stavKartoteka"></span></summary>
         <div class="obsah">
@@ -176,55 +226,6 @@
             <button data-v="rgba(20,20,20,.6)">tmavá</button>
           </div>
           <label class="check"><input type="checkbox" id="mriezkaExport"> aj do stiahnutej fotky</label>
-        </div>
-      </details>
-
-      <details data-skupina="ciary">
-        <summary><span class="sipka">▸</span>Čiary, uhly a kresba<span class="stav" id="stavCiary"></span></summary>
-        <div class="obsah">
-          <button class="tl" id="kreslit">✎ kresliť čiary</button>
-          <div class="prepinac" id="nastroj">
-            <button data-v="ciara" class="on">／ čiara</button>
-            <button data-v="uhol">∠ uhol</button>
-            <button data-v="sipka">➚ šípka</button>
-            <button data-v="kresba">〰 voľná kresba</button>
-            <button data-v="detail" title="Vyznač miesto — vedľa sa objaví jeho zväčšenina">◎ krúžok</button>
-          </div>
-          <div class="prepinac" id="riadokHrubka" hidden>
-            <span id="hrubkaKresby" style="display:contents">
-              <button data-v="2">tenká</button><button data-v="4" class="on">stredná</button><button data-v="7">hrubá</button>
-            </span>
-          </div>
-          <div class="prepinac" id="farbaCiar">
-            <button data-v="#ff8a1f" class="on">oranžová</button>
-            <button data-v="#ffffff">biela</button>
-            <button data-v="#38e07b">zelená</button>
-            <button data-v="#ff4d4d">červená</button>
-          </div>
-          <div id="vybranaInfo" class="napoveda" hidden style="font-size:13px;color:var(--text)"></div>
-          <div class="tlacidla">
-            <button class="tl" id="zmazVybranu" disabled>zmazať vybranú</button>
-            <button class="tl" id="zmazVsetky" disabled>zmazať všetky</button>
-          </div>
-          <label class="check"><input type="checkbox" id="sklon" checked> sklon pri každej čiare</label>
-          <label class="check"><input type="checkbox" id="ciaryExport" checked> čiary do stiahnutej fotky</label>
-          <div id="uholNapoveda" class="napoveda" hidden style="color:var(--accentLight);font-size:13px">Prvé rameno je hotové — teraz ťahaj <b>druhé rameno</b>; začne samo vo vrchole.</div>
-          <div class="napoveda">Kým je táto skupina otvorená, kreslíš. <b>∠ uhol</b>: potiahni prvé rameno (od konca k vrcholu), potom druhé — začne vo vrchole. <b>Koniec</b> čiary, šípky či ramena chytíš a posunieš vždy, aj keď je skupina zavretá; <b>ťah po čiare</b> posunie celý útvar. <b>Shift</b> = presne vodorovne/zvisle. <b>Voľná kresba</b> = krivka prstom či perom (kyfóza, lordóza…); pokazený ťah vráti ↶ späť. <b>◎ Krúžok</b>: ťahom vyznač miesto (ťuknutie = stredný krúžok), vedľa sa objaví jeho zväčšenina — tú chytíš kdekoľvek a odložíš (aj do druhej polovice), za <b>bodku na okraji</b> ju zväčšíš; malý krúžok tiež posunieš a za jeho bodku zmeníš veľkosť vyznačeného miesta. Zmaže sa ako čiara (vyber a Delete).</div>
-        </div>
-      </details>
-
-      <!-- Popis k fotke ako jedna zo skupín, nie stále otvorený (Jerry, 12. 10. 2026). -->
-      <details data-skupina="popis">
-        <summary><span class="sipka">▸</span>Popis k fotke<span class="stav" id="stavPopis"></span></summary>
-        <div class="obsah popis-fotky">
-          <textarea id="popisFotky" rows="4" placeholder="Čo je na porovnaní vidieť — napr. „Hrudník otvorenejší, panva sa už tak neprekláňa dopredu.“"></textarea>
-          <div class="tlacidla" style="align-items:center">
-            <button class="tl" id="opravitPopis" type="button" title="Oprava pravopisu, diakritiky, čiarok a gramatiky — jazyk aj obsah ostanú">✓ opraviť text</button>
-            <button class="tl" id="cestinaPopis" type="button" title="Preklad do češtiny (stránka pre klienta je po česky) a zároveň oprava chýb">⇄ do češtiny</button>
-            <button class="tl" id="povodnyPopis" type="button" hidden>↶ vrátiť pôvodné</button>
-            <span id="opravaStav" class="napoveda" style="margin:0"></span>
-          </div>
-          <div class="napoveda">Uloží sa s porovnaním ku klientovi a klient ho uvidí pod fotkou v odkaze. Každé porovnanie má svoj — pri nových fotkách začína prázdny.</div>
         </div>
       </details>
     </div>
