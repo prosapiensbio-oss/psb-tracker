@@ -42,6 +42,7 @@ import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, ProfilKlienta, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, klucVybaveniaBezBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlhJednehoKlienta, dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
+import { textNadRamec } from "../../lib/psb/zostatokText";
 import { menaPlatiZa, platiteliaZOverridov } from "../../lib/psb/platiZa";
 import { NAZOV_PRENESENYCH, zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
@@ -1462,7 +1463,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         Na telefóne ide hneď za meno, nech je v prvom riadku. */}
                     <div style={{ minWidth: uzke ? 0 : 118, textAlign: "right", fontSize: 11.5, color: C.textDim, order: uzke ? 1 : 2 }}>
                       {x.vMinuse > 0
-                        ? <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>−{x.vMinuse} h</span>
+                        ? <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>{textNadRamec(x.vMinuse)}</span>
                         : <span>na nule</span>}
                       {x.objednanych ? <span style={{ marginLeft: 7 }}>obj. {x.objednanych}</span> : null}
                     </div>

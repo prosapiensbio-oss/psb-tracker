@@ -18,13 +18,15 @@ import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { UVODNY } from "../../lib/psb/uvodnaStranka";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
-import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
+import { mesiacovVztahu, priemerDochadzky, sedeniaPoMesiacoch, skupinaKlienta, tempoMesacne, type SkupinaZoznamu } from "../../lib/psb/profil";
 import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { VyberMena } from "./VyberMena";
 import { chybaDielov, menaPlatiZa } from "../../lib/psb/platiZa";
 import { dlhJednehoKlienta } from "../../lib/psb/dlznici";
+import { textZostatku, vetaZostatku } from "../../lib/psb/zostatokText";
+import { jeZrusenieKlientom } from "../../lib/psb/kalendarZmeny";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -138,7 +140,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
-  const [stav, setStav] = useState<"aktivni" | "neaktivni">("aktivni");
+  const [stav, setStav] = useState<SkupinaZoznamu>("aktivni");
   const [menoVnutri, setMenoVnutri] = useState("");
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
@@ -529,11 +531,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   );
 
   /** Zrušené tréningy za 90 dní — z histórie zmien v kalendári. */
-  const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string }[]>([]);
+  const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string; poznamka?: string | null }[]>([]);
   useEffect(() => {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { zmenyHistoria?: { klient: string | null; druh: string; kedy: string }[] }) => setZruseneKal(j.zmenyHistoria || []))
+      .then((j: { zmenyHistoria?: { klient: string | null; druh: string; kedy: string; poznamka?: string | null }[] }) => setZruseneKal(j.zmenyHistoria || []))
       .catch(() => setZruseneKal([]));
   }, []);
 
@@ -554,12 +556,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     const tempa = ostatni.map((x) => x.sessions.filter((y) => y.date.slice(0, 10) > dni(90)).length / 3).filter((x) => x > 0);
     const tempo = tempa.length ? tempa.reduce((a, b) => a + b, 0) / tempa.length : 0;
 
-    const zruseneVsetky = zruseneKal.filter((z) => z.druh === "zrusene" && z.kedy.slice(0, 10) > dni(90));
+    const zruseneVsetky = zruseneKal.filter((z) => jeZrusenieKlientom(z) && z.kedy.slice(0, 10) > dni(90));
     const aktivnych = Math.max(1, ostatni.filter((x) => x.sessions.some((y) => y.date.slice(0, 10) > dni(90))).length);
     const zrusene = zruseneVsetky.length / aktivnych;
 
-    const dochadzky = ostatni.filter((x) => x.sessionCount > 0).map((x) => x.attendance || 0);
-    const dochadzka = dochadzky.length ? dochadzky.reduce((a, b) => a + b, 0) / dochadzky.length : 0;
+    // Jedna funkcia s profilom aj Firmou → Klienti. Do 1. 11. 2026 sa tu delilo
+    // všetkými, čo kedy trénovali — „priemer aktívnych" potom hlásil 33 % proti 71 %.
+    const dochadzka = priemerDochadzky(ostatni).podiel;
 
     const dlzky = ostatni.filter((x) => x.firstSession)
       .map((x) => (Date.now() - Date.parse(x.firstSession)) / (86400000 * 30.44));
@@ -625,7 +628,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     return zdravieKlienta(c, {
       tempoTeraz: vokne(dni(90), dni(0)) / 3,
       tempoPredtym: vokne(dni(180), dni(90)) / 3,
-      zrusene: zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length,
+      zrusene: zruseneKal.filter((z) => jeZrusenieKlientom(z) && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length,
       priemery,
     });
   }, [c, meno, zruseneKal, priemery, dni]);
@@ -974,7 +977,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
      * a všetci na B, a nech je to rolovacie."
      *
      * Predvolene AKTÍVNI. Neaktívnych je viac než aktívnych a kto otvára
-     * stôl, ide skoro vždy za niekým, kto chodí.
+     * stôl, ide skoro vždy za niekým, kto chodí. Kto ešte netrénoval (dopyt,
+     * dohodnutý úvodný), je v treťom filtri — viď `skupinaKlienta`.
      */
     /**
      * Mená z exportu plus tí, čo majú zatiaľ len ručný zápis (nový klient,
@@ -986,8 +990,22 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     for (const m of mena) if (!podlaKluca.has(normName(m))) podlaKluca.set(normName(m), m);
     for (const m of Object.keys(data.clientOverrides || {})) if (!podlaKluca.has(normName(m))) podlaKluca.set(normName(m), m);
     const vsetci = [...podlaKluca.values()];
-    const jeAktivny = (m: string) => (clients[m]?.status || "") !== "Neaktívny";
-    const podlaStavu = vsetci.filter((m) => (stav === "aktivni" ? jeAktivny(m) : !jeAktivny(m)));
+    const pocty: Record<SkupinaZoznamu, number> = { aktivni: 0, neaktivni: 0, cakaju: 0 };
+    for (const m of vsetci) pocty[skupinaKlienta(clients[m])]++;
+    const podlaStavu = vsetci.filter((m) => skupinaKlienta(clients[m]) === stav);
+    // Najbližší termín — kto má úvodný zajtra, nesmie sa stratiť medzi dopytmi,
+    // preto ide vo filtri „čakajú" navrch a v riadku má dátum.
+    const dnesStol = dnesISO();
+    const terminPodlaMena = new Map<string, string>();
+    for (const u of kalUdalosti || []) {
+      if (!u.klient || (u.typ !== "trening" && u.typ !== "uvodny")) continue;
+      const d = u.zaciatok.slice(0, 10);
+      if (d < dnesStol) continue;
+      const k = normName(u.klient);
+      const b = terminPodlaMena.get(k);
+      if (!b || d < b) terminPodlaMena.set(k, d);
+    }
+    const terminKlienta = (m: string) => terminPodlaMena.get(normName(m)) || "";
     const q = normName(hladam);
     // Hľadá sa cez OBE skupiny — kto píše meno, chce toho človeka nájsť,
     // nie sa dozvedieť, že je v druhej záložke.
@@ -996,7 +1014,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       .sort((a, b) => a.localeCompare(b, "sk"));
 
     const skupiny: { pismeno: string; mena: string[] }[] = [];
+    const sTerminom = !q && stav === "cakaju" ? vidno.filter((m) => terminKlienta(m)).sort((a, b) => terminKlienta(a).localeCompare(terminKlienta(b))) : [];
+    if (sTerminom.length) skupiny.push({ pismeno: "S termínom", mena: sTerminom });
     for (const m of vidno) {
+      if (sTerminom.includes(m)) continue;
       const p = (m.trim()[0] || "?").toLocaleUpperCase("sk");
       const posledna = skupiny[skupiny.length - 1];
       if (posledna && posledna.pismeno === p) posledna.mena.push(m);
@@ -1014,8 +1035,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             style={{ flex: "1 1 240px", minWidth: 190, padding: "9px 12px", borderRadius: 10, fontSize: 13.5, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
           />
           <div style={{ display: "flex", gap: 5 }}>
-            <button onClick={() => setStav("aktivni")} style={prepinac(stav === "aktivni")}>Aktívni</button>
-            <button onClick={() => setStav("neaktivni")} style={prepinac(stav === "neaktivni")}>Neaktívni</button>
+            <button onClick={() => setStav("aktivni")} style={prepinac(stav === "aktivni")}>Aktívni ({pocty.aktivni})</button>
+            <button onClick={() => setStav("neaktivni")} style={prepinac(stav === "neaktivni")}>Neaktívni ({pocty.neaktivni})</button>
+            <button onClick={() => setStav("cakaju")} title="Ľudia bez jediného tréningu: dopyty a dohodnuté úvodné" style={prepinac(stav === "cakaju")}>Dopyty / čakajú ({pocty.cakaju})</button>
           </div>
           <button onClick={() => setNovy(true)} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
             + Nový klient
@@ -1048,13 +1070,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     background: "transparent", color: C.text, fontSize: 13, cursor: "pointer",
                   }}>
                     <span style={{ flex: 1 }}>{m}</span>
-                    {c2 ? (
+                    {c2 && c2.sessionCount > 0 ? (
                       <span style={{ fontSize: 11, color: C.textDim }}>
                         {c2.primaryTrainer}
                         {c2.lastSession ? ` · naposledy ${fmtDMY(c2.lastSession)}` : ""}
                       </span>
                     ) : (
-                      <span style={{ fontSize: 11, color: C.textDim }}>čaká na prvý tréning</span>
+                      <span style={{ fontSize: 11, color: terminKlienta(m) ? C.accentLight : C.textDim }}>
+                        {terminKlienta(m) ? `termín ${fmtDMY(terminKlienta(m))}` : "čaká na prvý tréning"}
+                      </span>
                     )}
                   </button>
                 );
@@ -1250,7 +1274,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         {c && c.packageTotal > 0 && (
           <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 40)}` }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.accentLight }}>
-              {c.packageOdvodeny || mimoExportu > 0 ? "≈" : ""}{c.packageRemaining - mimoExportu < 0 ? `${mimoExportu - c.packageRemaining} h nad rámec` : `${c.packageRemaining - mimoExportu} h zostáva`}
+              {vetaZostatku(c.packageRemaining - mimoExportu, c.packageOdvodeny || mimoExportu > 0)}
             </div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
               {nazovProduktu(c.membership) || `z ${c.packageTotal}`}
@@ -2865,7 +2889,7 @@ function stitky(
   pridaj("narodeniny", c.narodeniny ? `${fmtDMY(c.narodeniny)}${doNar == null ? "" : doNar === 0 ? " · dnes!" : ` · o ${Sk.dni(doNar)}`}` : "", C.accentLight);
   pridaj("členstvo", c.membership);
   if (c.packageTotal) {
-    pridaj("balíček", `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}`,
+    pridaj("balíček", textZostatku({ zostava: c.packageRemaining, spolu: c.packageTotal, odvodene: c.packageOdvodeny }),
       c.packageRemaining <= 1 ? C.orange : undefined,
       c.packageOdkial || "zostatok z archívu");
   }

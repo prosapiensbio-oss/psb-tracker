@@ -231,6 +231,22 @@ function prebehOdpoctu(
 const jeZvysokBezKonca = (b: BalicekPreZostatok): boolean =>
   !b.platnostDo && b.hodiny != null && /doplnenie|prenesen/i.test(b.nazov);
 
+/**
+ * Posledný skutočný balíček klienta ukončený s vrátením peňazí — ak si odvtedy
+ * nekúpil nový (inak `null`). Kto ho má, s PSB skončil: nula hodín na jeho karte
+ * nie je „treba predať ďalší balíček" (Radek Baláž, ukončený 13. 10. 2026, visel
+ * v „Balíček dojde" ešte 1. 11.).
+ */
+export function ukoncenyBalicekKlienta(balicky: BalicekPreZostatok[], klient: string, dnes: string): BalicekPreZostatok | null {
+  const k = normName(klient);
+  const ukonceny = balicky
+    .filter((b) => normName(b.klient) === k && !b.zruseneAt && b.ukonceny && !b.kotva && den(b.platnostOd) <= dnes)
+    .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
+  if (!ukonceny) return null;
+  const novsi = balicky.some((b) => normName(b.klient) === k && !b.zruseneAt && !b.ukonceny && den(b.platnostOd) > den(ukonceny.platnostOd));
+  return novsi ? null : ukonceny;
+}
+
 export function zostatokKokpitu(
   balicky: BalicekPreZostatok[],
   klient: string,
@@ -262,10 +278,8 @@ export function zostatokKokpitu(
   // „Doplnenie členstva“ k 20. 9.) je upratanie, nie koniec spolupráce
   // (22. 10. 2026: Panagiotis Tsiolis mal 18 h od 10. 9. a karta ukázala
   // 0 h, lebo jeho doplnenie bolo „ukončené 29. 9. — v PTminderi už nie je“).
-  const ukonceny = balicky
-    .filter((b) => normName(b.klient) === k && !b.zruseneAt && b.ukonceny && !b.kotva && den(b.platnostOd) <= dnes)
-    .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
-  if (ukonceny && !balicky.some((b) => normName(b.klient) === k && !b.zruseneAt && !b.ukonceny && den(b.platnostOd) > den(ukonceny.platnostOd))) {
+  const ukonceny = ukoncenyBalicekKlienta(balicky, klient, dnes);
+  if (ukonceny) {
     const hod = ukonceny.hodiny || 0;
     const koniecUkonceneho = den(ukonceny.platnostDo || "") || den(ukonceny.platnostOd);
     let poUkonceni = 0;

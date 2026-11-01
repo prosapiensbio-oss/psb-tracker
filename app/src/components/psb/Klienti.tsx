@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
+import { priemerDochadzky } from "../../lib/psb/profil";
+import { textZostatku } from "../../lib/psb/zostatokText";
+import { cenaZaSedenieVDnoch, menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
@@ -255,6 +257,15 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     return m;
   }, [all]);
 
+  // Ø cena sedenia v riadku klienta: tá istá definícia ako dlaždica nad tabuľkou
+  // (prijaté ÷ sedenia). Bol tu `paidAvg`, priemer ceny zapísanej pri sedení bez núl.
+  const prijatePodlaKlienta = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of data.payments) if (p.client) m.set(normName(p.client), (m.get(normName(p.client)) || 0) + p.amount);
+    return m;
+  }, [data.payments]);
+  const cenaSedeniaKlienta = (c: ClientAgg) => (c.sessionCount ? (prijatePodlaKlienta.get(normName(c.name)) || 0) / c.sessionCount : 0);
+
   // Everything except the package-donut filter — the donut is built from this,
   // so its slices stay visible/clickable even after you pick one.
   const baseList = useMemo(() => {
@@ -317,13 +328,13 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       pkg: (c) => c.packageRemaining,
       sessions: (c) => c.sessionCount,
       attendance: (c) => c.attendance,
-      avg: (c) => c.paidAvg,
+      avg: (c) => cenaSedeniaKlienta(c),
       // Kto ešte nebol (objednaný úvodný), má `lastSession` prázdne — na koniec.
       last: (c) => Date.parse(c.lastSession) || 0,
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });
-  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, lenPauza, nameSearch, sorted, focusClient, all, skupina]);
+  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, lenPauza, nameSearch, sorted, focusClient, all, skupina, prijatePodlaKlienta]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -346,11 +357,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     } else if (preset && preset.days > 0) {
       lo = Date.now() - preset.days * 86400000;
     }
-    let hours = 0, sedeni = 0, clientsWithSess = 0;
+    let hours = 0, clientsWithSess = 0;
     for (const c of list) {
       const sess = scoped ? c.sessions.filter((s) => { const t = new Date(s.date).getTime(); return t >= lo && t <= hi; }) : c.sessions;
       if (sess.length) clientsWithSess++;
-      sedeni += sess.length;
       for (const s of sess) hours += s.duration / 60;
     }
     // Ø cena sedenia = PRIJATÉ PENIAZE ÷ sedenia, rovnako ako na Kokpite
@@ -360,17 +370,15 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     // balíčkom; vyhodiť ho z menovateľa znamená stratiť pätinu odrobenej
     // práce a cenu nadhodnotiť.
     const menaList = new Set(list.map((c) => normName(c.name)));
-    let cash = 0;
-    for (const p of data.payments) {
-      if (!p.client || !menaList.has(normName(p.client))) continue;
-      const t = new Date(p.date).getTime();
-      if (scoped && (t < lo || t > hi)) continue;
-      cash += p.amount;
-    }
+    const cena = cenaZaSedenieVDnoch(data, (datum) => {
+      if (!scoped) return true;
+      const t = new Date(datum).getTime();
+      return t >= lo && t <= hi;
+    }, menaList);
     const denom = (scoped ? clientsWithSess : list.length) || 1;
-    const att = list.length ? (list.reduce((a, c) => a + c.attendance, 0) / list.length) * 100 : 0;
-    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: sedeni ? cash / sedeni : 0, scoped, sedeni, denom };
-  }, [list, kpiWin, kpiFrom, kpiTo, data.payments]);
+    const dochadzka = priemerDochadzky(list);
+    return { count: list.length, activeInWin: clientsWithSess, att: dochadzka.podiel * 100, attN: dochadzka.n, hpc: hours / denom, avg: cena.czk, scoped, sedeni: cena.sedeni, denom, obdobie: preset?.label || (kpiWin === "custom" ? "vlastné obdobie" : kpiWin) };
+  }, [list, kpiWin, kpiFrom, kpiTo, data]);
 
   const cell = (t: string, seg: string) => {
     const active = fTrainer === t && fSegment === seg;
@@ -455,9 +463,9 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               (÷ len tí, čo v okne chodili) bez toho, aby to bolo vidno —
               dva priemery, dva rôzne menovatele, jeden pás. Ľudia sú
               v tabuľke priamo pod tým, s tými istými filtrami. */}
-          <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text={`Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času. Delené VŠETKÝMI ${kpis.count} klientmi vo výbere — aj tými, čo v zvolenom okne nechodili.`} label={`Ø dochádzka · ÷ ${kpis.count}`} />} />
+          <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text={`Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času. Delené ${kpis.attN} klientmi z výberu, ktorí nie sú neaktívni a chodia aspoň 6 týždňov (kratšia história dochádzku nemeria). To isté číslo ukazuje profil klienta ako Ø ostatní.`} label={`Ø dochádzka · ÷ ${kpis.attN}`} />} />
           <StatCard value={kpis.hpc.toFixed(1).replace(".", ",")} label={<Info text={`Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu). Delené ${kpis.denom} klientmi — ${kpis.scoped ? "len tými, čo v okne reálne chodili" : "všetkými vo výbere"}.`} label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""} · ÷ ${kpis.denom}`} />} />
-          <StatCard value={fmtCZK(kpis.avg)} label={<Info text={`Prijaté peniaze delené počtom odtrénovaných sedení (${kpis.sedeni}) za zvolené obdobie, pre klientov v tomto zozname. Rovnaká definícia ako „Ø cena sedenia“ na Kokpite a v Peniazoch. Neráta sa z ceny zapísanej pri sedení: tá je pri 19 % sedení nulová, lebo platba visí na balíčku.`} label={`Ø CZK/sedenie · ÷ ${kpis.sedeni} sed.`} />} />
+          <StatCard value={fmtCZK(kpis.avg)} label={<Info text={`Prijaté peniaze delené počtom odtrénovaných sedení (${kpis.sedeni}) za obdobie „${kpis.obdobie}“, LEN pre ${kpis.count} klientov v tomto zozname. Rovnaká funkcia ako „Ø cena sedenia“ na Dnes, ktorá ale ráta všetkých klientov — preto môže vyjsť o pár korún inak.`} label={`Ø Kč/sedenie · ${kpis.obdobie} · tento zoznam · ÷ ${kpis.sedeni} sed.`} />} />
         </div>
       </Card>
 
@@ -684,10 +692,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
                 <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={nazovProduktu(c.membership)}>{c.membership ? nazovProduktu(c.membership) : c.clientType}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: od počtu hodín v názve balíčka sa odčítali odtrénované hodiny." : undefined}>
-                  {c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
+                  {c.packageTotal ? textZostatku({ zostava: c.packageRemaining, spolu: c.packageTotal, odvodene: c.packageOdvodeny }) : "—"}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>
+                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(cenaSedeniaKlienta(c))}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtDate(c.lastSession)}</td>
                 <td style={S.td}>
                   <select
@@ -735,7 +743,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           {editC.membership && (
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
               Predplatné: <strong style={{ color: C.text }}>{nazovProduktu(editC.membership)}</strong>
-              {editC.packageTotal ? ` · zostatok ${editC.packageOdvodeny ? "≈" : ""}${editC.packageRemaining}/${editC.packageTotal}` : ""}
+              {editC.packageTotal ? ` · zostatok ${textZostatku({ zostava: editC.packageRemaining, spolu: editC.packageTotal, odvodene: editC.packageOdvodeny })}` : ""}
               {editC.packageOdkial ? <span style={{ color: C.textDim }}> · {editC.packageOdkial}</span> : null}
             </div>
           )}

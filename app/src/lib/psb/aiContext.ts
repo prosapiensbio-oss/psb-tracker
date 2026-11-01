@@ -8,6 +8,8 @@ import { platbyNaZaplatenie, stavPlatieb, type StavPlatby } from "./platbyMesiac
 import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
+import { priemerDochadzky } from "./profil";
+import { textZostatku } from "./zostatokText";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -224,6 +226,25 @@ export function buildAiContext(
   const beziaci = kotva.ciastocny ? fin.find((m) => m.month === kotva.mesiac) : undefined;
   const kpi = {
     aktivnychKlientov: clientList.filter((c) => c.status !== "Neaktívny").length,
+    // Ľudia bez jediného tréningu (dopyty, dohodnuté úvodné) — filter „Dopyty /
+    // čakajú" na stole klienta, do aktívnych sa nerátajú.
+    cakajuNaPrvyTrening: [...new Set([...clientList.map((c) => c.name), ...Object.keys(data.clientOverrides || {})].map(normName))]
+      .filter((k) => !clientList.some((c) => normName(c.name) === k && c.sessionCount > 0)).length,
+    // To isté číslo ako „Ø ostatní" v profile a Ø dochádzka vo Firme → Klienti.
+    priemernaDochadzkaAktivnychPct: r0(priemerDochadzky(clientList).podiel * 100),
+    // Ø cena sedenia = prijaté peniaze ÷ odtrénované sedenia (cenaZaSedenie).
+    // Vždy povedz obdobie a menovateľ; cena zapísaná pri sedení sa už nikde neukazuje.
+    cenaSedenia: lastMonth
+      ? (() => {
+        const rok = lastMonth.month.slice(0, 4);
+        const m = cenaZaSedenie(data, (mk) => mk === lastMonth.month);
+        const r = cenaZaSedenie(data, (mk) => mk.slice(0, 4) === rok && mk <= lastMonth.month);
+        return {
+          poslednyPlnyMesiac: { mesiac: monthLabel(lastMonth.month), czk: r0(m.czk), sedeni: m.sedeni },
+          rokDoPoslednehoPlneho: { rok, czk: r0(r.czk), sedeni: r.sedeni },
+        };
+      })()
+      : null,
     // Vedome NIE „tento týždeň“: bežiaci týždeň ešte nie je celý, takže
     // posledný úplný je spravidla ten minulý. Názov klamal.
     odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), ...(lastWeek ? rozsahTyzdna(lastWeek) : { tyzden: null, od: null, do: null }) },
@@ -816,6 +837,8 @@ export function buildAiContext(
        * hoci to appka vie z kalendára (Jerry, 1. 10. 2026).
        */
       objednanyUvodny: c.objednanyUvodny || undefined,
+      // Skončil s vrátením peňazí — balíček sa mu nepredáva, nula hodín nie je úloha.
+      ukonceny: c.ukonceny || undefined,
       esteNetrenoval: c.objednanyUvodny && !c.sessionCount ? true : undefined,
       statusAuto: c.statusAuto,
       statusManual: c.statusOverride,
@@ -823,7 +846,7 @@ export function buildAiContext(
       trener: c.primaryTrainer,
       trenerManual: c.primaryTrainerOverride,
       balicek: c.membership || "Bez balíčka",
-      zostatokSedeni: c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : null,
+      zostatokSedeni: c.packageTotal ? textZostatku({ zostava: c.packageRemaining, spolu: c.packageTotal, odvodene: c.packageOdvodeny }) : null,
       // Záporný zostatok = tréningy nad rámec ZAPLATENÝCH hodín (Jerry, 3. 10.
       // 2026: „nezaplatený balík je 0"). Balíček s otvoreným poplatkom hodiny
       // nedáva, kým sa nezaplatí; mínus nie je dlh v korunách, dlh je v `dlh`.
