@@ -9,6 +9,14 @@ describe("faktúra uhradená balíčkom (Martin Vaško, 23. 10. 2026)", () => {
   it("balíček zaplatený → faktúra uhradená dňom platby", () => {
     expect(faktureUhradeneBalickom([f({})], new Set(["b"]), [], pl, "2026-10-23")).toEqual([{ id: "f", den: "2026-10-09", platbaId: "p" }]);
   });
+  it("dve platby na rovnakú sumu: berie sa tá po vystavení, nie staršia (Jan Kral)", () => {
+    const dve = [{ id: "stara", klient: "Martin Vaško", datum: "2026-09-16", suma: 6990 }, { id: "nova", klient: "Martin Vaško", datum: "2026-10-19", suma: 6990 }];
+    expect(faktureUhradeneBalickom([f({})], new Set(["b"]), [], dve, "2026-10-23")).toEqual([{ id: "f", den: "2026-10-19", platbaId: "nova" }]);
+  });
+  it("zaplatil vopred: berie sa platba pred vystavením", () => {
+    const vopred = [{ id: "v", klient: "Martin Vaško", datum: "2026-10-01", suma: 6990 }];
+    expect(faktureUhradeneBalickom([f({})], new Set(["b"]), [], vopred, "2026-10-23")).toEqual([{ id: "f", den: "2026-10-01", platbaId: "v" }]);
+  });
   it("balíček v dlhu (aj čiastočne) → nie", () => {
     const dlh = [{ klient: "Martin Vaško", den: "2026-09-27", nazov: "x", cena: 6990, doplatit: 100, zdroj: "kokpit", id: "b" }] as never;
     expect(faktureUhradeneBalickom([f({})], new Set(["b"]), dlh, pl, "2026-10-23")).toEqual([]);

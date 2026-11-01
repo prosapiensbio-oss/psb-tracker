@@ -13,8 +13,10 @@ import type { DlhPolozka } from "./zaplatene";
  * Rozhoduje TO ISTÉ pravidlo ako dlh: balíček faktúry žije (nie je zrušený)
  * a medzi položkami dlhu nie je. Čiastočne zaplatený balíček (Lucia: dlh
  * 4 290 z 5 640) v dlhu ostáva, takže jeho faktúra uhradená nie je.
- * Deň úhrady je platba klienta na sumu faktúry (± 1 Kč) od 30 dní pred
- * vystavením; keď taká nie je, dnešok.
+ * Deň úhrady je platba klienta na sumu faktúry (± 1 Kč): prvá od vystavenia,
+ * inak najbližšia do 30 dní pred ním (zaplatil vopred); keď taká nie je, dnešok.
+ * Pri rovnakej sume každý balíček vyhrávala najstaršia platba: Jan Kral má na
+ * faktúre z 16. 10. úhradu 16. 9. — to bol jeho predošlý balíček, túto platil 19. 10.
  */
 export function faktureUhradeneBalickom(
   faktury: { id: string; klient: string; balicekId: string | null; vystavene: string; celkom: number; uhradeneAt: string | null; stornoAt: string | null }[],
@@ -32,7 +34,11 @@ export function faktureUhradeneBalickom(
     const p = platby
       .filter((x) => normName(x.klient) === normName(f.klient) && Math.abs(Math.round(x.suma) - Math.round(f.celkom)) <= 1
         && x.datum >= posun(f.vystavene, -30) && x.datum <= dnes)
-      .sort((a, b) => a.datum.localeCompare(b.datum))[0];
+      .sort((a, b) => {
+        const po = (d: string) => d >= f.vystavene;
+        if (po(a.datum) !== po(b.datum)) return po(a.datum) ? -1 : 1;
+        return po(a.datum) ? a.datum.localeCompare(b.datum) : b.datum.localeCompare(a.datum);
+      })[0];
     out.push({ id: f.id, den: p?.datum || dnes, platbaId: p?.id || null });
   }
   return out;

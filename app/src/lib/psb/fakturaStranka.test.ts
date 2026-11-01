@@ -25,6 +25,21 @@ describe("stránka faktúry za odkazom z SMS (29. 10. 2026)", () => {
     expect(h).not.toContain("Linda Muth");
     expect(h).not.toContain("<script");
   });
+  it("pred splatnosťou si klient vyberie ihneď / v deň splatnosti a QR sa prepne (1. 11. 2026)", () => {
+    const h = fakturaStranka({ ...f, pdfUrl: "?pdf=1", dnes: "2026-10-29", qrUrl: "data:image/gif;base64,IHNED", qrNaSplatnost: "data:image/gif;base64,NESKOR" });
+    expect(h).toContain("Zaplatit ihned");
+    expect(h).toContain("V den splatnosti");
+    expect(h).toMatch(/id="psb-kedy-ihned"[^>]*checked/);
+    expect(h).toContain("base64,IHNED");
+    expect(h).toContain("base64,NESKOR");
+    expect((h.match(/data-psb-qr-ulozit/g) || []).length).toBe(2);
+    expect(h).not.toContain("<script");
+  });
+  it("bez druhého QR výber nie je", () => {
+    const h = fakturaStranka({ ...f, pdfUrl: "?pdf=1", dnes: "2026-11-20", qrUrl: "data:image/gif;base64,AA" });
+    expect(h).not.toContain("Zaplatit ihned");
+    expect(h).toContain("Po splatnosti od 12. 11. 2026");
+  });
   it("uhradená a stornovaná sa neplatí", () => {
     const u = fakturaStranka({ ...f, uhradeneAt: "2026-11-03", pdfUrl: "?pdf=1", dnes: "2026-11-04" });
     expect(u).toContain("Faktura je uhrazena");

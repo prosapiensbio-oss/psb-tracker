@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
 
-import { DODAVATEL, POPISY, ascii, dalsieCislo, den, poSplatnosti, spayd, splatnostZ, suma } from "./vydanaFaktura";
+import { DODAVATEL, POPISY, ascii, daSaPlatitNeskor, dalsieCislo, den, poSplatnosti, spayd, splatnostZ, stavFaktury, suma } from "./vydanaFaktura";
 
 describe("číselná rada", () => {
   it("prvá faktúra roku je RRRR1001", () => {
@@ -153,5 +153,25 @@ describe("QR platba — variabilný symbol", () => {
     expect(q).not.toContain("X-VS");
     expect(q).toContain("MSG:MARTIN VASKO");
     expect(q).toContain("AM:6990.00");
+  });
+});
+
+describe("kedy platiť a stav faktúry (1. 11. 2026)", () => {
+  it("v deň splatnosti sa dá vybrať, len kým nenastal", () => {
+    expect(daSaPlatitNeskor("2026-11-12", "2026-11-01")).toBe(true);
+    expect(daSaPlatitNeskor("2026-11-01", "2026-11-01")).toBe(false);
+    expect(daSaPlatitNeskor("2026-10-20", "2026-11-01")).toBe(false);
+    expect(daSaPlatitNeskor(undefined, "2026-11-01")).toBe(false);
+  });
+  it("QR na ihneď nenesie dátum, na splatnosť áno", () => {
+    expect(spayd({ suma: 100, vs: "20261014", sprava: "x" })).not.toContain("DT:");
+    expect(spayd({ suma: 100, vs: "20261014", sprava: "x", splatnost: "2026-11-12" })).toContain("DT:20261112");
+  });
+  it("stav: storno prebíja, potom zaplatená, potom splatnosť", () => {
+    const z = { splatnost: "2026-11-12", uhradeneAt: null, stornoAt: null };
+    expect(stavFaktury(z, "2026-11-01")).toBe("nezaplatena");
+    expect(stavFaktury(z, "2026-11-13")).toBe("po-splatnosti");
+    expect(stavFaktury({ ...z, uhradeneAt: "2026-11-02" }, "2026-11-13")).toBe("zaplatena");
+    expect(stavFaktury({ ...z, uhradeneAt: "2026-11-02", stornoAt: "2026-11-03" }, "2026-11-13")).toBe("storno");
   });
 });

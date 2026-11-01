@@ -257,6 +257,22 @@ export function spayd(v: {
   return polia.join("*");
 }
 
+/**
+ * Dá sa ešte vybrať „v deň splatnosti"? Len keď ten deň ešte nenastal. Inak je
+ * jediná možnosť zaplatiť hneď a do QR nepatrí dátum: minulý dátum by banka
+ * mohla odmietnuť alebo klientovi ukázať nezmysel.
+ */
+export const daSaPlatitNeskor = (splatnost: string | null | undefined, dnes: string): boolean => !!splatnost && splatnost.slice(0, 10) > dnes;
+
+export type StavFaktury = "storno" | "zaplatena" | "po-splatnosti" | "nezaplatena";
+
+/** Jedna odpoveď na „je zaplatená?" pre zoznam aj jeho filter. */
+export function stavFaktury(f: Pick<Faktura, "splatnost" | "uhradeneAt" | "stornoAt">, dnes: string): StavFaktury {
+  if (f.stornoAt) return "storno";
+  if (f.uhradeneAt) return "zaplatena";
+  return poSplatnosti(f, dnes) ? "po-splatnosti" : "nezaplatena";
+}
+
 /** Je faktúra po splatnosti? Stornovaná a uhradená nikdy. */
 export function poSplatnosti(f: Pick<Faktura, "splatnost" | "uhradeneAt" | "stornoAt">, dnes: string): boolean {
   if (f.uhradeneAt || f.stornoAt) return false;

@@ -16,7 +16,7 @@ const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"
 const kc = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kč`;
 const datum = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}. ${iso.slice(0, 4)}`;
 
-export function fakturaStranka(f: Faktura & { qrUrl?: string; logoUrl?: string; pdfUrl: string; dnes: string }): string {
+export function fakturaStranka(f: Faktura & { qrUrl?: string; qrNaSplatnost?: string; logoUrl?: string; pdfUrl: string; dnes: string }): string {
   const s = SADZBA;
   const polozky = polozkyFaktury(f);
   const sMenami = klientiNaDoklade(f).length > 1;
@@ -35,7 +35,7 @@ export function fakturaStranka(f: Faktura & { qrUrl?: string; logoUrl?: string; 
     ? blokPlatby({
       klient: f.klient, oslovenie: "", trener: "", os: [], zostatok: null, hodinSpolu: 0, odkedy: "",
       platba: { popis: `Faktura ${f.cislo}`, suma: f.celkom, ucet: DODAVATEL.ucet, sprava: `Faktura ${f.cislo} PSB`, vs: f.cislo, splatnost: f.splatnost, odpocet: 0, novy: false },
-    } as never, f.qrUrl)
+    } as never, f.qrUrl, f.qrNaSplatnost)
     : "";
   const logo = f.logoUrl
     ? `<img src="${esc(f.logoUrl)}" alt="ProSapiens Biomechanic" width="200" style="width:200px;max-width:62%;height:auto;display:block">`

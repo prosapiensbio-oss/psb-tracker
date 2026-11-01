@@ -22,7 +22,7 @@ import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import { czkZaPolozky } from "../lib/psb/platiZa";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
-import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
+import { DODAVATEL, daSaPlatitNeskor, spayd } from "../lib/psb/vydanaFaktura";
 import { jeNahladTrenera } from "../lib/psb/verejnyOdkaz";
 
 /**
@@ -58,6 +58,15 @@ function sChybou<F extends (...a: any[]) => Promise<Response>>(f: F): F {
       );
     }
   }) as F;
+}
+
+/** QR platby ako `data:` adresa do stránky. */
+function qrAdresa(text: string): string {
+  const o = qrObrazok(text);
+  const bajty = new Uint8Array(o.data);
+  let bin = "";
+  for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
+  return `data:${o.typ};base64,${btoa(bin)}`;
 }
 
 export const Route = createFileRoute("/v/$token")({
@@ -136,16 +145,15 @@ export const Route = createFileRoute("/v/$token")({
               },
             });
           }
-          const qr = qrObrazok(spayd({ suma: fa.celkom, vs: fa.cislo, sprava: `Faktura ${fa.cislo} PSB`, splatnost: fa.splatnost, prijemca: DODAVATEL.meno }));
-          const bajtyF = new Uint8Array(qr.data);
-          let binF = "";
-          for (let i = 0; i < bajtyF.length; i += 4096) binF += String.fromCharCode(...bajtyF.subarray(i, i + 4096));
+          const platbaFa = { suma: fa.celkom, vs: fa.cislo, sprava: `Faktura ${fa.cislo} PSB`, prijemca: DODAVATEL.meno };
           if (!url.searchParams.has("nahlad")) {
             await audit(DB, { action: "faktura-odkaz-otvoreny", predmet: fa.cislo, actor: "klient (odkaz na faktúru)" });
           }
           return new Response(fakturaStranka({
             ...fa, dnes: dnesPraha(), pdfUrl: `${url.origin}/v/${token}?pdf=1`,
-            qrUrl: `data:${qr.typ};base64,${btoa(binF)}`, logoUrl: `${url.origin}/znacka-napis-tmava.svg`,
+            qrUrl: qrAdresa(spayd(platbaFa)),
+            qrNaSplatnost: daSaPlatitNeskor(fa.splatnost, dnesPraha()) ? qrAdresa(spayd({ ...platbaFa, splatnost: fa.splatnost })) : undefined,
+            logoUrl: `${url.origin}/znacka-napis-tmava.svg`,
           }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
         }
 
@@ -252,6 +260,7 @@ export const Route = createFileRoute("/v/$token")({
         }
 
         let qrUrl: string | undefined;
+        let qrNaSplatnost: string | undefined;
         if ((!jeBitcoin || vypis.platba?.vs) && suma > 0) {
           /**
            * OTVORENÁ FAKTÚRA NA TÚ ISTÚ SUMU → TO ISTÉ QR AKO NA FAKTÚRE.
@@ -270,14 +279,13 @@ export const Route = createFileRoute("/v/$token")({
           // Otvorenú faktúru vyberá `obsahOdkazu` (jedna faktúra, kde je
           // klient platiteľom) — stránka tu len prepíše jej číslo do QR.
           const p = vypis.platba;
-          const o = qrObrazok(spayd(p?.vs
-            ? { suma, vs: p.vs, sprava: `Faktura ${p.vs} PSB`, splatnost: p.splatnost, prijemca: DODAVATEL.meno }
+          qrUrl = qrAdresa(spayd(p?.vs
+            ? { suma, vs: p.vs, sprava: `Faktura ${p.vs} PSB`, prijemca: DODAVATEL.meno }
             // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
             : { suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
-          const bajty = new Uint8Array(o.data);
-          let bin = "";
-          for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
-          qrUrl = `data:${o.typ};base64,${btoa(bin)}`;
+          if (p?.vs && daSaPlatitNeskor(p.splatnost, dnesPraha())) {
+            qrNaSplatnost = qrAdresa(spayd({ suma, vs: p.vs, sprava: `Faktura ${p.vs} PSB`, splatnost: p.splatnost, prijemca: DODAVATEL.meno }));
+          }
         }
 
         /**
@@ -352,6 +360,7 @@ export const Route = createFileRoute("/v/$token")({
           // Bitcoinový QR je už vo výpise; bankový `qrUrl` je pri takom
           // klientovi prázdny a prepísať ho ním by znamenalo stránku bez QR.
           qrUrl: vypis.qrUrl || qrUrl,
+          qrNaSplatnost: vypis.qrUrl ? undefined : qrNaSplatnost,
           pocitovka: pocity,
           logoUrl: `${origin}/znacka-napis-tmava.svg`,
           historiaPoslana: new URL(request.url).searchParams.get("historia") === "1",

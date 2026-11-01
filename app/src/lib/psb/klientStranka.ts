@@ -148,13 +148,15 @@ const ZDIELAJ_QR = "try{if(navigator.canShare){var d=this.href,b=atob(d.split(',
  * Text je POD kódom, mimo jeho plochy, takže čítateľnosť QR neohrozí.
  */
 const POPIS_QR = (popis: string, logo: string) => `(function(){try{
-var img=document.querySelector('img[data-psb-qr]');var odkaz=document.querySelector('a[data-psb-qr-ulozit]');
-if(!img)return;
+/* QR môžu byť dva (ihneď / v deň splatnosti), každý má svoje tlačidlo. */
+var obr=document.querySelectorAll('img[data-psb-qr]'),odk=document.querySelectorAll('a[data-psb-qr-ulozit]');
+if(!obr.length)return;
 /* PNG, nie SVG: znacka-figura.svg ma len viewBox bez width/height
    a Safari takú kresbu do canvasu nevykreslí — na Macu by logo bolo
    a na iPhone klienta nie. PNG nakreslí každý prehliadač rovnako.
    (Bez spätných apostrofov: celý tento skript je template literal.) */
 var zn=new Image();zn.src=${JSON.stringify(logo)};
+var kresli=function(img,odkaz){
 var hotovo=function(){try{
 var m=3,p=10,v=32,w=img.naturalWidth||256,c=document.createElement('canvas');
 c.width=(w+p*2)*m;c.height=(w+p*2+v)*m;var x=c.getContext('2d');if(!x)return;
@@ -180,6 +182,8 @@ img.src=u;if(odkaz){odkaz.href=u;odkaz.setAttribute('download','ProSapiens-QR.pn
 var pocet=0,skus=function(){if(++pocet>40)return;
  if(img.complete&&img.naturalWidth&&(zn.complete||pocet>12))hotovo();else setTimeout(skus,100);};
 skus();
+};
+for(var q=0;q<obr.length;q++)kresli(obr[q],odk[q]);
 }catch(e){}})();`;
 
 /** Čo sa vkreslí pod kód: pri bitcoine obe meny, pri banke len koruny. */
@@ -287,16 +291,47 @@ ${tlacidloKurzu(s.pozadie)}
 </div>`;
 }
 
-export function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
+/**
+ * ZAPLATIŤ IHNEĎ / V DEŇ SPLATNOSTI (Jerry, 1. 11. 2026) — vyberá klient a podľa
+ * toho sa mení QR: „ihneď" je bez dátumu (banka dá dnešok), druhý nesie dátum
+ * splatnosti. Sú to dva hotové obrázky a prepína ich CSS, bez skriptu — stránka
+ * sa otvára z SMS. Predvolené je „ihneď".
+ */
+function volbaKedyPlatit(splatnost: string): { styl: string; volba: string; len: (kedy: "ihned" | "den", html: string) => string; poznamka: string } {
+  const s = SADZBA;
+  const den = `${Number(splatnost.slice(8, 10))}. ${Number(splatnost.slice(5, 7))}. ${splatnost.slice(0, 4)}`;
+  const tlacidlo = (id: string, hore: string, dole: string) => `<label for="${id}" style="flex:1 1 0;padding:9px 6px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:700;line-height:1.25;border:2px solid ${s.pozadie}">${hore}<span style="display:block;font-size:12px;font-weight:400">${dole}</span></label>`;
+  return {
+    styl: `<style>
+.psb-kedy-radio{position:absolute;opacity:0;pointer-events:none}
+.psb-kedy-den{display:none}
+#psb-kedy-ihned:checked~.psb-kedy-volba label[for=psb-kedy-ihned],#psb-kedy-den:checked~.psb-kedy-volba label[for=psb-kedy-den]{background:${s.pozadie};color:${s.zelena}}
+#psb-kedy-den:checked~.psb-kedy-telo .psb-kedy-ihned{display:none}
+#psb-kedy-den:checked~.psb-kedy-telo .psb-kedy-den{display:block}
+</style>`,
+    volba: `<input type="radio" name="psb-kedy" id="psb-kedy-ihned" class="psb-kedy-radio" checked>
+<input type="radio" name="psb-kedy" id="psb-kedy-den" class="psb-kedy-radio">
+<div class="psb-kedy-volba" style="display:flex;gap:8px;margin-top:14px;color:${s.pozadie}">
+${tlacidlo("psb-kedy-ihned", "Zaplatit ihned", "dnes")}
+${tlacidlo("psb-kedy-den", "V den splatnosti", esc(den))}
+</div>`,
+    len: (kedy, html) => `<div class="psb-kedy-${kedy}">${html}</div>`,
+    poznamka: `<div class="psb-kedy-den" style="margin-top:8px;font-size:12px;line-height:1.5;color:#4d5940">V bance se předvyplní datum ${esc(den)}. Před potvrzením ho prosím zkontroluj.</div>`,
+  };
+}
+
+export function blokPlatby(v: VypisKlienta, qrUrl?: string, qrNaSplatnost?: string): string {
   if (!v.platba || v.platba.suma <= 0) return "";
   // `id="platba"` je cieľ CTA zhora — pri bankovej platbe rovnako ako pri bitcoine.
   const s = SADZBA;
-  const qr = qrUrl
-    ? `<div style="margin-top:14px;text-align:center">
-<img src="${esc(qrUrl)}" data-psb-qr alt="QR platba" width="190" height="190" style="width:190px;height:190px;display:inline-block;border-radius:10px;background:#FFFFFF">
+  const kedy = qrUrl && qrNaSplatnost && v.platba.splatnost ? volbaKedyPlatit(v.platba.splatnost) : null;
+  const obrazokQr = (url: string) => `<div style="margin-top:14px;text-align:center">
+<img src="${esc(url)}" data-psb-qr alt="QR platba" width="190" height="190" style="width:190px;height:190px;display:inline-block;border-radius:10px;background:#FFFFFF">
 <div style="margin-top:6px;font-size:12px;color:#4d5940">Načti QR v bankovní aplikaci</div>
-</div>`
-    : "";
+</div>`;
+  const qr = !qrUrl ? "" : kedy
+    ? `${kedy.len("ihned", obrazokQr(qrUrl))}${kedy.len("den", obrazokQr(qrNaSplatnost!))}${kedy.poznamka}`
+    : obrazokQr(qrUrl);
   /**
    * ULOŽIŤ QR DO FOTIEK.
    *
@@ -316,9 +351,10 @@ export function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
    * ignoruje (staršie Safari), obrázok sa otvorí a dá sa podržať prstom —
    * horší, ale stále priechodný koniec.
    */
+  const tlacidloQr = (url: string) => tlacidloUlozQr(url, "platba-prosapiens.gif", s.pozadie);
   const ulozQr = qrUrl
     ? `<div style="margin-top:14px">
-${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
+${kedy ? `${kedy.len("ihned", tlacidloQr(qrUrl))}${kedy.len("den", tlacidloQr(qrNaSplatnost!))}` : tlacidloQr(qrUrl)}
 <div style="margin-top:4px;font-size:12px;line-height:1.5;color:#4d5940">V bankovní aplikaci pak dej „načíst QR z galerie" — umí to všechny české banky.</div>
 </div>`
     : "";
@@ -328,6 +364,7 @@ ${tlacidloUlozQr(qrUrl, "platba-prosapiens.gif", s.pozadie)}
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}${v.platba.odpocet ? ` · ${esc(hod(v.platba.odpocet))} se hned odečte` : ""}</div>
 ${rozpisPlatby(v)}
+${kedy ? `${kedy.styl}${kedy.volba}<div class="psb-kedy-telo">` : ""}
 ${qr}
 <div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.pozadie}">
 ${v.platba.vs
@@ -345,6 +382,7 @@ ${v.platba.vs
 <input value="${esc(v.platba.ucet)}" readonly inputmode="none" onfocus="this.select()" style="width:100%;box-sizing:border-box;margin-top:5px;padding:11px 12px;border:1px solid #4d5940;border-radius:10px;background:transparent;color:${s.pozadie};font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:700;text-align:center">
 </label>
 ${ulozQr}
+${kedy ? "</div>" : ""}
 </div>`;
 }
 
@@ -610,6 +648,8 @@ Poslali jsme ti celou historii na e-mail. Kdyby nedorazila, mrkni do spamu.</div
 export function klientStranka(v: VypisKlienta & {
   /** QR ako `data:` adresa; bez neho sa nakreslí len suma a účet. */
   qrUrl?: string;
+  /** Druhé QR s dátumom splatnosti — je len vtedy, keď je čo vyberať. */
+  qrNaSplatnost?: string;
   /** HTML bloku „Jak ti je?" — skladá ho `pocitovkaStranka`. */
   pocitovka?: string;
   /** Logo v hlavičke. */
@@ -676,7 +716,7 @@ ${dalsi}
 ${ctaNaPlatbu(v)}
 
 ${blokOsi(v, false)}
-${v.platiZaNeho ? blokPlatiZaNeho(v.platiZaNeho) : v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl)}
+${v.platiZaNeho ? blokPlatiZaNeho(v.platiZaNeho) : v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl, v.qrNaSplatnost)}
 ${pocitovka}
 ${blokHistorie(!!v.historiaPoslana)}
 

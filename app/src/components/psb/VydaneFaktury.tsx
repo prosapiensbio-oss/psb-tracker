@@ -7,7 +7,7 @@ import { vytlacFakturu } from "../../lib/psb/fakturaHtml";
 import { adresyMailu } from "../../lib/psb/mime";
 import { mailFaktury } from "../../lib/psb/mailFaktury";
 import {
-  DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura, type PolozkaFaktury,
+  DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, stavFaktury, suma, type Faktura, type PolozkaFaktury,
 } from "../../lib/psb/vydanaFaktura";
 import { Card, Info } from "./ui";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -113,6 +113,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   onPredvolbaSpracovana?: () => void;
 }) {
   const [riadky, setRiadky] = useState<Riadok[] | null>(null);
+  /** Filter zoznamu podľa toho, či je faktúra zaplatená (Jerry, 1. 11. 2026). */
+  const [ukazat, setUkazat] = useState<"vsetky" | "nezaplatene" | "zaplatene">("vsetky");
   const [udaje, setUdaje] = useState<Udaje[]>([]);
   /**
    * ĎALŠIE FIRMY KLIENTA (Jerry, 20. 10. 2026: „ulož obidva a daj mi možnosť
@@ -310,6 +312,8 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   const zive = mojeRiadky.filter((r) => !r.storno_at);
   const nezaplatene = zive.filter((r) => !r.uhradene_at);
   const meskajuce = nezaplatene.filter((r) => poSplatnosti(naFakturu(r), dnes()));
+  const zaplatene = zive.filter((r) => r.uhradene_at);
+  const videne = ukazat === "nezaplatene" ? nezaplatene : ukazat === "zaplatene" ? zaplatene : mojeRiadky;
   const tentoRok = zive.filter((r) => r.vystavene.startsWith(String(new Date().getFullYear())));
   const celkomRok = tentoRok.reduce((a, r) => a + r.celkom_czk, 0);
 
@@ -826,8 +830,21 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {mojeRiadky.map((r) => {
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+            {([["vsetky", "Všetky", mojeRiadky.length], ["nezaplatene", "Nezaplatené", nezaplatene.length], ["zaplatene", "Zaplatené", zaplatene.length]] as const).map(([id, nazov, pocet]) => (
+              <button key={id} type="button" aria-pressed={ukazat === id} onClick={() => setUkazat(id)}
+                style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${ukazat === id ? C.accent : C.border}`, background: ukazat === id ? mix(C.accent, 12) : "transparent", color: ukazat === id ? C.accentLight : C.textMuted }}>
+                {nazov} ({pocet})
+              </button>
+            ))}
+          </div>
+          {videne.length === 0 && (
+            <div style={{ fontSize: 12.5, color: C.textMuted, padding: "6px 2px" }}>{ukazat === "nezaplatene" ? "Všetky faktúry sú zaplatené." : "Zatiaľ žiadna zaplatená faktúra."}</div>
+          )}
+          {videne.map((r) => {
             const mesk = poSplatnosti(naFakturu(r), dnes());
+            const stav = stavFaktury(naFakturu(r), dnes());
+            const farbaStavu = stav === "zaplatena" ? C.green : stav === "po-splatnosti" ? C.red : stav === "nezaplatena" ? C.orange : C.textDim;
             return (
               <div key={r.id}>
               <div
@@ -835,6 +852,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap",
                   padding: "8px 10px", borderRadius: 9,
                   border: `1px solid ${mesk ? mix(C.red, 50) : C.border}`,
+                  borderLeft: `3px solid ${farbaStavu}`,
                   opacity: r.storno_at ? 0.55 : 1,
                 }}
               >
@@ -846,10 +864,12 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 </span>
                 {/* Pevná šírka a zarovnanie vpravo: sumy pod sebou sa dajú porovnať očami. */}
                 <span style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums", minWidth: 78, textAlign: "right" }}>{suma(r.celkom_czk)} Kč</span>
-                <span style={{ fontSize: 11.5, color: mesk ? C.red : C.textDim, flex: "0 1 290px" }}>
-                  {r.storno_at ? `storno — ${r.storno_dovod}`
-                    : r.uhradene_at ? `uhradená ${den(r.uhradene_at.slice(0, 10))}`
-                      : mesk ? `po splatnosti od ${den(r.splatnost)}` : `splatná ${den(r.splatnost)}`}
+                <span style={{ fontSize: 11.5, color: C.textDim, flex: "0 1 290px" }}>
+                  <b style={{ color: farbaStavu, fontWeight: 700 }}>
+                    {stav === "storno" ? `storno — ${r.storno_dovod}`
+                      : stav === "zaplatena" ? `✓ zaplatená ${den(r.uhradene_at!.slice(0, 10))}`
+                        : stav === "po-splatnosti" ? `nezaplatená · po splatnosti od ${den(r.splatnost)}` : `nezaplatená · splatná ${den(r.splatnost)}`}
+                  </b>
                   {/* Odkedy nechodí skrytá kópia do info@, je toto jediné
                       miesto, kde je vidieť, že doklad odišiel — a komu. */}
                   {r.odoslane_at && !r.storno_at
@@ -874,10 +894,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                   </button>
                 )}
                 {!r.storno_at && !r.uhradene_at && (
-                  <button type="button" onClick={() => void posli({ akcia: "uhradena", id: r.id }, r.id)} style={odkazStyl}>uhradená</button>
+                  <button type="button" onClick={() => void posli({ akcia: "uhradena", id: r.id }, r.id)} style={odkazStyl}>označiť zaplatenú</button>
                 )}
                 {!r.storno_at && r.uhradene_at && (
-                  <button type="button" title="Faktúra sa znova označí ako neuhradená" onClick={() => void posli({ akcia: "neuhradena", id: r.id }, r.id)} style={odkazStyl}>zrušiť úhradu</button>
+                  <button type="button" title="Faktúra sa znova označí ako neuhradená" onClick={() => void posli({ akcia: "neuhradena", id: r.id }, r.id)} style={odkazStyl}>zrušiť zaplatenie</button>
                 )}
                 {/* Storno a mazanie za „⋯", oddelene od bežných akcií: vyzerali
                     rovnako ako „uhradená" a stáli hneď vedľa nej. */}
