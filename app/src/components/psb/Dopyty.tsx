@@ -9,6 +9,7 @@ import type { Lead } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Modal, RolovaciaTabulka, Select, StatCard, TableWrap } from "./ui";
 import { SOURCES, STATUSES, statusColor } from "./Klienti";
 import { dnesPraha } from "../../lib/psb/cas";
+import * as Sk from "../../lib/psb/sklonovanie";
 
 /**
  * Dopyty — kto sa ozval a čo sa s ním stalo.
@@ -192,7 +193,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
   useEffect(() => {
     if (focus?.filter === "nevyriesene") setLenNevyriesene(true);
   }, [focus?.filter, focus?.nonce]);
-  const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
+  const [rychlyZdroj, setRychlyZdroj] = useState("");
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
 
@@ -324,7 +325,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
               detailu, ale prvý zápis musí trvať desať sekúnd — inak sa nestane.
               Meno a zdroj stačia; dátum je dnešok a stav „ozval sa". */}
           <form
-            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: dnesPraha(), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "", odpovedaneAt: uzOzvane ? new Date().toISOString() : "" }); setRychleMeno(""); }}
+            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; if (!rychlyZdroj) { setChybaZapisu(`Dopyt „${rychleMeno.trim()}" sa NEULOŽIL — vyber zdroj.`); return; } setChybaZapisu(""); void save({ date: dnesPraha(), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "", odpovedaneAt: uzOzvane ? new Date().toISOString() : "" }); setRychleMeno(""); }}
             style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
           >
             <input
@@ -332,13 +333,13 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
               value={rychleMeno} onChange={(e) => setRychleMeno(e.target.value)} placeholder="Meno — kto sa ozval"
               style={{ ...S.select, width: 200, minWidth: 0 }}
             />
-            <Select value={rychlyZdroj} onChange={setRychlyZdroj} options={SOURCES} />
+            <Select value={rychlyZdroj} onChange={(v) => { setRychlyZdroj(v); setChybaZapisu(""); }} options={[{ value: "", label: "Zdroj — vyber…" }, ...SOURCES]} />
             {/* Zapisovanie dopytu a odpovedanie naň sú často jedna a tá istá
                 chvíľa — zavoláš a hneď to píšeš. Bez tohto by sa muselo
                 preklikávať do zoznamu a čas by sa nikdy nezaznamenal presne. */}
             <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.textMuted, cursor: "pointer" }}>
               <input type="checkbox" checked={uzOzvane} onChange={(e) => setUzOzvane(e.target.checked)} />
-              už som sa ozval
+              už sme sa ozvali
             </label>
             <button type="submit" disabled={busy || !rychleMeno.trim()}
               style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy || !rychleMeno.trim() ? "default" : "pointer", opacity: busy || !rychleMeno.trim() ? 0.45 : 1 }}>
@@ -361,7 +362,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
           <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
             label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
           <StatCard
-            value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Math.round(counts.median / 24)} dni`}
+            value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Sk.dni(Math.round(counts.median / 24))}`}
             label={<Info text="Medián času od dopytu po našu prvú odpoveď. V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia než cena aj než text reklamy. Meria sa tlačidlom „ozvali sme sa“ pri dopyte; medián preto, aby jeden zabudnutý dopyt neroztiahol celé číslo." label="Ozveme sa za" />}
             color={counts.median === null ? C.textDim : counts.median <= 24 ? C.green : C.orange} />
           <div onClick={() => { setLenCakajuci((x) => !x); zoznamRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
@@ -446,7 +447,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
               <tr>
                 <th style={{ ...S.th, minWidth: 118 }}>Dátum</th>
                 <th style={{ ...S.th, minWidth: 130 }}>Meno</th>
-                <th style={{ ...S.th, minWidth: 128 }}>Odkiaľ prišiel</th>
+                <th style={{ ...S.th, minWidth: 128 }}>Zdroj</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Od koho</th>
                 <th style={{ ...S.th, minWidth: 130 }}>Kampaň</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
@@ -635,7 +636,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                 placeholder="napr. Peter Novák" style={{ ...inputStyle, marginTop: 4 }} />
             </label>
             <label style={{ fontSize: 12, color: C.textMuted }}>
-              Odkiaľ prišiel
+              Zdroj
               <div style={{ marginTop: 4 }}>
                 <Select value={draft.source ?? "instagram"} onChange={(v) => setDraft({ ...draft, source: v as Lead["source"] })}
                   options={SOURCES} style={inputStyle} />
