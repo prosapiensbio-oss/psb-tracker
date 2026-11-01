@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { fmtDMY } from "../../lib/psb/format";
+import { smieKonta, type RolaKonta } from "../../lib/psb/kontaPrava";
 
 import { C, mix } from "../../lib/psb/theme";
 import { Info } from "./ui";
@@ -27,6 +28,8 @@ type Konto = { login: string; name: string; active: boolean; lastLogin?: string 
 export function Konta() {
   const [kontá, setKontá] = useState<Konto[]>([]);
   const [ja, setJa] = useState("");
+  const [jaLogin, setJaLogin] = useState<string | null>(null);
+  const [rola, setRola] = useState<RolaKonta>("cudzi");
   const [nacitane, setNacitane] = useState(false);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -41,9 +44,11 @@ export function Konta() {
   const nacitaj = useCallback(() => {
     void fetch("/api/users", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; ja?: string; users?: Konto[] }) => {
+      .then((j: { ok?: boolean; ja?: string; jaLogin?: string | null; rola?: RolaKonta; users?: Konto[] }) => {
         setKontá(j.users || []);
         setJa(j.ja || "");
+        setJaLogin(j.jaLogin ?? null);
+        setRola(j.rola ?? "cudzi");
         setNacitane(true);
       })
       .catch(() => setNacitane(true));
@@ -66,6 +71,9 @@ export function Konta() {
           short_password: "Heslo musí mať aspoň 8 znakov.",
           need_password: "Nové konto potrebuje heslo.",
           bad_request: "Nepodarilo sa prečítať formulár.",
+          nesmie: "Na toto nemáš oprávnenie — kontá spravuje Jerry.",
+          vlastne_konto: "Vlastné konto sa vypnúť nedá.",
+          no_user: "Také konto neexistuje alebo je vypnuté.",
         }[j.error || ""] || j.error || "Nepodarilo sa uložiť.");
         return false;
       }
@@ -93,6 +101,9 @@ export function Konta() {
   });
 
   const noveKonto = upravovany === null;
+  const spravca = rola === "spravca";
+  const zachrana = rola === "zachrana";
+  const akciaHesla = zachrana ? "zachrana" as const : "heslo" as const;
   const platny = noveKonto
     ? /^[a-z0-9._-]{2,40}$/.test(login.trim()) && heslo.length >= 8
     : heslo.length >= 8;
@@ -102,7 +113,9 @@ export function Konta() {
       <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
         {kontá.length === 0
           ? "Zatiaľ nemá vlastné prihlásenie nikto — appka preto pri každej odpovedi na notifikáciu zapíše len „app“ a nedá sa zistiť, kto ju napísal. Založ konto sebe aj Terezke; na prihlasovacej obrazovke sa potom ukážu ako tlačidlá."
-          : `Prihlásený si ako ${ja}. Heslo sa nikam nevracia — server ho ukladá zahashované so soľou, takže sa nedá prečítať ani z databázy.`}
+          : zachrana
+            ? "Si prihlásený spoločným heslom. Môžeš len nastaviť nové heslo zabudnutému kontu: zapíše sa to do auditu a konto sa odhlási na všetkých zariadeniach."
+            : `Prihlásený si ako ${ja}. Heslo sa nikam nevracia — server ho ukladá zahashované so soľou, takže sa nedá prečítať ani z databázy.${spravca ? "" : " Kontá spravuje Jerry, ty si meníš len svoje heslo."}`}
       </div>
 
       {kontá.length > 0 && (
@@ -115,18 +128,21 @@ export function Konta() {
               <span style={{ fontSize: 13, fontWeight: 600, color: k.active ? C.text : C.textDim, flex: "1 1 130px" }}>
                 {k.name}
                 <span style={{ color: C.textDim, fontWeight: 400 }}> · {k.login}</span>
-                {k.login === ja && <span style={{ color: C.accentLight, fontWeight: 400 }}> · to si ty</span>}
+                {k.login === jaLogin && <span style={{ color: C.accentLight, fontWeight: 400 }}> · to si ty</span>}
               </span>
               <span style={{ fontSize: 11, color: C.textDim, flex: "0 0 auto" }}>
                 {k.active ? (k.lastLogin ? `naposledy ${fmtDMY(k.lastLogin)}` : "ešte sa neprihlásil") : "vypnuté"}
               </span>
-              <button
-                onClick={() => { setUpravovany(k.login); setLogin(k.login); setMeno(k.name); setHeslo(""); setSprava(""); setChyba(""); }}
-                disabled={busy} style={{ ...tlacidlo(false), padding: "4px 9px", fontSize: 11.5 }}>
-                zmeniť heslo
-              </button>
+              {/* Vypnuté konto záchrana nevracia, to je vec správcu. */}
+              {smieKonta(rola, jaLogin, akciaHesla, k.login) && (!zachrana || k.active) && (
+                <button
+                  onClick={() => { setUpravovany(k.login); setLogin(k.login); setMeno(k.name); setHeslo(""); setSprava(""); setChyba(""); }}
+                  disabled={busy} style={{ ...tlacidlo(false), padding: "4px 9px", fontSize: 11.5 }}>
+                  {zachrana ? "nastaviť nové heslo" : "zmeniť heslo"}
+                </button>
+              )}
               {/* Vlastné konto sa vypnúť nedá — kto by sa potom prihlásil. */}
-              {k.login !== ja && (
+              {k.login !== jaLogin && smieKonta(rola, jaLogin, "uprava", k.login) && (
                 <button
                   onClick={() => void posli({ login: k.login, name: k.name, active: !k.active },
                     k.active ? `Konto ${k.name} je vypnuté.` : `Konto ${k.name} je späť.`)}
@@ -139,6 +155,7 @@ export function Konta() {
         </div>
       )}
 
+      {(spravca || !noveKonto) && (
       <div style={{ padding: 12, borderRadius: 8, background: mix(C.accent, 0.05), border: `1px solid ${mix(C.border, 0.9)}` }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 9 }}>
           {noveKonto ? "Nové konto" : `Nové heslo pre ${meno || upravovany}`}
@@ -161,8 +178,14 @@ export function Konta() {
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button
             onClick={() => void posli(
-              { login: (noveKonto ? login : upravovany)!.trim(), name: (meno || login).trim(), password: heslo },
-              noveKonto ? `Konto ${meno || login} je založené — nech sa ním prihlási.` : "Heslo zmenené.",
+              zachrana
+                ? { login: upravovany!.trim(), password: heslo, akcia: "zachrana" }
+                : { login: (noveKonto ? login : upravovany)!.trim(), ...(spravca ? { name: (meno || login).trim() } : {}), password: heslo },
+              noveKonto
+                ? `Konto ${meno || login} je založené — nech sa ním prihlási.`
+                : zachrana
+                  ? "Heslo nastavené, konto je odhlásené na všetkých zariadeniach. Teraz sa odhlás a prihlás sa ním."
+                  : upravovany === jaLogin ? "Heslo zmenené. Ostatné zariadenia sa odhlásili." : "Heslo zmenené. Konto je odhlásené na všetkých zariadeniach.",
             )}
             disabled={busy || !platny}
             style={{ ...tlacidlo(true), opacity: busy || !platny ? 0.5 : 1 }}>
@@ -177,6 +200,7 @@ export function Konta() {
           </span>
         </div>
       </div>
+      )}
 
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}
       {sprava && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{sprava}</div>}

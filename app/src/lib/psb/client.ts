@@ -2,6 +2,7 @@
 import type { ClientOverride, Lead, PSBData } from "./types";
 import { EMPTY_DATA } from "./types";
 import type { IngestResult } from "./db.server";
+import type { RolaKonta } from "./kontaPrava";
 import { zapniZdielanie, zdielanaFunkcia } from "./spolocnyDopyt";
 
 // Rovnaké súbežné čítania idú na server raz (viď `spolocnyDopyt.ts`).
@@ -39,17 +40,17 @@ export async function login(password: string, meno = ""): Promise<{ ok: boolean;
 
 export type Konto = { login: string; name: string; active: boolean; lastLogin?: string };
 
-export async function fetchKonta(): Promise<{ ja: string | null; users: Konto[] }> {
+export async function fetchKonta(): Promise<{ ja: string | null; jaLogin: string | null; rola: RolaKonta; users: Konto[] }> {
   try {
     const r = await fetch("/api/users", { credentials: "same-origin" });
-    const j = (await r.json()) as { ja?: string; users?: Konto[] };
-    return { ja: j.ja ?? null, users: j.users ?? [] };
+    const j = (await r.json()) as { ja?: string; jaLogin?: string | null; rola?: RolaKonta; users?: Konto[] };
+    return { ja: j.ja ?? null, jaLogin: j.jaLogin ?? null, rola: j.rola ?? "cudzi", users: j.users ?? [] };
   } catch {
-    return { ja: null, users: [] };
+    return { ja: null, jaLogin: null, rola: "cudzi", users: [] };
   }
 }
 
-export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean }): Promise<{ ok: boolean; error?: string }> {
+export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean; akcia?: "zachrana" }): Promise<{ ok: boolean; error?: string }> {
   const r = await post("/api/users", k);
   const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
   return { ok: !!j.ok, error: j.error };

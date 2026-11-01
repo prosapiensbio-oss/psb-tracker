@@ -1,15 +1,15 @@
 import { Database } from "bun:sqlite";
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import { hmacHex, overPodpisCookie, sessionPlati, tokenSession, identitaZdielaneho } from "./sessionToken";
+import { env, podstrcEnv } from "./testEnv";
 
 /**
  * Prihlásenie celou cestou: skutočný kód auth.server.ts nad skutočným SQLite,
  * v tvare, aký dáva D1. Väzby Cloudflaru sa podstrčia.
  */
 const SECRET = "testovacie-tajomstvo";
-const env: Record<string, unknown> = {};
-mock.module("cloudflare:workers", () => ({ env }));
+podstrcEnv();
 const { currentUser, isAuthed, overPouzivatela, sessionCookie, stavKonta, zabudniKonta, hashPassword, novaSol } = await import("./auth.server");
 
 type Dopyty = { n: number };

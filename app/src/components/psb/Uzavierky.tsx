@@ -7,6 +7,7 @@ import type { KrokUzavierky, NavFocus } from "./App";
 import { SpravaMesiaca } from "./SpravaMesiaca";
 import { ReportyMesiaca, type ReportVstup } from "./ReportyMesiaca";
 import { fetchKonta, fetchPeriods, odhlasVsade, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
+import { smieKonta, type RolaKonta } from "../../lib/psb/kontaPrava";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -43,6 +44,7 @@ const POPIS: Record<string, string> = {
   "nove-konto": "Nové konto",
   "uprava-konta": "Úprava konta",
   "odhlasenie-vsade": "Odhlásenie všade",
+  "zachrana-hesla": "Záchrana hesla",
 };
 
 const CHYBY: Record<string, string> = {
@@ -50,7 +52,9 @@ const CHYBY: Record<string, string> = {
   short_password: "Heslo musí mať aspoň 8 znakov.",
   need_password: "Nové konto sa nedá založiť bez hesla.",
   no_user: "Také konto neexistuje.",
-  no_migration: "Odhlásenie zatiaľ nejde — v databáze chýba migrácia 0129.",
+  no_migration: "Zatiaľ to nejde — v databáze chýba migrácia 0129.",
+  nesmie: "Na toto nemáš oprávnenie — kontá spravuje Jerry.",
+  vlastne_konto: "Vlastné konto sa vypnúť nedá.",
   no_db: "Databáza neodpovedala.",
 };
 
@@ -61,7 +65,8 @@ const CHYBY: Record<string, string> = {
 // zdieľanom hesle a v audite je pri všetkom „app".
 function Konta() {
   const [users, setUsers] = useState<Konto[]>([]);
-  const [ja, setJa] = useState<string | null>(null);
+  const [jaLogin, setJaLogin] = useState<string | null>(null);
+  const [rola, setRola] = useState<RolaKonta>("cudzi");
   const [login, setLogin] = useState("");
   const [meno, setMeno] = useState("");
   const [heslo, setHeslo] = useState("");
@@ -71,16 +76,26 @@ function Konta() {
 
   // Len aktívne kontá. Deaktivované konto je pre appku preč — kým sa nezaloží
   // znova s heslom, nemá sa čím pripomínať.
-  const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users.filter((u) => u.active)); setJa(r.ja); }); };
+  const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users.filter((u) => u.active)); setJaLogin(r.jaLogin); setRola(r.rola); }); };
   useEffect(nacitaj, []);
+
+  // Tréner a záchrana menia len heslo: bez polí na meno, cieľ je riadok v zozname.
+  const spravca = rola === "spravca";
+  const akciaHesla = rola === "zachrana" ? "zachrana" as const : "heslo" as const;
 
   const uloz = async (e: React.FormEvent) => {
     e.preventDefault();
     setChyba(""); setHotovo(""); setBusy(true);
-    const r = await ulozKonto({ login, name: meno || login, password: heslo });
+    const r = await ulozKonto(spravca
+      ? { login, name: meno || undefined, password: heslo }
+      : { login, password: heslo, akcia: rola === "zachrana" ? "zachrana" : undefined });
     setBusy(false);
     if (!r.ok) { setChyba(CHYBY[r.error || ""] || "Nepodarilo sa uložiť."); return; }
-    setHotovo(`Konto ${meno || login} uložené.`);
+    setHotovo(spravca
+      ? `Konto ${meno || login} uložené. Pri zmene hesla sa ostatné zariadenia odhlásia.`
+      : rola === "zachrana"
+        ? "Heslo nastavené, konto je odhlásené na všetkých zariadeniach. Teraz sa odhlás a prihlás sa ním."
+        : "Heslo zmenené. Ostatné zariadenia sa odhlásili.");
     setLogin(""); setMeno(""); setHeslo("");
     nacitaj();
   };
@@ -90,13 +105,13 @@ function Konta() {
     setChyba(""); setHotovo("");
     const r = await odhlasVsade(u.login);
     if (!r.ok) { setChyba(CHYBY[r.error || ""] || "Nepodarilo sa odhlásiť."); return; }
-    if (u.name === ja) { window.location.reload(); return; }
+    if (u.login === jaLogin) { window.location.reload(); return; }
     setHotovo(`${u.name}: odhlásené na všetkých zariadeniach.`);
   };
 
   return (
     <Card>
-      <H3><Info text="Kým konto nemá nikto, appka beží na zdieľanom hesle a v audite je pri každej zmene „app“. Keď má každý vlastné konto, v audite je vidieť meno. Prístup majú obaja rovnaký — konto je identita, nie oprávnenie. Zdieľané heslo zostáva funkčné ako núdzová brzda." label="Kontá" /></H3>
+      <H3><Info text="Kým konto nemá nikto, appka beží na zdieľanom hesle a v audite je pri každej zmene „app“. Keď má každý vlastné konto, v audite je vidieť meno. K dátam majú obaja prístup rovnaký; kontá spravuje Jerry, tréner si mení len svoje heslo. Zdieľané heslo zostáva ako núdzová brzda: vie nastaviť nové heslo zabudnutému kontu a zapíše sa to do auditu." label="Kontá" /></H3>
       {users.length === 0 ? (
         <div style={{ fontSize: 12, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.55 }}>
           Zatiaľ žiadne kontá — appka beží na zdieľanom hesle a v audite je pri všetkom „app“.
@@ -107,20 +122,35 @@ function Konta() {
             <div key={u.login} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 55)}`, fontSize: 12.5 }}>
               <span style={{ color: C.text, fontWeight: 600, minWidth: 110 }}>{u.name}</span>
               <span style={{ color: C.textDim, fontSize: 11 }}>{u.login}</span>
-              {ja === u.login && <span style={{ color: C.green, fontSize: 11 }}>· prihlásený</span>}
+              {jaLogin === u.login && <span style={{ color: C.green, fontSize: 11 }}>· prihlásený</span>}
               <span style={{ marginLeft: "auto", color: C.textDim, fontSize: 11 }}>
                 {u.lastLogin ? `naposledy ${fmtDMY(u.lastLogin)}` : "ešte sa neprihlásil"}
               </span>
-              <button type="button" onClick={() => void odhlas(u)}
-                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: C.textMuted, textDecoration: "underline" }}>
-                odhlásiť všade
-              </button>
+              {smieKonta(rola, jaLogin, "odhlas-vsade", u.login) && (
+                <button type="button" onClick={() => void odhlas(u)}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: C.textMuted, textDecoration: "underline" }}>
+                  odhlásiť všade
+                </button>
+              )}
+              {!spravca && smieKonta(rola, jaLogin, akciaHesla, u.login) && (
+                <button type="button" onClick={() => { setLogin(u.login); setHeslo(""); setChyba(""); setHotovo(""); }}
+                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: C.textMuted, textDecoration: "underline" }}>
+                  {rola === "zachrana" ? "nastaviť nové heslo" : "zmeniť heslo"}
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
+      {rola === "zachrana" && (
+        <div style={{ fontSize: 12, color: C.textMuted, margin: "0 0 10px", lineHeight: 1.55 }}>
+          Si prihlásený spoločným heslom. Môžeš len nastaviť nové heslo zabudnutému kontu: zapíše sa to do auditu a konto sa odhlási na všetkých zariadeniach.
+        </div>
+      )}
+      {(spravca || login) && (<>
       <form onSubmit={uloz} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        {spravca ? (<>
         <label style={{ flex: "1 1 130px", fontSize: 11, color: C.textMuted }}>
           Meno
           <input value={meno} onChange={(e) => setMeno(e.target.value)} placeholder="Terezka"
@@ -131,6 +161,9 @@ function Konta() {
           <input value={login} onChange={(e) => setLogin(e.target.value)} placeholder="terezka" autoComplete="off"
             style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
         </label>
+        </>) : (
+          <div style={{ flex: "1 1 130px", fontSize: 12.5, color: C.text, paddingBottom: 8 }}>Nové heslo pre {users.find((u) => u.login === login)?.name || login}</div>
+        )}
         <label style={{ flex: "1 1 150px", fontSize: 11, color: C.textMuted }}>
           Heslo (min. 8 znakov)
           <input value={heslo} onChange={(e) => setHeslo(e.target.value)} type="password" autoComplete="new-password"
@@ -142,12 +175,15 @@ function Konta() {
             border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 8), color: C.accentLight,
             opacity: busy || !login || heslo.length < 8 ? 0.45 : 1,
           }}>
-          {busy ? "Ukladám…" : "Uložiť konto"}
+          {busy ? "Ukladám…" : spravca ? "Uložiť konto" : "Uložiť heslo"}
         </button>
       </form>
-      <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-        Rovnaké prihlasovacie meno prepíše existujúcemu kontu heslo — tak sa heslo aj mení.
-      </div>
+      {spravca && (
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+          Rovnaké prihlasovacie meno prepíše existujúcemu kontu heslo — tak sa heslo aj mení. Jeho ostatné zariadenia sa odhlásia.
+        </div>
+      )}
+      </>)}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
       {hotovo && <div style={{ fontSize: 12, color: C.green, marginTop: 8 }}>{hotovo}</div>}
     </Card>
