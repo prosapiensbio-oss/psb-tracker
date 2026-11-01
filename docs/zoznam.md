@@ -83,6 +83,7 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 
 10i. [x] (31. 10.) Pri kontrole kritiky dorobené: audit editora (Inšpektor na plnú výšku, strizna 732caec), editor pod pruhmi, scenár karty podľa účtu + háčiky účtu, hashtagy podľa účtu, Jarvis bez fáz štúdia pre osobné účty.
 10j. [ ] Naživo po prihlásení Clauda (`~/.local/bin/claude` → /login): Napísať, ✦ text titulky, scenár osobnej karty, prvý strih, feed iného účtu.
+- **10k** [ ] Montáž cvikov z videí z ruky (1. 11. 2026, commit 7a7f4d7 v strizna): všetky klipy dávky v strihu, bez švihov kamery, zoom ≤ 130 %, bez falošných nápisov. Skúšobný strih: deň 2026-11-01, r2 „Montáž – všetkých 8“. Ostáva: Jerry posúdi r2; zábery sú stále vyberané podľa pohybu, nie podľa toho, čo ukazujú – z 135 s dlhého IMG_0386 sú 2,7 s.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
