@@ -78,3 +78,17 @@ export function krstne(meno: string): string {
 
 /** Celé meno klienta → krstné meno v 5. páde („Ing. Michal Knapčok" → „Michale"). */
 export const oslovenieKlienta = (meno: string): string => vokativ(krstne(meno || ""));
+
+/**
+ * KOMU — TRÉNER V 3. PÁDE („Napsat Filipovi", „Přijde to rovnou Terezce").
+ *
+ * Stránky skladali vety s holým menom: „Odeslat Filip", „Přijde to rovnou
+ * Terezka". Pre klienta je to Filip, kľúč v appke je Jerry — oba tvary dajú to
+ * isté. Neznáme meno nedostane vymyslený tvar, ale „trenérovi".
+ */
+export function trenerovi(kto: string | null | undefined): string {
+  const k = bez(String(kto || "").trim());
+  if (k === "jerry" || k === "filip") return "Filipovi";
+  if (k === "terezka") return "Terezce";
+  return "trenérovi";
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { blokFakturyHtml, notifikacieFaktur, platneIco, udajeHotove, udajeZAres, vstupZFormulara } from "./fakturaKlienta";
+import { blokFakturyHtml, notifikacieFaktur, platneIco, udajeHotove, udajeZAres, vstupZFormulara, zapisFakturyOtvoreny } from "./fakturaKlienta";
 import { uvodnaStrankaHtml } from "./uvodnaStranka";
 
 describe("IČO s kontrolnou číslicou", () => {
@@ -90,7 +90,7 @@ describe("blok na stránke po úvodnom", () => {
   it("je tretie tlačidlo pod „Potvrdit termín“ a „Zavolat“, len po úvodnom", () => {
     const zaklad = { trener: "Jerry", kedy: null, logoUrl: "/l.svg" } as const;
     const po = uvodnaStrankaHtml({ ...zaklad, druh: "po", faktura: { klient: "Jan", udaje: null } });
-    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Jerrymu"));
+    expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Zavolat Filipovi"));
     expect(po.indexOf("Chcete platit fakturou?")).toBeGreaterThan(po.indexOf("Souhrn z dnešní lekce"));
     expect(uvodnaStrankaHtml({ ...zaklad, druh: "po" })).not.toContain("Chcete platit fakturou?");
   });
@@ -113,5 +113,30 @@ describe("notifikácia: klient vyplnil fakturačné údaje", () => {
   });
   it("staršie ako 30 dní už nečaká", () => {
     expect(notifikacieFaktur([{ ...riadok, at: "2026-09-20T10:00:00.000Z" }], "2026-10-28")).toEqual([]);
+  });
+});
+
+describe("okno na zmenu údajov cez odkaz", () => {
+  const TERAZ = new Date("2026-11-01T12:00:00Z");
+  it("60 dní od vzniku sa dá písať, potom nie", () => {
+    expect(zapisFakturyOtvoreny("2026-09-02T12:00:00Z", TERAZ)).toBe(true);
+    expect(zapisFakturyOtvoreny("2026-09-02T11:59:00Z", TERAZ)).toBe(false);
+  });
+  it("neznámy dátum odkaz nezlomí", () => {
+    expect(zapisFakturyOtvoreny(null, TERAZ)).toBe(true);
+    expect(zapisFakturyOtvoreny("", TERAZ)).toBe(true);
+    expect(zapisFakturyOtvoreny("nezmysel", TERAZ)).toBe(true);
+  });
+  it("zamknutý blok údaje ukáže, ale formulár nie", () => {
+    const h = blokFakturyHtml({ klient: "Jan", zamknute: true, udaje: { firma: "Firma s.r.o.", ico: "27074358", dic: "", ulica: "Hlavní 1", psc: "60200", mesto: "Brno", email: "a@b.cz" } });
+    expect(h).toContain("Firma s.r.o.");
+    expect(h).toContain("Změnu údajů nám prosím napište.");
+    expect(h).not.toContain("<form");
+    expect(h).not.toContain('name="akcia"');
+  });
+  it("zamknutý blok bez údajov formulár tiež nekreslí", () => {
+    const h = blokFakturyHtml({ klient: "Jan", zamknute: true, udaje: null });
+    expect(h).not.toContain("<form");
+    expect(h).toContain("Chcete platit fakturou?");
   });
 });

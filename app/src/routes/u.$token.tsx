@@ -9,7 +9,7 @@ import { audit } from "../lib/psb/audit.server";
 import { odsifrujBajty } from "../lib/psb/sifra.server";
 import { normName } from "../lib/psb/format";
 import { odlozOdberatela } from "../lib/psb/odberatelOdlozenie.server";
-import {
+import { zapisFakturyOtvoreny,
   rucnaAdresaFirmy, udajeZAres, vstupZFormulara,
   type BlokFaktury, type UdajeFirmy, type UlozeneUdaje,
 } from "../lib/psb/fakturaKlienta";
@@ -54,7 +54,7 @@ async function firmaZAres(ico: string): Promise<UdajeFirmy | null | "nedostupne"
   }
 }
 
-type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string | null; cena_czk: number | null; fotky_json?: string | null };
+type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string | null; cena_czk: number | null; vytvorene?: string | null; fotky_json?: string | null };
 
 /**
  * Riadok odkazu. Stĺpec `fotky_json` pribudol migráciou 0127 — keď ešte nie
@@ -64,10 +64,10 @@ type RiadokOdkazu = { klient: string; druh: string; trener: string; kedy: string
  */
 async function riadokOdkazu(DB: D1Database, token: string): Promise<RiadokOdkazu | null> {
   try {
-    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, fotky_json FROM uvodne_odkazy WHERE token = ?1")
+    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, vytvorene, fotky_json FROM uvodne_odkazy WHERE token = ?1")
       .bind(token).first<RiadokOdkazu>();
   } catch {
-    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk FROM uvodne_odkazy WHERE token = ?1")
+    return await DB.prepare("SELECT klient, druh, trener, kedy, cena_czk, vytvorene FROM uvodne_odkazy WHERE token = ?1")
       .bind(token).first<RiadokOdkazu>();
   }
 }
@@ -123,7 +123,7 @@ async function stranka(DB: D1Database, request: Request, r: RiadokOdkazu, extra:
     fotky: fotkyOdkazu(r).map((id) => `${o}${new URL(request.url).pathname}?foto=${encodeURIComponent(id)}`),
     odpovedPoslana: extra.odpovedPoslana,
     faktura: druh === "po"
-      ? (extra.faktura ?? { klient: r.klient, udaje: await ulozeneUdaje(DB, r.klient) })
+      ? (extra.faktura ?? { klient: r.klient, udaje: await ulozeneUdaje(DB, r.klient), zamknute: !zapisFakturyOtvoreny(r.vytvorene) })
       : null,
   });
 }
@@ -152,6 +152,10 @@ async function ulozFakturu(DB: D1Database | null, request: Request, token: strin
     ? { klient: "Jan Ukázka", druh: "po", trener: "Jerry", kedy: "2026-10-16T09:00", cena_czk: null }
     : DB ? await riadokOdkazu(DB, token).catch(() => null) : null;
   if (!r) return new Response(null, { status: 303, headers: { location: `/u/${encodeURIComponent(token)}`, "cache-control": "no-store" } });
+  // Starý odkaz už údaje nemení — stránka ich len ukáže (`zapisFakturyOtvoreny`).
+  if (!ukazka && !zapisFakturyOtvoreny(r.vytvorene)) {
+    return new Response(null, { status: 303, headers: { location: `/u/${encodeURIComponent(token)}#faktura`, "cache-control": "no-store" } });
+  }
 
   const sChybou = async (chyba: string, udaje: UlozeneUdaje | null = null) => {
     const faktura: BlokFaktury = { klient: r.klient, udaje: udaje ?? (DB && !ukazka ? await ulozeneUdaje(DB, r.klient) : null), chyba, vstup: polia };
@@ -277,7 +281,7 @@ export const Route = createFileRoute("/u/$token")({
             headers: { "content-type": f.typ || "image/jpeg", "cache-control": "private, no-cache", "x-robots-tag": "noindex" },
           });
         }
-        const fakturaUlozena = q.get("faktura") === "ok";
+        const fakturaUlozena = q.get("faktura") === "ok" && zapisFakturyOtvoreny(r.vytvorene);
         const html = await stranka(DB, request, r, {
           odpovedPoslana: q.get("odpoved") === "1",
           faktura: fakturaUlozena && r.druh === "po"

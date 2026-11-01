@@ -395,7 +395,7 @@ describe("platba bitcoinom", () => {
   it("bez faktúry zostane adresa a suma sa zadáva ručne", () => {
     const h = klientStranka({ ...z, lightning: { ...z.lightning, bolt11: undefined } } as never);
     expect(h).toContain("Pošli na adresu");
-    expect(h).toContain("zadej v peněžence sám");
+    expect(h).toContain("zadej v peněžence ručně");
     expect(h).not.toContain("omezenou platnost");
   });
 });

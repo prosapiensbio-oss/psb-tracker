@@ -70,7 +70,7 @@ export function mailFaktury(f: Faktura, volby: VolbyMailu = {}): MailFaktury {
       podpis,
     ].join("\n")
     : [
-      `Ahoj ${krstne(f.klient)},`,
+      `Ahoj ${oslovenieKlienta(f.klient)},`,
       "",
       `posílám fakturu č. ${f.cislo} na ${ciastka} se splatností ${den(f.splatnost)}.`,
       "",

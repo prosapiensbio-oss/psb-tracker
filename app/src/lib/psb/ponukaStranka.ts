@@ -1,4 +1,5 @@
 import { TRENERI } from "./mailFaktury";
+import { trenerovi } from "./oslovenie";
 import { casHHMM, denCz, type CasPonuky } from "./ponukaTerminov";
 
 /**
@@ -87,7 +88,7 @@ const cislo = (t: string) => t.replace(/[^\d+]/g, "");
 export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener: string; logoUrl: string; stav: StavStranky; typ: string }): string {
   const t = TRENERI[v.trener] ? v.trener : "Jerry";
   const tr = TRENERI[t];
-  const komu = t === "Terezka" ? "Terezce" : "Filipovi";
+  const komu = trenerovi(t);
   const smsNehodi = `sms:${cislo(tr.telefon)}?&body=${encodeURIComponent("Dobrý den, z poslaných termínů se mi nehodí žádný. Šlo by to jindy?")}`;
   const nadpisUvod = v.typ === "uvodny" ? "Váš úvodní trénink" : "Volné termíny pro vás";
   let telo = "";

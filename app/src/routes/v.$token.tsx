@@ -3,7 +3,6 @@ import { terazPraha, dnesPraha } from "../lib/psb/cas";
 import { obsahOdkazu } from "../lib/psb/obsahOdkazu.server";
 
 import { bindings } from "../lib/bindings.server";
-import { isAuthed } from "../lib/psb/auth.server";
 import { deriveClients } from "../lib/psb/compute";
 import { klientStranka } from "../lib/psb/klientStranka";
 import { UKAZKA_KLIENT, jeUkazka } from "../lib/psb/ukazka";
@@ -23,6 +22,7 @@ import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu
 import { czkZaPolozky } from "../lib/psb/platiZa";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
+import { jeNahladTrenera } from "../lib/psb/verejnyOdkaz";
 
 /**
  * VEREJNÁ STRÁNKA KLIENTA — to, na čo klikne z SMS.
@@ -150,11 +150,11 @@ export const Route = createFileRoute("/v/$token")({
 
         const r = await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
           .bind(token).first<{ klient: string; balickov: number | null }>();
-        if (!r) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
+        if (!r) return prec("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.", 404);
 
         const data = await loadData(DB);
         const c = deriveClients(data)[r.klient];
-        if (!c) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
+        if (!c) return prec("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.", 404);
 
         /**
          * KALENDÁR PATRÍ NA OS, INAK ČÍSLO NESEDÍ SO ZOZNAMOM.
@@ -356,11 +356,12 @@ export const Route = createFileRoute("/v/$token")({
          * a keby ho dvíhal aj náhľad z Kokpitu, to číslo by prestalo o čomkoľvek
          * vypovedať.
          *
-         * Preto `?nahlad=1` a LEN pre prihláseného. Bez prihlásenia sa
-         * správa ako bežné otvorenie, takže kto adresu odkukne z SMS,
-         * počítadlo neobíde.
+         * Preto `?nahlad=1` nepočíta NIKDY, prihlásený či nie. Klient sa k tejto
+         * adrese nedostane: v SMS je krátky odkaz cez prosapiens.cz a WordPress
+         * query string zahadzuje. Podmienka na prihlásenie len znamenala, že
+         * náhľad z bety (iná doména, iná cookie) dvíhal počítadlo.
          */
-        const jeNahlad = new URL(request.url).searchParams.get("nahlad") === "1" && await isAuthed(request);
+        const jeNahlad = jeNahladTrenera(new URL(request.url));
         // Klepnutie na „Aktualizovat kurz" je to isté otvorenie, nie ďalšie.
         const jeObnovaKurzu = new URL(request.url).searchParams.get("kurz") === "1";
         if (!jeNahlad && !jeObnovaKurzu) {

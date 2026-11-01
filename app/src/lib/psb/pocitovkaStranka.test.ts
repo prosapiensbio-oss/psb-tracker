@@ -70,7 +70,7 @@ describe("blok na verejnej stránke", () => {
 
   it("minulý odkaz sa ukáže ako citát, nie ako predvyplnený text", () => {
     const h = blokPocitovky({ poslednyOdkaz: { datum: "2026-08-15", text: "lepšie sa mi spí" } });
-    expect(h).toContain("minule jsi napsal: „lepšie sa mi spí“");
+    expect(h).toContain("minule: „lepšie sa mi spí“");
     expect(h).toContain("<textarea name=\"poznamka\" rows=\"3\"");
     expect(h).not.toContain(">lepšie sa mi spí</textarea>");
   });
