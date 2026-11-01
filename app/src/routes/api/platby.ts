@@ -10,6 +10,8 @@ import {
   sposobZRiadku, textPlatby, TOLERANCIA_FAKTURY, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
+import { prijmyNaOtazku } from "../../lib/psb/zositZdvojenia";
+import { zdvojeniaZoServera } from "../../lib/psb/zositZdvojenia.server";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
 import { dnesPraha } from "../../lib/psb/cas";
 import { btcEsteNezapisane, btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
@@ -515,8 +517,12 @@ async function stavPlatieb(DB: D1Database) {
     menaKlientov,
   );
 
+  // Príjem zo zošita, ktorý čaká na otázku „je to tá istá platba?“ — jeden klik
+  // tu by založil druhú platbu k tej ručnej (Jerry, 1. 11. 2026). Keď sa to
+  // nedá overiť, zoznam ostane ako doteraz.
+  const naOtazku = prijmyNaOtazku(await zdvojeniaZoServera(DB).catch(() => []));
   const vsetkyNepriradene = nepriradene(
-    (fio.results || []) as unknown as FioRiadok[],
+    ((fio.results || []) as unknown as FioRiadok[]).filter((r) => !naOtazku.has(r.id)),
     platby.map(naPlatbu),
     mapovanie,
     new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { ZDVOJENIA_KLUC } from "../../lib/psb/zositZdvojenia";
+import { vybaveneZdvojenia, zdvojeniaZoServera } from "../../lib/psb/zositZdvojenia.server";
 import { oznacZosit, type HotovostVDb, type VkladVBanke } from "../../lib/psb/zositNahlad";
 import { bindings } from "../../lib/bindings.server";
 
@@ -63,13 +65,66 @@ function imageBlock(url: string) {
 export const Route = createFileRoute("/api/zosit")({
   server: {
     handlers: {
+      /** Možné zdvojenia, na ktoré sa ešte nikto neodpovedal (`zositZdvojenia.ts`). */
+      GET: async ({ request }) => {
+        if (!(await isAuthed(request))) return unauthorized();
+        const { DB } = bindings();
+        if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 503 });
+        try {
+          return Response.json({ ok: true, podozrenia: await zdvojeniaZoServera(DB) });
+        } catch (e) {
+          return Response.json({ ok: false, error: `Zdvojenia sa nedali overiť: ${String(e instanceof Error ? e.message : e)}` }, { status: 500 });
+        }
+      },
       POST: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
+
+        let b: { obrazky?: string[]; rok?: string; akcia?: string; kluc?: string; odpoved?: string; zahodit?: string };
+        try { b = (await request.json()) as typeof b; } catch { return Response.json({ ok: false, error: "bad_json" }, { status: 400 }); }
+
+        /**
+         * ODPOVEĎ NA MOŽNÉ ZDVOJENIE. Zoznam sa počíta znova na serveri: platí
+         * len dvojica, ktorá ešte naozaj je podozrivá, nie to, čo pošle obrazovka.
+         *
+         *  • „dve“ — nič sa nemení, len sa to už nepýta.
+         *  • príjem — riadok sa spojí s ručnou platbou (`fio_id`), z nepriradených
+         *    zmizne a druhá platba nevznikne. Suma platby sa nemení.
+         *  • ostatné — riadok ide mimo P&L s poznámkou prečo. Nemaže sa: z obálky
+         *    tie peniaze odišli raz a keď príde tá istá strana znova, náhľad ho
+         *    musí spoznať, inak by sa zapísal tretíkrát.
+         */
+        if (b.akcia === "zdvojenie") {
+          const { DB } = bindings();
+          if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 503 });
+          const p = (await zdvojeniaZoServera(DB)).find((x) => x.kluc === b.kluc);
+          if (!p) return Response.json({ ok: false, error: "Táto otázka už neplatí — obnov stránku." }, { status: 409 });
+          const kto = (await currentUser(request)) || "";
+          const prikazy = [];
+          if (b.odpoved === "ista") {
+            if (p.druh === "prijem") {
+              const zmena = await DB.prepare("UPDATE platby SET fio_id = ?1 WHERE id = ?2 AND fio_id IS NULL AND zrusene_at IS NULL")
+                .bind(p.riadok.id, p.druhy.id).run();
+              if (!zmena.meta.changes) return Response.json({ ok: false, error: "Platba sa medzitým zmenila — obnov stránku." }, { status: 409 });
+            } else {
+              const zahodit = p.druh === "dvaRiadky" && b.zahodit === p.druhy.id ? p.druhy : p.riadok;
+              const ostava = zahodit === p.riadok ? p.druhy : p.riadok;
+              const poznamka = `zdvojené s ${ostava.popis} ${ostava.suma} Kč z ${ostava.datum} · zo zošita`.slice(0, 400);
+              prikazy.push(DB.prepare("UPDATE fio_transactions SET category = 'mimo', note = ?2, potvrdene_at = ?3, potvrdil = ?4 WHERE id = ?1")
+                .bind(zahodit.id, poznamka, new Date().toISOString(), kto || null));
+            }
+          } else if (b.odpoved !== "dve") {
+            return Response.json({ ok: false, error: "Neznáma odpoveď." }, { status: 400 });
+          }
+          const vybavene = [...new Set([...(await vybaveneZdvojenia(DB)), p.kluc])];
+          prikazy.push(DB.prepare("INSERT INTO vzas_settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+            .bind(ZDVOJENIA_KLUC, JSON.stringify(vybavene)));
+          await DB.batch(prikazy);
+          await audit(DB, { action: "zosit-zdvojenie", predmet: p.kluc, neu: `${b.odpoved}: ${p.riadok.popis} ${p.riadok.suma} ↔ ${p.druhy.popis} ${p.druhy.suma}`, actor: kto });
+          return Response.json({ ok: true });
+        }
+
         const key = bindings().ANTHROPIC_API_KEY;
         if (!key) return Response.json({ ok: false, error: "Chýba API kľúč." }, { status: 500 });
-
-        let b: { obrazky?: string[]; rok?: string };
-        try { b = (await request.json()) as typeof b; } catch { return Response.json({ ok: false, error: "bad_json" }, { status: 400 }); }
         const bloky = (b.obrazky || []).map(imageBlock).filter(Boolean).slice(0, 4);
         if (!bloky.length) return Response.json({ ok: false, error: "Žiadny použiteľný obrázok (max 5 MB, JPG/PNG)." }, { status: 400 });
 

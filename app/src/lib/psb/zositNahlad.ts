@@ -47,7 +47,7 @@ export type OznacenyRiadok = RiadokZositu & {
  */
 export type VkladVBanke = { date: string; amount_czk: number; counterparty: string };
 
-const prveSlovo = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim().split(/[\s,.(]+/)[0] || "";
+export const prveSlovo = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim().split(/[\s,.(]+/)[0] || "";
 const den = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 
 export function oznacZosit(

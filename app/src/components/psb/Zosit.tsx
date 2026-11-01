@@ -8,6 +8,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 import { VyberKategorie } from "./VyberKategorie";
 import * as Sk from "../../lib/psb/sklonovanie";
+import type { Podozrenie } from "../../lib/psb/zositZdvojenia";
 
 // Zošit hotovostných platieb.
 //
@@ -81,7 +82,84 @@ const dataUrl = (f: File) => new Promise<string>((res, rej) => {
   r.readAsDataURL(f);
 });
 
+const denMes = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}.`;
+const sumaZ = (n: number) => `${n > 0 ? "+" : ""}${fmtCZK(n)}`;
+
+const OTAZKA_ZDVOJENIA: Record<Podozrenie["druh"], { druhy: string; ista: string; dve: string; pomoc: string }> = {
+  prijem: { druhy: "Ručne zapísaná platba", ista: "Je to tá istá platba", dve: "Sú to dve platby", pomoc: "Tá istá: riadok sa spojí s platbou a tržba ostane raz. Dve: riadok pôjde medzi nepriradené." },
+  vratenie: { druhy: "Vrátenie klientovi v platbách", ista: "Je to tá istá vec", dve: "Sú to dve veci", pomoc: "Tá istá: vrátenie už znižuje tržby, riadok zo zošita vypadne z nákladov." },
+  banka: { druhy: "Riadok z banky", ista: "Je to tá istá platba", dve: "Sú to dve platby", pomoc: "Tá istá: ostane riadok z banky, tento zo zošita vypadne z P&L." },
+  dvaRiadky: { druhy: "Skôr zapísaný riadok", ista: "", dve: "Sú to dva riadky", pomoc: "Rovnaká vec s inou sumou: rukopis sa asi prečítal inak. Vyber sumu podľa zošita." },
+};
+
+/**
+ * OTÁZKY NA ZDVOJENIE (Jerry, 1. 11. 2026). Načítajú sa pri otvorení aj po
+ * zápise, takže otázka neodíde, kým na ňu niekto neodpovie. Chyba odpovede
+ * ostáva pri riadku a otázka nezmizne.
+ */
+function ZdvojeneOtazky({ obnov, onHotovo }: { obnov: number; onHotovo?: () => void }) {
+  const [zoznam, setZoznam] = useState<Podozrenie[]>([]);
+  const [chyba, setChyba] = useState("");
+  const [pracujem, setPracujem] = useState("");
+  const nacitaj = async () => {
+    type Odpoved = { ok?: boolean; podozrenia?: Podozrenie[]; error?: string };
+    const j = await fetch("/api/zosit", { credentials: "same-origin" }).then((r) => r.json() as Promise<Odpoved>)
+      .catch((): Odpoved => ({ ok: false, error: "Zdvojenia sa nedali overiť — spojenie zlyhalo." }));
+    if (!j.ok) { setChyba(j.error || "Zdvojenia sa nedali overiť."); return; }
+    setChyba("");
+    setZoznam(j.podozrenia || []);
+  };
+  useEffect(() => { void nacitaj(); }, [obnov]);
+  const odpovedz = async (p: Podozrenie, odpoved: "ista" | "dve", zahodit?: string) => {
+    setPracujem(p.kluc); setChyba("");
+    type Odpoved = { ok?: boolean; error?: string };
+    const j = await fetch("/api/zosit", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "zdvojenie", kluc: p.kluc, odpoved, zahodit }),
+    }).then((r) => r.json() as Promise<Odpoved>).catch((): Odpoved => ({ ok: false, error: "Spojenie zlyhalo — odpoveď sa nezapísala." }));
+    setPracujem("");
+    if (!j.ok) { setChyba(j.error || "Odpoveď sa nezapísala."); return; }
+    await nacitaj();
+    if (odpoved === "ista") { onHotovo?.(); oznam("peniaze"); }
+  };
+  if (!zoznam.length && !chyba) return null;
+  const tlacidlo = { padding: "6px 11px", borderRadius: 7, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.text } as const;
+  return (
+    <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 9, border: `1px solid ${mix(C.orange, 45)}`, background: mix(C.orange, 7) }}>
+      {zoznam.length > 0 && <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Toto môžu byť zdvojené platby ({zoznam.length})</div>}
+      {zoznam.map((p) => {
+        const t = OTAZKA_ZDVOJENIA[p.druh];
+        const busy = pracujem === p.kluc;
+        return (
+          <div key={p.kluc} style={{ padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+              Zo zošita: <b>{p.riadok.popis}</b> {sumaZ(p.riadok.suma)} · {denMes(p.riadok.datum)}
+            </div>
+            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.6 }}>
+              {t.druhy}: <b>{p.druhy.popis}</b> {sumaZ(p.druhy.suma)} · {denMes(p.druhy.datum)}
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.5, margin: "2px 0 6px" }}>{t.pomoc}</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {p.druh === "dvaRiadky" ? (
+                <>
+                  <button disabled={busy} style={tlacidlo} onClick={() => void odpovedz(p, "ista", p.druhy.id)}>Platí {fmtCZK(p.riadok.suma)}</button>
+                  <button disabled={busy} style={tlacidlo} onClick={() => void odpovedz(p, "ista", p.riadok.id)}>Platí {fmtCZK(p.druhy.suma)}</button>
+                </>
+              ) : (
+                <button disabled={busy} style={tlacidlo} onClick={() => void odpovedz(p, "ista")}>{t.ista}</button>
+              )}
+              <button disabled={busy} style={tlacidlo} onClick={() => void odpovedz(p, "dve")}>{t.dve}</button>
+            </div>
+          </div>
+        );
+      })}
+      {chyba && <div style={{ fontSize: 12, color: C.red, lineHeight: 1.5, marginTop: 6 }}>{chyba}</div>}
+    </div>
+  );
+}
+
 export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
+  const [obnovZdvojenia, setObnovZdvojenia] = useState(0);
   const [ulozeny] = useState(nacitajNahlad);
   const [riadky, setRiadky] = useState<Riadok[] | null>(ulozeny?.riadky ?? null);
   const [busy, setBusy] = useState(false);
@@ -180,6 +258,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
       setStav("");
       onZapisane?.();
       oznam("peniaze");
+      setObnovZdvojenia((n) => n + 1);
     } catch (e) {
       setStav(`Zápis zlyhal: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -203,6 +282,8 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
           text="Odfoť stranu zošita a appka z nej spraví riadky, ktoré sa dajú opraviť a potom zapísať. Zapisujú sa do tej istej tabuľky ako pohyby z banky, takže sa objavia v P&L aj v Zapísaných pohyboch. Riadky, ktorými si model nie je istý, sú zvýraznené — rukopis sa mýli na číslach a nikdy sa nemýli nahlas, tak sa to radšej povie."
         />
       </H3>
+
+      <ZdvojeneOtazky obnov={obnovZdvojenia} onHotovo={onZapisane} />
 
       {/* Pretiahnutie je pri fotke prirodzenejšie než dialóg na výber súboru —
           fotka býva už otvorená vedľa. Klik zostáva pre mobil, kde sa ťahať
