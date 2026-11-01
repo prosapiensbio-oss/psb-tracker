@@ -77,6 +77,38 @@ export function dochadzkaPorovnatelna(c: Pick<ClientAgg, "firstSession">, teraz:
 }
 
 /**
+ * Ø DOCHÁDZKA — jedno číslo pre profil, stôl klienta aj Firma → Klienti.
+ *
+ * `attendance` = podiel týždňov s aspoň jedným tréningom z posledných 18. Stôl
+ * klienta delil VŠETKÝMI, čo kedy trénovali, aj tými, čo odišli pred rokom, a pod
+ * nápisom „priemer aktívnych" ukazoval 33 %, kým Klienti 71 %. Počíta sa z tých,
+ * ktorých dá vedľa seba postaviť: nie sú neaktívni a chodia aspoň šesť týždňov.
+ * `klienti` môže byť výber (filter v Klientoch), `n` ide do popisu ako menovateľ.
+ */
+export function priemerDochadzky(
+  klienti: (Pick<ClientAgg, "firstSession" | "attendance" | "status">)[],
+  teraz: Date = new Date(),
+): { podiel: number; n: number } {
+  const v = klienti.filter((c) => c.status !== "Neaktívny" && dochadzkaPorovnatelna(c, teraz));
+  return { podiel: v.length ? v.reduce((a, c) => a + (c.attendance || 0), 0) / v.length : 0, n: v.length };
+}
+
+/**
+ * ZOZNAM NA STOLE KLIENTA — tri skupiny, každé meno práve v jednej.
+ *
+ * Do 1. 11. 2026 boli „Aktívni" všetci, ktorí neboli výslovne neaktívni, teda
+ * aj ~91 ľudí bez jediného tréningu (dopyty, čo majú len zápis v overrides):
+ * 157 mien proti 66 skutočným. Kto ešte netrénoval, ide do „Dopyty / čakajú" —
+ * nezmizne, hľadanie ho nájde a v zozname má dátum, ak má termín. `jeKlient`
+ * (lievik) ani `clients` (prehľady, SMS) sa tým nemenia.
+ */
+export type SkupinaZoznamu = "aktivni" | "neaktivni" | "cakaju";
+export function skupinaKlienta(c: Pick<ClientAgg, "status" | "sessionCount"> | undefined): SkupinaZoznamu {
+  if (!c || !c.sessionCount) return "cakaju";
+  return c.status === "Neaktívny" ? "neaktivni" : "aktivni";
+}
+
+/**
  * Priemer z hodnôt ostatných.
  *
  * Nuly sa vyhadzujú zámerne: klient na pauze má tempo 0 a porovnávať sa

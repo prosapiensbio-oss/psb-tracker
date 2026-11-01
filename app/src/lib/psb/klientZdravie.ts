@@ -155,7 +155,7 @@ export function zdravieKlienta(
         priemerHodnota: `${Math.round(p * 100)} %`,
         lepsieJeViac: true,
         mierka: "priemer aktívnych klientov",
-        detail: "koľko z objednaných termínov naozaj odchodil",
+        detail: "týždne s aspoň jedným tréningom z posledných 18",
         tón: moja >= p ? "dobre" as const : moja >= p * 0.8 ? "vsimnut" as const : "zle" as const,
         doZaveru: true,
       };

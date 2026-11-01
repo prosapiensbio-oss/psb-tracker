@@ -34,6 +34,8 @@ export type KlientPreKartu = {
   primaryTrainer: string;
   membership: string;
   packageRemaining: number;
+  /** Skončil s vrátením peňazí — balíček sa mu už nepredáva. */
+  ukonceny?: boolean;
   packageTotal: number;
   packageValidTo: string;
   lastSession: string;
@@ -169,7 +171,7 @@ export function bezAktivnehoBalicka(
 ): BezBalicka[] {
   const out: BezBalicka[] = [];
   for (const c of clients) {
-    if (c.status !== "Aktívny") continue;
+    if (c.status !== "Aktívny" || c.ukonceny) continue;
 
     const vKokpite = zostatokVKokpite(vlastne, udalosti, c.name, dnes);
     // Paušál v Kokpite = predplatené mesiace, nie hodiny. Nepatrí sem.

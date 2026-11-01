@@ -373,6 +373,8 @@ export function otazkyPlatieb(dlhy: DlhPolozka[] | undefined, acks?: Record<stri
 export type KlientPreSms = {
   name: string; status: string; primaryTrainer: string; membership: string;
   packageRemaining: number; packageTotal: number; lastSession: string;
+  /** Skončil s vrátením peňazí. */
+  ukonceny?: boolean;
 };
 
 export type RiadokSms = {
@@ -518,6 +520,7 @@ export function upozorneniaHodin(
   const out: UpozornenieHodin[] = [];
   for (const c of clients) {
     if (c.status === "Neaktívny" || c.status === "Pauza") continue;
+    if (c.ukonceny) continue;
     if (!(c.packageTotal > 0)) continue;
     const zostatok = Math.round(c.packageRemaining * 100) / 100;
     if (zostatok > 1) continue;

@@ -213,6 +213,19 @@ export const DOVODY_ZRUSENIA = [
 ] as const;
 
 /**
+ * Zrušil tréning KLIENT? Rozhoduje dôvod, ktorý zapísal človek.
+ *
+ * „Zrušené tréningy" v zdraví klienta rátali každý riadok `zrusene`: Albert Matl
+ * mal 1. 11. 2026 „4 za 90 dní" pri dochádzke 100 %, hoci tri z nich mali
+ * odpoveď „chyba v zápise". Bez odpovede sa riadok počíta — appka nevie, a karta
+ * Zmeny sa na to pýta.
+ */
+const NIE_JE_ZRUSENIE_KLIENTOM = /^\s*(chyba v zápise|presunuli sme|zrušil tréner)/i;
+export function jeZrusenieKlientom(z: { druh: string; poznamka?: string | null }): boolean {
+  return z.druh === "zrusene" && !NIE_JE_ZRUSENIE_KLIENTOM.test(z.poznamka || "");
+}
+
+/**
  * Pri týchto dôvodoch sa okno spýta, či hodinu započítať do dochádzky
  * (Jerry, 30. 10. 2026: „zrušil na poslednú chvíľu — a keď to dám, nech sa
  * ma spýta, či započítať hodinu"). Neprišiel bez ozvania je ten istý prípad:

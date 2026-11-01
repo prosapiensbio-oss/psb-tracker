@@ -2,7 +2,7 @@
 // no browser globals. Reused across every module.
 import { jeTestPostury, nechceHovor } from "./dopytTestPostury";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
-import { klucNezaplateneho, treningyBezBalicka, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
+import { klucNezaplateneho, treningyBezBalicka, ukoncenyBalicekKlienta, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { CENNIK } from "./cennik";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
@@ -198,6 +198,8 @@ export type ClientAgg = {
   objednanyUvodny: string;
   /** Kto ten úvodný vedie. Jediný podklad pre primárneho trénera, kým nie sú sedenia. */
   objednanyUvodnyTrener: string;
+  /** Posledný balíček ukončený s vrátením peňazí a odvtedy nič nové — klient skončil. */
+  ukonceny?: boolean;
   lenDoplnky: boolean;
 };
 
@@ -334,6 +336,7 @@ function prazdnyKlient(meno: string, den: string): ClientAgg {
   lenDoplnky: false,
   objednanyUvodny: "",
   objednanyUvodnyTrener: "",
+  ukonceny: false,
   };
 }
 
@@ -730,6 +733,7 @@ export function deriveClients(
      * tváriť sa, že má nulu, by bola nepravda o tom, čo si kúpil.
      */
     if (dnesPack >= KOKPIT_OD && data.balickyKokpit) {
+      c.ukonceny = !!ukoncenyBalicekKlienta(data.balickyKokpit, c.name, dnesPack);
       const k = zostatokKokpitu(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), dnesPack, zdarmaDni, nezaplateneBalicky);
       c.packageRemainingPtminder = c.packageRemaining;
       if (k) {
@@ -1190,14 +1194,35 @@ const predchadzajuciMesiac = (mk: string) => {
  */
 export const PRAH_ZASTARANIA = 10;
 
-export function kotvaDat(data: { sessions: { date: string }[]; payments?: { date: string }[] }): Kotva {
+export function kotvaDat(
+  data: { sessions: { date: string }[]; payments?: { date: string }[] },
+  /** Dnešok v Prahe; parameter je len pre testy. */
+  dnes: string = dnesPraha(),
+): Kotva {
   let den = "";
   for (const s of data.sessions) if (s.date > den) den = s.date;
   for (const p of data.payments || []) if (p.date > den) den = p.date;
   den = den.slice(0, 10);
   if (!den) return { den: "", mesiac: "", plny: "", ciastocny: false };
   const mesiac = den.slice(0, 7);
-  const ciastocny = den < poslednyDenMesiaca(mesiac);
+  /**
+   * MESIAC, KTORÝ SA SKONČIL, JE PLNÝ, AJ KEĎ JEHO POSLEDNÝ DEŇ BOL BEZ TRÉNINGU.
+   *
+   * 1. 11. 2026 (nedeľa): posledný tréning 30. 10., sobota 31. 10. bez jediného
+   * záznamu a november ešte bez platby. Stará podmienka `den < posledný deň`
+   * z toho urobila „rozrobený október" — Dopyty, Ø cena, Marketing aj graf
+   * tržieb padli na september, hoci P&L hlásilo október ako uzavretý. Trvá to,
+   * kým v novom mesiaci nepribudne prvý záznam, takže sa to opakovalo každý
+   * prvý deň (a každý prvý víkend) mesiaca.
+   *
+   * Dátum z kalendára sám nestačí: kto by mal posledné dáta 5. 8. a dnes je
+   * september, ten august plný nemá — zdroj jednoducho stojí. Preto ešte
+   * podmienka, že dáta siahajú k jeho koncu (rovnaká tolerancia ako čerstvosť).
+   */
+  const koniec = poslednyDenMesiaca(mesiac);
+  const skoncil = dnes > koniec;
+  const dosiahol = (Date.parse(koniec) - Date.parse(den)) / 86400000 <= PRAH_ZASTARANIA;
+  const ciastocny = den < koniec && !(skoncil && dosiahol);
   return { den, mesiac, plny: ciastocny ? predchadzajuciMesiac(mesiac) : mesiac, ciastocny };
 }
 
@@ -1428,14 +1453,40 @@ export function cenaZaSedenie(
   /** Normalizované mená — obmedzí výpočet na skupinu klientov. */
   klienti?: Set<string>,
 ): { czk: number; sedeni: number; cash: number } {
+  return cenaZaSedenieVDnoch(data, (datum) => vObdobi(monthKey(datum)), klienti);
+}
+
+/**
+ * To isté pre okno v dňoch (Klienti: 30 dní, vlastný rozsah). Delia sa tým dve
+ * miesta jednou funkciou — Klienti mali do 1. 11. 2026 vlastnú slučku a ich
+ * číslo sa na obrazovke nedalo odlíšiť od toho na Dnes.
+ */
+export function cenaZaSedenieVDnoch(
+  data: PSBData,
+  /** Dostane surový dátum riadku, nie orezaný deň — mesiac sa z neho berie rovnako ako v `monthlyFinance`. */
+  vOkne: (datum: string) => boolean,
+  klienti?: Set<string>,
+): { czk: number; sedeni: number; cash: number } {
   const patri = (meno: string) => !klienti || klienti.has(normName(meno));
   let sedeni = 0;
-  for (const s of data.sessions) if (vObdobi(monthKey(s.date)) && patri(s.client)) sedeni++;
+  for (const s of data.sessions) if (vOkne(s.date) && patri(s.client)) sedeni++;
   let cash = 0;
   // Riadky bez klienta sú súhrnné riadky reportu, nie platby — do tržieb
   // nepatria (rovnaké pravidlo ako monthlyFinance).
-  for (const p of data.payments) if (p.client && vObdobi(monthKey(p.date)) && patri(p.client)) cash += p.amount;
+  for (const p of data.payments) if (p.client && vOkne(p.date) && patri(p.client)) cash += p.amount;
   return { czk: sedeni ? cash / sedeni : 0, sedeni, cash };
+}
+
+/**
+ * Ø hodín na obdobie (týždeň, mesiac) z radu po obdobiach — Dnes aj Tréningy.
+ *
+ * Pravidlo kotvy: rozrobené posledné obdobie sa do priemeru nepočíta, prázdne
+ * obdobia tiež nie (nula je chýbajúci riadok, nie práca). Dnes ho vyhadzoval,
+ * Tréningy nie, a tá istá otázka mala 23,9 a 23,8 h.
+ */
+export function priemerZUplnychObdobi(hodiny: number[], poslednyRozrobeny: boolean): { avg: number; n: number } {
+  const v = (poslednyRozrobeny ? hodiny.slice(0, -1) : hodiny).filter((h) => h > 0);
+  return { avg: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, n: v.length };
 }
 
 export function monthlyFinance(data: PSBData): FinanceMonth[] {
@@ -3641,17 +3692,26 @@ export type Prediction = {
 // Uzávierka je až prvý víkend nasledujúceho mesiaca, takže začiatkom mesiaca
 // ešte nie sú nahraté žiadne tréningy — a bez tohto by aktuálny mesiac vypadol
 // úplne: nebol by ani skutočnosť, ani odhad (2. 8. viedol graf júl → september).
-const nextMonthKeys = (n: number, poslednyZDat?: string): string[] => {
+/**
+ * Mesiace predikcie: VŽDY od mesiaca po bežiacom.
+ *
+ * Začiatok sa kedysi odvíjal od posledného mesiaca s dátami, lebo PTminder
+ * chodil s týždňovým oneskorením. Od 1. 10. 2026 sú dáta živé a pravidlo
+ * spôsobovalo jediné: prvý deň mesiaca (bez platby) mala dlaždica „Odhad tržieb
+ * — budúci mesiac" nápis BEŽIACEHO mesiaca a stála vedľa „Tržby tento mesiac"
+ * s tým istým „nov 26" (1. 11. 2026: 223 931 a 226 444). Po prvej platbe číslo
+ * samo skočilo o mesiac ďalej. Bežiaci mesiac má vlastnú dlaždicu (prišlo
+ * + čaká sa z `perClient`), predikcia je za ten nasledujúci.
+ *
+ * Bez `Date.setMonth`: 31. 10. + mesiac je 1. 12. a november by z radu vypadol.
+ */
+export const nextMonthKeys = (n: number, dnes: string = dnesPraha()): string[] => {
   const out: string[] = [];
-  const teraz = new Date();
-  const zaciatok = poslednyZDat && poslednyZDat < `${teraz.getFullYear()}-${String(teraz.getMonth() + 1).padStart(2, "0")}`
-    ? new Date(Number(poslednyZDat.slice(0, 4)), Number(poslednyZDat.slice(5, 7)) - 1, 1)
-    : teraz;
-  const d = zaciatok;
-  d.setMonth(d.getMonth() + 1);
-  for (let i = 0; i < n; i++) {
-    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    d.setMonth(d.getMonth() + 1);
+  const r = Number(dnes.slice(0, 4));
+  const m = Number(dnes.slice(5, 7));
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(Date.UTC(r, m - 1 + i, 1));
+    out.push(d.toISOString().slice(0, 7));
   }
   return out;
 };
@@ -3714,8 +3774,7 @@ export function predictCash(
   clients: Record<string, ClientAgg>,
   horizon = 3,
 ): { months: CashPred[]; perClient: { name: string; kedy: string; suma: number; confidence: number; tyzdnov: number }[] } {
-  const poslednyMesiacDat = data.payments.reduce((max, p) => (p.date.slice(0, 7) > max ? p.date.slice(0, 7) : max), "");
-  const keys = nextMonthKeys(horizon, poslednyMesiacDat);
+  const keys = nextMonthKeys(horizon);
   const months: CashPred[] = keys.map((m) => ({ month: m, expected: 0, lo: 0, hi: 0 }));
   const perClient: { name: string; kedy: string; suma: number; confidence: number; tyzdnov: number }[] = [];
   const sixM = deriveSixM(data, clients);
@@ -3731,6 +3790,8 @@ export function predictCash(
     const objednane = OBJEDNANE[c.name] || 0;
     if (c.status === "Neaktívny" && !objednane) continue;
     if (duchOdpoved(c) === "ano" && !objednane) continue;   // potvrdený duch už nezaplatí
+    // Skončil a dostal peniaze späť — žiadna obnova neprichádza.
+    if (c.ukonceny && !objednane) continue;
     // Dohodnutá pauza je to najsilnejšie, čo o budúcnosti vieme — je to jediná
     // informácia, ktorú appka nedopočítala, ale dostala od človeka. Kým beží,
     // klient nemíňa hodiny, a teda ani nekupuje ďalšie.
@@ -3885,8 +3946,7 @@ export function predictEarnings(
   opts: { excludeSpecial: boolean; horizon?: number } = { excludeSpecial: false },
 ): Prediction {
   const horizon = opts.horizon ?? 3;
-  const poslednyMesiacDat = data.sessions.reduce((max, x) => (x.date.slice(0, 7) > max ? x.date.slice(0, 7) : max), "");
-  const monthsArr = nextMonthKeys(horizon, poslednyMesiacDat).map((m) => ({ month: m, guaranteed: 0, expected: 0 }));
+  const monthsArr = nextMonthKeys(horizon).map((m) => ({ month: m, guaranteed: 0, expected: 0 }));
   const sixM = deriveSixM(data, clients);
   const sixMPhase: Record<string, SixMRow> = {};
   for (const r of sixM) sixMPhase[r.client] = r;

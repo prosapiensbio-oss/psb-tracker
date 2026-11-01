@@ -15,6 +15,8 @@
 export const ZASKOK = "Matyáš";
 /** Od kedy platí model záskoku. Staršie sedenia sú z čias, keď mal vlastných klientov. */
 export const ZASKOK_OD = "2026-09-01";
+/** Matyáš skončil (Jerry, 20. 9. 2026). Kód ostáva pre prípad návratu. */
+export const ZASKOK_DO = "2026-09-20";
 /** Kč za odtrénovanú hodinu (Excel „Matyáš vyplata", 2025 – 3/2026). */
 export const SADZBA_ZASKOK_KC = 370;
 
