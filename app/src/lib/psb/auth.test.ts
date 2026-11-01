@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { beforeEach, describe, expect, it } from "bun:test";
 
-import { hmacHex, overPodpisCookie, sessionPlati, tokenSession, identitaZdielaneho } from "./sessionToken";
+import { hmacHex, overPodpisCookie, sessionPlati, tokenSession } from "./sessionToken";
 import { env, podstrcEnv } from "./testEnv";
 
 /**
@@ -10,7 +10,7 @@ import { env, podstrcEnv } from "./testEnv";
  */
 const SECRET = "testovacie-tajomstvo";
 podstrcEnv();
-const { currentUser, isAuthed, overPouzivatela, sessionCookie, stavKonta, zabudniKonta, hashPassword, novaSol } = await import("./auth.server");
+const { currentUser, isAuthed, overPouzivatela, sessionCookie, zabudniKonta, hashPassword, novaSol } = await import("./auth.server");
 
 type Dopyty = { n: number };
 function d1(db: Database, dopyty: Dopyty = { n: 0 }) {
@@ -55,13 +55,10 @@ describe("nasadenie nikoho neodhlási", () => {
     env.DB = d1(zaklad());
     expect(await currentUser(req(await staraCookie("Jerry")))).toBe("Jerry");
   });
-  it("najstarší tvar bez mena platí a hlási sa ako app", async () => {
-    env.DB = d1(zaklad());
-    expect(await currentUser(req(await staraCookie()))).toBe("app");
-  });
-  it("meno bez konta platí vo verzii 0 (prechod z bitcoinovej knihy, zdieľané heslo)", async () => {
+  it("prechod z bitcoinovej knihy (btc, bez konta) platí vo verzii 0", async () => {
     env.DB = d1(zaklad());
     expect(await currentUser(req(await staraCookie("btc")))).toBe("btc");
+    expect(await currentUser(req(await noveCookie("btc", 1)))).toBeNull();
   });
   it("kým migrácia nebeží (stĺpec chýba), staré cookies platia a neaktívny neprejde", async () => {
     env.DB = d1(zaklad(false));
@@ -71,6 +68,49 @@ describe("nasadenie nikoho neodhlási", () => {
   it("nová cookie vo verzii 0 je presne pôvodný tvar", async () => {
     const c = await sessionCookie("Jerry");
     expect(c).toContain(encodeURIComponent(await staraCookie("Jerry")));
+  });
+});
+
+describe("spoločné heslo je zrušené: jeho cookies neplatia, hoci majú platný podpis", () => {
+  it("najstarší tvar bez mena", async () => {
+    env.DB = d1(zaklad());
+    expect(await currentUser(req(await staraCookie()))).toBeNull();
+    expect(await isAuthed(req(await staraCookie()))).toBe(false);
+  });
+  it("identita app, ani vo vyššej verzii", async () => {
+    env.DB = d1(zaklad());
+    expect(await currentUser(req(await staraCookie("app")))).toBeNull();
+    expect(await currentUser(req(await noveCookie("app", 1)))).toBeNull();
+  });
+  it("ani pri výpadku databázy, tam by inak stačil podpis", async () => {
+    env.DB = zlaDb;
+    expect(await currentUser(req(await staraCookie()))).toBeNull();
+    expect(await currentUser(req(await staraCookie("app")))).toBeNull();
+  });
+  it("vymyslené meno bez konta: spoločné heslo do 1. 11. podpísalo, čo človek napísal", async () => {
+    env.DB = d1(zaklad());
+    for (const meno of ["Falosny", "App", "Btc"]) {
+      expect(await currentUser(req(await staraCookie(meno)))).toBeNull();
+    }
+  });
+  it("ani konto menom app cookie neotvorí", async () => {
+    const db = zaklad();
+    db.run("INSERT INTO users (login, name, pass_hash, pass_salt, active, created_at) VALUES ('app', 'app', 'h', 's', 1, '')");
+    env.DB = d1(db);
+    expect(await currentUser(req(await staraCookie("app")))).toBeNull();
+  });
+  it("session bez mena sa nedá vydať tak, aby prešla", async () => {
+    env.DB = d1(zaklad());
+    const c = await sessionCookie("");
+    expect(await currentUser(req(decodeURIComponent(c.split(";")[0].split("=")[1])))).toBeNull();
+  });
+  it("PSB_PASSWORD v prostredí neotvorí nič: ani ako cookie, ani ako tajomstvo podpisu", async () => {
+    env.DB = d1(zaklad());
+    env.PSB_PASSWORD = "spolocne-heslo-1";
+    expect(await currentUser(req("spolocne-heslo-1"))).toBeNull();
+    expect(await currentUser(req("Jerry|spolocne-heslo-1"))).toBeNull();
+    const t = await hmacHex("spolocne-heslo-1", "psb-authed-v1|Jerry");
+    expect(await currentUser(req(`Jerry|${t}`))).toBeNull();
   });
 });
 
@@ -174,7 +214,7 @@ describe("bez PSB_SESSION_SECRET", () => {
   });
 });
 
-describe("heslo a zdieľané heslo", () => {
+describe("heslo", () => {
   it("vlastné konto: vráti verziu; bez stĺpca verzia 0", async () => {
     const sol = novaSol();
     const hash = await hashPassword("heslo-123456", sol);
@@ -187,32 +227,30 @@ describe("heslo a zdieľané heslo", () => {
       expect(await overPouzivatela(d1(db) as never, "jerry", "zle-heslo")).toBeNull();
     }
   });
-  it("zdieľané heslo neotvorí meno s kontom, ani neaktívnym", async () => {
-    const db = d1(zaklad()) as never;
-    expect(identitaZdielaneho(await stavKonta(db, "jerry"))).toBeNull();
-    expect(identitaZdielaneho(await stavKonta(db, "stary"))).toBeNull();
-  });
-  it("záchranná brzda: bez mena, s neznámym menom aj pri výpadku databázy = app", async () => {
-    const db = d1(zaklad()) as never;
-    expect(identitaZdielaneho(await stavKonta(db, ""))).toBe("app");
-    expect(identitaZdielaneho(await stavKonta(db, "falosny-jerry"))).toBe("app");
-    expect(identitaZdielaneho(await stavKonta(zlaDb as never, "jerry"))).toBe("app");
+  it("výpadok databázy nie je zlé heslo: chyba letí von", async () => {
+    await expect(overPouzivatela(zlaDb as never, "jerry", "heslo-123456")).rejects.toThrow();
   });
 });
 
 describe("čisté funkcie tokenu", () => {
   it("meno so zvislou čiarou nevyrobí cudziu vyššiu verziu", async () => {
-    // Kto cez zdieľané heslo získa podpis mena „Jerry|v1", nesmie ním prejsť ako Jerry v1.
+    // Kto má podpis mena „Jerry|v1" (spoločné heslo ho vedelo vydať), nesmie ním prejsť ako Jerry v1.
     const t = await tokenSession(SECRET, "Jerry|v1", 0);
     expect(await overPodpisCookie(SECRET, `Jerry|v1.${t}`)).toBeNull();
   });
+  it("cookie bez mena je neplatná už pri overení podpisu", async () => {
+    expect(await overPodpisCookie(SECRET, await hmacHex(SECRET, "psb-authed-v1"))).toBeNull();
+    expect(await overPodpisCookie(SECRET, `|${await tokenSession(SECRET, "")}`)).toBeNull();
+  });
   it("sessionPlati", () => {
-    expect(sessionPlati(0, undefined)).toBe(true);
-    expect(sessionPlati(5, undefined)).toBe(true);
-    expect(sessionPlati(0, null)).toBe(true);
-    expect(sessionPlati(1, null)).toBe(false);
-    expect(sessionPlati(0, { active: 1 })).toBe(true);
-    expect(sessionPlati(0, { active: 0 })).toBe(false);
-    expect(sessionPlati(0, { active: 1, session_ver: 1 })).toBe(false);
+    expect(sessionPlati("Jerry", 0, undefined)).toBe(true);
+    expect(sessionPlati("Jerry", 5, undefined)).toBe(true);
+    expect(sessionPlati("btc", 0, null)).toBe(true);
+    expect(sessionPlati("btc", 1, null)).toBe(false);
+    expect(sessionPlati("Niekto", 0, null)).toBe(false);
+    expect(sessionPlati("Jerry", 0, { active: 1 })).toBe(true);
+    expect(sessionPlati("Jerry", 0, { active: 0 })).toBe(false);
+    expect(sessionPlati("Jerry", 0, { active: 1, session_ver: 1 })).toBe(false);
+    for (const konto of [undefined, null, { active: 1 }]) expect(sessionPlati("app", 0, konto)).toBe(false);
   });
 });

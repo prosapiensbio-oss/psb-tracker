@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, sessionCookie } from "../../lib/psb/auth.server";
+import { IDENTITA_BTC } from "../../lib/psb/sessionToken";
 import { bindings } from "../../lib/bindings.server";
 
 // Prechod medzi Kokpitom a bitcoinovou knihou bez druhého prihlasovania.
@@ -84,7 +85,7 @@ export const Route = createFileRoute("/api/sso")({
         // prechodom z knihy a nie vlastným prihlásením.
         return new Response(null, {
           status: 302,
-          headers: { Location: new URL("/", request.url).toString(), "Set-Cookie": await sessionCookie("btc") },
+          headers: { Location: new URL("/", request.url).toString(), "Set-Cookie": await sessionCookie(IDENTITA_BTC) },
         });
       },
     },
