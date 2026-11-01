@@ -177,7 +177,7 @@ je kde pozrieť).
          Lucia. Overené 22. 10. simuláciou 27. 10. nad ostrými dátami: návrh
          „1h Balíček 1 450" na 27. 10., po založení offline tréning kryje 1h
          a online balíček sa nemíňa.
-4. [ ] *(1. 11. 2026: posledné reporty v `~/Downloads/PTminder archív 2026-11-01/`, platby od 3. 10. sedia s Kokpitom po vysvetlených rozdieloch; do D1 sa nenalievajú, od 1. 10. platí Kokpit. Chýba Client List, potom zrušiť.)* **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
+4. [ ] *(1. 11. 2026: posledné reporty v `~/Downloads/PTminder archív 2026-11-01/`, platby od 3. 10. sedia s Kokpitom po vysvetlených rozdieloch; do D1 sa nenalievajú, od 1. 10. platí Kokpit. Client List a opravené sedenia doplnené večer, spolu 11 súborov; zostáva zrušiť predplatné.)* **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
        **Jerry 27. 10. 2026: „PTminder zrušíme budúci týždeň.“** Čiže v týždni
        2.–8. 11., po uzávierke októbra. Posledná platba 2 287 Kč odišla 2. 10.;
        ďalšia by prišla 2. 11., takže zrušiť ideálne PRED druhým. Archív rokov
