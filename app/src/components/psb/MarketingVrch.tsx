@@ -9,7 +9,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Info } from "./ui";
 
-import { krokyZa, oknoLievika, oknoMesiacov } from "./MarketingLievik";
+import { krokyZa, oknoLievika } from "./MarketingLievik";
 import * as Sk from "../../lib/psb/sklonovanie";
 
 /**

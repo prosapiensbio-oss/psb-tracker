@@ -318,7 +318,9 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
     "Prečítaj texty bežiacich reklám a navrhni jednu novú verziu na otestovanie.",
   ];
   return (
-    <Card style={{ display: "flex", flexDirection: "column", height: 640, padding: 0, overflow: "hidden" }}>
+    // Výška tak, aby sa debata vošla do karty Workspace — pevných 640 px v karte
+    // s výškou ~550 px dávalo rolovanie v rolovaní (rozbor, 1. 11. 2026).
+    <Card style={{ display: "flex", flexDirection: "column", height: "min(640px, max(420px, calc(72vh - 160px)))", padding: 0, overflow: "hidden" }}>
       <div style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <b style={{ color: C.text, fontSize: 15 }}>Reklama · Jarvis</b>
         <span style={{ fontSize: 11.5, color: C.textMuted }}>jedna stála debata o reklame · vidí do Mety · každú zmenu potvrdíš tlačidlom</span>

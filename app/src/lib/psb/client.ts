@@ -2,6 +2,10 @@
 import type { ClientOverride, Lead, PSBData } from "./types";
 import { EMPTY_DATA } from "./types";
 import type { IngestResult } from "./db.server";
+import { zapniZdielanie, zdielanaFunkcia } from "./spolocnyDopyt";
+
+// Rovnaké súbežné čítania idú na server raz (viď `spolocnyDopyt.ts`).
+zapniZdielanie();
 
 async function post(url: string, body: unknown, signal?: AbortSignal) {
   const r = await fetch(url, {
@@ -234,10 +238,13 @@ export type BtcNakup = {
 // Two hops on purpose: our server signs a short-lived URL (it holds the shared
 // token), the browser then calls the Bitcoin app directly. Worker-to-worker
 // calls inside the platform time out, so this is the path that works.
-export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false, sNakupmi = false): Promise<BtcReserve | null> {
+//
+// Pýta sa vždy na všetko a súbežné volania sa zdieľajú (1. 11. 2026): načítanie
+// robilo štyri rôzne dopyty z tej istej knihy podľa toho, čo ktorá obrazovka
+// číta, a kto si `platby` nevypýtal, ich jednoducho nečíta.
+const stiahniBtcReserve = zdielanaFunkcia<BtcReserve>(async () => {
   try {
-    const q = [sPlatbami ? "platby=1" : "", sVyplatami ? "vyplaty=1" : "", sNakupmi ? "nakupy=1" : ""].filter(Boolean).join("&");
-    const r = await fetch(`/api/btc-reserve${q ? `?${q}` : ""}`);
+    const r = await fetch("/api/btc-reserve?platby=1&vyplaty=1&nakupy=1");
     if (!r.ok) return null;
     const j = (await r.json()) as { ok?: boolean; url?: string };
     if (!j.ok || !j.url) return null;
@@ -248,6 +255,10 @@ export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false, sNa
   } catch {
     return null;
   }
+});
+
+export async function fetchBtcReserve(_sPlatbami = false, _sVyplatami = false, _sNakupmi = false): Promise<BtcReserve | null> {
+  return stiahniBtcReserve();
 }
 
 /**

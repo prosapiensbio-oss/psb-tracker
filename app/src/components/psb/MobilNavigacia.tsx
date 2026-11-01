@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 import { C, mix } from "../../lib/psb/theme";
 import { Icon } from "./ui";
@@ -37,6 +38,18 @@ export function MobilNavigacia({
 }) {
   const [viac, setViac] = useState(false);
   const [hladat, setHladat] = useState(false);
+  const poleHladania = useRef<HTMLDivElement | null>(null);
+  /**
+   * KURZOR HNEĎ V TOM ISTOM ŤUKNUTÍ. iOS ukáže klávesnicu len na `focus()` volaný
+   * priamo z ťuknutia; po prekreslení je neskoro — pole sa ukázalo bez kurzora,
+   * treba bolo ťuknúť druhýkrát a prvé písanie sa stratilo (rozbor, 1. 11. 2026).
+   * `flushSync` postaví pole ešte vnútri kliku, aby sa do neho dalo vojsť.
+   */
+  const prepniHladanie = () => {
+    if (hladat) { setHladat(false); return; }
+    flushSync(() => setHladat(true));
+    poleHladania.current?.querySelector("input")?.focus();
+  };
   // Prechod inam zavrie otvorený zoznam aj hľadanie.
   useEffect(() => { setViac(false); setHladat(false); }, [aktivna]);
 
@@ -89,10 +102,10 @@ export function MobilNavigacia({
         {ikona("≡", () => setViac((v) => !v), "Viac — ostatné obrazovky", viac)}
         {mozeSpat && ikona("‹", spat, "Späť")}
         <span style={{ fontSize: 18, fontWeight: 800, color: C.accent, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nadpis}</span>
-        {ikona("⌕", () => setHladat((h) => !h), "Hľadať klienta", hladat)}
+        {ikona("⌕", prepniHladanie, "Hľadať klienta", hladat)}
       </div>
       {hladat && (
-        <div style={{ position: "sticky", top: 59, zIndex: 39, padding: "8px 12px", background: mix(C.bg, 96), borderBottom: `1px solid ${mix(C.border, 60)}` }}>
+        <div ref={poleHladania} style={{ position: "sticky", top: 59, zIndex: 39, padding: "8px 12px", background: mix(C.bg, 96), borderBottom: `1px solid ${mix(C.border, 60)}` }}>
           {hladanie}
         </div>
       )}

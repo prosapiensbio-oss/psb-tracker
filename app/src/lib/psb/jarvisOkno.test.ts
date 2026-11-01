@@ -18,10 +18,12 @@ describe("Jarvisov panel sa otvára prázdny", () => {
     expect(zdroj).not.toContain("setMsgs(opravStratene(recent.messages || []))");
   });
 
-  it("bublina otvára cez otvorPrazdny, nie cez setOpen", () => {
-    const i = zdroj.indexOf('aria-label="Otvoriť Jarvisa"');
+  // Plávajúca bublina je od 1. 11. 2026 preč — vstup je tlačidlo v hlavičke appky.
+  it("tlačidlo v hlavičke otvára cez otvorPrazdny, nie cez setOpen", () => {
+    const app = readFileSync(new URL("../../components/psb/App.tsx", import.meta.url).pathname, "utf8");
+    const i = app.indexOf('title="Jarvis vedľa práce');
     expect(i).toBeGreaterThan(0);
-    const tlacidlo = zdroj.slice(Math.max(0, i - 900), i);
+    const tlacidlo = app.slice(Math.max(0, i - 400), i);
     expect(tlacidlo).toContain("chat.otvorPrazdny()");
   });
 

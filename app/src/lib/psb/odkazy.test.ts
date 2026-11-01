@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { CIELE, adresaStranky, jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "./odkazy";
+import { CIELE, adresaStranky, jePlatnyCiel, jeVonkajsiOdkaz, mdOdkaz, naPlnuAdresu } from "./odkazy";
 
 describe("jeVonkajsiOdkaz", () => {
   it("pozná adresu článku aj príspevku", () => {
@@ -93,5 +93,23 @@ describe("adresaStranky", () => {
     expect(adresaStranky("example.com/x")).toBeNull();
     expect(adresaStranky("javascript:alert(1)")).toBeNull();
     expect(adresaStranky("")).toBeNull();
+  });
+});
+
+describe("mdOdkaz — odkaz po markdownovsky (reklamná debata, 1. 11. 2026)", () => {
+  it("[text](adresa) je odkaz", () => {
+    expect(mdOdkaz("[MFR reel z 5. 12. 2022](https://www.instagram.com/reel/ClySHnVA_DL/)"))
+      .toEqual({ text: "MFR reel z 5. 12. 2022", url: "https://www.instagram.com/reel/ClySHnVA_DL/", tucne: false });
+  });
+  it("tučný **[text](adresa)** je odkaz, a tučný", () => {
+    expect(mdOdkaz("**[Anatomy Trains / Tom Myers](https://www.instagram.com/reel/DZ5IY6QAr3D/)**")?.tucne).toBe(true);
+  });
+  it("adresa bez https z vymenovaných domén prejde", () => {
+    expect(mdOdkaz("[fascia](prosapiens.cz/fascia/)")?.url).toBe("https://prosapiens.cz/fascia/");
+  });
+  it("zátvorky, ktoré odkaz nie sú, ostanú textom", () => {
+    expect(mdOdkaz("[poznámka](niečo)")).toBeNull();
+    expect(mdOdkaz("[bez adresy]")).toBeNull();
+    expect(mdOdkaz("**[a](https://x.cz)")).toBeNull();
   });
 });

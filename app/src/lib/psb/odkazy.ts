@@ -48,6 +48,18 @@ export function naPlnuAdresu(x: string): string | null {
 }
 
 /**
+ * Odkaz po markdownovsky: `[text](adresa)` aj tučné `**[text](adresa)**`.
+ * Adresa musí byť naozajstná (`naPlnuAdresu`) — hranaté zátvorky vo vete odkazom
+ * nie sú a `[x](y)` s nezmyslom ostane textom.
+ */
+export function mdOdkaz(x: string): { text: string; url: string; tucne: boolean } | null {
+  const m = /^(\*\*)?\[([^\]]+)\]\(([^\s)]+)\)(\*\*)?$/.exec((x || "").trim());
+  if (!m || !!m[1] !== !!m[4]) return null;
+  const url = naPlnuAdresu(m[3]);
+  return url ? { text: m[2], url, tucne: !!m[1] } : null;
+}
+
+/**
  * Ciele navigácie v appke.
  *
  * Sú tu aj STARÉ id („financie", „vysledky", „6m"), lebo ich `navigate`

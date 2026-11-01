@@ -591,6 +591,21 @@ export function klucPolozky(
  */
 export const DNI_PO_UVODNOM = 14;
 
+/**
+ * Na ktorej karte človek stojí po tom, čo sa zoznam kariet zmenil.
+ *
+ * Index platí len pre zoznam, v ktorom vznikol: karta bez položiek zmizne,
+ * prepínač Jerryho/Terezkine pridá Dopyty a uberie Kontrolu. Rovnaké číslo by
+ * potom ukázalo inú kartu. `ulozena` je meno karty spred obnovenia stránky —
+ * platí len pri prvom zozname. Keď otvorená karta zmizla, ostáva sa na jej mieste.
+ */
+export function indexKartyPoZmene(stare: string[], nove: string[], i: number, ulozena?: string | null): number {
+  if (!nove.length) return i;
+  const hladana = stare.length ? stare[Math.min(Math.max(0, i), stare.length - 1)] : ulozena;
+  const j = hladana ? nove.indexOf(hladana) : -1;
+  return j >= 0 ? j : Math.min(Math.max(0, i), nove.length - 1);
+}
+
 export function rozdelAnamnezy(
   riadky: AnamnezaRiadok[],
   dnes: string,

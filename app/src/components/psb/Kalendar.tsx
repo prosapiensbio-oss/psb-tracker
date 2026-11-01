@@ -25,6 +25,7 @@ import { VyberMena } from "./VyberMena";
 import { PonukaTerminov } from "./PonukaTerminov";
 import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import * as Sk from "../../lib/psb/sklonovanie";
+import { denOdPondelka, dniTyzdnaPohladu, krokPolohy, polohaDnes } from "../../lib/psb/kalendarPohlad";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -118,6 +119,14 @@ async function posli(telo: Record<string, unknown>) {
     trener?: string; vysledok?: Snimka; zostava?: string[];
     vysledky?: Record<string, Snimka>;
   };
+}
+
+/** Rozsah mriežky, ktorý si človek naposledy vybral. Treba ho skôr než poloha dneška. */
+function ulozenyRozsah(): 7 | 3 | 1 {
+  try {
+    const x = Number(localStorage.getItem("psb-kalendar-rozsah"));
+    return x === 1 || x === 3 ? x : 7;
+  } catch { return 7; }
 }
 
 export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onNavigate }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null; trainer?: string; onTrainer?: (t: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
@@ -1149,28 +1158,19 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   predvolenyTrener: string;
   onObnov: () => Promise<void>;
 }) {
-  const [posun, setPosun] = useState(0);
+  // V nedeľu je „Týždeň" už budúci týždeň (`polohaDnes`).
+  const [posun, setPosun] = useState(() => polohaDnes(dnesPraha(), ulozenyRozsah()).posun);
   const [vyber, setVyber] = useState<VyberMriezky | null>(null);
   const [zrusene, setZrusene] = useState<ZrusenaHodina | null>(null);
 
   // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
   const pondelok = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
+    // Pražský deň, nie deň prístroja — na obed nerobí rozdiel, o polnoci áno.
+    const d = new Date(`${dnesPraha()}T00:00:00`);
     const doPondelka = (d.getDay() + 6) % 7;
     d.setDate(d.getDate() - doPondelka + posun * 7);
     return d;
   }, [posun]);
-
-  const dni = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(pondelok);
-      d.setDate(d.getDate() + i);
-      const p2 = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
-    }),
-    [pondelok],
-  );
 
   /**
    * Na telefóne zostáva CELÝ TÝŽDEŇ — tak, ako ho ukazuje Google Calendar
@@ -1191,20 +1191,21 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
    * kalendári prepínač na týždeň, 3 dni a 1 deň"). Voľba sa pamätá — inak by
    * si ju na telefóne vyberal pri každom otvorení.
    */
-  const [rozsah, setRozsah] = useState<7 | 3 | 1>(() => {
-    try {
-      const x = Number(localStorage.getItem("psb-kalendar-rozsah"));
-      return x === 1 || x === 3 ? x : 7;
-    } catch { return 7; }
-  });
-  const dnesVTyzdni = (new Date().getDay() + 6) % 7;
+  const [rozsah, setRozsah] = useState<7 | 3 | 1>(ulozenyRozsah);
+  // Dni v mriežke. Pri troch dňoch aj dva za nedeľou — „3 dni" začínajú dnes,
+  // aj keď je nedeľa (kalendarPohlad.ts).
+  const dni = useMemo(() => {
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return dniTyzdnaPohladu(`${pondelok.getFullYear()}-${p2(pondelok.getMonth() + 1)}-${p2(pondelok.getDate())}`, rozsah);
+  }, [pondelok, rozsah]);
+  const dnesVTyzdni = denOdPondelka(dnesPraha());
   const [zac, setZac] = useState(() => dnesVTyzdni);
 
   const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
   const p2 = (n: number) => String(n).padStart(2, "0");
 
-  const zaciatok = Math.max(0, Math.min(7 - rozsah, zac));
+  const zaciatok = Math.max(0, Math.min(6, zac));
   const viditelne = rozsah === 7 ? dni : dni.slice(zaciatok, zaciatok + rozsah);
   const POCET = viditelne.length;
   /** Čísla nad mriežkou aj výška mriežky hovoria o TOM, ČO JE VIDNO — nie o týždni. */
@@ -1259,29 +1260,28 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
    * Cez okraj týždňa sa prechádza na susedný týždeň — hranica −3 až +2 je
    * tam, kam siaha stiahnutý kalendár, a platí ďalej.
    */
-  const naZaciatok = posun <= -3 && zaciatok === 0;
-  const naKonci = posun >= 2 && zaciatok >= 7 - rozsah;
+  const naZaciatok = !krokPolohy({ posun, zac: zaciatok }, rozsah, -1);
+  const naKonci = !krokPolohy({ posun, zac: zaciatok }, rozsah, 1);
   const krok = (smer: 1 | -1) => {
     setVyber(null);
-    if (rozsah === 7) { setPosun(posun + smer); return; }
-    const novy = zaciatok + smer * rozsah;
-    if (novy < 0) {
-      if (posun <= -3) return;
-      setPosun(posun - 1);
-      setZac(7 - rozsah);
-    } else if (novy > 7 - rozsah) {
-      if (posun >= 2) return;
-      setPosun(posun + 1);
-      setZac(0);
-    } else setZac(novy);
+    const nova = krokPolohy({ posun, zac: zaciatok }, rozsah, smer);
+    if (!nova) return;
+    setPosun(nova.posun);
+    if (rozsah !== 7) setZac(nova.zac);
   };
 
   const prepniRozsah = (r: 7 | 3 | 1) => {
     setRozsah(r);
     setVyber(null);
     // Nový rozsah sa otvára tam, kde je dnešok — ak je tento týždeň na
-    // obrazovke. Inak od pondelka.
-    setZac(Math.max(0, Math.min(7 - r, posun === 0 ? dnesVTyzdni : 0)));
+    // obrazovke. Inak od pondelka. Výnimka je nedeľa: z budúceho týždňa (kam
+    // „Týždeň" v nedeľu otvára) do „3 dní" sa ide na dnes, nie o týždeň ďalej.
+    const domov = polohaDnes(dnesPraha(), rozsah);
+    if (posun === domov.posun) {
+      const ciel = polohaDnes(dnesPraha(), r);
+      setPosun(ciel.posun);
+      setZac(ciel.zac);
+    } else setZac(posun === 0 ? dnesVTyzdni : 0);
     try { localStorage.setItem("psb-kalendar-rozsah", String(r)); } catch { /* súkromné okno */ }
   };
 
@@ -1449,7 +1449,8 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 
   // Poloha okna: vedľa stĺpca označenej hodiny — vpravo od neho, pri konci
   // týždňa vľavo, aby nevyšlo z obrazovky. Žiadne stmavené pozadie.
-  const vyberIdx = vyber ? dni.indexOf(vyber.den) : -1;
+  // Stĺpec v tom, čo je vidno — pri troch dňoch je to iné číslo než deň v týždni.
+  const vyberIdx = vyber ? viditelne.indexOf(vyber.den) : -1;
   const vyberTop = vyber && vyberMin != null ? ((vyberMin - od * 60) / 60) * VYSKA : 0;
 
   return (
@@ -1484,8 +1485,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           </span>
           <button onClick={() => krok(1)} disabled={naKonci}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: naKonci ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: naKonci ? C.textDim : C.textMuted }}>→</button>
-          {(posun !== 0 || (rozsah !== 7 && zaciatok !== Math.max(0, Math.min(7 - rozsah, dnesVTyzdni)))) && (
-            <button onClick={() => { setPosun(0); setZac(Math.max(0, Math.min(7 - rozsah, dnesVTyzdni))); }}
+          {/* „dnes" ide vždy na tento týždeň — aj v nedeľu, keď sa „Týždeň" otvára na budúcom. */}
+          {(posun !== 0 || (rozsah !== 7 && zaciatok !== dnesVTyzdni)) && (
+            <button onClick={() => { setPosun(0); setZac(dnesVTyzdni); }}
               style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>dnes</button>
           )}
         </div>
@@ -1547,7 +1549,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                   color: jeDnes ? C.accentLight : C.textMuted,
                   borderBottom: `1px solid ${mix(C.border, 60)}`,
                 }}>
-                  {DNI_SK[i]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.accentLight : C.text }}>{Number(d.slice(8, 10))}</b>
+                  {DNI_SK[i % 7]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.accentLight : C.text }}>{Number(d.slice(8, 10))}</b>
                 </div>
               );
             })}
@@ -1684,9 +1686,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                     top: Math.max(0, Math.min(vyberIdx >= 0 ? vyberTop : 0, hodin * VYSKA - 300)),
                     left: vyberIdx < 0
                       ? "calc(42px + 6px)"
-                      : vyberIdx <= 3
-                        ? `calc(42px + ${vyberIdx + 1} * ((100% - 42px) / 7) + 5px)`
-                        : `calc(42px + ${vyberIdx} * ((100% - 42px) / 7) - 289px)`,
+                      : vyberIdx <= (POCET - 1) / 2
+                        ? `calc(42px + ${vyberIdx + 1} * ((100% - 42px) / ${POCET}) + 5px)`
+                        : `calc(42px + ${vyberIdx} * ((100% - 42px) / ${POCET}) - 289px)`,
                   }}
               />
             )}

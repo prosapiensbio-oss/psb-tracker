@@ -137,7 +137,7 @@ function vzorNovehoBalicka(os: Udalost[], ceny: { den: string; cena: number | nu
   const stalaInaCena = cenaPoslednych.length === 2 && posl != null && cenaPoslednych[1] === posl && posl !== katalog;
   const cena = Math.round(stalaInaCena ? posl : (katalog ?? posl ?? 0));
   const cenaPoznamka = stalaInaCena
-    ? `platí stále ${posl} Kč, cenník je ${katalog ?? "—"}`
+    ? `platí stále ${fmtCZK(posl)}, cenník je ${katalog == null ? "—" : fmtCZK(katalog)}`
     : posl != null && katalog != null && Math.round(posl) !== katalog
       ? `posledný stál ${Math.round(posl)} Kč, navrhujem cenník`
       : undefined;

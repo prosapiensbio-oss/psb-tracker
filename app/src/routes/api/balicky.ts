@@ -7,6 +7,7 @@ import { smieVzniknutAutomaticky } from "../../lib/psb/workspaceKroky";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { type Balicek } from "../../lib/psb/balickyEvidencia";
 import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac, normName } from "../../lib/psb/format";
@@ -131,8 +132,7 @@ export const Route = createFileRoute("/api/balicky")({
         const zPlanovaca = new URL(request.url).searchParams.get("cron") === "1";
         if (zPlanovaca) {
           const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
-          const dany = request.headers.get("x-cron-token") || "";
-          if (!token || token.length !== dany.length || token !== dany) {
+          if (!jeOdPlanovaca(request, token)) {
             return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
           }
         } else if (!(await isAuthed(request))) return unauthorized();
