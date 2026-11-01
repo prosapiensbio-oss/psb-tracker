@@ -2,6 +2,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, tokyKlientov, type ClientAgg, type KlientTok } from "../../lib/psb/compute";
+import { kohortaDozrela } from "../../lib/psb/kohorty";
 import { fetchMonthNotes, saveMonthNote } from "../../lib/psb/client";
 import { fmtCZK, fmtDMY, monthKey, monthLabel } from "../../lib/psb/format";
 import { klucZdroja, popisZdroja } from "../../lib/psb/zdroje";
@@ -160,7 +161,7 @@ export function RastAStrata({ data, clients, onKlient, onSkupina }: { data: PSBD
       </Card>
 
       <KdeTecie odisli={odisli} onKlient={onKlient} />
-      <Prezitie zoznam={zoznam} onSkupina={onSkupina} />
+      <Prezitie zoznam={zoznam} poslednyPlny={kotvaDat(data).plny} onSkupina={onSkupina} />
       <HodnotaPodlaZdroja zoznam={zoznam} onSkupina={onSkupina} />
     </>
   );
@@ -228,7 +229,7 @@ function KdeTecie({ odisli, onKlient }: { odisli: Klient[]; onKlient?: (m: strin
 }
 
 // ── 3. Prežitie kohorty ──────────────────────────────────────────────────────
-function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label: string, mena: string[]) => void }) {
+function Prezitie({ zoznam, poslednyPlny, onSkupina }: { zoznam: Klient[]; poslednyPlny: string | null | undefined; onSkupina?: (label: string, mena: string[]) => void }) {
   const riadky = useMemo(() => {
     const m = new Map<string, Klient[]>();
     for (const c of zoznam) {
@@ -236,6 +237,7 @@ function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label:
       m.set(k, [...(m.get(k) || []), c]);
     }
     return [...m.entries()]
+      .filter(([mk]) => kohortaDozrela(mk, poslednyPlny))
       .sort((a, b) => b[0].localeCompare(a[0]))
       .slice(0, 14)
       .map(([mk, cs]) => ({
@@ -250,7 +252,7 @@ function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label:
         m12: cs.filter((c) => c._zivot >= 365).length,
         sixM: cs.filter((c) => c.is6m).length,
       }));
-  }, [zoznam]);
+  }, [zoznam, poslednyPlny]);
 
   // Kohorta stará dva mesiace nemôže mať nikoho, kto vydržal tri — a „0 · 0 %"
   // by to ukázalo ako zlyhanie. Kým míľnik neprešiel, je tam pomlčka.

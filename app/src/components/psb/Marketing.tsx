@@ -1194,7 +1194,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
       />
 
       {sub === "prehlad" && <MarketingPrehlad data={data} clients={clients} onNavigate={onNavigate} />}
-      {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} focus={focus} />}
+      {sub === "dopyty" && <Dopyty data={data} leads={leads} clients={clients} refresh={refresh} focus={focus} />}
 
       {sub === "lievik" && (
         <>

@@ -14,7 +14,9 @@ import {
 import { breakEvenRad, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { kpiFmt } from "./Vzas";
 import { jeKlient } from "./MarketingLievik";
-import { cenaZaSedenie, doPlnehoMesiaca, ltvSpoluprace, najdiKlienta, kotvaDat, monthlyFinance, pocetUvodnych, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
+import { parovanieDopytov } from "../../lib/psb/parovanieDopytov";
+import { kohortaDozrela } from "../../lib/psb/kohorty";
+import { cenaZaSedenie, doPlnehoMesiaca, ltvSpoluprace, kotvaDat, monthlyFinance, pocetUvodnych, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
 import { PlatobneKanaly } from "./PlatobneKanaly";
@@ -1279,7 +1281,7 @@ export function useExtraGrafy({
       // mešká, zahodil sa uzavretý mesiac a bežiaci zostal. Teraz rozhoduje
       // kotva dát, nie poradie.
       return [...m.entries()]
-        .filter(([mk]) => !kotva.plny || mk <= kotva.plny)
+        .filter(([mk]) => kohortaDozrela(mk, kotva.plny))
         .sort((a, b) => b[0].localeCompare(a[0]))
         .slice(0, 6);
     })();
@@ -1358,20 +1360,14 @@ export function useExtraGrafy({
     // ── Marketing ────────────────────────────────────────────────────────────
     const konv = (() => {
       const m = new Map<string, { dopyty: number; klienti: number; mena: string[] }>();
-      // najdiKlienta, nie holé lowercase: dopyt píše Jerry z hlavy a klient
-      // prichádza z PTmindera — diakritika ani preklep („Prochadzka") nesmú
-      // konverziu skryť. Vracia kanonické meno, aby klik otvoril klienta pod
-      // menom, pod ktorým ho pozná zoznam Klientov.
-      // jeKlient, nie „má firstSession": úvodný je PLATENÝ, takže „ukázal sa
-      // na tréningu" spĺňal každý dopyt, čo naň prišiel — presne tá podmienka
-      // splniteľná automaticky, ktorú lievik opustil 18. 8. Na ostrých dátach
-      // to robilo 69 % konverzie referencií namiesto 50 % (revízia 19. 8.).
-      const menaKlientov = Object.values(clients)
-        .filter((c) => !c.vratenie && jeKlient(c, data.payments)).map((c) => c.name);
+      // Tá istá otázka ako Lievik (`parovanieDopytov`): platiaci klient až po
+      // dopyte. Vracia kanonické meno, aby klik otvoril klienta pod menom,
+      // pod ktorým ho pozná zoznam Klientov.
+      const par = parovanieDopytov(data, clients);
       for (const l of data.leads || []) {
         const e = m.get(l.source) || { dopyty: 0, klienti: 0, mena: [] };
         e.dopyty++;
-        const kanonicke = najdiKlienta(menaKlientov, l.name || "");
+        const kanonicke = par.klient(l);
         if (kanonicke) { e.klienti++; e.mena.push(kanonicke); }
         m.set(l.source, e);
       }
@@ -1379,7 +1375,7 @@ export function useExtraGrafy({
     })();
     nodes.konverziaZdroj = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Konverzia dopytov podľa zdroja" text="Koľko z dopytov daného zdroja sa stalo klientmi (meno dopytu sa našlo medzi klientmi s odtrénovaným sedením). Zdroj s desiatimi dopytmi a nulou klientov je drahší než zdroj s dvomi a dvomi." /></H3>
+        <H3><Info label="Konverzia dopytov podľa zdroja" text="Koľko z dopytov daného zdroja sa stalo platiacim klientom po dopyte. Ten istý výpočet ako Lievik. Zdroj s desiatimi dopytmi a nulou klientov je drahší než zdroj s dvomi a dvomi." /></H3>
         <Klik kam={() => onNavigate("klienti", "dopyty")} onNavigate="Klienti → Dopyty">
           {konv.length ? (
             <div style={{ marginTop: 8 }}>
@@ -1799,17 +1795,16 @@ export function useExtraGrafy({
       </Card>
     );
 
-    // Kohorty dopytov: z dopytov KTORÉHO mesiaca sa stali klienti. Priradenie
-    // podľa mena cez najdiKlienta (presne, potom fuzzy) — dopyt píše Jerry
-    // z hlavy a diakritika či preklep nesmú konverziu skryť.
-    const menaKlientovVsetky = Object.values(clients).map((c) => c.name);
+    // Kohorty dopytov: z dopytov KTORÉHO mesiaca sa stali klienti. Tá istá
+    // otázka ako Lievik a tabuľka kohort (`parovanieDopytov`).
+    const parD = parovanieDopytov(data, clients);
     const dopytyPodlaMes = new Map<string, { n: number; z: number }>();
     for (const l of data.leads || []) {
       const mk = (l.date || "").slice(0, 7);
       if (!mk) continue;
       const e = dopytyPodlaMes.get(mk) || { n: 0, z: 0 };
       e.n++;
-      if (najdiKlienta(menaKlientovVsetky, l.name || "")) e.z++;
+      if (parD.klient(l)) e.z++;
       dopytyPodlaMes.set(mk, e);
     }
     const kohortyD = [...dopytyPodlaMes.entries()].filter(([mk]) => vMes(mk)).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);

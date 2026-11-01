@@ -26,6 +26,15 @@
 
 import { monthKey } from "./format";
 
+/**
+ * Patrí kohorta do tabuľky „Kto vydrží"? Bežiaci mesiac sa nemá ako prejaviť
+ * a 1. 11. tam stála kohorta „nov 26" z termínov, ktoré ešte neboli. Rozhoduje
+ * kotva dát (`kotvaDat().plny`), nie kalendár: keď sa export oneskorí, zahodil
+ * by sa uzavretý mesiac. Jedna podmienka pre graf aj Fluktuáciu.
+ */
+export const kohortaDozrela = (mesiac: string, poslednyPlny: string | null | undefined): boolean =>
+  !poslednyPlny || mesiac <= poslednyPlny;
+
 export type Kohorta = {
   /** Mesiac prvého tréningu, `RRRR-MM`. */
   mesiac: string;

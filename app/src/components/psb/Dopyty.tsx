@@ -2,10 +2,12 @@ import { nechceHovor } from "../../lib/psb/dopytTestPostury";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
-import { DOVOD_DOPYTU_OD, maTermin, najdiKlienta, objednaneVerzia, type ClientAgg } from "../../lib/psb/compute";
-import { fmtDMY, normName } from "../../lib/psb/format";
+import { DOVOD_DOPYTU_OD, jeKlient, maTermin, najdiKlienta, objednaneVerzia, type ClientAgg } from "../../lib/psb/compute";
+import { krokyZa } from "./MarketingLievik";
+import { parovanieDopytov } from "../../lib/psb/parovanieDopytov";
+import { fmtDMY, monthKey, normName } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
-import type { Lead } from "../../lib/psb/types";
+import type { Lead, PSBData } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Modal, RolovaciaTabulka, Select, StatCard, TableWrap } from "./ui";
 import { SOURCES, STATUSES, statusColor } from "./Klienti";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -107,7 +109,7 @@ function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<bool
   );
 }
 
-export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void>; focus?: { client?: string; filter?: string; nonce?: number } | null }) {
+export function Dopyty({ data, leads, clients, refresh, focus }: { data: PSBData; leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void>; focus?: { client?: string; filter?: string; nonce?: number } | null }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [upravCas, setUpravCas] = useState<string | null>(null);
@@ -131,6 +133,24 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
   // konverziu na diakritike či preklepe. Rovnaká rodina chýb ako Prochádzka.
   const menaKlientovAll = useMemo(() => Object.keys(clients), [clients]);
   const converted = (l: Lead) => !!(l.name && najdiKlienta(menaKlientovAll, l.name));
+  /**
+   * „Je v Kokpite" nie je „je klient" (1. 11. 2026): kto prišiel raz na úvodný,
+   * tu stál ako „✓ klient — nie je čo vysvetľovať". Otázka „prečo z toho nič
+   * nebolo" sa preto nemení (`nevyrieseny`), mení sa len nápis.
+   */
+  const ktoJe = (l: Lead): "klient" | "uvodny" | "" => {
+    const m = l.name ? najdiKlienta(menaKlientovAll, l.name) : "";
+    const c = m ? clients[m] : null;
+    if (!c) return "";
+    if (jeKlient(c, data.payments)) return "klient";
+    return c.sessions.length ? "uvodny" : "";
+  };
+  /** Tie isté kroky ako Lievik a Prehľad, len za všetky mesiace so zapísaným dopytom. */
+  const kroky = useMemo(() => {
+    const mesiace = [...new Set(leads.map((l) => monthKey(l.date)).filter(Boolean))];
+    return krokyZa({ ...data, leads }, clients, mesiace);
+  }, [data, leads, clients]);
+  const parovanie = useMemo(() => parovanieDopytov(data, clients), [data, clients]);
 
   /**
    * Nevyriešený = pri ktorom má ešte zmysel pýtať sa „prečo z toho nič nebolo".
@@ -255,7 +275,6 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
-    const konv = leads.filter(converted).length;
     // Rýchlosť odpovede: medián, nie priemer. Jeden dopyt, na ktorý sa
     // zabudlo na tri týždne, by priemer roztiahol tak, že by číslo prestalo
     // hovoriť o bežnom prípade.
@@ -266,7 +285,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
       .sort((a, b) => a - b);
     const median = casy.length ? casy[Math.floor(casy.length / 2)] : null;
     const bezOdpovede = leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy" && !nechceHovor(l)).length;
-    return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv, median, bezOdpovede };
+    return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, median, bezOdpovede };
   }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bySource = useMemo(() => {
@@ -274,10 +293,10 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
     for (const l of leads) {
       const e = (m[l.source] ||= { n: 0, klient: 0 });
       e.n++;
-      if (converted(l)) e.klient++;
+      if (parovanie.klient(l)) e.klient++;
     }
     return m;
-  }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leads, parovanie]);
 
   const inputStyle = { ...S.select, width: "100%", minWidth: 0 } as const;
   const REFERRER_LIST = "psb-referrers";
@@ -359,8 +378,10 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
           <StatCard value={String(counts.total)} label="Dopytov spolu" color={C.blue} />
           <StatCard value={String(counts.dohodnuty)} label="Dohodnutý úvodný" color={C.accentLight} />
           <StatCard value={String(counts.neodpisal)} label="Neodpovedané" color={C.red} />
-          <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
-            label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
+          <StatCard value={kroky.dopyty ? `${Math.round((kroky.zDopytuUvodny / kroky.dopyty) * 100)} %` : "—"}
+            label={<Info text={`${kroky.zDopytuUvodny} z ${kroky.dopyty} dopytov došlo na úvodný tréning, najskôr v deň dopytu. Ten istý výpočet ako Lievik a Prehľad (tie majú okno 12 mesiacov po posledný plný mesiac). Počíta sa automaticky, nezapisuje sa.`} label="Dopyt → úvodný" />} color={C.accentLight} />
+          <StatCard value={kroky.dopyty ? `${Math.round((kroky.zDopytu / kroky.dopyty) * 100)} %` : "—"}
+            label={<Info text={`Z ${kroky.zDopytu} z ${kroky.dopyty} dopytov sa stal platiaci klient: prišiel znova alebo zaplatil nad úvodný, a to až po dopyte. Starý klient, ktorý vyplnil formulár znova, sa nepočíta. Ten istý výpočet ako Lievik a kohorty.`} label="Dopyt → klient" />} color={C.green} />
           <StatCard
             value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Sk.dni(Math.round(counts.median / 24))}`}
             label={<Info text="Medián času od dopytu po našu prvú odpoveď. V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia než cena aj než text reklamy. Meria sa tlačidlom „ozvali sme sa“ pri dopyte; medián preto, aby jeden zabudnutý dopyt neroztiahol celé číslo." label="Ozveme sa za" />}
@@ -467,7 +488,8 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                   <td style={S.td}>
                     <input defaultValue={l.name} placeholder="meno (ak vieme)" onBlur={(e) => e.target.value !== l.name && save({ ...l, name: e.target.value })}
                       style={inputStyle} />
-                    {converted(l) && <span title="už je medzi klientmi" style={{ color: C.green, fontSize: 11, marginLeft: 6 }}>✓ klient</span>}
+                    {ktoJe(l) === "klient" && <span title="už je medzi klientmi" style={{ color: C.green, fontSize: 11, marginLeft: 6 }}>✓ klient</span>}
+                    {ktoJe(l) === "uvodny" && <span title="prišiel na úvodný, klientom sa nestal" style={{ color: C.textMuted, fontSize: 11, marginLeft: 6 }}>✓ úvodný</span>}
                   </td>
                   <td style={S.td}>
                     <Select value={l.source} onChange={(v) => save({ ...l, source: v as Lead["source"], referrer: v === "referencia" ? l.referrer : "" })}
@@ -577,9 +599,12 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                         s tým: Jerry sa hneď pýtal, ako sa to vypĺňa. */}
                     {l.status === "neodpisal" || l.status === "zruseny" ? (
                       <DovodPole l={l} onSave={(v) => save({ ...l, dovod: v }, `dôvod pri ${l.name || "dopyte"}`)} />
-                    ) : converted(l) ? (
+                    ) : ktoJe(l) === "klient" ? (
                       <span title="Tento človek sa stal klientom — nie je čo vysvetľovať."
                         style={{ color: C.green, fontSize: 11.5 }}>klient</span>
+                    ) : ktoJe(l) === "uvodny" ? (
+                      <span title="Prišiel na úvodný a neostal. Prečo, sa zapisuje v Lieviku pri stratených."
+                        style={{ color: C.textMuted, fontSize: 11.5 }}>bol na úvodnom</span>
                     ) : maTermin(l.name || "") ? (
                       <span title="V kalendári má dohodnutý termín — ešte sa nič nestratilo."
                         style={{ color: C.accentLight, fontSize: 11.5 }}>má termín</span>

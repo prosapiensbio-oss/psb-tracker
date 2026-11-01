@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kohortyKlientov, priemernePrezitie } from "./kohorty";
+import { kohortaDozrela, kohortyKlientov, priemernePrezitie } from "./kohorty";
 
 const DNES = new Date("2026-09-24T10:00:00Z");
 const k = (name: string, prvy: string, dalsie: string[] = []) => ({
@@ -54,5 +54,15 @@ describe("kohorty klientov", () => {
   it("klient bez prvého tréningu do kohort nepatrí", () => {
     const v = kohortyKlientov([{ name: "X", sessions: [] }], DNES);
     expect(v).toEqual([]);
+  });
+});
+
+describe("kohortaDozrela", () => {
+  it("bežiaci mesiac bez plných dát do tabuľky nejde", () => {
+    expect(kohortaDozrela("2026-11", "2026-10")).toBe(false);
+    expect(kohortaDozrela("2026-10", "2026-10")).toBe(true);
+  });
+  it("bez kotvy sa nič neskrýva", () => {
+    expect(kohortaDozrela("2026-11", "")).toBe(true);
   });
 });
