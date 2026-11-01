@@ -13,6 +13,7 @@ import { ReklamaPracovisko } from "./ReklamaDozor";
 import { NekonecnyRad } from "./NekonecnyRad";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
+import { balicekPreOs } from "../../lib/psb/klientOsCasu";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, terminSK, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
@@ -315,11 +316,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Aktívni bez hodín — pýta sa exportu aj vlastnej evidencie naraz. */
   const bezBalicka = useMemo<BezBalicka[]>(
     () => {
-    const evidencia = balicky.map((b) => ({
-      id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
-      platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
-      cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
-    }));
+    const evidencia = balicky.map(balicekPreOs);
     /** Zdroj osi času — ten istý, aký používa profil klienta. */
     const ZDROJ_OSI = {
       sessions: data.sessions as never,
@@ -336,6 +333,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       druhyTreningov: data.druhyTreningov || {},
       // Skutočné hodiny minulých členstiev z PTmindera — nie z názvu.
       historia: (data.historiaBalickov || []) as never,
+      acks: data.anomalyAck,
       balicky: evidencia as never,
       kalUdalosti: (kalUdalosti || []) as never,
     };

@@ -23,8 +23,10 @@ export function patriDoFiltra(p: PohybNaFilter, f: FilterPohybov, maSplit = fals
     case "potvrdene": return jePotvrdeny(p, maSplit);
     // Náklady = všetko, čo odišlo, okrem výplat a súkromného — aj nezaradené,
     // lebo aj to je náklad, len ešte bez škatuľky.
-    // Rezerva nie je náklad — peniaze ostávajú firme, len na druhom účte.
-    case "naklady": return vydaj && (maSplit || (!kat.startsWith("vyplaty") && kat !== "mimo" && kat !== "rezerva"));
+    // Rezerva ani presun nie sú náklad — peniaze ostávajú firme, len na inom
+    // mieste. P&L ich nečíta ani jedno (`fio.ts` PRESUN, REZERVA_FIRMY), tak
+    // ich filter nesmie tvrdiť opak (prevod z 27. 10. 2026, −4 741 Kč).
+    case "naklady": return vydaj && (maSplit || (!kat.startsWith("vyplaty") && kat !== "mimo" && kat !== "rezerva" && kat !== "presun"));
     case "vyplaty": return vydaj && !maSplit && kat.startsWith("vyplaty");
     case "sukromne": return vydaj && !maSplit && kat === "mimo";
     case "prijmy": return p.suma > 0;

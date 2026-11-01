@@ -116,6 +116,8 @@ export type VypisKlienta = {
   os: BodOsi[];
   /** Koľko hodín zostáva; `null` = appka to nevie povedať. */
   zostatok: number | null;
+  /** Nula preto, že posledný balíček skončil — nie preto, že sa dochodil (`priebehBalickov`). */
+  platnostSkoncila?: boolean;
   /** Odtrénované hodiny spolu a odkedy klient chodí. */
   hodinSpolu: number;
   odkedy: string;
@@ -307,11 +309,13 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   const treningy = v.os.filter((b) => b.druh === "trening");
   const posledny = treningy[treningy.length - 1]?.den || "";
   const doslo = v.zostatok !== null && v.zostatok <= 0;
+  // „Dochodený" by bola nepravda, keď hodiny prepadli alebo balíček len skončil.
+  const skoncil = doslo && !!v.platnostSkoncila;
 
   const predmet = v.uplna
     ? "Tvoje tréningy a platby — ProSapiens"
-    : doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
-  const nadpis = v.uplna ? "Celá história" : doslo ? "Balíček dochodený" : "Tvoja dochádzka";
+    : skoncil ? "Balíček skončil — výpis" : doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
+  const nadpis = v.uplna ? "Celá história" : skoncil ? "Balíček skončil" : doslo ? "Balíček dochodený" : "Tvoja dochádzka";
   const dnesnaHodina = !!v.dnes && !!posledny && posledny.slice(0, 10) === v.dnes;
   /**
    * Hodiny NAD RÁMEC balíčka. Tie sa nesmú schovať za „dochodený": klient
@@ -325,6 +329,8 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     ? "posielam celú históriu tréningov aj platieb."
     : navyse
     ? `${dnesnaHodina ? "dnes si mal" : "mal si"} ${navyse === 1 ? "hodinu" : `${navyse} hodiny`} nad rámec balíčka — ${navyse === 1 ? "je" : "sú"} v ďalšej platbe.`
+    : skoncil
+      ? "tvoj posledný balíček už skončil."
     : doslo
       ? dnesnaHodina
         ? "dnes si mal poslednú hodinu z balíčka."
@@ -346,7 +352,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       ? v.os
       : [...v.os, {
         den: "",
-        popis: v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
+        popis: skoncil ? "Balíček skončil" : v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
         druh: "balicekDo" as const,
       }]),
     // Najbližší termín je posledný bod osi, lebo ňou naozaj je — os ide

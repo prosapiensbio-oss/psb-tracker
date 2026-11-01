@@ -97,6 +97,26 @@ export function mozePrepnut(
  * Kľúč (`fio_id`) je `btc:deň|meno|sats` — kniha riadky nečísluje a ten istý
  * zápis musí pri ďalšom načítaní vyjsť rovnako, inak by sa zapísal znova.
  */
+/**
+ * KTORÉ POLOŽKY KNIHY JE EŠTE TREBA ZAPÍSAŤ.
+ *
+ * Kniha chodí pri každom načítaní celá a rozdelenie medzi platiteľa a toho,
+ * za koho platí, sa počíta z DNEŠNÝCH dlhov. Dvojica (fio_id, klient) preto
+ * nestačí: Kaňovský pošle 14 802 Kč skôr, než Kadličkovej vznikne balíček,
+ * celá suma ide jemu; po jej prvom tréningu by ďalší import tú istú platbu
+ * rozdelil a zapísal jej 7 401 Kč navyše. Platba je jedna, kľúč má jeden,
+ * takže keď má pre kľúč riadok ktokoľvek — aj zrušený, aj preradený inému
+ * klientovi — o celej položke je rozhodnuté a znova sa neotvára.
+ */
+export function btcEsteNezapisane<T extends { kluc: string }>(zapisat: T[], zapisaneKluce: Iterable<string>): T[] {
+  const uz = new Set(zapisaneKluce);
+  return zapisat.filter((z) => {
+    if (uz.has(z.kluc)) return false;
+    uz.add(z.kluc);
+    return true;
+  });
+}
+
 export type BtcZKnihy = { klient: string | null; datum: string; czk: number | null; sats?: number };
 
 export function btcNaPlatby(

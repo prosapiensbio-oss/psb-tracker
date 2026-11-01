@@ -40,6 +40,23 @@ export const popisPreKlienta = (r: RiadokVypisu): string => {
   return "tréning";
 };
 
+/**
+ * ČÍSLO V NADPISE ODKAZU. Tréningy bez hodiny na konci sú hodiny nad rámec, aj
+ * keď os skončila na nule (Lukáš Hanus 3. 10. 2026: stránka tvrdila „Poslední
+ * hodina", hoci odvtedy trénoval trikrát). Po konci platnosti to neplatí:
+ * mínus skončeného členstva ostal len na riadkoch ako fakt o tom dni.
+ */
+export function zostatokNaOdkaze(v: Pick<VypisKlienta, "os" | "zostatok" | "platnostSkoncila">): number | null {
+  let nadRamec = 0;
+  for (let i = v.os.length - 1; i >= 0; i--) {
+    const b = v.os[i];
+    if (b.druh !== "trening") continue;
+    if (b.zostatok != null || !b.dlh) break;
+    nadRamec += 1;
+  }
+  return (v.zostatok ?? 0) === 0 && nadRamec > 0 && !v.platnostSkoncila ? -nadRamec : v.zostatok;
+}
+
 export function historiaPreMail(
   meno: string,
   os: Udalost[],
@@ -157,6 +174,7 @@ export function historiaPreMail(
     trener: klient.primaryTrainer || "Jerry",
     os: body,
     zostatok: v.koniec,
+    platnostSkoncila: v.platnostSkoncila,
     hodinSpolu: body.filter((b) => b.druh === "trening").length,
     odkedy: (klient.firstSession || "").slice(0, 10),
     mesiacov: Math.round(mesiacovVztahu(klient, new Date(dnes))),

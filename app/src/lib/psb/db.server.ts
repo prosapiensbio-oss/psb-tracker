@@ -480,7 +480,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         }));
     }
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
-      klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
+      klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null, zdroj: r.zdroj || "",
       platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
       zruseneAt: r.zrusene_at || null,
       kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),

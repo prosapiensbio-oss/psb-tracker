@@ -32,6 +32,10 @@ describe("klientStranka", () => {
     // vždy rovnako."
     expect(klientStranka({ ...zaklad, zostatok: 4 })).toContain("Zbývá ti 4 h");
     expect(klientStranka({ ...zaklad, zostatok: 0 })).toContain("Poslední hodina");
+    // Skončený balíček nemusí byť dochozený: hodiny mohly propadnout.
+    const skoncil = klientStranka({ ...zaklad, zostatok: 0, platnostSkoncila: true });
+    expect(skoncil).toContain("Bez aktivního balíčku");
+    expect(skoncil).not.toContain("Poslední hodina");
     // Jerry, 8. 10. 2026: „Nad rámec nahradiť Nezaplatené a dať to červeným."
     const minus = klientStranka({ ...zaklad, zostatok: -3 });
     expect(minus).toContain("Nezaplaceno 3 h");

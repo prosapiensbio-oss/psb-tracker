@@ -20,7 +20,7 @@ import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { klucPlatbyMesiaca, platbyNaZaplatenie } from "./platbyMesiaca";
-import { obdobieRezervy, odlozeneOd, predosleObdobie, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL, REZERVA_START, rezervaZaObdobie } from "./rezervaOdlozenie";
+import { odlozenieTeraz, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL } from "./rezervaOdlozenie";
 import type {
   Lead,
   PackageRow,
@@ -3224,33 +3224,21 @@ export function deriveRegister(
   // obdobie sa pripočíta, aby jeden prehliadnutý termín rezervu neobral.
   // Peniaze sú Jerryho, preto `trener: "Jerry"`.
   {
-    const o = obdobieRezervy(dnesPraha());
-    const teraz = rezervaZaObdobie(data.payments, o);
-    const pred = predosleObdobie(o);
-    const predKluc = `rezerva|${pred.splatne}`;
     /**
      * Prevod na rezervný účet pripomienku ZAVRIE sám (od 27. 10. 2026) —
-     * Kokpit ho vidí v nočnom sťahovaní Fio. Počíta sa, čo odišlo na rezervu
-     * od dňa splatnosti; predošlé obdobie je vybavené, keď naň odišlo
-     * dosť medzi jeho dňom a dňom terajšieho.
+     * Kokpit ho vidí v nočnom sťahovaní Fio. Suma je jedna funkcia, tú istú
+     * číta Jarvis (`odlozenieTeraz`).
      */
-    const prevody = data.rezervaPrevody || [];
-    const predOdlozene = odlozeneOd(prevody, pred.splatne, o.splatne);
-    const predSuma = pred.splatne >= REZERVA_START ? rezervaZaObdobie(data.payments, pred).suma : 0;
-    const dlzne = !ack[predKluc] && predSuma > 0 && predOdlozene < predSuma - 1
-      ? { ...rezervaZaObdobie(data.payments, pred), suma: predSuma - Math.max(0, predOdlozene) }
-      : null;
-    const spolu = teraz.suma + (dlzne?.suma || 0);
-    const uzOdlozene = odlozeneOd(prevody, o.splatne);
-    if (spolu > 0 && o.splatne >= REZERVA_START && uzOdlozene < spolu - 1) {
+    const { obdobie: o, teraz, dlzne, uzOdlozene, zostava } = odlozenieTeraz(data.payments, data.rezervaPrevody || [], ack, dnesPraha());
+    if (zostava > 0) {
       const fmt = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/,/g, " ")} Kč`;
       add(
         `rezerva|${o.splatne}`,
         "Zápis",
         "blue",
-        `Odlož do rezervy ${fmt(spolu - Math.max(0, uzOdlozene))}`,
+        `Odlož do rezervy ${fmt(zostava)}`,
         // Riadok registra kreslí DETAIL, nie titulok — suma preto patrí na začiatok.
-        `Odlož do rezervy ${fmt(spolu - Math.max(0, uzOdlozene))}. ${Math.round(REZERVA_PODIEL * 100)} % z platieb klientov ${fmtDMY(o.od)} – ${fmtDMY(o.do)}: ${teraz.pocet} platieb za ${fmt(teraz.prijate)} → ${fmt(teraz.suma)}.`
+        `Odlož do rezervy ${fmt(zostava)}. ${Math.round(REZERVA_PODIEL * 100)} % z platieb klientov ${fmtDMY(o.od)} – ${fmtDMY(o.do)}: ${teraz.pocet} platieb za ${fmt(teraz.prijate)} → ${fmt(teraz.suma)}.`
           + (dlzne && dlzne.suma > 0 ? ` K tomu neodložené z obdobia ${fmtDMY(dlzne.od)} – ${fmtDMY(dlzne.do)}: ${fmt(dlzne.suma)}.` : "")
           + (uzOdlozene > 0 ? ` Už odložené: ${fmt(uzOdlozene)}.` : "")
           + ` Pošli to z hlavného účtu na rezervný účet ${REZERVA_CISLO}/${REZERVA_KOD} — keď to Kokpit v noci uvidí vo výpise, pripomienka zmizne sama.`,

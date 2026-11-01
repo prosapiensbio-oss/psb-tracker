@@ -74,6 +74,7 @@ import { zostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 type BalicekRiadok = {
   klient: string; nazov: string; hodiny: number | null; platnost_od: string;
   platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
+  poznamka?: string | null;
 };
 type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null };
 import { Assistant, useAssistantChat } from "./Assistant";
@@ -81,6 +82,7 @@ import { REKLAMA_AGENT } from "./ReklamaDozor";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { barterovePredaje } from "../../lib/psb/barter";
+import { balicekPreOs } from "../../lib/psb/klientOsCasu";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { jeBeta } from "../../lib/psb/beta";
 import { C, S, mix, tab } from "../../lib/psb/theme";
@@ -2896,11 +2898,7 @@ function skupinaFaktur(
    * istý dôvod, prečo rezerva aj dlh trénera žijú v `lib/psb`.
    */
   const fronty = useMemo(() => {
-    const evidencia = balickyRiadky.map((b) => ({
-      id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
-      platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
-      cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
-    }));
+    const evidencia = balickyRiadky.map(balicekPreOs);
     const treneri: Record<string, string> = {};
     for (const [meno, c] of Object.entries(clients)) treneri[meno] = c.primaryTrainer || "";
     /** Zdroj osi času — ten istý, aký používa profil klienta. */
@@ -2919,6 +2917,7 @@ function skupinaFaktur(
       druhyTreningov: data.druhyTreningov || {},
       // Skutočné hodiny minulých členstiev z PTmindera — nie z názvu.
       historia: (data.historiaBalickov || []) as never,
+      acks: data.anomalyAck,
       balicky: evidencia as never,
       kalUdalosti: (kalUdalosti || []) as never,
     };

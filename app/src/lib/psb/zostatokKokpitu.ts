@@ -38,6 +38,7 @@
  */
 import { normName } from "./format";
 import { jeBeta } from "./beta";
+import { posunDen } from "./cas";
 
 export type BalicekPreZostatok = {
   klient: string;
@@ -57,6 +58,8 @@ export type BalicekPreZostatok = {
   ukonceny?: boolean;
   /** Cena balíčka v Kokpite (barter Sofie, `barterovePredaje`). */
   cena?: number | null;
+  /** „rucne" / „ptminder" — os podľa toho rozlišuje staršie riadky. */
+  zdroj?: string;
 };
 
 export type SedeniePreZostatok = { client: string; date: string; duration?: number };
@@ -220,6 +223,14 @@ function prebehOdpoctu(
   return { zvysok, minus };
 }
 
+/**
+ * Zvyšok hodín bez dátumu konca — nie je to predaj, „platí", kým má hodiny.
+ * Podľa názvu, nie podľa `kotva`: prevzatý zostatok pod menom produktu (Josef
+ * Šnirych, SPECIAL 3) je jeho členstvo a karta sa o ňom má dozvedieť dátumom.
+ */
+const jeZvysokBezKonca = (b: BalicekPreZostatok): boolean =>
+  !b.platnostDo && b.hodiny != null && /doplnenie|prenesen/i.test(b.nazov);
+
 export function zostatokKokpitu(
   balicky: BalicekPreZostatok[],
   klient: string,
@@ -242,6 +253,10 @@ export function zostatokKokpitu(
    * Karta vzala len ten a pripísala mu všetky tréningy od jeho začiatku
    * (18 h − 23). Kto má balíček ukončený a vrátené peniaze, má nula —
    * kým si nekúpi nový (vtedy rozhoduje bežné pravidlo nižšie).
+   *
+   * Tréning PO ukončení (Radek má v kalendári termíny od 17. 11.) je mínus
+   * ako po konci každého členstva, to isté ukáže os a nové hodiny ho prepíšu.
+   * Nerobí to −5 zo starého balíčka: počítajú sa len dni za koncom ukončeného.
    */
   // Len skutočný balíček. Ukončený PREVZATÝ ZOSTATOK z PTmindera (kotva —
   // „Doplnenie členstva“ k 20. 9.) je upratanie, nie koniec spolupráce
@@ -252,8 +267,16 @@ export function zostatokKokpitu(
     .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)))[0];
   if (ukonceny && !balicky.some((b) => normName(b.klient) === k && !b.zruseneAt && !b.ukonceny && den(b.platnostOd) > den(ukonceny.platnostOd))) {
     const hod = ukonceny.hodiny || 0;
+    const koniecUkonceneho = den(ukonceny.platnostDo || "") || den(ukonceny.platnostOd);
+    let poUkonceni = 0;
+    for (const s of sedenia) {
+      if (normName(s.client) !== k) continue;
+      const d = den(s.date);
+      if (d > koniecUkonceneho && d <= dnes && !zadarmo.has(`${k}|${d}`)) poUkonceni += (s.duration || 60) / 60;
+    }
+    poUkonceni = Math.round(poUkonceni * 100) / 100;
     return {
-      zostatok: 0, nadRamec: 0, spolu: hod, nezaplateneHodin: 0, minute: hod, od: den(ukonceny.platnostOd),
+      zostatok: poUkonceni ? -poUkonceni : 0, nadRamec: poUkonceni, spolu: hod, nezaplateneHodin: 0, minute: hod + poUkonceni, od: den(ukonceny.platnostOd),
       nazov: ukonceny.nazov, platnostDo: ukonceny.platnostDo || null, pausal: false,
     };
   }
@@ -261,6 +284,21 @@ export function zostatokKokpitu(
     .filter((b) => normName(b.klient) === k && jeAktivnyBalicek(b, dnes))
     .sort((a, b) => den(b.platnostOd).localeCompare(den(a.platnostOd)));
   if (!aktivne.length) return null;
+
+  /**
+   * VYČERPANÉ DOPLNENIE BEZ KONCA NEDRŽÍ ČLENSTVO (rozbor, 1. 11. 2026).
+   *
+   * Prevzatý zostatok, doplnenie a prenesené hodiny často nemajú dátum konca,
+   * takže „platia" navždy. Po skončení riadneho balíčka ukazovala karta
+   * „Doplnenie členstva 0/1" a klient nespadol do „Bez balíčka" (Vaško, Sofia
+   * Resnerová, Markéta Lozias). Keď nič iné neplatí a z týchto hodín nič
+   * nezostalo, je to ako žiadny balíček. Zápis v dátach sa nemení.
+   */
+  if (aktivne.every(jeZvysokBezKonca)) {
+    const { zvysok } = prebehOdpoctu(balicky.filter((b) => normName(b.klient) === k), k, sedenia, dnes, zadarmo,
+      (b) => nezaplatene.has(klucNezaplateneho(b.klient, b.platnostOd)));
+    if (aktivne.every((b) => (zvysok.get(b) || 0) <= 0)) return null;
+  }
 
   const najnovsi = aktivne[0];
   const pausal = aktivne.some((b) => b.hodiny == null);
@@ -325,7 +363,8 @@ export const zostatokBezPtmindera = (): boolean => ZOSTATOK_BEZ_PTMINDERA_NAOSTR
  *
  * Kryje ho akýkoľvek nezrušený balíček s platnosťou cez ten deň — aj
  * vyčerpaný (tréning nad rámec je mínus a hlási ho notifikácia hodín, nie
- * táto). Tréning zadarmo sa nepočíta; nič nechýba. Len od `od` (KOKPIT_OD):
+ * táto). Výnimka je zvyšok bez dátumu konca (`jeZvysokBezKonca`): ten kryje,
+ * len kým má hodiny, inak by kryl navždy. Tréning zadarmo sa nepočíta; nič nechýba. Len od `od` (KOKPIT_OD):
  * staršie tréningy kryl PTminder a appka o nich nesúdi.
  */
 export function treningyBezBalicka(
@@ -343,8 +382,13 @@ export function treningyBezBalicka(
     if (normName(s.client) !== k) continue;
     const d = den(s.date);
     if (!d || d < od || d > dnes || zadarmo.has(`${k}|${d}`)) continue;
-    const kryty = moje.some((b) => den(b.platnostOd) <= d && (!b.platnostDo || d <= den(b.platnostDo)));
-    if (!kryty) dni.add(d);
+    const kryty = moje.some((b) => !jeZvysokBezKonca(b) && den(b.platnostOd) <= d && (!b.platnostDo || d <= den(b.platnostDo)));
+    if (kryty) continue;
+    const zvysky = moje.filter((b) => jeZvysokBezKonca(b) && den(b.platnostOd) <= d);
+    if (!zvysky.length) { dni.add(d); continue; }
+    // Hodiny na konci predošlého dňa; zvyšok začínajúci dnes ich má celé.
+    const { zvysok } = prebehOdpoctu(moje, k, sedenia, posunDen(d, -1), zadarmo, () => false);
+    if (!zvysky.some((b) => den(b.platnostOd) === d || (zvysok.get(b) || 0) > 0)) dni.add(d);
   }
   return [...dni].sort();
 }

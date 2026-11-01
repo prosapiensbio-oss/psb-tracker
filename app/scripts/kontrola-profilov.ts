@@ -16,7 +16,10 @@ import { polozkyHodin } from "../src/lib/psb/notifikaciaHodin";
 import { deriveClients } from "../src/lib/psb/compute";
 import { jeUkonceny } from "../src/lib/psb/ukoncenieBalicka";
 import { normName } from "../src/lib/psb/format";
-import { hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
+import { balicekPreOs, hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
+import { dnesPraha, terazPraha } from "../src/lib/psb/cas";
+import { zostatokNaOdkaze } from "../src/lib/psb/historiaMail";
+import { upozorneniaHodin, poslednaZmenaStavu } from "../src/lib/psb/workspaceKroky";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
 import { historiaPreMail } from "../src/lib/psb/historiaMail";
@@ -28,7 +31,7 @@ const D = process.env.KONTROLA_DATA;
 if (!D) throw new Error("chýba KONTROLA_DATA — pusti ./scripts/kontrola-profilov.sh");
 const nacitaj = (n: string) => JSON.parse(require("fs").readFileSync(`${D}/${n}.json`, "utf8"));
 const den = (x: string | null | undefined) => String(x || "").slice(0, 10);
-const DNES = new Date().toISOString().slice(0, 10);
+const DNES = dnesPraha();
 
 const sessions = nacitaj("sessions").map((r: any) => ({
   date: r.date, time: r.time, client: r.client_name, sessionTrainer: r.session_trainer,
@@ -88,6 +91,10 @@ const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
   ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
 });
 const bezHodin = bezHodinZDlhov(dlhy, dvojcata);
+/** Odpovede z registra — appka ich číta ako `anomalyAck` (`db.server.ts`). */
+const anomalyAck: Record<string, { note: string; ackedAt: string; actor: string }> = Object.fromEntries(
+  nacitaj("acks").map((r: any) => [r.anomaly_key, { note: r.note || "", ackedAt: r.acked_at, actor: r.actor || "" }]),
+);
 const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
   .map((p: any) => ({ klient: String(p.klient), datum: den(p.datum), suma: Number(p.suma_czk) || 0, sposob: String(p.sposob || "") }));
 
@@ -97,13 +104,12 @@ const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
  * a hlásil rozdiely, ktoré v nej nie sú.
  */
 {
-  const terazPraha = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
   const bal = doplnHodinySpolu(
     balicky.map((r: any) => ({ klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""), platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null, hodinySpoluUlozene: r.hodiny_spolu ?? null })),
     packages.map((p: any) => ({ client: p.client, package: p.package, total: p.total, naObdobie: p.naObdobie })),
     hodinZNazvuBalicka,
   );
-  const zKal = sedeniaZKalendara(kal.filter((u: any) => u.zaciatok >= KOKPIT_OD), bal, terazPraha);
+  const zKal = sedeniaZKalendara(kal.filter((u: any) => u.zaciatok >= KOKPIT_OD), bal, terazPraha());
   const spojene = spojDochadzku(sessions, zKal).sessions;
   sessions.length = 0;
   sessions.push(...spojene);
@@ -111,7 +117,7 @@ const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
 
 const data: PSBData = {
   ...EMPTY_DATA, sessions, packages, services, payments, poplatky: otvorenePoplatky, treningyZdarma,
-  dlhy, bezHodin, platbyKokpit, historiaBalickov, doplneniaHodiny,
+  dlhy, bezHodin, platbyKokpit, historiaBalickov, doplneniaHodiny, anomalyAck,
   // Od 1. 10. 2026 sa zostatok na karte počíta z týchto balíčkov — bez nich
   // by kontrolór videl iné číslo než appka.
   balickyKokpit: balicky.map((r: any) => ({
@@ -150,7 +156,7 @@ const data: PSBData = {
     balicekKDatumu: String(r.balicek_k_datumu || ""),
     updatedAt: String(r.updated_at || ""),
   }])),
-  acks: nacitaj("acks"), leads: nacitaj("leads"),
+  leads: nacitaj("leads"),
 } as PSBData;
 
 const clients = deriveClients(data);
@@ -158,12 +164,12 @@ const mena = Object.keys(clients);
 // Len udalosti, ktoré už začali — ako appka (`osKlientaZoServera` s hodinou).
 // Ráno by inak dnešný tréning o 17:00 stál na osi ako odtrénovaný a kontrolór
 // hlásil „odkaz −1 · karta 0" pri každom, kto dnes trénuje (6. 10. 2026: 13×).
-const terazKontroly = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+const terazKontroly = terazPraha();
 const kalUdalosti = kal.filter((r: any) => String(r.zaciatok).slice(0, 16) <= terazKontroly)
   .map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
 const osi = new Map<string, Udalost[]>();
 for (const m of mena) {
-  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny, druhyTreningov } as never, DNES));
+  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky: balicky.map(balicekPreOs), kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny, druhyTreningov, acks: anomalyAck } as never, terazKontroly));
 }
 
 let nalezov = 0;
@@ -350,8 +356,10 @@ sekcia("TRÉNINGY NA NEZAPLATENOM ČLENSTVE");
     sDlhom.filter((x) => x.nedavno).sort((a, b) => b.nedavno - a.nedavno).map((x) => `${x.m} — ${x.nedavno}× za 2 mesiace (${x.spolu}× celkovo, naposledy ${x.posledny})`),
     "značka = tréning skôr, než zaň prišla platba; nie je to automaticky chyba");
 
-  const otvorene = poplatky.map((p: any) => `${p.klient} · ${den(p.datum)} · ${Math.round(p.suma)} Kč — ${String(p.popis).slice(0, 44)}`);
-  hlas("otvorené poplatky v PTminderi", otvorene, "toto sú skutočne nezaplatené veci");
+  // Od 21. 10. 2026 rozhoduje Kokpit (`dlhyKlientov`); poplatky z PTmindera od
+  // 1. 10. dlh nerobia a tento zoznam už nie je ich kópia.
+  const nezaplatene = dlhy.map((d: any) => `${d.klient} · ${den(d.den)} · ${Math.round(d.doplatit)} Kč — ${String(d.nazov || "").slice(0, 44)}`);
+  hlas("nezaplatené podľa Kokpitu (data.dlhy)", nezaplatene, "to isté, čo karta Dlhujú peniaze");
 }
 
 // ───────────────────────────────────────────────────────── CENY
@@ -390,6 +398,7 @@ sekcia("ODKAZ PRE KLIENTA");
   const prazdne: string[] = [];
   const diery: string[] = [];
   const nadpisy: string[] = [];
+  const stareNadpisy: string[] = [];
   const sumy: string[] = [];
   const dlzniciPodlaMena = new Map(dlznici(dlhy, {}, DNES).map((d) => [normName(d.meno), d.spolu]));
 
@@ -403,8 +412,28 @@ sekcia("ODKAZ PRE KLIENTA");
   for (const m of mena) {
     const c = clients[m];
     const posledny = (osi.get(m) || []).filter((u) => u.druh === "trening").map((u) => u.den).sort().pop() || "";
-    if (posledny < hranicaAktivity) continue;
     const v = historiaPreMail(m, osi.get(m)!, c, DNES, undefined, false);
+
+    /**
+     * Nadpis stránky proti karte — pre KAŽDÉHO klienta a aj bez aktívneho
+     * balíčka. Pri 0/0 karta hovorí „žiadny balíček", teda nula; kontrola to
+     * dovtedy preskakovala, a preto nevidela Bambúškovú ani Baťu (rozbor 05).
+     * Tréning po konci platnosti je mínus aj tam: karta ho nesie ako
+     * `treningyBezBalicka`. Paušál (členstvo bez hodín) sa neporovnáva.
+     */
+    const zostatokOdkazu = zostatokNaOdkaze(v);
+    const pausal = c.packageTotal === 0 && !!c.membership;
+    if (zostatokOdkazu != null && !pausal) {
+      const karta = c.packageTotal > 0 ? c.packageRemaining : -(c.treningyBezBalicka?.length || 0);
+      if (zostatokOdkazu !== karta) {
+        const riadok = `${m} — odkaz ${zostatokOdkazu} h · karta ${c.packageTotal > 0 ? `${karta} h` : `bez balíčka, ${-karta} tréningov bez neho`}`;
+        // Dávno neaktívnym odkaz nechodí — stará os bez dátumov platnosti, nie porucha.
+        if (c.status === "Neaktívny" && posledny < hranicaAktivity) stareNadpisy.push(riadok);
+        else nadpisy.push(riadok);
+      }
+    }
+
+    if (posledny < hranicaAktivity) continue;
 
     /**
      * Prázdny riadok sa počíta LEN tam, kde výpis stojí na balíčku. Kto
@@ -422,11 +451,6 @@ sekcia("ODKAZ PRE KLIENTA");
       if (hodiny[i] < hodiny[i - 1] - 1) diery.push(`${m} · ${hodiny[i - 1]} → ${hodiny[i]}`);
     }
 
-    // Nadpis stránky vychádza zo `zostatok`; karta klienta z `packageRemaining`.
-    if (v.zostatok != null && c.packageTotal > 0 && v.zostatok !== c.packageRemaining) {
-      nadpisy.push(`${m} — odkaz ${v.zostatok} h · karta ${c.packageRemaining} h`);
-    }
-
     const dlh = dlhJednehoKlienta(dlhy, m);
     const naKarte = dlzniciPodlaMena.get(normName(m)) || 0;
     if (Math.round(dlh.dlzi) !== Math.round(naKarte)) {
@@ -437,17 +461,23 @@ sekcia("ODKAZ PRE KLIENTA");
   hlas("tréning bez čísla na osi", prazdne, "klient vidí riadok, ktorý nič nehovorí");
   hlas("diera v odpočte hodín", diery, "6, 5, 4… sa nesmie preskočiť");
   hlas("nadpis odkazu proti karte klienta", nadpisy, "obe čísla majú hovoriť to isté");
+  console.log(`  \u001b[2m  to isté u dávno neaktívnych, ktorým odkaz nechodí: ${stareNadpisy.length}${stareNadpisy.length ? ` (${stareNadpisy.map((x) => x.split(" — ")[0]).join(", ")})` : ""}\u001b[0m`);
   hlas("suma na QR proti karte dlžníkov", sumy, "dve definície dlhu sa rozišli");
 }
 
 // ── NOTIFIKÁCIA „POSLEDNÁ HODINA / MÍNUS" (9. 10. 2026) ──
 // Len vypíše, komu by svietila (bez filtra odoslanej SMS — audit skript
 // nesťahuje), aby sa dalo pred nasadením vidieť, či nezaplaví register.
+// Dvakrát: dnes (hlási sa len v deň tréningu, takže nula v nedeľu nič nehovorí)
+// a koho by sa to týkalo bez ohľadu na deň. Odpovede idú z `anomalyAck`.
 {
   console.log("\n\u001b[1mNOTIFIKÁCIA POSLEDNÁ HODINA / MÍNUS\u001b[0m");
   const p = polozkyHodin(clients, kalUdalosti, platbyKokpit, data.balickyKokpit || [], {}, data.anomalyAck || {}, new Date());
-  console.log(`  kandidátov ${p.length} (pred filtrom odoslanej SMS)`);
+  console.log(`  dnes kandidátov ${p.length} (pred filtrom odoslanej SMS), z toho odpovedaných ${p.filter((x) => x.acked).length}; odpovedí v registri ${Object.keys(anomalyAck).length}`);
   for (const x of p) console.log(`      ${x.title}${x.acked ? " · odpovedané" : ""}`);
+  const { reset } = poslednaZmenaStavu(mena, kalUdalosti, platbyKokpit, data.balickyKokpit || [], terazKontroly);
+  const kazdyDen = upozorneniaHodin(Object.values(clients), {}, reset, new Set(mena.map(normName)));
+  console.log(`  bez ohľadu na deň tréningu by svietili ${kazdyDen.length}: ${kazdyDen.filter((u) => u.stav === "minus").length} v mínuse, ${kazdyDen.filter((u) => u.stav === "nula").length} na nule, ${kazdyDen.filter((u) => u.stav === "posledna").length} s poslednou hodinou`);
 }
 
 console.log(`\n${nalezov ? `\u001b[33m${nalezov} vecí na pozretie\u001b[0m` : "\u001b[32mbez nálezov\u001b[0m"}\n`);

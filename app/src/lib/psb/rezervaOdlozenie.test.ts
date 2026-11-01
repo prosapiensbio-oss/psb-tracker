@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { obdobieRezervy, predosleObdobie, rezervaZaObdobie } from "./rezervaOdlozenie";
+import { odlozenieTeraz } from "./rezervaOdlozenie";
 
 describe("rezerva firmy 3. a 18. (Jerry, 26. 10. 2026)", () => {
   it("18. a neskôr pokrýva 3. – 17.", () => {
@@ -29,5 +30,30 @@ describe("rezerva firmy 3. a 18. (Jerry, 26. 10. 2026)", () => {
     ];
     const r = rezervaZaObdobie(platby, obdobieRezervy("2026-10-20"));
     expect(r).toMatchObject({ prijate: 6090, pocet: 3, suma: 305 });
+  });
+});
+
+describe("odlozenieTeraz — jedno číslo pre register aj Jarvisa", () => {
+  // 3. 11.: obdobie 18. 10.–2. 11.; predošlé (splatné 18. 10.) je 3.–17. 10.
+  const platby = [{ date: "2026-10-05", amount: 20000 }, { date: "2026-10-25", amount: 10000 }];
+
+  it("neodložené predošlé obdobie sa pripočíta", () => {
+    const r = odlozenieTeraz(platby, [], {}, "2026-11-03");
+    expect(r.teraz.suma).toBe(500);
+    expect(r.dlzne?.suma).toBe(1000);
+    expect(r.zostava).toBe(1500);
+  });
+
+  it("odpoveď v registri predošlé obdobie uzavrie", () => {
+    expect(odlozenieTeraz(platby, [], { "rezerva|2026-10-18": true }, "2026-11-03").zostava).toBe(500);
+  });
+
+  it("prevod v predošlom období ho zníži, prevod po splatnosti zníži zvyšok", () => {
+    expect(odlozenieTeraz(platby, [{ date: "2026-10-20", amount: -400 }], {}, "2026-11-03").zostava).toBe(1100);
+    expect(odlozenieTeraz(platby, [{ date: "2026-11-03", amount: -1500 }], {}, "2026-11-03").zostava).toBe(0);
+  });
+
+  it("pred prvým termínom sa nepýta nič", () => {
+    expect(odlozenieTeraz([{ date: "2026-10-01", amount: 20000 }], [], {}, "2026-10-05").zostava).toBe(0);
   });
 });
