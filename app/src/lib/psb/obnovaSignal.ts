@@ -28,6 +28,8 @@
  * to, čoho sa to týka.
  */
 
+import { zabudniZdielane } from "./spolocnyDopyt";
+
 /** Čoho sa zápis dotkol. */
 export type Oblast =
   /** Fio, faktúry, platby, balíčky, stav hotovosti, zámok mesiaca → P&L a uzávierka. */
@@ -52,6 +54,8 @@ const poslucháči = new Map<Oblast, Set<Poslucháč>>();
 
 /** Zapísal som niečo v tejto oblasti. */
 export const oznam = (oblast: Oblast): void => {
+  // Kto po oznámení číta znova, musí ísť na server — nie na odpoveď spred zápisu.
+  zabudniZdielane();
   for (const f of [...(poslucháči.get(oblast) || [])]) {
     try { f(); } catch { /* jeden pokazený poslucháč nesmie zhodiť ostatných */ }
   }
