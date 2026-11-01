@@ -6,6 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 import { MIN_DENNE_KC, POPIS_DORUCOVANIA, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
@@ -433,8 +434,7 @@ export const Route = createFileRoute("/api/meta")({
         // integrácia, ktorú Meta chce vidieť — nie umelé volania, ale skutočné
         // používanie, ktoré appka aj tak potrebuje.
         const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
-        const dany = request.headers.get("x-cron-token") || "";
-        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        const odPlanovaca = jeOdPlanovaca(request, cronToken);
         if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         DB_PRE_POCITADLO = DB;

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
 import { jeKategoriaPrijmu } from "../../lib/psb/kategoriePrijmov";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -134,8 +135,7 @@ export const Route = createFileRoute("/api/fio")({
         // Plánovač (nočné sťahovanie, 14. 10. 2026) sa preukáže tokenom
         // a smie LEN akciu `auto` — nič, čo mení kategórie či pravidlá.
         const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
-        const dany = request.headers.get("x-cron-token") || "";
-        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        const odPlanovaca = jeOdPlanovaca(request, cronToken);
         if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });

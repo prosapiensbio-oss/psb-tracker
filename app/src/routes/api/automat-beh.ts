@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { zapisBeh } from "../../lib/psb/automaty.server";
 
@@ -22,8 +23,7 @@ export const Route = createFileRoute("/api/automat-beh")({
       POST: async ({ request }) => {
         const env = bindings() as { DB?: D1Database; KAL_CRON_TOKEN?: string };
         const token = env.KAL_CRON_TOKEN;
-        const dany = request.headers.get("x-cron-token") || "";
-        if (!token || token.length !== dany.length || token !== dany) {
+        if (!jeOdPlanovaca(request, token)) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
         let b: { automat?: string; ok?: boolean; detail?: string; chyba?: string };

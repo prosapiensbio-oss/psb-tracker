@@ -3,6 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { UCET_REKLAM } from "../../lib/psb/kampanPlan";
 import { type NalezKontroly, skontrolujStranku } from "../../lib/psb/webKontrola";
 import {
@@ -324,8 +325,7 @@ export const Route = createFileRoute("/api/web-kontrola")({
         const url = new URL(request.url);
         if (url.searchParams.get("cron") === "1") {
           const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
-          const dany = request.headers.get("x-cron-token") || "";
-          if (!token || token.length !== dany.length || token !== dany) {
+          if (!jeOdPlanovaca(request, token)) {
             return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
           }
         } else if (!(await isAuthed(request))) {

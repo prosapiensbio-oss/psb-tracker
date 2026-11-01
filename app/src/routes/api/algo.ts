@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { dnesPraha } from "../../lib/psb/cas";
 
 // Čo sa mení v algoritmoch — z oficiálnych zdrojov, nie z blogov o marketingu.
@@ -125,8 +126,7 @@ export const Route = createFileRoute("/api/algo")({
         // plánovač, jeden kľúč; druhý by len znamenal ďalšie miesto, kde sa
         // dá zabudnúť ho nastaviť.
         const jeCron = new URL(request.url).searchParams.get("cron") === "1"
-          && !!(bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN
-          && request.headers.get("x-cron-token") === (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
+          && jeOdPlanovaca(request, (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN);
         if (!jeCron && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });

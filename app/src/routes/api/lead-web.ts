@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { posliLead } from "../../lib/psb/capi";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca, rovnakyToken } from "../../lib/psb/cronToken.server";
 import { dnesPraha } from "../../lib/psb/cas";
 
 /**
@@ -87,9 +88,8 @@ export const Route = createFileRoute("/api/lead-web")({
          * a smie poslať VÝHRADNE kontrolný riadok.
          */
         const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
-        const danyCron = request.headers.get("x-cron-token") || "";
-        const odPlanovaca = !!cronToken && cronToken.length === danyCron.length && cronToken === danyCron;
-        if (!odPlanovaca && (!ocakavane || dane !== ocakavane)) {
+        const odPlanovaca = jeOdPlanovaca(request, cronToken);
+        if (!odPlanovaca && (!ocakavane || !rovnakyToken(dane, ocakavane))) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
 

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { loadData } from "../../lib/psb/db.server";
 import { temaDna, OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU } from "../../lib/psb/temaDna";
 import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
@@ -74,9 +75,7 @@ export const Route = createFileRoute("/api/push-rano")({
     handlers: {
       GET: async ({ request }) => {
         const { DB, KAL_CRON_TOKEN } = bindings() as { DB?: D1Database; KAL_CRON_TOKEN?: string };
-        const dany = request.headers.get("x-cron-token") || "";
-        const token = KAL_CRON_TOKEN || "";
-        if (!token || token.length !== dany.length || token !== dany) {
+        if (!jeOdPlanovaca(request, KAL_CRON_TOKEN)) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });

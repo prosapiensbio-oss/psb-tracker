@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { isAuthed } from "../../lib/psb/auth.server";
 import { btcVyplatyJerryho } from "../../lib/psb/btcVyplaty.server";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
@@ -27,10 +28,9 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
       POST: async ({ request }) => {
         const env = bindings() as { DB?: D1Database; KAL_CRON_TOKEN?: string };
         const token = env.KAL_CRON_TOKEN;
-        const dany = request.headers.get("x-cron-token") || "";
         const skuska = new URL(request.url).searchParams.get("skuska") === "1";
         // Plánovač s tokenom; prihlásený človek smie len skúšku (nič nepošle ani nezapíše).
-        const odPlanovaca = !!token && token.length === dany.length && token === dany;
+        const odPlanovaca = jeOdPlanovaca(request, token);
         if (!odPlanovaca && !(skuska && (await isAuthed(request)))) {
           return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
         }

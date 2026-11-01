@@ -5,6 +5,7 @@ import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types"
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, klientPodlaCelehoMena, nejednoznacneMena, tvarZnamehoKlienta, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
@@ -228,8 +229,7 @@ export const Route = createFileRoute("/api/kalendar")({
         // rezerve: po drôte ide dôkaz, nie heslo.
         if (q0.get("cron") === "1") {
           const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
-          const dany = request.headers.get("x-cron-token") || "";
-          if (!token || token.length !== dany.length || token !== dany) {
+          if (!jeOdPlanovaca(request, token)) {
             return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
           }
           // Aj tu jeden zdroj na volanie — z rovnakého dôvodu ako pri ručnom
