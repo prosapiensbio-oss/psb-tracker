@@ -27,6 +27,14 @@ const html = (text: string, status = 200) => new Response(text, {
 const zle = (text: string, status = 404) => html(`<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>ProSapiens</title></head>
 <body style="margin:0;background:#FFFFFF;color:#1A2E24;font-family:Arial,Helvetica,sans-serif"><div style="max-width:420px;margin:80px auto;padding:0 20px;text-align:center;font-size:15px;line-height:1.6">${text}</div></body></html>`, status);
 const krstne = oslovenieKlienta;
+/**
+ * Výpadok databázy nie je neplatný odkaz ani voľný kalendár: bez istoty, čo je
+ * obsadené, sa nesmie ponúknuť nič (`obsadeneVOkne` chybu nezhltne).
+ */
+const skusteNeskor = (e: unknown) => {
+  console.error("/t/: stránka ponuky sa nedá poskladať", e);
+  return zle("Termíny se teď nepodařilo načíst. Zkuste to prosím za chvíli.", 503);
+};
 
 async function stav(DB: NonNullable<ReturnType<typeof bindings>["DB"]>, token: string, chyba?: string) {
   const n = await nacitajPonuku(DB, token);
@@ -57,7 +65,8 @@ export const Route = createFileRoute("/t/$token")({
         const token = String((params as { token?: string }).token || "");
         const { DB } = bindings();
         if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return zle("Tento odkaz neplatí.");
-        const x = await stav(DB, token).catch(() => null);
+        let x: Awaited<ReturnType<typeof stav>>;
+        try { x = await stav(DB, token); } catch (e) { return skusteNeskor(e); }
         if (!x) return zle("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.");
         const url = new URL(request.url);
         // „Přidat do kalendáře" — udalosť pre telefón klienta.
@@ -82,7 +91,8 @@ export const Route = createFileRoute("/t/$token")({
         const { DB, GCAL_SA_KLUC } = bindings() as ReturnType<typeof bindings> & { GCAL_SA_KLUC?: string };
         const spat = (q = "") => new Response(null, { status: 303, headers: { location: `/t/${encodeURIComponent(token)}${q}`, "cache-control": "no-store" } });
         if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return zle("Tento odkaz neplatí.");
-        const x = await stav(DB, token).catch(() => null);
+        let x: Awaited<ReturnType<typeof stav>>;
+        try { x = await stav(DB, token); } catch (e) { return skusteNeskor(e); }
         if (!x) return zle("Tento odkaz neplatí.");
         if (x.s.druh !== "vyber") return spat();
         // Hodnota je „id|HH:MM" (začiatok v rozmedzí); staré stránky posielajú len id.
@@ -104,7 +114,9 @@ export const Route = createFileRoute("/t/$token")({
 
         // Iná ponuka mohla ten istý čas vybrať v tej istej sekunde.
         const o = oknoCasov([c]);
-        const inde = await obsadeneVOkne(DB, o.od, o.do, token);
+        // Chyba po zamknutí nesmie nechať ponuku navždy „vybranú" bez udalosti.
+        let inde: Awaited<ReturnType<typeof obsadeneVOkne>>;
+        try { inde = await obsadeneVOkne(DB, o.od, o.do, token); } catch (e) { await uvolni().catch(() => null); return skusteNeskor(e); }
         if (inde.some((k) => k.trener === c.trener && prekryva(c, k))) { await uvolni(); return spat("?chyba=obsazeno"); }
 
         const minut = c === rozsah

@@ -118,6 +118,22 @@ export function jeNahladOdkazu(ua: string): boolean {
 }
 
 /**
+ * Počíta sa stiahnutie feedu `.ics` do „odoberá"?
+ *
+ * Nie cez `jeNahladOdkazu`: tá za človeka berie len prehliadač („Mozilla/…"),
+ * kdežto feed sťahuje práve kalendár v telefóne (`iOS/18.0 … dataaccessd`)
+ * a Google (`Google-Calendar-Importer`). Preto opačne: počíta sa všetko okrem
+ * náhľadu trénera (`?nahlad=1`) a toho, čo sa samo prezradí ako robot —
+ * inak by jeden `curl` prepísal „iPhone" na „iný" a stav odberu by klamal.
+ */
+export function pocitaSaStiahnutie(ua: string, nahlad: boolean): boolean {
+  if (nahlad) return false;
+  const u = ua || "";
+  if (/Google-Calendar-Importer/i.test(u)) return true;
+  return !/bot\b|bot\/|crawler|spider|facebookexternalhit|WhatsApp|Slack|Telegram|Discord|Viber|Skype|GoogleOther|HeadlessChrome|curl|wget|python/i.test(u);
+}
+
+/**
  * Veta o stave odberu pre dlaždicu v profile. Rozlišuje, kde sa to zaseklo:
  * stránku neotvoril / otvoril, ale kalendár si nepridal (a pri Androide
  * prečo) / odoberá.

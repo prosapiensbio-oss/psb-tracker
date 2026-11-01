@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, platformaZAgenta, stavOdberu, telefonZAdresy, teloStrankyKalendara, zalom } from "./kalendarMobil";
+import { feedKlienta, jeNahladOdkazu, odoberaKalendar, platformaStranky, pocitaSaStiahnutie, platformaZAgenta, stavOdberu, telefonZAdresy, teloStrankyKalendara, zalom } from "./kalendarMobil";
 
 const T = { Jerry: { krstne: "Filip", telefon: "+420 111 222 333" }, Terezka: { krstne: "Terezka", telefon: "+420 702 147 704" } } as Record<string, { krstne: string; telefon: string }>;
 const tr = (t: string) => T[t] || T.Jerry;
@@ -118,5 +118,29 @@ describe("stránka kalendára — otázka na telefón", () => {
     expect(telefonZAdresy("iphone")).toBe("iphone");
     expect(telefonZAdresy("<script>")).toBe(null);
     expect(telefonZAdresy(null)).toBe(null);
+  });
+});
+
+describe("pocitaSaStiahnutie — kto sa ráta do odberu", () => {
+  it("kalendáre v telefónoch a Google áno", () => {
+    for (const ua of [
+      "iOS/18.0 (22A3354) dataaccessd/1.0",
+      "macOS/14.5 (23F79) dataaccessd/1.0",
+      "Mac OS X/10.15.7 (19H2) CalendarAgent/954",
+      "Google-Calendar-Importer",
+      "Mozilla/5.0 (compatible; Google-Calendar-Importer; +http://www.google.com/calendar)",
+      "ICSx5/2.2.3 (ical4j/3.2.14; okhttp/4.12.0; Android)",
+      "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0)",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+      "",
+    ]) expect(pocitaSaStiahnutie(ua, false)).toBe(true);
+  });
+  it("náhľad trénera nie, aj keby prišiel z telefónu", () => {
+    expect(pocitaSaStiahnutie("iOS/18.0 (22A3354) dataaccessd/1.0", true)).toBe(false);
+  });
+  it("roboti a skúšky z príkazového riadka nie", () => {
+    for (const ua of ["curl/8.7.1", "Wget/1.21", "python-requests/2.31", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "facebookexternalhit/1.1", "WhatsApp/2.23.20.0 A", "Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/120.0"]) {
+      expect(pocitaSaStiahnutie(ua, false)).toBe(false);
+    }
   });
 });
