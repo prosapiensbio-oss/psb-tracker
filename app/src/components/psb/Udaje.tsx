@@ -11,7 +11,7 @@ import type { AssistantChat } from "./Assistant";
 import { Zosit } from "./Zosit";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, KrokUzavierky, NavFocus } from "./App";
-import { fetchVzasSettings, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
+import { fetchVzasNastavene, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { BtcParovanie } from "./BtcParovanie";
 import { PushOdber } from "./PushOdber";
@@ -1163,30 +1163,43 @@ function NapojenieMailu() {
 }
 
 function NapojenieWebu() {
+  // Hodnotu server neposiela (tajneKluce.ts). `tajne` je vyplnené len tesne po
+  // vygenerovaní, aby sa dala skopírovať do WordPressu; po obnovení stránky
+  // ostane len „nastavené" a platná hodnota žije v snippete na webe.
   const [tajne, setTajne] = useState<string>("");
-  const [stav, setStav] = useState<"load" | "ok">("load");
+  const [nastavene, setNastavene] = useState(false);
+  const [stav, setStav] = useState<"load" | "ok" | "chyba">("load");
   const [ukaz, setUkaz] = useState(false);
+  const [hlaska, setHlaska] = useState("");
 
   useEffect(() => {
-    void fetchVzasSettings().then((s) => {
-      setTajne(typeof s["web_lead_secret"] === "string" ? (s["web_lead_secret"] as string) : "");
+    void fetchVzasNastavene().then((stavy) => {
+      // Bez odpovede sa nesmie ukázať „Vygenerovať" — prepísalo by platné tajomstvo.
+      if (!stavy) { setStav("chyba"); return; }
+      setNastavene(!!stavy["web_lead_secret"]);
       setStav("ok");
     });
   }, []);
 
   const vygeneruj = async () => {
+    if (nastavene && !window.confirm("Staré tajomstvo prestane platiť a dopyty z webu sa zastavia, kým nové nevložíš do snippetu vo WordPresse. Pokračovať?")) return;
     // Náhoda z prehliadača, nie z kódu — takto sa hodnota nikdy neobjaví
     // v repozitári ani v žiadnom rozhovore.
     const b = new Uint8Array(24);
     crypto.getRandomValues(b);
     const nove = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-    await saveVzasSetting("web_lead_secret", nove);
+    setHlaska("");
+    if (!(await saveVzasSetting("web_lead_secret", nove))) { setHlaska("Tajomstvo sa neuložilo — skús znova. Staré platí ďalej."); return; }
+    setNastavene(true);
     setTajne(nove);
     setUkaz(true);
   };
 
   const url = `${typeof location !== "undefined" ? location.origin : ""}/api/lead-web`;
   if (stav === "load") return null;
+  if (stav === "chyba") {
+    return <div style={{ marginTop: 14, fontSize: 12, color: C.red }}>Napojenie webu: stav tajomstva sa nepodarilo načítať. Obnov stránku.</div>;
+  }
 
   return (
     <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
@@ -1200,9 +1213,12 @@ function NapojenieWebu() {
         Adresa pre WordPress: <code style={{ background: mix(C.text, 8), padding: "2px 6px", borderRadius: 4 }}>{url}</code>
       </div>
       {!tajne ? (
-        <button onClick={() => void vygeneruj()} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: "pointer" }}>
-          Vygenerovať tajomstvo
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {nastavene && <span style={{ fontSize: 12, color: C.green }}>Tajomstvo je nastavené</span>}
+          <button onClick={() => void vygeneruj()} style={{ fontSize: nastavene ? 11.5 : 12, padding: nastavene ? "4px 8px" : "6px 12px", borderRadius: 6, border: `1px solid ${nastavene ? C.border : C.accent}`, background: "transparent", color: nastavene ? C.textDim : C.accent, cursor: "pointer" }}>
+            {nastavene ? "vygenerovať nové" : "Vygenerovať tajomstvo"}
+          </button>
+        </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <code style={{ background: mix(C.text, 8), padding: "2px 6px", borderRadius: 4, fontSize: 11.5 }}>
@@ -1220,8 +1236,9 @@ function NapojenieWebu() {
         </div>
       )}
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
-        Nové tajomstvo prestane platiť pre starý snippet na webe — po jeho vygenerovaní ho treba prepísať aj tam.
+        Hodnota sa ukáže len raz, hneď po vygenerovaní, potom už len „nastavené“. Nové tajomstvo prestane platiť pre starý snippet na webe — po jeho vygenerovaní ho treba prepísať aj tam.
       </div>
+      {hlaska && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{hlaska}</div>}
 
       {/* ── Hotový snippet ────────────────────────────────────────────────
           Dovtedy dávala appka adresu a tajomstvo a kód si musel Jerry napísať
@@ -1237,7 +1254,7 @@ function NapojenieWebu() {
           3. UTM parametre sa čítajú z adresy AŽ pri odoslaní. Kto medzitým
              klikol na inú stránku, prišiel o kampaň — preto sa ukladajú
              hneď pri príchode. */}
-      {tajne && (
+      {(tajne || nastavene) && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>
             Hotový kód do päty webu (WordPress → Vzhľad → Editor / plugin na skripty):
@@ -1245,7 +1262,7 @@ function NapojenieWebu() {
           <textarea
             readOnly
             onFocus={(e) => e.currentTarget.select()}
-            value={snippetWeb(url, ukaz ? tajne : "TAJOMSTVO-ZOBRAZ-VYSSIE")}
+            value={snippetWeb(url, tajne && ukaz ? tajne : "SEM-VLOZ-TAJOMSTVO")}
             style={{ width: "100%", height: 150, background: C.bg, color: C.textMuted, border: `1px solid ${C.border}`,
               borderRadius: 7, padding: 8, fontSize: 10.5, fontFamily: "monospace", lineHeight: 1.45 }}
           />
@@ -1253,7 +1270,8 @@ function NapojenieWebu() {
             Posiela sa až po ÚSPEŠNOM odoslaní formulára, nie pri kliknutí a nie pri načítaní stránky —
             to je rozdiel medzi konverziou a tým, že sa niekto pozrel na stránku. Pixel aj server použijú
             rovnaké <code>event_id</code>, takže Meta započíta dopyt raz.
-            {!ukaz && " Klikni na tlačidlo ukázať vyššie, nech je v kóde aj tajomstvo."}
+            {tajne && !ukaz && " Klikni na tlačidlo ukázať vyššie, nech je v kóde aj tajomstvo."}
+            {!tajne && " Tajomstvo v kóde je zástupný text: platná hodnota je v snippete na webe, alebo vygeneruj novú."}
           </div>
         </div>
       )}
