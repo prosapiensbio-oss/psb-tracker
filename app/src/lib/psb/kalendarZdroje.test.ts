@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, zdrojNaDobeh } from "./kalendarZdroje";
+import { chybaZdroja, NEDOKONCENE, odmietnutPokles, overIcal, prudkyPokles, stiahniIcal, textPoklesu, vyberZdroj, zdrojNaDobeh } from "./kalendarZdroje";
+
+const ICS = "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n";
 
 describe("vyberZdroj — rotácia podľa pokusu", () => {
   test("scenár 10.–13. 9. 2026: padajúci Jerry nesmie blokovať Terezku", () => {
@@ -58,7 +60,7 @@ describe("stiahniIcal — Google občas odmietne (HTTP 429)", () => {
     const fetchFn = async () => {
       const k = kody[volania.length] ?? 200;
       volania.push(k);
-      return new Response(k === 200 ? "BEGIN:VCALENDAR" : "", { status: k });
+      return new Response(k === 200 ? ICS : "", { status: k });
     };
     return { fetchFn, volania };
   };
@@ -67,7 +69,7 @@ describe("stiahniIcal — Google občas odmietne (HTTP 429)", () => {
 
   test("po odmietnutí skúsi znova a vráti kalendár", async () => {
     const o = odpovede(429, 200);
-    expect(await stiahniIcal("u", { fetchFn: o.fetchFn, cakaj })).toBe("BEGIN:VCALENDAR");
+    expect(await stiahniIcal("u", { fetchFn: o.fetchFn, cakaj })).toBe(ICS);
     expect(o.volania).toEqual([429, 200]);
   });
 
@@ -112,5 +114,51 @@ describe("zdrojNaDobeh — hodinový dobeh po zlyhaní", () => {
   });
   test("čerstvý pokus (ešte môže bežať) nechá tak", () => {
     expect(zdrojNaDobeh([{ trener: "Jerry", posledny_pokus: "2026-10-20T16:10:00Z", posledny_ok: 0 }], teraz)).toBeUndefined();
+  });
+});
+
+describe("overIcal — odpoveď 200 ešte nie je kalendár", () => {
+  const dobry = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n";
+  test("platný súbor prejde, aj s BOM a koncovými riadkami", () => {
+    expect(() => overIcal(dobry)).not.toThrow();
+    expect(() => overIcal(`\uFEFF${dobry}\r\n\r\n`)).not.toThrow();
+  });
+  test("prázdne telo, HTML a odseknutý súbor sú chyba", () => {
+    expect(() => overIcal("")).toThrow(/prázdny/);
+    expect(() => overIcal("<!doctype html><html>Prihláste sa</html>")).toThrow(/BEGIN:VCALENDAR/);
+    expect(() => overIcal("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a\r\n")).toThrow(/END:VCALENDAR/);
+  });
+  test("stiahniIcal chybu pustí ďalej a neopakuje — nič sa neprečíta ako 0 udalostí", async () => {
+    let volani = 0;
+    const fetchFn = async () => { volani++; return new Response("<html></html>", { status: 200 }); };
+    await expect(stiahniIcal("x", { fetchFn, cakaj: async () => {} })).rejects.toThrow(/BEGIN:VCALENDAR/);
+    expect(volani).toBe(1);
+  });
+});
+
+describe("prudký pokles počtu udalostí", () => {
+  const TERAZ = Date.parse("2026-11-01T12:00:00Z");
+  test("hranice: viac než polovica a aspoň 10 udalostí", () => {
+    expect(prudkyPokles(150, 0)).toBe(true);
+    expect(prudkyPokles(150, 74)).toBe(true);
+    expect(prudkyPokles(150, 75)).toBe(false);
+    expect(prudkyPokles(12, 0)).toBe(true);
+    expect(prudkyPokles(9, 0)).toBe(false); // malý kalendár, nie je čo porovnávať
+    expect(prudkyPokles(0, 0)).toBe(false); // prvé stiahnutie
+    expect(prudkyPokles(100, 180)).toBe(false);
+  });
+  test("prvé odmietnutie aj ďalšie do dvoch dní sa odmietnu", () => {
+    expect(odmietnutPokles(150, 3, null, TERAZ)).toBe(true);
+    expect(odmietnutPokles(150, 3, "2026-10-31T00:00:00.000Z", TERAZ)).toBe(true);
+  });
+  test("po dvoch dňoch sa stav prijme — kalendár nesmie ostať zaseknutý navždy", () => {
+    expect(odmietnutPokles(150, 3, "2026-10-30T11:00:00.000Z", TERAZ)).toBe(false);
+  });
+  test("bežná zmena sa neodmieta ani s dávnym odmietnutím", () => {
+    expect(odmietnutPokles(150, 140, "2026-10-01T00:00:00.000Z", TERAZ)).toBe(false);
+  });
+  test("chyba sa ukáže na obrazovke tak, ako je zapísaná", () => {
+    const t = textPoklesu(150, 3);
+    expect(chybaZdroja({ posledne_ok: "2026-10-31T00:00:00Z", posledna_chyba: t }, { kedy: "2026-11-01T00:00:00Z", ok: 0, chyba: t }, TERAZ)).toBe(t);
   });
 });

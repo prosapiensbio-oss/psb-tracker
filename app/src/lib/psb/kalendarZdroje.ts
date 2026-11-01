@@ -73,6 +73,22 @@ export type StiahniMoznosti = {
   cakaj?: (ms: number) => Promise<void>;
 };
 
+/**
+ * ODPOVEĎ 200 EŠTE NIE JE KALENDÁR. Prázdny súbor, HTML stránka alebo súbor
+ * odseknutý uprostred sa bez tejto stráže prečítali ako „0 udalostí" a snímka
+ * označila celé 35-dňové okno za zmiznuté — každý tréning by sa Jerrymu vrátil
+ * ako otázka „bol tam?". Chyba sa zapíše ako každá iná a dáta ostanú nedotknuté.
+ */
+export function overIcal(text: string): void {
+  const zaciatok = text.slice(0, 300).replace(/^\uFEFF/, "").trimStart();
+  if (!zaciatok.startsWith("BEGIN:VCALENDAR")) {
+    throw new Error(text.trim() ? "Odpoveď nie je kalendár (chýba BEGIN:VCALENDAR) — nič sa neoznačilo za zmiznuté." : "Kalendár prišiel prázdny — nič sa neoznačilo za zmiznuté.");
+  }
+  if (!text.slice(-300).trimEnd().endsWith("END:VCALENDAR")) {
+    throw new Error("Kalendár prišiel odseknutý (chýba END:VCALENDAR) — nič sa neoznačilo za zmiznuté.");
+  }
+}
+
 /** Text iCalu; pri prechodnom odmietnutí skúsi ešte dvakrát. Chyba = `HTTP <kód>`. */
 export async function stiahniIcal(url: string, m: StiahniMoznosti = {}): Promise<string> {
   const f = m.fetchFn ?? ((u: string, i: RequestInit) => fetch(u, i));
@@ -80,7 +96,11 @@ export async function stiahniIcal(url: string, m: StiahniMoznosti = {}): Promise
   for (let pokus = 0; ; pokus++) {
     // 28 s na pokus — Jerryho kalendár (~2,5 MB) generuje Google rôzne dlho (8. 9. 2026).
     const r = await f(url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
-    if (r.ok) return await r.text();
+    if (r.ok) {
+      const text = await r.text();
+      overIcal(text);
+      return text;
+    }
     if (!PRECHODNE.has(r.status) || pokus >= PAUZY_MS.length) {
       throw new Error(pokus ? `HTTP ${r.status} (${pokus + 1}× za sebou)` : `HTTP ${r.status}`);
     }
@@ -108,3 +128,34 @@ export function zdrojNaDobeh<T extends ZdrojNaDobeh>(zdroje: T[], teraz: number)
     .filter((z) => !!z.posledny_pokus && z.posledny_ok === 0 && teraz - Date.parse(z.posledny_pokus) > DOBEH_PO_MS)
     .sort((a, b) => (a.posledny_pokus || "").localeCompare(b.posledny_pokus || ""))[0];
 }
+
+// PRUDKÝ POKLES. Súbor môže byť platný a pritom skoro prázdny (Google vie
+// vrátiť rozpracovaný či cudzí stav). Bežné okno má 107–181 udalostí a medzi
+// snímkami sa za celý október 2026 nezmenilo ani o tretinu, takže strata viac
+// než polovice nie je „Jerry si zrušil týždeň". Snímka sa odmietne a nič sa
+// neoznačí za zmiznuté.
+//
+// Keby to bola pravda (tréner naozaj zmazal skoro všetko), kalendár nesmie
+// ostať zaseknutý navždy: po dvoch dňoch nepretržitého odmietania sa stav
+// prijme a Kokpit sa na zmiznuté spýta ako vždy. Zmiznutie nie je zrušenie
+// a udalosť, ktorá sa vráti, sa obnoví sama.
+export const POKLES_TEXT = "prudký pokles";
+const POKLES_MIN_STRATA = 10;
+const POKLES_PRIJAT_PO_MS = 48 * 3600 * 1000;
+
+/** Je nový počet udalostí podozrivo nízky oproti tomu, čo v okne žije? */
+export function prudkyPokles(predtym: number, teraz: number): boolean {
+  return predtym - teraz >= POKLES_MIN_STRATA && teraz < predtym / 2;
+}
+
+/**
+ * Odmietnuť snímku? `prveOdmietnutie` je čas prvej odmietnutej snímky od
+ * posledného úspechu (null = táto by bola prvá).
+ */
+export function odmietnutPokles(predtym: number, teraz: number, prveOdmietnutie: string | null, kedy: number): boolean {
+  if (!prudkyPokles(predtym, teraz)) return false;
+  return !prveOdmietnutie || kedy - Date.parse(prveOdmietnutie) < POKLES_PRIJAT_PO_MS;
+}
+
+export const textPoklesu = (predtym: number, teraz: number): string =>
+  `${POKLES_TEXT}: kalendár má náhle ${teraz} udalostí namiesto ${predtym}. Snímka odmietnutá, nič sa neoznačilo za zmiznuté. Ak je to pravda, po dvoch dňoch sa prijme sama.`;

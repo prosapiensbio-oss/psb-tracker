@@ -1,4 +1,5 @@
 import { normName } from "./format";
+import { prahaNaUtc } from "./notifikaciaHodin";
 
 /**
  * KTORÚ ZMENU V KALENDÁRI OHLÁSIŤ.
@@ -220,3 +221,73 @@ export const DOVODY_ZRUSENIA = [
  * konal = 1 znamená, že sa zmazaná hodina počíta, akoby klient prišiel.
  */
 export const DOVODY_S_DOCHADZKOU: ReadonlySet<string> = new Set(["zrušil na poslednú chvíľu / meškal", "neprišiel bez ozvania"]);
+
+/**
+ * ZMIZLA UDALOSŤ AŽ PO TOM, ČO SA SKONČILA?
+ *
+ * `zmizla_at` je UTC ISO zo stroja, `koniec` pražský nástenný čas. Priame
+ * porovnanie reťazcov (`u.zmizla_at > u.koniec` v SQL) bolo o 1–2 hodiny mimo:
+ * tréning do 10:00, ktorý zmizol o 11:00 v Prahe (v lete 09:00 UTC), vyšiel
+ * ako „zmizol pred koncom" a Kokpit sa naň nikdy nespýtal.
+ */
+export function zmizlaPoKonci(zmizlaAt: string | null | undefined, koniec: string | null | undefined): boolean {
+  if (!zmizlaAt || !koniec) return false;
+  const utc = prahaNaUtc(koniec);
+  return !!utc && Date.parse(zmizlaAt) > Date.parse(utc);
+}
+
+/**
+ * PRESUN UDALOSTI PRIAMO V GOOGLI.
+ *
+ * Kľúč udalosti je `UID|začiatok`, takže jednorazová udalosť presunutá
+ * v Googli príde ako nový riadok a to, čo o nej určil človek (`typ_rucne`,
+ * `klient_rucne`), by ostalo na zmiznutom. Pri ďalšom sťahovaní by z prepnutého
+ * úvodného bol zase bežný tréning a z Richarda zase Albert.
+ *
+ * Párujú sa len istoty: jeden zmiznutý a jeden nový s rovnakým UID, alebo pri
+ * sérii práve jeden a jeden v ten istý deň. Inak sa neprenesie nič — zlé
+ * pripísanie človeka je horšie než otázka navyše.
+ *
+ * `stare` = riadky v okne, `videne` = kľúče z práve stiahnutého súboru.
+ * Vráti novýKľúč → riadok, z ktorého sa berú ručné polia.
+ */
+export const holyUid = (kluc: string): string => {
+  const i = kluc.lastIndexOf("|");
+  return i < 0 ? kluc : kluc.slice(0, i);
+};
+
+export function prenosRucnych<T extends { uid: string; zaciatok: string; zmizla_at: string | null; typ_rucne: number | null; klient_rucne: number | null }>(
+  nove: { uid: string; zaciatok: string }[],
+  stare: T[],
+  videne: Set<string>,
+): Map<string, T> {
+  const out = new Map<string, T>();
+  const zname = new Set(stare.map((s) => s.uid));
+  const noveZaUid = new Map<string, { uid: string; zaciatok: string }[]>();
+  for (const n of nove) {
+    if (zname.has(n.uid)) continue;
+    const k = holyUid(n.uid);
+    noveZaUid.set(k, [...(noveZaUid.get(k) || []), n]);
+  }
+  if (!noveZaUid.size) return out;
+  const zmizleZaUid = new Map<string, T[]>();
+  for (const s of stare) {
+    if (videne.has(s.uid) || s.zmizla_at) continue;
+    const k = holyUid(s.uid);
+    if (noveZaUid.has(k)) zmizleZaUid.set(k, [...(zmizleZaUid.get(k) || []), s]);
+  }
+  const den = (x: { zaciatok: string }) => x.zaciatok.slice(0, 10);
+  for (const [k, noveU] of noveZaUid) {
+    const zmizle = zmizleZaUid.get(k) || [];
+    for (const n of noveU) {
+      const zdroj = noveU.length === 1 && zmizle.length === 1
+        ? zmizle[0]
+        : (() => {
+          const zTohoDna = zmizle.filter((s) => den(s) === den(n));
+          return zTohoDna.length === 1 && noveU.filter((x) => den(x) === den(n)).length === 1 ? zTohoDna[0] : undefined;
+        })();
+      if (zdroj && (zdroj.typ_rucne || zdroj.klient_rucne)) out.set(n.uid, zdroj);
+    }
+  }
+  return out;
+}

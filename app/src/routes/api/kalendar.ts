@@ -12,8 +12,8 @@ import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/
 import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from "../../lib/psb/nahodTrening.server";
 import { normName } from "../../lib/psb/format";
 import { citajIcal } from "../../lib/psb/ical";
-import { ohlasitZmenu, sparujZmeny, najdiPresun } from "../../lib/psb/kalendarZmeny";
-import { chybaZdroja, NEDOKONCENE, stiahniIcal, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
+import { ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, zmizlaPoKonci } from "../../lib/psb/kalendarZmeny";
+import { chybaZdroja, NEDOKONCENE, odmietnutPokles, POKLES_TEXT, stiahniIcal, textPoklesu, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
 //
@@ -106,6 +106,23 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const prveStiahnutie = stare.length === 0;
   const podlaUid = new Map(stare.map((s) => [s.uid, s]));
 
+  // Prudký pokles: platný, ale skoro prázdny súbor nesmie pochovať celé okno
+  // (kalendarZdroje). Porovnáva sa s tým, čo v tom istom okne práve žije.
+  const zivych = stare.filter((s) => !s.zmizla_at).length;
+  const prveOdmietnutie = (await DB.prepare(
+    `SELECT MIN(s.kedy) AS kedy FROM kal_snimky s
+      WHERE s.trener = ?1 AND s.ok = 0 AND s.chyba LIKE ?2
+        AND s.kedy > COALESCE((SELECT posledne_ok FROM kal_zdroje WHERE id = ?3), '')`,
+  ).bind(z.trener, `${POKLES_TEXT}%`, z.id).first<{ kedy: string | null }>())?.kedy ?? null;
+  if (odmietnutPokles(zivych, udalosti.length, prveOdmietnutie, Date.parse(kedy))) {
+    const chyba = textPoklesu(zivych, udalosti.length);
+    await DB.batch([
+      DB.prepare("UPDATE kal_zdroje SET posledna_chyba = ? WHERE id = ?").bind(chyba, z.id),
+      DB.prepare("UPDATE kal_snimky SET udalosti = ?, chyba = ? WHERE id = ?").bind(udalosti.length, chyba, snimkaId),
+    ]);
+    return { ok: false, chyba };
+  }
+
   // Naučené mapovanie mien — čo už raz človek potvrdil, sa druhýkrát nepýta.
   const mapovanie = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
     .bind(z.trener).all()).results || []) as unknown as Mapa[];
@@ -121,10 +138,12 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const zmena = (druh: string, u: string, nazov: string, klient: string | null, pred: string | null, po: string | null, typ: string | null = "trening") =>
     surove.push({ druh, u, nazov, klient, pred, po, typ: typ || "trening" });
 
-  const videne = new Set<string>();
+  const videne = new Set(udalosti.map((u) => u.uid));
+  // Udalosť presunutá priamo v Googli má nový kľúč, ale rozhodnutie človeka
+  // sa jej drží (kalendarZmeny.prenosRucnych).
+  const prenesene = prenosRucnych(udalosti, stare, videne);
 
   for (const u of udalosti) {
-    videne.add(u.uid);
     // Mapovanie sa vyberá aj podľa ČASU: „Marketa 8:30" je iná klientka než
     // „Marketa 14:00" a jedno meno na dvoch ľudí je v PSB bežné (18 krstných
     // mien má viac než jedného klienta).
@@ -135,9 +154,10 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // Klienta JEDNEJ udalosti, ktorého určil človek, pravidlo mena neprepíše
     // (21. 10. 2026 — „Albert Matl“ ↔ Richard Matl).
     const s = podlaUid.get(u.uid);
+    const rucne = s ?? prenesene.get(u.uid);
     // Klient z pravidla v tvare známeho klienta — „Široky" z pravidla je
     // „Široký" s balíčkom (28. 10. 2026, `tvarZnamehoKlienta`).
-    const klient = s?.klient_rucne ? s.klient : tvarZnamehoKlienta(m?.klient ?? presne, menaKlientov);
+    const klient = rucne?.klient_rucne ? rucne.klient : tvarZnamehoKlienta(m?.klient ?? presne, menaKlientov);
     // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
     // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie
@@ -150,12 +170,12 @@ async function snimka(DB: D1Database, z: Zdroj) {
      * každom ďalšom stiahnutí zmazalo ručnú opravu. Jerry, 7. 10. 2026: chce
      * vedieť z karty klienta prepnúť tréning na úvodný a mať pokoj.
      */
-    const typ = s?.typ_rucne ? (s.typ ?? typZPravidiel) : typZPravidiel;
+    const typ = rucne?.typ_rucne ? (rucne.typ ?? typZPravidiel) : typZPravidiel;
 
     if (!s) {
       prikazy.push(DB.prepare(
-        "INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at) VALUES (?,?,?,?,?,?,?,?,?,NULL)",
-      ).bind(u.uid, z.trener, u.zaciatok, u.koniec, u.nazov, klient, typ, kedy, kedy));
+        "INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, klient_rucne, prvy_raz, naposledy, zmizla_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL)",
+      ).bind(u.uid, z.trener, u.zaciatok, u.koniec, u.nazov, klient, typ, rucne?.typ_rucne ? 1 : null, rucne?.klient_rucne ? 1 : 0, kedy, kedy));
       if (!prveStiahnutie) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok, typ);
       continue;
     }
@@ -340,11 +360,13 @@ export const Route = createFileRoute("/api/kalendar")({
            * znamená len, že o ňom dlho nikto nerozhodol.
            */
           DB.prepare(
-            `SELECT u.uid, u.trener, u.zaciatok, u.nazov, u.klient, u.typ, u.zmizla_at
+            // „Zmizla po konci" sa stráži až v kóde (`zmizlaPoKonci`): zmizla_at
+            // je UTC, koniec pražský a v SQL sa to porovnať nedá.
+            `SELECT u.uid, u.trener, u.zaciatok, u.koniec, u.nazov, u.klient, u.typ, u.zmizla_at
                FROM kal_udalosti u
                LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
               WHERE u.zmizla_at IS NOT NULL
-                AND u.zmizla_at > u.koniec
+                AND u.koniec IS NOT NULL
                 AND u.typ IN ('trening','uvodny')
                 AND u.klient IS NOT NULL
                 AND k.uid IS NULL
@@ -469,7 +491,7 @@ export const Route = createFileRoute("/api/kalendar")({
           guillermo: guillermo.results || [],
           buduceTreningy: buduce.results || [],
           guillermoUdalosti: guillermoUdalosti.results || [],
-          sporneKonanie: sporne.results || [],
+          sporneKonanie: ((sporne.results || []) as unknown as { zmizla_at: string | null; koniec: string | null }[]).filter((u) => zmizlaPoKonci(u.zmizla_at, u.koniec)),
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
         });
       },
