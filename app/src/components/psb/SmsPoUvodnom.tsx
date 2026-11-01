@@ -102,7 +102,7 @@ export function SmsPoUvodnom({ meno, trener, dalsiTrening, klucNotifikacie, onOd
     try {
       const r = await fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ klient: meno, telefon, text: text.trim() }),
+        body: JSON.stringify({ klient: meno, telefon, text: text.trim(), druh: "uvodny" }),
       }).then((x) => x.json() as Promise<{ ok?: boolean; error?: string }>);
       if (!r.ok) { setChyba(r.error || "SMS neodišla."); return; }
       const poznamka = `SMS po úvodnom odoslaná${datum && cas ? ` · ďalší tréning ${datum} ${cas}` : ""}${fotky ? " · s fotkami pred a po" : ""}`;

@@ -34,7 +34,8 @@ describe("stránka pred úvodným", () => {
     expect(h).toContain("10:00");
     expect(h).toContain("Fanderlíkova 70");
     expect(h).toContain("60 minut");
-    expect(h).toContain("1100 Kč");
+    expect(h).toContain("1\u00a0100\u00a0Kč");
+    expect(h).not.toContain("1100 Kč");
   });
 
   it("nesie Jerryho znenie, nezmenené", () => {
@@ -64,8 +65,8 @@ describe("stránka pred úvodným", () => {
 describe("zľava sa prepíše do stránky", () => {
   it("nižšia cena nechá pôvodnú prečiarknutú vedľa", () => {
     const h = uvodnaStrankaHtml({ druh: "pred", trener: "Jerry", kedy: "2026-10-14T10:00", cenaCzk: 800, logoUrl: "/l.svg" });
-    expect(h).toContain("800 Kč");
-    expect(h).toContain(`<s style="color:#9FBCA9;font-weight:400">${UVODNY.cenaCzk} Kč</s>`);
+    expect(h).toContain("800\u00a0Kč");
+    expect(h).toContain(`<s style="color:#9FBCA9;font-weight:400">1\u00a0100\u00a0Kč</s>`);
   });
 
   it("nula je „zdarma“, nie chýbajúci údaj", () => {
@@ -107,7 +108,7 @@ describe("stránka po úvodnom", () => {
   });
 
   it("nepýta peniaze ani oblečenie — to už bolo", () => {
-    expect(h).not.toContain("1100 Kč");
+    expect(h).not.toContain("1\u00a0100\u00a0Kč");
     expect(h).not.toContain("legíny");
   });
 });
@@ -242,5 +243,31 @@ describe("ceník vyzerá ako tlačidlo", () => {
   it("šípka mieri dole, nie doprava", () => {
     expect(h).toContain(".rozbal{display:flex;transform:rotate(90deg)");
     expect(h).toContain("details[open] .rozbal{transform:rotate(-90deg)}");
+  });
+});
+
+describe("tréner v 3. páde a v správnom rode", () => {
+  const po = (trener: string) => uvodnaStrankaHtml({ druh: "po", trener, kedy: "2026-10-16T09:00", logoUrl: "/l.svg" });
+  it("Filip je Filipovi — nikde Jerrymu ani holé Filip", () => {
+    const h = po("Jerry");
+    expect(h).toContain(">Odeslat Filipovi</button>");
+    expect(h).toContain("Přijde to rovnou Filipovi, nikam jinam.");
+    expect(h).toContain("Zavolat Filipovi</a>");
+    expect(h).not.toContain("Jerrymu");
+    expect(h).toContain("jsem rád");
+    expect(h).toContain("jsem Vám dnes říkal,");
+  });
+  it("Terezka je Terezce a píše v ženskom rode", () => {
+    const h = po("Terezka");
+    expect(h).toContain(">Odeslat Terezce</button>");
+    expect(h).toContain("Přijde to rovnou Terezce, nikam jinam.");
+    expect(h).toContain("Zavolat Terezce</a>");
+    expect(h).toContain("jsem ráda");
+    expect(h).toContain("jsem Vám dnes říkala,");
+    expect(h).not.toContain("jsem rád,");
+  });
+  it("cena po zľave má tiež medzeru", () => {
+    const h = uvodnaStrankaHtml({ druh: "pred", trener: "Jerry", kedy: "2026-10-14T10:00", cenaCzk: 990, logoUrl: "/l.svg" });
+    expect(h).toContain("1\u00a0100\u00a0Kč</s> 990\u00a0Kč");
   });
 });

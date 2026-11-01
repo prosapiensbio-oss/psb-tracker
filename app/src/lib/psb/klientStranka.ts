@@ -275,7 +275,7 @@ ${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:$
 <span style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#4d5940">${l.bolt11 ? "Nebo pošli na adresu" : "Pošli na adresu"}</span>
 <input value="${esc(l.adresa)}" readonly inputmode="none" onfocus="this.select()" style="width:100%;box-sizing:border-box;margin-top:5px;padding:11px 12px;border:1px solid #4d5940;border-radius:10px;background:transparent;color:${s.pozadie};font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:700;text-align:center">
 </label>
-${l.bolt11 ? "" : `<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#4d5940">Částku ${esc(l.sats)} sats zadej v peněžence sám.</div>`}
+${l.bolt11 ? "" : `<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#4d5940">Částku ${esc(l.sats)} sats zadej v peněžence ručně.</div>`}
 ${ulozQr}
 <div style="margin-top:14px;font-size:11.5px;line-height:1.5;color:#4d5940">Částka je ${esc(kc(l.czk))}; satoshi jsou přepočet kurzem ${esc(l.kurz)} Kč/BTC${l.kurzKedy ? ` v ${esc(l.kurzKedy)}` : ""}. Peněženka může ukázat o pár korun jinak — platí korunová částka.</div>
 ${tlacidloKurzu(s.pozadie)}

@@ -117,7 +117,7 @@ ${stupnica(`oblast_sila_${i}`, minule[o], uvodne[o])}
   }).join("");
 
   const uvod = oblasti.length
-    ? `Ptáme se na to, s čím jsi přišel — na stejná místa, která jsi označil na úvodní lekci.`
+    ? `Ptáme se na stejná místa, která máš označená z úvodní lekce.`
     : `Když budeš chtít, ťukni. Vidí to jen tvůj trenér.`;
 
   const minulyPosun = minule[POSUN.id];
@@ -136,7 +136,7 @@ ${minulyPosun ? `<div style="font-size:11px;color:${TLMENY};margin-top:2px">minu
   const odkaz = `<div style="margin-bottom:16px">
 <div style="font-size:14px;line-height:1.45;margin-bottom:4px">${esc(POZNAMKA.text)}</div>
 <div style="font-size:11px;color:${TLMENY};margin-bottom:7px">${esc(POZNAMKA.pomoc)}</div>
-${v.poslednyOdkaz ? `<div style="font-size:11.5px;color:${TLMENY};margin-bottom:7px;padding-left:8px;border-left:2px solid ${RAMIK};line-height:1.45">minule jsi napsal: „${esc(v.poslednyOdkaz.text)}“ · ${den(v.poslednyOdkaz.datum)}</div>` : ""}
+${v.poslednyOdkaz ? `<div style="font-size:11.5px;color:${TLMENY};margin-bottom:7px;padding-left:8px;border-left:2px solid ${RAMIK};line-height:1.45">minule: „${esc(v.poslednyOdkaz.text)}“ · ${den(v.poslednyOdkaz.datum)}</div>` : ""}
 <textarea name="poznamka" rows="3" style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:9px;border:1px solid ${RAMIK};background:${VNUTRO};color:${TEXT};font-family:inherit;font-size:14px;line-height:1.45;resize:vertical"></textarea>
 </div>`;
 

@@ -4,6 +4,7 @@ import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { vychodiskovaSprava, type CisloKarty } from "../../lib/psb/fotkyStranka";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { krstne, TRENERI } from "../../lib/psb/mailFaktury";
+import { textSmsFotiek } from "../../lib/psb/smsSablony";
 import { nazovPohladu, type Fotka } from "../../lib/psb/kartoteka";
 import { C, mix } from "../../lib/psb/theme";
 import { OpravitText } from "./OpravitText";
@@ -78,7 +79,7 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
         <div style={{ marginTop: 12 }}>
           <SmsKlientovi
             meno={meno} trener={trener} vlozene druhAuditu="fotky"
-            predvolenyText={`Ahoj ${krstne(meno)}, posílám ti srovnání tvých fotek: ${hotovo.url}${podpis ? ` ${podpis}` : ""}`}
+            predvolenyText={textSmsFotiek(meno, hotovo.url, podpis)}
           />
         </div>
         <button type="button" onClick={onZrus} style={{ marginTop: 10, background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zavrieť</button>

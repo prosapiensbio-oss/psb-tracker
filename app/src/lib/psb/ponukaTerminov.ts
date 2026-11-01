@@ -10,6 +10,7 @@
  * Prahy": nikdy cez Date.parse, server je v UTC).
  */
 import { vokativ } from "./oslovenie";
+import { bezDiakritiky } from "./sms";
 
 
 export type CasPonuky = { id: string; trener: string; zaciatok: string; koniec: string };
@@ -142,13 +143,13 @@ export function denCz(den: string, velke = true): string {
 export const casHHMM = (s: string) => `${Number(s.slice(11, 13))}:${s.slice(14, 16)}`;
 
 /**
- * SMS s odkazom. Krátka — s diakritikou má jedna SMS 70 znakov a odkaz
- * zaberie väčšinu (pamäť „SMS je zvonček"). Stav (koľko termínov, kedy)
- * nenesie: ten povie stránka, ktorá je vždy aktuálna.
+ * SMS s odkazom. Krátka a BEZ DIAKRITIKY — s jediným mäkčeňom má správa limit
+ * 70 znakov a všetkých 5 ponúk z októbra 2026 odišlo ako dve SMS. Stav (koľko
+ * termínov, kedy) nenesie: ten povie stránka, ktorá je vždy aktuálna.
  */
 export function textSmsPonuky(oslovenie: string, url: string, podpis: string): string {
   const o = vokativ(oslovenie.trim());
-  return `${o ? `${o}, p` : "P"}osílám volné termíny, vyberte si: ${url} ${podpis}`.trim();
+  return bezDiakritiky(`${o ? `${o}, p` : "P"}osilam volne terminy, vyberte si: ${url} ${podpis}`).trim();
 }
 
 /**

@@ -22,7 +22,7 @@ describe("oslovenie", () => {
   it("človeku tyká — tak, ako Jerry píše z info@", () => {
     const m = mailFaktury(zaklad);
     expect(m.firme).toBe(false);
-    expect(m.telo.startsWith("Ahoj Anna,")).toBe(true);
+    expect(m.telo.startsWith("Ahoj Anno,")).toBe(true);
     expect(m.telo).toContain("tenhle mail");
     expect(m.telo).not.toContain("Dobrý den");
   });
@@ -90,7 +90,7 @@ describe("tykanie a vykanie sa dá prepnúť", () => {
     const m = mailFaktury({ ...zaklad, odberatel: { ...zaklad.odberatel, firma: "FSH Devices s.r.o." } }, { vykanie: false });
     expect(m.firme).toBe(true);
     expect(m.vykanie).toBe(false);
-    expect(m.telo.startsWith("Ahoj Anna,")).toBe(true);
+    expect(m.telo.startsWith("Ahoj Anno,")).toBe(true);
   });
 
   it("bez voľby rozhoduje, či je to firma", () => {

@@ -134,7 +134,28 @@ export type BlokFaktury = {
   ulozene?: boolean;
   /** Predvyplnené hodnoty z neúspešného odoslania, aby klient nepísal znova. */
   vstup?: Partial<Record<string, string>> | null;
+  /** Odkaz je starší než `FAKTURA_ZAPIS_DNI` — údaje sa len ukážu, formulár nie. */
+  zamknute?: boolean;
 };
+
+/**
+ * DOKEDY SA DAJÚ ÚDAJE MENIŤ CEZ ODKAZ.
+ *
+ * Odkaz po úvodnom nemá prihlásenie: kto ho má (preposlaná SMS, cudzí telefón),
+ * by inak vedel klientovi natrvalo prepísať firmu aj e-mail na faktúre. Fakturačné
+ * údaje sa riešia okolo úvodného, nie po mesiacoch. Po 60 dňoch stránka len číta;
+ * Kokpit okno obnoví, keď tréner odkaz vyrobí znova (`/api/uvodny`). Stránka
+ * a odpoveď klienta fungujú ďalej — tie cudziemu nič nedajú.
+ *
+ * Neznámy dátum zámok nezapne: zlomiť existujúci odkaz je horšie než nechať okno.
+ */
+export const FAKTURA_ZAPIS_DNI = 60;
+
+export function zapisFakturyOtvoreny(vytvorene: string | null | undefined, teraz: Date = new Date()): boolean {
+  const t = Date.parse(String(vytvorene || ""));
+  if (!Number.isFinite(t)) return true;
+  return teraz.getTime() - t <= FAKTURA_ZAPIS_DNI * 86400_000;
+}
 
 const pole = (label: string, name: string, hodnota: string, o: { ph?: string; pomoc?: string; typ?: string; mod?: string; auto?: string } = {}) => `
 <label style="display:block;margin-top:14px">
@@ -186,6 +207,21 @@ details[open]>.fa-tlacidlo{display:none}
 export function blokFakturyHtml(b: BlokFaktury): string {
   const u = b.udaje;
   const hotove = udajeHotove(u);
+  if (b.zamknute) {
+    const riadky = hotove && u ? [
+      u.firma || b.klient,
+      u.ulica,
+      [u.psc, u.mesto].filter(Boolean).join(" "),
+      [u.ico ? `IČO ${u.ico}` : "", u.dic ? `DIČ ${u.dic}` : ""].filter(Boolean).join(" · "),
+      u.email,
+    ].filter(Boolean) : [];
+    return `<details id="faktura">
+<summary class="fa-tlacidlo">${riadky.length ? "Fakturační údaje ✓" : "Chcete platit fakturou?"}</summary>
+<div style="border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px;background:#F6F8F6;font-size:14.5px;line-height:1.6;color:#3C4C42">
+${riadky.length ? `Fakturu vystavíme na:<br>${riadky.map(esc).join("<br>")}<br><br>Změnu údajů nám prosím napište.` : "Napište nám fakturační údaje a fakturu Vám vystavíme."}
+</div>
+</details>`;
+  }
   const vstup = b.vstup || {};
   const h = (k: string) => String(vstup[k] ?? "");
   const komu = h("komu") || (u && !u.ico && u.ulica ? "osoba" : "firma");

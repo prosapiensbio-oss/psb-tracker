@@ -7,7 +7,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { zmazNavrhyKlienta } from "../../lib/psb/editorNavrhy.server";
 import { bindings } from "../../lib/bindings.server";
-import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { akciaSmsAuditu, chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { koloNaOdoslanie, tokenKlienta } from "../../lib/psb/dotaznik.server";
@@ -19,7 +19,7 @@ import { koloNaOdoslanie, tokenKlienta } from "../../lib/psb/dotaznik.server";
  *   POST { akcia: "nastav" }   → uloží bránu, kľúč a odosielateľa
  *   POST { klient, telefon, text } → pošle jednu správu
  *   POST { …, hromadna: true }     → to isté, ale v audite ako `sms-hromadna`
- *   POST { …, druh: "ponuka" | "kalendar" } → v audite `sms-ponuka` / `sms-kalendar`
+ *   POST { …, druh: "uvodny" | "ponuka" | "kalendar" | … } → v audite `sms-<druh>`, nie `sms-odoslana`
  *   `{dotaznik}` v texte → osobný odkaz na anonymný dotazník, v audite `sms-dotaznik`
  *                                    (ponuka termínov, kalendár do mobilu — nie správa o hodinách)
  *                                    (oznam pre všetkých nemení zoznam v kroku SMS)
@@ -73,7 +73,7 @@ export const Route = createFileRoute("/api/sms")({
         }
         const n = await nastavenia(DB);
         const poslane = await DB.prepare(
-          "SELECT COUNT(*) n, MAX(at) posledna FROM vzas_audit WHERE action = 'sms-odoslana'",
+          "SELECT COUNT(*) n, MAX(at) posledna FROM vzas_audit WHERE action IN ('sms-odoslana', 'sms-uvodny')",
         ).first<{ n: number; posledna: string | null }>().catch(() => null);
         // Kľúč sa von neposiela nikdy — len to, či je vyplnený.
         return Response.json({
@@ -217,9 +217,10 @@ export const Route = createFileRoute("/api/sms")({
         // nesedí s profilom.
         const prijemca = kus(b.prijemca, 120);
         await audit(DB, {
-          // Hromadná správa a ponuka termínov nie sú správa o hodinách —
-          // `sms-odoslana` by klienta vyčistil zo zoznamu kroku 2 · SMS.
-          action: jeDotaznik ? "sms-dotaznik" : b.hromadna === true ? "sms-hromadna" : b.druh === "ponuka" ? "sms-ponuka" : b.druh === "kalendar" ? "sms-kalendar" : b.druh === "fotky" ? "sms-fotky" : b.druh === "anamneza" ? "sms-anamneza" : b.druh === "faktura" ? "sms-faktura" : "sms-odoslana",
+          // Hromadná správa, ponuka termínov ani SMS okolo úvodného nie sú
+          // správa o hodinách — `sms-odoslana` by klienta vyčistil zo zoznamu
+          // kroku 2 · SMS a umlčal „balíček minutý".
+          action: akciaSmsAuditu({ dotaznik: jeDotaznik, hromadna: b.hromadna, druh: b.druh }),
           // Číslo faktúry v predmete — zoznam faktúr podľa neho ukáže „SMS odoslaná".
           predmet: `${klient} · ${cislo}${b.druh === "faktura" && /^\d{8}$/.test(String(b.faktura || "")) ? ` · faktúra ${b.faktura}` : ""}`,
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,

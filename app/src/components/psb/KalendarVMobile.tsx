@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { stavOdberu } from "../../lib/psb/kalendarMobil";
-import { oslovenieKlienta } from "../../lib/psb/oslovenie";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { TRENERI } from "../../lib/psb/mailFaktury";
+import { textSmsKalendara } from "../../lib/psb/smsSablony";
 import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
 
@@ -51,9 +51,8 @@ export function KalendarVMobile({ meno, trener }: { meno: string; trener: string
   const posliSms = async () => {
     const url = odkaz?.url || (await vyrob("odkaz"));
     if (!url) return;
-    const krstne = oslovenieKlienta(meno);
     const podpis = (TRENERI[trener] || TRENERI.Jerry).krstne;
-    setSms(`${krstne ? `${krstne}, v` : "V"}aše tréninky si můžete dát do kalendáře v mobilu — připomene vám je sám: ${url} ${podpis}`);
+    setSms(textSmsKalendara(meno, url, podpis));
   };
   const kopiruj = async () => {
     const url = odkaz?.url || (await vyrob("odkaz"));

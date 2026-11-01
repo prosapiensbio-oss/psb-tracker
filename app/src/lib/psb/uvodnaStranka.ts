@@ -1,5 +1,6 @@
 import { CENNIK } from "./cennik";
 import { TRENERI } from "./mailFaktury";
+import { trenerovi } from "./oslovenie";
 import { blokFakturyHtml, CSS_FAKTURY, type BlokFaktury } from "./fakturaKlienta";
 
 /**
@@ -280,8 +281,8 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
   const cenaText = cena === 0
     ? "zdarma"
     : cena < UVODNY.cenaCzk
-      ? `<s style="color:#9FBCA9;font-weight:400">${UVODNY.cenaCzk} Kč</s> ${cena} Kč`
-      : `${cena} Kč`;
+      ? `<s style="color:#9FBCA9;font-weight:400">${kc(UVODNY.cenaCzk)}</s> ${kc(cena)}`
+      : kc(cena);
   const cenaDlzka = predUvodnym
     ? `<div style="margin-top:22px;display:flex;gap:30px">
 <div><div style="font-size:10px;letter-spacing:2px;color:#9FBCA9">DÉLKA</div><div style="font-size:17px;font-weight:600;margin-top:3px">${UVODNY.minut} minut</div></div>
@@ -322,19 +323,19 @@ ${cennikHtml()}
 <span style="flex-grow:1;min-width:0;font-size:16px;line-height:1.55;color:#3C4C42">Chceme Vás také upozornit, že tady máme psa.</span>
 </div>`
     : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
-<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : "Děkuji za účast a jsem rád, že jsme domluvili pokračování."}</p>
+<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">${bezTerminuPo ? "Děkuji za účast na úvodní lekci." : `Děkuji za účast a jsem ${t === "Terezka" ? "ráda" : "rád"}, že jsme domluvili pokračování.`}</p>
 
 ${v.odpovedPoslana
   ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
   : `${v.odpovedChyba !== undefined ? `<div style="margin-top:22px;border-left:3px solid #B4432F;background:#FBF3F1;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Vaši odpověď se nepodařilo uložit. Text máte níže — zkuste ho prosím odeslat znovu.</div>` : ""}<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
 <div style="font-size:15.5px;line-height:1.6;color:#3C4C42">Napište mi pár slov — co Vás překvapilo, co bolí, na co se ptáte. Nemusíte psát nic.</div>
 <textarea name="odpoved" rows="4" maxlength="1000" placeholder="pár slov stačí…" style="width:100%;box-sizing:border-box;margin-top:12px;padding:13px 14px;border:1px solid #DCE3DD;border-radius:12px;font-family:inherit;font-size:15px;color:#1A2E24;line-height:1.6;resize:vertical">${esc(v.odpovedChyba || "")}</textarea>
-<div style="margin-top:12px"><button type="submit" style="border:0;background:#1A2E24;color:#FFFFFF;border-radius:32px;padding:13px 26px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Odeslat ${esc(tr.krstne)}</button></div>
-<div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(tr.krstne)}, nikam jinam.</div>
+<div style="margin-top:12px"><button type="submit" style="border:0;background:#1A2E24;color:#FFFFFF;border-radius:32px;padding:13px 26px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Odeslat ${esc(trenerovi(t))}</button></div>
+<div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(trenerovi(t))}, nikam jinam.</div>
 </form>`}
 
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Souhrn z dnešní lekce</h2>
-<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes říkal, je sepsané tady.</p>
+<p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes ${t === "Terezka" ? "říkala" : "říkal"}, je sepsané tady.</p>
 ${riadokOdkazu(ODKAZY.poUvodnej, "Informace po úvodní lekci", "souhrn z dnešního tréninku")}
 
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">K lepšímu pochopení</h2>
@@ -393,7 +394,7 @@ ${telo}
 
 <div style="margin-top:34px;display:flex;flex-direction:column;gap:11px">
 <a href="${esc(smsHref)}" style="display:block;text-align:center;text-decoration:none;background:#2D7D5A;color:#FFFFFF;font-size:17px;font-weight:600;padding:19px 24px;border-radius:32px">${bezTerminuPo ? "Domluvit další trénink" : "Potvrdit termín"}</a>
-<a href="tel:${esc(tel)}" style="display:block;text-align:center;text-decoration:none;border:2px solid #1A2E24;color:#1A2E24;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px">Zavolat ${esc(tr.krstne === "Filip" ? "Jerrymu" : tr.krstne)}</a>
+<a href="tel:${esc(tel)}" style="display:block;text-align:center;text-decoration:none;border:2px solid #1A2E24;color:#1A2E24;font-size:17px;font-weight:600;padding:17px 24px;border-radius:32px">Zavolat ${esc(trenerovi(t))}</a>
 ${v.faktura ? blokFakturyHtml(v.faktura) : ""}
 </div>
 ${predUvodnym ? "" : fotkyHtml(v.fotky)}

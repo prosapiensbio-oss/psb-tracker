@@ -2466,7 +2466,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       const r = await fetch("/api/sms", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ klient: item.oKom, telefon: uvTelefon, text: uvText.trim() }),
+        body: JSON.stringify({ klient: item.oKom, telefon: uvTelefon, text: uvText.trim(), druh: "uvodny" }),
       }).then((x) => x.json() as Promise<{ ok?: boolean; error?: string }>);
       if (!r.ok) { setUvChyba(r.error || "SMS neodišla."); return; }
       setUvOtvoreny(false);

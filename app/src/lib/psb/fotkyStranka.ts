@@ -1,5 +1,5 @@
 import { SADZBA } from "./klientStranka";
-import { vokativ } from "./oslovenie";
+import { trenerovi, vokativ } from "./oslovenie";
 
 /**
  * STRÁNKA S FOTKAMI PRE KLIENTA — `/f/<token>` (Jerry, 12. 10. 2026).
@@ -189,7 +189,7 @@ ${texty}
   const kratkyDen = (d: string) => { const [, m, dd] = d.slice(0, 10).split("-"); return m && dd ? `${Number(dd)}. ${Number(m)}.` : d; };
   const suhlasBlok = v.suhlas
     ? `<div class="souhlas"><h4>${v.suhlas === "ano" ? "Díky, smíme je ukázat" : "Fotky zůstanou jen pro tebe"}</h4>
-<p>${v.suhlas === "ano" ? "Vždy bez obličeje a bez jména." : "Nikde je nezveřejníme."} Rozmyslel sis to?</p>
+<p>${v.suhlas === "ano" ? "Vždy bez obličeje a bez jména." : "Nikde je nezveřejníme."} Chceš to změnit?</p>
 <form method="post"><input type="hidden" name="akcia" value="suhlas"><input type="hidden" name="hodnota" value="${v.suhlas === "ano" ? "ne" : "ano"}">
 <button class="ne" type="submit">${v.suhlas === "ano" ? "Ne, raději jen pro mě" : "Ano, bez obličeje můžete"}</button></form></div>`
     : `<div class="souhlas"><h4>Smíme tvé srovnání ukázat?</h4>
@@ -200,7 +200,7 @@ ${texty}
 
   const posledna = v.odpovede.length ? v.odpovede[v.odpovede.length - 1].kedy : "";
   const odpovedBlok = `<div class="odpoved" id="odpoved"><h4>Chceš se na něco zeptat?</h4>
-<p>Napiš, co na fotky říkáš, nebo cokoli, co tě k nim napadá. Přijde to ${esc(v.trener || "trenérovi")}.</p>
+<p>Napiš, co na fotky říkáš, nebo cokoli, co tě k nim napadá. Přijde to ${esc(trenerovi(v.trener))}.</p>
 ${posledna ? `<div class="odeslano">✓ Zpráva odeslána ${esc(den(posledna))}. Můžeš napsat i další.</div>` : ""}
 <form method="post"><input type="hidden" name="akcia" value="odpoved">
 <textarea name="text" rows="4" maxlength="2000" required placeholder="Tvoje zpráva…"></textarea>

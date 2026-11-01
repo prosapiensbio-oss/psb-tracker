@@ -4,6 +4,7 @@ import type { ClientAgg } from "../../lib/psb/compute";
 import { normName } from "../../lib/psb/format";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { zlozHromadnuSms } from "../../lib/psb/smsSablony";
 import { C, mix } from "../../lib/psb/theme";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { NAHLAD_DOTAZNIKA } from "../../lib/psb/dotaznik";
@@ -19,7 +20,8 @@ import { NAHLAD_DOTAZNIKA } from "../../lib/psb/dotaznik";
  * ide ako `sms-hromadna`, nie `sms-odoslana` — inak by oznam pre všetkých
  * vyčistil zoznam v kroku SMS, ktorý hovorí o stave hodín.
  *
- * `{meno}` v texte sa nahradí krstným menom.
+ * `{meno}` v texte sa nahradí krstným menom v 5. páde bez diakritiky
+ * („Ahoj Katerino") — „Ahoj Kateřina" je zlý pád a mäkčeň zhodí limit na 70 znakov.
  *
  * `{dotaznik}` (9. 10. 2026) nahradí až SERVER osobným odkazom na anonymný
  * dotazník — odkaz vzniká pri odoslaní a do auditu ide ako `sms-dotaznik`.
@@ -29,8 +31,7 @@ import { NAHLAD_DOTAZNIKA } from "../../lib/psb/dotaznik";
 type Kontakt = { klient: string; telefon?: string };
 type Filter = "aktivni" | "pauza" | "vsetci" | "dotaznik";
 
-const krstne = (meno: string) => meno.trim().split(/\s+/)[0] || meno;
-const zlozText = (text: string, meno: string) => text.replace(/\{meno\}/gi, krstne(meno));
+const zlozText = zlozHromadnuSms;
 /** Dĺžka sa ráta s odkazom takej dĺžky, aký server naozaj vloží. */
 const ukazkaOdkazu = () => verejnyOdkaz(`/d/${"x".repeat(14)}`, typeof window === "undefined" ? "" : window.location.origin);
 const naPocitanie = (text: string, meno: string) => zlozText(text, meno).replace(/\{dotaznik\}/gi, ukazkaOdkazu());
@@ -189,7 +190,7 @@ export function HromadnaSprava({ clients, trener }: { clients: Record<string, Cl
           </button>
         </div>
         <textarea value={text} onChange={(e) => { setText(e.target.value); setPotvrd(false); }} rows={3}
-          placeholder="Ahoj {meno}, …  ({meno} sa nahradí krstným menom)" style={{ ...pole, width: "100%", resize: "vertical" }} />
+          placeholder="Ahoj {meno}, …  ({meno} sa nahradí krstným menom v 5. páde bez diakritiky)" style={{ ...pole, width: "100%", resize: "vertical" }} />
         <div style={{ fontSize: 11.5, color: dlzka.sprav > 1 ? C.orange : C.textDim, marginTop: 4 }}>
           {najdlhsi} znakov · {dlzka.sprav} SMS na klienta{dlzka.unicode ? " (diakritika: 70 znakov na SMS)" : ""}
           {prijemcovia.length > 0 && text.trim() && <> · spolu <b>{spolu} SMS</b></>}

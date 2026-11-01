@@ -10,6 +10,7 @@ import { setOverride } from "../../lib/psb/db.server";
 import { prevezmi, type StaryRiadok } from "../../lib/psb/anamnezaImport";
 import { zasifruj } from "../../lib/psb/sifra.server";
 import { dnesPraha } from "../../lib/psb/cas";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
 /**
  * ANAMNÉZA — strana trénera.
@@ -89,7 +90,7 @@ export const Route = createFileRoute("/api/anamneza")({
               trener: treneri.get(r.klient) || "",
               uvodny: r.uvodny,
               stav: r.stav || "ceka",
-              odkaz: r.token ? `${origin}/a/${r.token}` : null,
+              odkaz: r.token ? verejnyOdkaz(`/a/${r.token}`, origin) : null,
               klientVyplnilAt: r.klient_vyplnil_at,
               zapisAt: r.zapis_at,
               uzBol: !!r.uvodny && r.uvodny.slice(0, 10) <= dnes,
@@ -142,7 +143,7 @@ export const Route = createFileRoute("/api/anamneza")({
             suhlasy: a.suhlasy, klientVyplnilAt: a.klientVyplnilAt, zapisAt: a.zapisAt,
           },
           predvyplnene,
-          odkaz: a ? `${new URL(request.url).origin}/a/${a.token}` : null,
+          odkaz: a ? verejnyOdkaz(`/a/${a.token}`, new URL(request.url).origin) : null,
         }, { headers: { "cache-control": "no-store" } });
       },
 
@@ -226,7 +227,7 @@ export const Route = createFileRoute("/api/anamneza")({
 
         if (b.akcia === "odkaz") {
           const a = await zalozAleboNajdi(DB, klient, ANAMNEZA_KLUC, kto);
-          return Response.json({ ok: true, odkaz: `${new URL(request.url).origin}/a/${a.token}`, stav: a.stav });
+          return Response.json({ ok: true, odkaz: verejnyOdkaz(`/a/${a.token}`, new URL(request.url).origin), stav: a.stav });
         }
 
         if (b.akcia === "zapis") {

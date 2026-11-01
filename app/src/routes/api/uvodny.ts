@@ -124,6 +124,7 @@ export const Route = createFileRoute("/api/uvodny")({
                trener     = excluded.trener,
                kedy       = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
                cena_czk   = excluded.cena_czk,
+               vytvorene  = excluded.vytvorene,
                fotky_json = CASE WHEN ?9 = 1 THEN excluded.fotky_json ELSE uvodne_odkazy.fotky_json END`,
           ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString(), fotkyJson ?? null, fotkyJson === undefined ? 0 : 1).run()
             // Bez migrácie 0127 stĺpec fotky_json nie je — odkaz bez fotiek
@@ -136,7 +137,8 @@ export const Route = createFileRoute("/api/uvodny")({
                  ON CONFLICT (klient, druh) DO UPDATE SET
                    trener   = excluded.trener,
                    kedy     = COALESCE(excluded.kedy, uvodne_odkazy.kedy),
-                   cena_czk = excluded.cena_czk`,
+                   cena_czk = excluded.cena_czk,
+                   vytvorene = excluded.vytvorene`,
               ).bind(token, klient, druh, trener, kedy, cena, new Date().toISOString()).run();
             });
 

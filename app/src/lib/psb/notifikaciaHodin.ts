@@ -35,7 +35,7 @@ export function polozkyHodin(
   udalosti: { zaciatok: string; klient: string | null; typ: string | null }[],
   platby: { klient: string; datum: string }[],
   balicky: { klient: string; platnost_od?: string; platnostOd?: string }[],
-  /** Kedy klientovi naposledy odišla SMS — audit `sms-odoslana` (UTC). */
+  /** Kedy klientovi naposledy odišla SMS O HODINÁCH — audit `sms-odoslana` (UTC); `sms-uvodny` a iné druhy sem nepatria. */
   odoslaneUtc: Record<string, string>,
   ack: Ack,
   dnes: Date = new Date(),

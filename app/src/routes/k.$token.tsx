@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { bindings } from "../lib/bindings.server";
 import { jeNahladOdkazu, platformaStranky, telefonZAdresy, teloStrankyKalendara } from "../lib/psb/kalendarMobil";
 import { TRENERI } from "../lib/psb/mailFaktury";
-import { oslovenieKlienta } from "../lib/psb/oslovenie";
+import { oslovenieKlienta, trenerovi } from "../lib/psb/oslovenie";
 import { verejnyOdkaz } from "../lib/psb/verejnyOdkaz";
 
 /**
@@ -88,7 +88,7 @@ export const Route = createFileRoute("/k/$token")({
           logo, oslovenie: oslovenieKlienta(r.klient), telefon,
           webcal, google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
           kratka: verejnyOdkaz(`/k/${token}`, url.origin),
-          telefonTrenera: t.telefon, komu: r.trener === "Terezka" ? "Terezce" : "Filipovi",
+          telefonTrenera: t.telefon, komu: trenerovi(r.trener || "Jerry"),
           naPocitaci: platforma === "Mac" || platforma === "Windows",
         }));
       },

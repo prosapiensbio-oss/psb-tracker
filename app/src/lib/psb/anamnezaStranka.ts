@@ -143,7 +143,8 @@ export function strankaHtml(v: VstupStranky): string {
         <h1 style="margin-top:10px">Máme to</h1>
         <p class="lead">Díky${krstne ? `, ${krstne}` : ""}. Vidíme se na úvodním tréninku${v.uvodny ? ` — ${esc(v.uvodny)}` : ""}.</p>
       </div>`
-    : `<form method="post" id="f">
+    : `<noscript><div class="pomoc">Prohlížeč má vypnutý JavaScript, takže vidíte všechny otázky. Vyplňte jen ty, které se vás týkají.</div></noscript>
+      <form method="post" id="f">
         <div class="viem">
           <b>${esc(v.klient)}</b><br>
           <span>${[v.kontakt.email, v.kontakt.telefon, narText].filter(Boolean).map(esc).join(" · ")}</span>
@@ -182,6 +183,7 @@ export function strankaHtml(v: VstupStranky): string {
 <meta name="format-detection" content="telephone=no">
 <title>Než přijdete — ProSapiens</title>
 <style>${STYL}</style>
+${v.hotovo ? "" : `<noscript><style>[hidden]{display:block!important}</style></noscript>`}
 </head><body><div class="obal">
 <div class="znacka">ProSapiens Biomechanic</div>
 ${v.hotovo ? "" : `<h1>Než přijdete</h1><p class="lead">${esc(sekcia.pozn || "")}</p>`}
