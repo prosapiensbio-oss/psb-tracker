@@ -1209,8 +1209,9 @@ const naTyzden = (h: number) => h / TYZDNOV;
 function DebtBox({ p }: { p: DebtPerson }) {
   const [open, setOpen] = useState(false);
   const rastie = p.slope < 0;
-  // Dlh voči trénerovi je záporné číslo (firma dlží). Keď je kladný, tréner si
-  // vybral viac, než mal nárok — vtedy nemá zmysel pýtať sa na hodiny.
+  // Rozdiel = Nárok − Poslané. ZÁPORNÝ dlh = tréner si vybral viac, než mal
+  // nárok, a dlží firme. KLADNÝ = vybral si menej a firma dlží jemu — vtedy
+  // nemá zmysel pýtať sa na hodiny.
   const dlzi = p.dlh < 0;
   const h12 = p.hodinyNa(12);
   const nadZonou = naTyzden(h12) > ZONE_HI;
@@ -1250,7 +1251,7 @@ function DebtBox({ p }: { p: DebtPerson }) {
             )}
           </div>
         )}
-        {/* Opačné znamienko: tréner si vybral viac, než mal nárok. Otázka
+        {/* Opačné znamienko: tréner si vybral menej, než mal nárok. Otázka
             „koľko hodín" tu nedáva zmysel — dlh je na druhej strane. */}
         {!dlzi && p.dlh !== 0 && (
           <div style={{ marginTop: 9, marginLeft: 14, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 60)}`, fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
