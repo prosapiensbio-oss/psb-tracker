@@ -534,6 +534,9 @@ verzia 2 od 24. 10. 2026 (podrobnosti v README v jej repe).
   Terezkiných dátach, košík skúšaný jedným banánom (vrátený).
 - [ ] **Pripomienka do telefónu** – overiť na Terezkinom telefóne (appka na ploche → Nastavenia → Povoliť
   → Poslať skúšobnú).
+- [ ] **Odovzdať appku Terezke na úpravy** – čaká na ňu (Jerry 1. 11. 2026): zatiaľ nemá GitHub ani Claude Code.
+  Keď pošle meno z GitHubu: súkromný repozitár, automatické nasadzovanie z `main` ako pri Kokpite, lokálne
+  skúšanie bez ostrého KV, návod pre jej Clauda (košík je skutočný). Kľúč od Cloudflare NEDÁVAŤ — má prístup aj ku Kokpitu a BTC.
 
 ---
 
