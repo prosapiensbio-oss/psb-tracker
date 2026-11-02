@@ -17,7 +17,7 @@ Stav k **27. 10. 2026** (overené v D1: ponuku termínov si klienti vybrali už 
 **Veci s dátumom** (sem patrí všetko, čo sa nedá urobiť skôr, aby to
 nezapadlo medzi úlohami bez termínu):
 
-- **2. 11. 2026** — ranná dávka notifikácií má prvýkrát odísť o 6:30 Prahy (05:30Z, `ranne-push` v `automaty`) a automatické balíčky prvýkrát z plánovača (04:15Z). Overiť.
+- [x] **2. 11. 2026** — overené v `automaty`: ranná dávka odišla o 05:30Z (4 odbery), automatické balíčky z plánovača o 04:15Z (0 nových), všetkých 17 automatov bez chyby.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **do 1. 12. 2026** — PTminder je zrušený (1. 11. 2026, účet sa deaktivuje 1. 12., ďalšia platba neodíde). Čaká sa na rozhodnutie o vrátení €90,97, tiket v ich chate, Jerry žiadal odpoveď na prosapiens.bio@gmail.com. Dáta vymažú 3 mesiace po zrušení; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
 - **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
@@ -25,6 +25,47 @@ nezapadlo medzi úlohami bez termínu):
   merania webu — 27. 10. 2026" nižšie).
 
 ---
+
+## NAŠLO SA PRI PREHĽADE KONVERZÁCIÍ — 2. 11. 2026
+
+Jerry: „na čo sme ešte zabudli, čo sme vynechali?“ Prešlo sa ~76 konverzácií od 10. 10. Nič z tohto v zozname nebolo. Do Websupportu, WordPressu ani Fintable sa nepozeralo; Gmail len hľadaním.
+
+**S termínom**
+- [ ] **20. 11. 2026 — Azure Speech (jazyková appka):** potvrdiť prechod na pay-as-you-go, inak kľúč výslovnosti prestane fungovať.
+
+**Peniaze a dohody**
+- [ ] **Postupné čerpanie výplaty vs. model A.** Jerry 2. 11.: „ostať pri tom mojom čerpaní“. Dohoda s Terezkou hovorí výplata 3. a strop zálohy (11/30 000, 12/20 000, 1/10 000, potom 0); `STROP_ZALOHY` v `strazcaVyberu.ts` ostáva, Strážca pošle „Záloha nad dohodu“. Prebrať s Terezkou; úprava Strážcu je 2. 11. rozrobená v inej session (necommitnuté).
+- [ ] **Chýbajúcich 100 Kč:** v zošite Jarek −10 000, Terka −4 000; Jerry: „chýbalo im každému 100 Kč“. Reálne 9 900 a 3 900? Riadky neopravené.
+- [ ] **Radek Baláž:** vrátené 15 500 (zošit) alebo 15 275 (platba)? Riadok je `mimo`, platba −15 275.
+- [ ] **Kasička čerpanie 57 k vs. Kokpit 65 735** za október — nevysvetlené.
+- [ ] **Poistka ČPP (Suchý):** zmluvu pred zaplatením 7 315 Kč skontrolovať (začiatok, bytový priestor, poistený). V Gmaile za 10 dní od neho nič.
+
+**Bezpečnosť**
+- [ ] **Výmena prístupových údajov** (rozbor 1. 11., pripomenuté 4×, bez odpovede): `info@`, SMS, Meta, Google servisný účet, Metricool, MailerLite, Google Ads, PageSpeed, tajomstvo webu. Zmazať `~/Downloads/psb-zaloha-2026-08-04.json` a `-08-08.json` (ešte tam sú).
+- [ ] **33 zastaraných pluginov** na webe (Wordfence 27. 10.; bezpečnostná oprava PixelYourSite, Yoast, WooCommerce). Na živom WP neoverené.
+- [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
+- [ ] **Gmail filter posiela do koša** `noreply-accounts@google.com`, `no-reply@stock.adobe.com`, `noreply@ptminder.com` (k 20. 10.). Môže zhltnúť odpoveď PTmindera o €90,97.
+
+**Vybavovačky** (do schránky jerrystranavsky sa nepozeralo)
+- [ ] Reedog: náhrada Cheerble Wicked Ball Air, zaplatených 711 Kč (31. 10.).
+- [ ] Klára, craft-line: cena DTG + výšivka a jej otázky z 22. 10. (31. 10.).
+- [ ] Mail pre Dárek pro Putina s fotkami: pripravený v `~/Downloads/Russke Horiace rafinerie/`, neodoslaný Claudom (26. 10.).
+- [ ] Zásielka LT069964211UA: telefonát na Poštu Brno 2 (2. 11.).
+- [ ] Kasička: korunový účet na vankúš; Fintable predplatné 72 € nikde nepotvrdené.
+
+**Neoverené naostro**
+- [ ] QR „V den splatnosti“ v bankovej appke (predvyplní budúci dátum?).
+- [ ] Okno dôvodu zrušenia + „započítať do dochádzky“: zatiaľ prešlo len bez započítania; po prvom „áno“ pozrieť, či hodina ubudla.
+- [ ] Večerné čítanie pošty, Terezkin pohľad a gestá na iPhone, prihlásenie po zrušení spoločného hesla.
+- [ ] Zvyšok auditu webu z 18. 10.: cookie lišta pre nového návštevníka, formulár klávesnicou, nenačítané obrázky.
+
+**Možno, Jerry rozhodne**
+- [ ] Marketingový plán s Terezkou z 3. 10. sa nenašiel; zapísať, keď ho prerozprávajú.
+- [ ] Rozhovory s Reginou a Annou (tehotné): Regina bola 15. 10. v 6.–7. mesiaci; súhlas písomne.
+- [ ] Reel Natália „lopatka“: hotový, bez reakcie, súhlas nezapísaný.
+- [ ] José/Guillermo: 2 tréningy v mínuse, čakala sa nová Blink adresa (14. 10.).
+- [ ] Investičná appka: odložená, „keď Budúcnosť stabilne drží 15 %“. Len evidencia, nestavať.
+- [ ] Drobnosti: „Treba urobiť“ dvakrát v Analýze Kasičky; `updated_at` na myšlienkovej mape; máj v Ahsokinom priemere; Irina Dyldina DYNAMIKA bez počtu hodín.
 
 ## PORADIE OD 13. 10. 2026 (Jerry: „napíš celý zoznam a poradie“)
 
@@ -458,7 +499,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - **Odkaz s fotkami pre klienta — NAOSTRO od 12. 10. 2026.** `/f/<token>` (podoba A, olivová; `lib/psb/fotkyStranka.ts`, route `f.$token.tsx`, migrácia 0113). Profil → fotky → krúžkom označiť porovnania z editora → „Poslať klientovi" (správa, voliteľné čísla, „čo ďalej") → odkaz + SMS tlačidlom. Odpoveď klienta → register trénerovi (`fotkyOdkazy.ts`) + push bez obsahu + denník (odkial „fotky") + sekcia „Poslané klientovi". Krátky odkaz prosapiens.cz/f/ zapnutý 12. 10. (snippet 26 so súhlasom). Editor od 12. 10.: šípka, lupa, jemné zväčšenie, návrat k hotovému porovnaniu (✎ upraviť, migrácia 0114). **Otvorené:** (1) lupa a kreslenie overené len simulovaným dotykom, nie na iPade; (2) ~~„Na čem budeme pracovat dál"~~ rozhodnuté 13. 10.: pýta sa až tesne pred vytvorením odkazu (krok „Ďalej →", dá sa preskočiť); v ten deň pribudol aj nadpis „N týdnů práce" s rozsahom dní a „tvůj trenér · poslal"; (3) prvé ostré poslanie: Vaškovi poslané a otvorené 13. 10. Oslovenie „Ahoj Martin" bez 5. pádu Jerry 13. 10. schválil („úplne v pohode, netreba"). Editor 13. 10.: touchpad a dva prsty = plocha, veľkosť fotky len za rohy — na skutočnom iPade neoverené.
 
 - **Dozor reklám — NAOSTRO od 10. 10. 2026.** Notifikácia z dôvodu, s číslami a návrhom (`lib/psb/reklamaDozor.ts`, testy; `/api/meta` akcie `dozor`, `rozhodni-kampan`, `dozor-nastavenie`; plánovač 4:20 UTC; migrácia 0109). Tlačidlá Nechať · Vypnúť · Zmeniť rozpočet (potvrdenie so sumou na mesiac, strop 2 000 Kč/deň a 3×) · počet DM pri interakciách · Prompt pre Clauda; karta Marketing → Náklady → Dozor reklám. **Čaká na Jerryho (overené naživo 27. 10. o 8:20):**
-- [ ] **Dva staré administrátorské účty STÁLE SÚ** — Nika Pastorová
+- [x] *(Jerry 27. 10. 2026: „zmazal som oba pluginy aj tie dva účty“; na živom WP neoverené.)* **Dva staré administrátorské účty** — Nika Pastorová
   (pastorova@emglare.com) a Admin Systedo (admin@systedo.cz). Administrátori sú
   stále traja.
 - [x] *(Jerry 1. 11. 2026: zmazané; `/wp-content/plugins/revslider/readme.txt` aj `js_composer` vracajú 404.)* **Zmazať Slider Revolution a WPBakery** — od 26. 10. vypnuté, ale
