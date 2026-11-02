@@ -43,7 +43,8 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 - [ ] **Reel Natália „lopatka“:** Natália súhlasí (Jerry 2. 11.), reel je `~/Downloads/Test strih videa/Natalia_reel_lopatka.mp4`, ešte nenaplánovaný.
 - [ ] **José/Guillermo:** 2 tréningy v mínuse, čaká sa na jeho odpoveď.
 - [ ] **Nový marketingový plán:** starý z 3. 10. sa nenašiel, Jerry: „ideme ďalej a vytvoríme nový“.
-- [ ] **Dátumy narodenia:** odkaz hotový (Workspace → Anamnézy), posiela Jerry.
+- [ ] **Dátumy narodenia:** odkaz hotový (Workspace → Anamnézy), posiela Jerry. Bez čísla: Klára Malíčková, Petr Baťa, Romana Prochádzková.
+- [ ] **Radek Baláž:** vyplatených 15 500, v platbe je −15 275. Opraviť v profile klienta (platba → upraviť → −15500); za mňa zápis neprešiel.
 - [ ] Neoverené naostro: večerné čítanie pošty, prihlásenie po zrušení spoločného hesla. Zvyšok auditu webu z 18. 10.: cookie lišta pre nového návštevníka, formulár klávesnicou, nenačítané obrázky.
 - [ ] Investičná appka: odložená, „keď Budúcnosť stabilne drží 15 %“. Len evidencia, nestavať.
 - [ ] Drobnosti: „Treba urobiť“ dvakrát v Analýze Kasičky; `updated_at` na myšlienkovej mape; máj v Ahsokinom priemere; Irina Dyldina DYNAMIKA bez počtu hodín.
@@ -51,7 +52,7 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 **Vybavené 2. 11. (neotvárať)**
 - Postupné čerpanie: s Terezkou dohodnuté. Strážca: november limit 46 487, od decembra nárok podľa tempa, strop zálohy zrušený.
 - Staré zálohy `psb-zaloha-*` sú v Koši. Gmail: PTminder už nejde do koša, od ptminder.com hviezdička + dôležité.
-- Radek Baláž: vyplatených 15 500. Jarek −10 000 sedí, z tých peňazí hneď zaplatil Markétu (9 400); riadky ostávajú.
+- Jarek −10 000 sedí, z tých peňazí hneď zaplatil Markétu (9 400); riadky ostávajú.
 - Reedog, Klára (craft-line), zásielka LT069964211UA: Jerry vybavil.
 - Okno „započítať hodinu“ a Terezkin pohľad na iPhone: Jerry: irelevantné, neoverovať.
 
