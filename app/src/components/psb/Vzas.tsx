@@ -16,7 +16,9 @@ import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlHodnotaOpravy, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { SADZBA_ZASKOK_KC, ZASKOK, ZASKOK_DO, ZASKOK_OD } from "../../lib/psb/zaskok";
-import { breakEvenRad } from "../../lib/psb/rezerva";
+import { CIEL_MESIACOV, breakEvenRad, chybaDoCiela } from "../../lib/psb/rezerva";
+import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
+import { useRezerva } from "./useRezerva";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
@@ -1721,7 +1723,7 @@ function SalaryTab({ sessions }: { sessions: PSBData["sessions"] }) {
 // the SAME side. Real cashflow needs the outgoing side too, which only VZAS has.
 // Non-cash lines are excluded: "Fond na náradie" is a transfer to/from a
 // reserve, not money leaving the business.
-function CashflowTab() {
+function CashflowTab({ data }: { data: PSBData }) {
   const p = pnlCalc();
   const r = useRange();
   const idx = r.idx;
@@ -1751,7 +1753,7 @@ function CashflowTab() {
         </div>
       </Card>
 
-      <ReserveCard idx={idx} />
+      <ReserveCard data={data} />
 
       <Card>
         <H3>
@@ -1771,7 +1773,7 @@ function CashflowTab() {
         </div>
       </Card>
 
-      <KamOdisliCard />
+      <KamOdisliCard rezervnyUcet={stavRezervnehoUctu(data.rezervaPrevody || [])} />
 
       <Card>
         <H3>Mesačný tok</H3>
@@ -1825,8 +1827,10 @@ type FioZostatok = { suma: number; datum: string; rucne?: boolean };
  *   • účet — konečný zostatok z NAJNOVŠIEHO výpisu z Fia (číslo od banky),
  *   • hotovosť — koľko je fyzicky v obálke; opisuje sa pri uzávierke,
  *   • bitcoin — prepočítaný kurzom z druhej appky.
+ * Od 2. 11. 2026 aj rezervný účet, ak na ňom niečo je: bez neho „Firma má spolu"
+ * nesedelo s dlaždicou Rezerva o to, čo sa už odložilo.
  */
-export function KamOdisliCard() {
+export function KamOdisliCard({ rezervnyUcet = 0 }: { rezervnyUcet?: number }) {
   const [res, setRes] = useState<BtcReserve | null>(null);
   const [fio, setFio] = useState<FioZostatok | null>(null);
   const [stav, setStav] = useState<StavPenazi | null>(null);
@@ -1927,7 +1931,7 @@ export function KamOdisliCard() {
   const btc = res?.czk ?? 0;
   const naUcte = fio?.suma ?? 0;
   const hotovost = stav?.hotovost ?? 0;
-  const spolu = naUcte + hotovost + btc;
+  const spolu = naUcte + hotovost + btc + rezervnyUcet;
   const staryFio = fio ? (Date.now() - Date.parse(fio.datum)) / 86400000 : 0;
   const staraHotovost = stav ? (Date.now() - Date.parse(stav.datum)) / 86400000 : 0;
 
@@ -1945,7 +1949,7 @@ export function KamOdisliCard() {
     <Card>
       <H3>
         <Info
-          text="Tri skutočné čísla, nič dopočítané. Účet je konečný zostatok z najnovšieho výpisu z Fia — číslo od banky, nie súčet pohybov. Hotovosť sa opisuje z obálky pri uzávierke. Bitcoin sa prepočítava kurzom sám. Predtým tu bol teoretický rozklad („prevádzkový prebytok“, „vklad od Jarka“), ktorý vyzeral ako zostatok, ale zostatok to nebol — tie peniaze dávno nie sú."
+          text="Skutočné čísla, nič dopočítané. Účet je konečný zostatok z najnovšieho výpisu z Fia — číslo od banky, nie súčet pohybov. Hotovosť sa opisuje z obálky pri uzávierke. Bitcoin sa prepočítava kurzom sám. Predtým tu bol teoretický rozklad („prevádzkový prebytok“, „vklad od Jarka“), ktorý vyzeral ako zostatok, ale zostatok to nebol — tie peniaze dávno nie sú."
           label="Kde tie peniaze sú"
         />
       </H3>
@@ -1965,6 +1969,11 @@ export function KamOdisliCard() {
           "V bitcoine", btc, C.orange,
           "Hodnota bitcoinovej rezervy podľa aktuálneho kurzu, načítaná z BTC appky. Prepočítava sa sama.",
           "aktuálny kurz",
+        )}
+        {rezervnyUcet > 0 && riadok(
+          "Rezervný účet", rezervnyUcet, C.text,
+          "Súčet prevodov z hlavného účtu na rezervný účet PSB (5 % z platieb klientov).",
+          "súčet prevodov",
         )}
       </div>
 
@@ -2044,37 +2053,40 @@ export function KamOdisliCard() {
 }
 
 // ── Rezerva ──────────────────────────────────────────────────────────────────
-// The reserve is not a P&L line — it is what the studio has, not what it earned.
-// It lives in the Bitcoin app; this reads it live so nobody retypes two numbers.
-// Measured in months of operating cost, because "178 000 Kč" means nothing until
-// you know it buys about one month.
-function ReserveCard({ idx }: { idx: number[] }) {
-  const [res, setRes] = useState<BtcReserve | null>(null);
-  const [stav, setStav] = useState<"load" | "ok" | "err">("load");
-  useEffect(() => { fetchBtcReserve().then((r) => { setRes(r); setStav(r ? "ok" : "err"); }); }, []);
-
-  // Vzorec žije vo vzas.ts (breakEvenRad) — jedna definícia pre celú appku.
-  const beRad = breakEvenRad();
-  const beMes = idx.length ? idx.reduce((a, i) => a + beRad[i], 0) / idx.length : 0;
-  const czk = res?.czk ?? 0;
-  const mesiace = beMes > 0 ? czk / beMes : 0;
+// Rozklik dlaždice Rezerva: to isté číslo a pod ním, z čoho je. Do 2. 11. 2026
+// tu bol len bitcoin delený break-evenom zvoleného obdobia (1,6 mes. proti 1,8).
+// Filter obdobia sa rezervy netýka: je to stav dnes, nie súčet za obdobie.
+function ReserveCard({ data }: { data: PSBData }) {
+  const { rezerva, btc: res, btcStav: stav, ucet, hotovost, rezervnyUcet } = useRezerva(data.rezervaPrevody);
+  const mesiace = rezerva.mesiace;
+  const chyba = chybaDoCiela(rezerva);
   const goalPct = res?.goalSats ? (res.sats / res.goalSats) * 100 : null;
+  const zlozky = [
+    ucet ? `účet ${fmtCZK(ucet.suma)}` : "",
+    hotovost ? `hotovosť ${fmtCZK(hotovost.suma)}` : "",
+    res ? `bitcoin ${fmtCZK(res.czk ?? 0)}` : "",
+    rezervnyUcet > 0 ? `rezervný účet ${fmtCZK(rezervnyUcet)}` : "",
+  ].filter(Boolean).join(" + ");
 
   return (
     <Card>
-      <H3><Info text="Bitcoinová rezerva sa načítava priamo z appky PSB Bitcoin (len na čítanie). Nie je to príjem ani náklad, preto nie je v P&L — je to majetok. Prepočet na mesiace používa break-even za zvolené obdobie, teda vrátane nárokov na výplaty." label="Rezerva" /></H3>
+      <H3><Info text="Koľko mesiacov by firma ustála bez jedinej tržby. To isté číslo ako dlaždica Rezerva a Jarvis: všetko, čo firma má, delené priemerným break-evenom za posledných 6 uzavretých mesiacov (vrátane nárokov na výplaty). Filter obdobia ho nemení, je to stav dnes. Nie je to príjem ani náklad, preto nie je v P&L." label="Rezerva" /></H3>
       {stav === "load" && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam z BTC appky…</div>}
       {stav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
       {stav === "ok" && res && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-            <StatCard value={fmtCZK(czk)} label={<Info text={`${res.sats.toLocaleString("sk-SK")} sats pri kurze ${fmtCZK(res.rateCzkPerBtc ?? 0)} / BTC.`} label="Hodnota rezervy" />} color={C.orange} />
-            <StatCard value={`${mesiace.toFixed(1).replace(".", ",")} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes. Drž na pamäti, že je v bitcoine — pri poklese kurzu o tretinu je z toho tretina mesiaca menej.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
+            <StatCard value={mesiace === null ? "—" : `${mesiace.toFixed(1).replace(".", ",")} mes.`} label={<Info text={`Pri priemernom break-evene ${fmtCZK(rezerva.bePriem ?? 0)}/mes. Väčšina je v bitcoine, takže pri poklese kurzu číslo klesne.`} label="Mesiacov prevádzky" />} color={mesiace !== null && mesiace >= CIEL_MESIACOV ? C.green : mesiace !== null && mesiace >= 1 ? C.orange : C.red} />
+            <StatCard value={fmtCZK(rezerva.majetok ?? 0)} label={<Info text="Účet, hotovosť, bitcoin a rezervný účet spolu." label="Hodnota rezervy" />} color={C.orange} />
+            {chyba !== null && chyba > 0 && <StatCard value={fmtCZK(chyba)} label={`Chýba do ${CIEL_MESIACOV} mesiacov`} color={C.textMuted} />}
             {goalPct != null && (
-              <StatCard value={`${Math.round(goalPct)} %`} label={<Info text={`Cieľ z BTC appky: ${(res.goalSats ?? 0).toLocaleString("sk-SK")} sats.`} label="Cieľ v satoshi" />} color={C.blue} />
+              <StatCard value={`${Math.round(goalPct)} %`} label={<Info text={`Cieľ z BTC appky: ${(res.goalSats ?? 0).toLocaleString("sk-SK")} sats. Máš ${res.sats.toLocaleString("sk-SK")} sats pri kurze ${fmtCZK(res.rateCzkPerBtc ?? 0)} / BTC.`} label="Cieľ v satoshi" />} color={C.blue} />
             )}
           </div>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
+            {zlozky} · delené break-evenom {fmtCZK(rezerva.bePriem ?? 0)} / mes. (Ø 6 uzavretých mesiacov)
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 3 }}>
             Kurz aktualizovaný {res.rateUpdatedAt ? new Date(res.rateUpdatedAt).toLocaleString("sk-SK") : "—"} · zdroj: appka PSB Bitcoin
           </div>
         </>
@@ -2083,7 +2095,6 @@ function ReserveCard({ idx }: { idx: number[] }) {
   );
 }
 
-// ── Jarek ────────────────────────────────────────────────────────────────────
 function JarekTab() {
   const [kanalyOpen, setKanalyOpen] = useState(false);
   const jk = jarekCalc();
@@ -3062,11 +3073,10 @@ function KpiTab({ data, onNavigate }: { data: PSBData; onNavigate?: (tab: string
       return next;
     });
   };
-  const [rezerva, setRezerva] = useState<number | null>(null);
-  useEffect(() => { fetchBtcReserve().then((r) => setRezerva(r?.czk ?? null)); }, []);
+  const { rezerva } = useRezerva(data.rezervaPrevody);
   const kpis = useMemo(
-    () => computeKpis(year, data.sessions, data.payments, overrides, rezerva),
-    [year, data.sessions, data.payments, overrides, rezerva],
+    () => computeKpis(year, data.sessions, data.payments, overrides, rezerva.mesiace),
+    [year, data.sessions, data.payments, overrides, rezerva.mesiace],
   );
   const groups: KpiGroup[] = ["peniaze", "lievik", "kapacita", "cena"];
   const mimo = kpis.filter((k) => k.status === "mimo");
@@ -3436,7 +3446,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
           </div>
         </>
       )}
-      {sub === "cashflow" && <CashflowTab />}
+      {sub === "cashflow" && <CashflowTab data={data} />}
       {sub === "jarek" && <JarekTab />}
       {sub === "nakupy" && <Nakupy />}
     </>

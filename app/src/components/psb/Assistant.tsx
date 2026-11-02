@@ -1458,29 +1458,17 @@ export function Assistant({ chat, onClientClick, onNavigate, bezSpustaca = false
     window.addEventListener("pointerup", up);
   }
 
-  /**
-   * PANEL SI VYHRADÍ MIESTO, NEPREKRÝVA PRÁCU (rozbor Kokpitu, 1. 11. 2026:
-   * zakryl meno v Evidencii). Obsah appky sa odsunie doľava o šírku panela —
-   * `--jarvis-miesto` číta aj Workspace, ktorý ide na celú šírku okna.
-   * Keď by obsahu ostalo menej než 760 px (kde sa tabuľky začnú lámať), panel
-   * prekrýva vedome: je to okno na jednu otázku a ✕ je hneď po ruke. Na telefóne
-   * je to tak vždy.
-   */
-  useEffect(() => {
-    if (!open || bezSpustaca) return;
-    const miesto = Math.min(size.w, window.innerWidth - 32) + 32;
-    if (window.innerWidth - miesto < 760) return;
-    document.documentElement.style.setProperty("--jarvis-miesto", `${miesto}px`);
-    document.body.style.paddingRight = `${miesto}px`;
-    return () => {
-      document.documentElement.style.removeProperty("--jarvis-miesto");
-      document.body.style.paddingRight = "";
-    };
-  }, [open, size.w, bezSpustaca]);
-
-  // Vstup je v hlavičke appky (počítač) alebo v lište dole (telefón) — plávajúce
-  // tlačidlo zakrývalo obsah a robilo to isté z druhého miesta (1. 11. 2026).
-  if (!open) return null;
+  // Bublina vpravo dole a panel ako vyskakovacie okno nad prácou (Jerry, 2. 11. 2026:
+  // „vráť mi Jarvisa aj doprava dole"). Rozbor z 1. 11. ich vzal: tlačidlo ostalo len
+  // v hlavičke a panel odsúval obsah. Hlavička zostáva ako druhý vstup.
+  if (!open) {
+    if (bezSpustaca) return null;
+    return (
+      <button onClick={() => chat.otvorPrazdny()} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť Jarvisa">
+        <Spark /> Jarvis
+      </button>
+    );
+  }
 
   return (
     <div className="psb-card" style={{ position: "fixed", right: 20, bottom: bezSpustaca ? "calc(84px + env(safe-area-inset-bottom))" : 20, zIndex: 61, width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>

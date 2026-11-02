@@ -27,6 +27,7 @@ import { Zosit } from "./Zosit";
 import { Uzavierky } from "./Uzavierky";
 import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
+import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { RegisterRow } from "./Dashboard";
 import { NaCeluObrazovku } from "./NaCeluObrazovku";
 import { NarodeninyKarta } from "./NarodeninyKarta";
@@ -2059,7 +2060,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
               // výdavkami aj tak nejde (`prekazkyZamku` v App).
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
               otazky: <OtazkyMesiaca mesiac={mk} ja={trenerKroku === "Terezka" ? "terezka" : trenerKroku === "Jerry" ? "jerry" : undefined} />,
-              hotovostStav: <KamOdisliCard />,
+              hotovostStav: <KamOdisliCard rezervnyUcet={stavRezervnehoUctu(data.rezervaPrevody || [])} />,
               // Zdroj sa doplní tu, nie o dve obrazovky ďalej (Jerry, 8. 10. 2026).
               zdroje: (
                 <ZdrojeKlientov
@@ -2221,8 +2222,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
     // plocha — čím širšia, tým viac riadkov sa vybaví bez rolovania, a vpravo
     // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
     // trik: 100vw a posun o polovicu rozdielu doľava.
-    // `--jarvis-miesto`: šírka, ktorú si vyhradil otvorený panel Jarvisa (Assistant).
-    <div style={{ width: "calc(100vw - var(--jarvis-miesto, 0px))", marginLeft: "calc(50% - 50vw + var(--jarvis-miesto, 0px) / 2)", padding: mobil ? "0 10px" : "0 20px", boxSizing: "border-box" }}>
+    <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: mobil ? "0 10px" : "0 20px", boxSizing: "border-box" }}>
       {mobil && (
         <div style={{ position: "sticky", top: 59, zIndex: 30, margin: "-16px -10px 8px", padding: "6px 10px", background: mix(C.bg, 96), backdropFilter: "blur(10px)" }}>
           {radKariet}

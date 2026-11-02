@@ -1,3 +1,4 @@
+import { useRezerva } from "./useRezerva";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries, type BtcReserve } from "../../lib/psb/client";
@@ -522,6 +523,7 @@ export function useExtraGrafy({
 
   // Rezervu potrebuje aj KPI „rezerva v mesiacoch prevádzky", nielen karta BTC.
   const chceKpi = KPI_KARTY.some((k) => aktivne.has(k.id));
+  const { rezerva: rezervaKpi } = useRezerva(dataAll.rezervaPrevody, chceKpi);
   const [btc, setBtc] = useState<BtcReserve | null>(null);
   const [btcStav, setBtcStav] = useState<"load" | "ok" | "err">("load");
   useEffect(() => {
@@ -1489,7 +1491,7 @@ export function useExtraGrafy({
     // Rovnaké čísla ako obrazovka Výsledky → KPI (tá istá computeKpis, tie isté
     // ciele z DB) — len bez posuvníkov. Cieľ sa mení tam, kde sa o ňom
     // rozhoduje; dashboard ho ukazuje.
-    const kpis = computeKpis(KPI_ROK, dataAll.sessions, dataAll.payments, kpiOverrides, btc?.czk ?? null);
+    const kpis = computeKpis(KPI_ROK, dataAll.sessions, dataAll.payments, kpiOverrides, rezervaKpi.mesiace);
     for (const karta of KPI_KARTY) {
       const riadky = kpis.filter((k) => k.def.group === karta.group && !kpiSkryte.includes(k.def.id));
       const vsetkyVSkupine = kpis.filter((k) => k.def.group === karta.group).length;

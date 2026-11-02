@@ -3301,11 +3301,10 @@ function skupinaFaktur(
               robia. Rad záložiek je mapa obrazoviek; toto tam robilo zmätok.
               Tvar aj rozmery kopírujú „+ Zápis", aby dvojica držala spolu. */}
           <button
-            // Jediný vstup na počítači (rozbor, 1. 11. 2026: hlavička aj plávajúce
-            // tlačidlo robili to isté z dvoch miest). Otvorí panel vedľa práce;
+            // Otvorí panel, rovnako ako bublina vpravo dole (Jerry chce obe, 2. 11. 2026);
             // do veľkého rozloženia vedie ⤢ v jeho hlavičke.
             onClick={() => { if (active === "jarvis") return; if (chat.floatingOpen) chat.setFloatingOpen(false); else chat.otvorPrazdny(); }}
-            title="Jarvis vedľa práce — ⤢ v jeho hlavičke ho otvorí vo veľkom, s dokumentmi a staršími debatami"
+            title="Jarvis v okne — ⤢ v jeho hlavičke ho otvorí vo veľkom, s dokumentmi a staršími debatami"
             aria-pressed={chat.floatingOpen || active === "jarvis"}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",

@@ -1,7 +1,8 @@
 import { describe, expect, it, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { CIEL_MESIACOV, breakEvenPriemer, breakEvenRad, chybaDoCiela, poslednyUzavretyIdx, spocitajRezervu } from "./rezerva";
-import { VZAS_MONTHS } from "./vzas";
+import { VZAS_MONTHS, computeKpis } from "./vzas";
 
 describe("spocitajRezervu", () => {
   it("sčíta účet, hotovosť aj bitcoin", () => {
@@ -113,5 +114,24 @@ describe("konsolidácia zostatku (27. 8. 2026)", () => {
     expect(r.majetok).toBe(138_223);
     expect(Number.isFinite(r.majetok)).toBe(true);
     expect(r.uplna).toBe(false);
+  });
+});
+
+// Jerry, 2. 11. 2026: dlaždica 1,8 mes., po rozkliknutí 1,6.
+describe("rezerva v mesiacoch je všade to isté číslo", () => {
+  const citaj = (f: string) => readFileSync(new URL(f, import.meta.url).pathname, "utf8");
+
+  it("Cashflow aj KPI berú useRezerva, nie vlastný výpočet", () => {
+    const vzas = citaj("../../components/psb/Vzas.tsx");
+    const karta = vzas.slice(vzas.indexOf("function ReserveCard"), vzas.indexOf("function JarekTab"));
+    expect(karta).toContain("useRezerva(data.rezervaPrevody)");
+    expect(karta).not.toContain("breakEvenRad");
+    expect(vzas).toContain("overrides, rezerva.mesiace)");
+    expect(citaj("../../components/psb/DashGrafy.tsx")).toContain("kpiOverrides, rezervaKpi.mesiace)");
+  });
+
+  it("KPI prevezme hodnotu tak, ako prišla", () => {
+    const k = computeKpis("2026", [], [], undefined, 1.8).find((x) => x.def.id === "rezervaMes");
+    expect(k?.value).toBe(1.8);
   });
 });
