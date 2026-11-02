@@ -1552,11 +1552,16 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
               const jeDnes = d === dnesIso;
               return (
                 <div key={d} style={{
+                  position: "relative",
                   textAlign: "center", fontSize: 11.5, paddingBottom: 5,
-                  color: jeDnes ? C.accentLight : C.textMuted,
+                  color: jeDnes ? C.red : C.textMuted,
+                  background: jeDnes ? mix(C.red, 8) : undefined,
+                  borderRadius: jeDnes ? "7px 7px 0 0" : undefined,
                   borderBottom: `1px solid ${mix(C.border, 60)}`,
                 }}>
-                  {DNI_SK[i % 7]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.accentLight : C.text }}>{Number(d.slice(8, 10))}</b>
+                  {DNI_SK[i % 7]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.red : C.text }}>{Number(d.slice(8, 10))}</b>
+                  {/* Rám dnešného dňa: horná časť, pokračuje v stĺpci mriežky. */}
+                  {jeDnes && <div style={{ position: "absolute", inset: 0, bottom: -1, border: `2px solid ${C.red}`, borderBottom: "none", borderRadius: "7px 7px 0 0", pointerEvents: "none" }} />}
                 </div>
               );
             })}
@@ -1587,11 +1592,15 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                   position: "relative", height: hodin * VYSKA,
                   borderLeft: `1px solid ${mix(C.border, 60)}`,
                   overflow: "hidden", cursor: "copy",
+                  background: d === dnesIso ? mix(C.red, 8) : undefined,
+                  borderRadius: d === dnesIso ? "0 0 7px 7px" : undefined,
                 }}
               >
                 {Array.from({ length: hodin }, (_, i) => (
                   <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 45)}` }} />
                 ))}
+                {/* Prekrytie, nie okraj stĺpca: okraj by posunul výpočet času pri kliku a ťahu. */}
+                {d === dnesIso && <div style={{ position: "absolute", inset: 0, border: `2px solid ${C.red}`, borderTop: "none", borderRadius: "0 0 7px 7px", pointerEvents: "none" }} />}
                 {((vDni) => {
                   // Prekrývajúce sa hodiny vedľa seba, nie na sebe.
                   const miesta = rozlozUdalosti(vDni.map((u) => ({ od: minuty(u.zaciatok), do: minuty(u.koniec) })));
