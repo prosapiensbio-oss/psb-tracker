@@ -32,19 +32,19 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 
 **Otvorené**
 - [ ] **20. 11. 2026 — Azure Speech (jazyková appka):** účet jerrystranavsky@gmail.com, portál → Upgrade, plán „Basic – Zahrnuto“ (nie Vývojář $29). Stránku som Jerrymu otvoril, potvrdzuje a platí on.
-- [ ] **26 z 34 pluginov na webe má aktualizáciu** (29 aktívnych), overené vo WP 2. 11., Jerry myslel, že sú vymazané. Patrí sem PixelYourSite, Contact Form 7, WooCommerce, Jetpack, Klaviyo, Správce souborů WP. Čo sa nepoužíva, zmazať; zvyšok aktualizovať a po formulároch overiť dopyt.
-- [ ] **Gmail filter maže „Wordfence Alert / Problems found“** (online@prosapiens.cz). Po vlámaní z 19. 10. je to práve výstraha, ktorú treba vidieť. Čaká na Jerryho slovo. Filter na Google prihlásenia a Adobe Stock tiež ostáva.
+- [ ] **Pluginy na webe (2. 11.):** 9 nepotrebných vypnutých a web overený (duplicate-page, exclude-pages-from-menu, health-check, kirki, klaviyo, media-cleaner, responsive-lightbox, social-icons-widget-by-wpzoom, wp-file-manager). **Jerry má zmazať** všetkých 14 vypnutých vo WP → Pluginy → Neaktívne, najmä `card-press-756_deactivated`, podstrčený plugin z vlámania 19. 10. Ostáva 20 aktívnych, časť má čakajúcu aktualizáciu, aktualizovať po jednom. Nezmazať: Jetpack (doručuje obrázky cez i0.wp.com), Forminator, CF7, Easy Accordion (5 stránok), Real Testimonials (/, /o-nas/, /jerry/), Simple Download Monitor (Protokol MFR), Code Snippets, Asset CleanUp.
+- [x] Gmail filter mazal výstrahy Wordfence: zrušený 2. 11. Filter na Google prihlásenia a Adobe Stock ostáva.
 - [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
 - [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
-- [ ] **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo, potom nachystá zmluvu. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali. Pred zaplatením 7 315 Kč skontrolovať začiatok a poisteného.
-- [ ] **Mail Dárek pro Putina:** `podpora@proukrajinu.org`, text a fotky v `~/Downloads/Russke Horiace rafinerie/`. Jerry: „kľudne ho pošli“.
+- [ ] **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo. Jerry: „čakaj“, zatiaľ neodpovedať. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali.
+- [ ] **Mail Dárek pro Putina:** text pripravený v otvorenom okne Gmailu (2. 11.), Jerry priloží 3 fotky z `~/Downloads/Russke Horiace rafinerie/PRE-FOND/` (01, 02, 03) a odošle. Sedenie k priečinku nemá prístup.
 - [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
 - [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.
 - [ ] **Reel Natália „lopatka“:** Natália súhlasí (Jerry 2. 11.), reel je `~/Downloads/Test strih videa/Natalia_reel_lopatka.mp4`, ešte nenaplánovaný.
 - [ ] **José/Guillermo:** 2 tréningy v mínuse, čaká sa na jeho odpoveď.
 - [ ] **Nový marketingový plán:** starý z 3. 10. sa nenašiel, Jerry: „ideme ďalej a vytvoríme nový“.
 - [ ] **Dátumy narodenia:** odkaz hotový (Workspace → Anamnézy), posiela Jerry. Bez čísla: Klára Malíčková, Petr Baťa, Romana Prochádzková.
-- [ ] **Radek Baláž:** vyplatených 15 500, v platbe je −15 275. Opraviť v profile klienta (platba → upraviť → −15500); za mňa zápis neprešiel.
+- [x] Radek Baláž: vrátenie opravené na −15 500 (2. 11., Jerry: „urob to ty“).
 - [ ] Neoverené naostro: večerné čítanie pošty, prihlásenie po zrušení spoločného hesla. Zvyšok auditu webu z 18. 10.: cookie lišta pre nového návštevníka, formulár klávesnicou, nenačítané obrázky.
 - [ ] Investičná appka: odložená, „keď Budúcnosť stabilne drží 15 %“. Len evidencia, nestavať.
 - [ ] Drobnosti: „Treba urobiť“ dvakrát v Analýze Kasičky; `updated_at` na myšlienkovej mape; máj v Ahsokinom priemere; Irina Dyldina DYNAMIKA bez počtu hodín.
