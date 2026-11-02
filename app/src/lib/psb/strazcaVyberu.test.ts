@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { cerpanieMesiaca, narokPodlaTempa, rozhodni, rozhodniZalohu, stropZalohy, zalohyMesiaca } from "./strazcaVyberu";
+import { cerpanieMesiaca, limitMesiaca, narokPodlaTempa, rozhodni, rozhodniLimit, rozhodniZalohu, stropZalohy, zalohyMesiaca } from "./strazcaVyberu";
 
 const model = { fix: 27000, prah: 60, sadzba: 850 };
 
@@ -68,5 +68,19 @@ describe("zálohy po prechode na výplatu 3. (model A)", () => {
     const r = rozhodniZalohu("2026-11", 31000, 30000, null);
     expect(r.poslat).toBe(true);
     expect(rozhodniZalohu("2026-11", 33000, 30000, { mesiac: "2026-11", prah: 1 }).poslat).toBe(false);
+  });
+});
+
+describe("limit celého mesiaca", () => {
+  test("platí len pre november; december ostáva na zálohách", () => {
+    expect(limitMesiaca("2026-11")).toBe(46487);
+    expect(limitMesiaca("2026-12")).toBeNull();
+  });
+  test("výber po 5. v limite je ticho, nad limitom sa ozve a potom po 5 000 Kč", () => {
+    expect(rozhodniLimit("2026-11", 46487, 46487, null).poslat).toBe(false);
+    const r = rozhodniLimit("2026-11", 47000, 46487, null);
+    expect(r.poslat).toBe(true);
+    expect(rozhodniLimit("2026-11", 50000, 46487, { mesiac: "2026-11", prah: 1 }).poslat).toBe(false);
+    expect(rozhodniLimit("2026-11", 52000, 46487, { mesiac: "2026-11", prah: 1 }).poslat).toBe(true);
   });
 });

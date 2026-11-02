@@ -3228,6 +3228,9 @@ Za apríl – september si Jerry vybral +29 % nad nárok; s hodinami navyše za
   jan 10 000 · potom 0; `stropZalohy`). Výplata 1.–5. deň a spoločné sa do
   zálohy nerátajú. VZAS priraďuje výplatu podľa dňa prevodu — mesačný
   rozdiel sa tým posunie o mesiac, kumulovaný dlh sedí.
+  **November 2026 výnimka** (Jerry 2. 11.: čerpá postupne): strážca porovnáva
+  celé čerpanie s limitom mesiaca 46 487 (`LIMIT_MESIACA`). December a ďalej
+  zálohy, kým sa Jerry s Terezkou nedohodnú inak.
 - **Rezervný účet PSB = Fio 2503222384/2010** (`REZERVA_CISLO`). Spozná sa
   podľa ČÍSLA protiúčtu (meno je to isté ako pri výplatách): kategória
   `presun` (nie náklad), nie je kandidát na platbu klienta, `data.rezervaPrevody`

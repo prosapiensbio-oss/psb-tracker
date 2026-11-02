@@ -9,7 +9,7 @@ import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { loadData } from "../../lib/psb/db.server";
 import { mzdoveHodiny } from "../../lib/psb/mzdoveHodiny";
 import { posli, type Odber } from "../../lib/psb/push.server";
-import { cerpanieMesiaca, narokPodlaTempa, rozhodni, rozhodniZalohu, stropZalohy, zalohyMesiaca, type PohybFio, type StavStrazcu } from "../../lib/psb/strazcaVyberu";
+import { cerpanieMesiaca, limitMesiaca, narokPodlaTempa, rozhodni, rozhodniLimit, rozhodniZalohu, stropZalohy, zalohyMesiaca, type PohybFio, type StavStrazcu } from "../../lib/psb/strazcaVyberu";
 import { platbaNavyse } from "../../lib/psb/hodinyNavyse";
 import { CURRENT_ERA } from "../../lib/psb/vzas";
 
@@ -75,8 +75,10 @@ export const Route = createFileRoute("/api/strazca-vyberu")({
          */
         const strop = stropZalohy(mesiac);
         const zalohy = zalohyMesiaca(pohyby, mesiac);
-        const r = strop === null ? rozhodni(mesiac, cerpanie, narok, posledny) : rozhodniZalohu(mesiac, zalohy, strop, posledny);
-        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0, zalohy, stropZalohy: strop,
+        const limit = limitMesiaca(mesiac);
+        const r = limit !== null ? rozhodniLimit(mesiac, cerpanie, limit, posledny)
+          : strop === null ? rozhodni(mesiac, cerpanie, narok, posledny) : rozhodniZalohu(mesiac, zalohy, strop, posledny);
+        const suhrn = { mesiac, cerpanie, narok: narok.narok, podlaTempa: narok.podlaTempa, hodinyDoteraz: hodiny[mesiac]?.jerry || 0, zalohy, stropZalohy: strop, limitMesiaca: limit,
           btcVyplaty: btc === null ? "kniha neodpovedala" : btc.filter((p) => p.date >= `${mesiac}-01`).reduce((x, p) => x - p.suma, 0) };
 
         if (!r.poslat || skuska) return Response.json({ ok: true, ...suhrn, poslat: r.poslat, text: r.poslat ? r.text : undefined, skuska });

@@ -119,3 +119,35 @@ export function rozhodniZalohu(
       : `Počas mesiaca je vybraných ${kc(zalohy)} mimo výplaty 3. Podľa dohody sa výber nad nárok robí len po dohode s Terezkou.`,
   };
 }
+
+/**
+ * LIMIT CELÉHO MESIACA NAMIESTO ZÁLOHY (Jerry 2. 11. 2026): čerpá postupne, nie
+ * jednou výplatou 3., takže výber po 5. nie je „záloha nad dohodu“. V takom
+ * mesiaci sa stráži všetko čerpanie proti tomu, čo mu v ňom patrí: doplatok
+ * za október 22 630 − nechané vo firme 6 143 + strop 30 000 (číslo z Kasičky).
+ * December a ďalej zatiaľ platia zálohy — dohoda je aj na Terezke.
+ */
+export const LIMIT_MESIACA: Record<string, number> = { "2026-11": 46487 };
+
+export function limitMesiaca(mesiac: string): number | null {
+  return LIMIT_MESIACA[mesiac] ?? null;
+}
+
+export function rozhodniLimit(
+  mesiac: string,
+  cerpanie: number,
+  limit: number,
+  posledny: StavStrazcu,
+): { poslat: false } | { poslat: true; prah: number; titulok: string; text: string } {
+  const nad = cerpanie - limit;
+  if (nad <= 0) return { poslat: false };
+  const prah = Math.floor(nad / KROK_CZK) + 1;
+  if (posledny && posledny.mesiac === mesiac && posledny.prah >= prah) return { poslat: false };
+  const kc = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kč`;
+  return {
+    poslat: true,
+    prah,
+    titulok: "Výber nad limit mesiaca",
+    text: `Tento mesiac je vybraných ${kc(cerpanie)}, limit je ${kc(limit)} — o ${kc(nad)} viac.`,
+  };
+}
