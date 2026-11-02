@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { polozkyFotiek } from "./fotkyOdkazy";
+import { odkazNeodoslany, polozkyFotiek, smsKOdkazu } from "./fotkyOdkazy";
 
 describe("odpovede klientov na fotky v notifikáciách", () => {
   it("každá odpoveď je vlastná položka trénerovi, ktorý odkaz poslal", () => {
@@ -21,4 +21,36 @@ describe("odpovede klientov na fotky v notifikáciách", () => {
     expect(p.map((x) => x.key)).toEqual(["fotky|suhlas|a"]);
   });
   it("bez dát nič", () => expect(polozkyFotiek(undefined)).toEqual([]));
+});
+
+describe("odkaz s fotkami, ku ktorému neodišla SMS (Lukas Hanus, 1. 11. 2026)", () => {
+  const vznik = "2026-11-01T13:31:51.851Z";
+  const zaklad = { vytvorene: vznik, platiDo: "2026-12-01", sms: null };
+  const teraz = new Date("2026-11-02T09:00:00Z");
+  it("SMS pred vznikom odkazu ani SMS inému klientovi sa nerátajú", () => {
+    expect(smsKOdkazu("Lukas Hanus", vznik, [
+      { at: "2026-10-15T15:36:00Z", predmet: "Lukas Hanus · +420733712969" },
+      { at: "2026-11-01T14:00:00Z", predmet: "Radek Balaž · +420777776363" },
+    ])).toBeNull();
+  });
+  it("SMS po vzniku sa ráta aj pri inom tvare mena", () => {
+    expect(smsKOdkazu("Lukas Hanus", vznik, [{ at: "2026-11-01T14:00:00Z", predmet: "Lukáš Hanus · +420733712969" }])).toBe("2026-11-01T14:00:00Z");
+  });
+  it("hlási sa odkaz bez SMS starší než hodina", () => {
+    expect(odkazNeodoslany(zaklad, teraz)).toBe(true);
+    expect(odkazNeodoslany(zaklad, new Date("2026-11-01T14:00:00Z"))).toBe(false);
+  });
+  it("nehlási sa odoslaný, otvorený, zrušený ani po platnosti", () => {
+    expect(odkazNeodoslany({ ...zaklad, sms: "2026-11-01T14:00:00Z" }, teraz)).toBe(false);
+    expect(odkazNeodoslany({ ...zaklad, otvorene: "2026-11-01T14:00:00Z" }, teraz)).toBe(false);
+    expect(odkazNeodoslany({ ...zaklad, zrusene: "2026-11-01T14:00:00Z" }, teraz)).toBe(false);
+    expect(odkazNeodoslany({ ...zaklad, platiDo: "2026-11-01" }, teraz)).toBe(false);
+  });
+  it("v registri je to oranžová položka s menom a miestom, kde sa to vybaví", () => {
+    const p = polozkyFotiek({ odpovede: [], suhlasy: [], neodoslane: [{ token: "uM", klient: "Lukas Hanus", kedy: vznik, trener: "Jerry" }] });
+    expect(p[0].key).toBe("fotky|neodoslane|uM");
+    expect(p[0].tone).toBe("orange");
+    expect(p[0].detail).toContain("Lukas Hanus");
+    expect(p[0].detail).toContain("Poslať SMS");
+  });
 });

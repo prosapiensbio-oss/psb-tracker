@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { smsKOdkazu } from "../../lib/psb/fotkyOdkazy";
 
 import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
@@ -143,6 +144,12 @@ export const Route = createFileRoute("/api/fotky")({
           odpovede.push({ id: Number(r.id), token: String(r.token), text, kedy: String(r.vytvorene_at) });
         }
         const origin = new URL(request.url).origin;
+        const odKedy = odkazyRiadky.map((r) => String(r.vytvorene_at)).sort()[0];
+        const smsRiadky: Record<string, unknown>[] = odKedy
+          ? await DB.prepare("SELECT at, payment_id FROM vzas_audit WHERE action = 'sms-fotky' AND at >= ?1")
+            .bind(odKedy).all().then((x) => x.results as Record<string, unknown>[]).catch(() => [])
+          : [];
+        const smsFotiek = smsRiadky.map((s) => ({ at: String(s.at), predmet: String(s.payment_id || "") }));
         const odkazy = odkazyRiadky.map((r) => {
           let pocet = 0;
           try { pocet = (JSON.parse(String(r.fotky_json)) as unknown[]).length; } catch { /* 0 */ }
@@ -150,6 +157,7 @@ export const Route = createFileRoute("/api/fotky")({
             token: String(r.token), url: verejnyOdkaz(`/f/${r.token}`, origin), pocet,
             trener: r.trener ?? null, kto: r.kto ?? null, vytvorene: String(r.vytvorene_at), platiDo: String(r.plati_do),
             zrusene: r.zrusene_at ?? null, otvorene: r.otvorene_at ?? null, suhlas: r.suhlas ?? null, suhlasKedy: r.suhlas_at ?? null,
+            sms: smsKOdkazu(klient, String(r.vytvorene_at), smsFotiek),
           };
         });
 

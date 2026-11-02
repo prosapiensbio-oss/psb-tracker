@@ -23,6 +23,8 @@ import { SmsKlientovi } from "./SmsKlientovi";
 export type OdkazFotiek = {
   token: string; url: string; pocet: number; trener: string | null; kto: string | null;
   vytvorene: string; platiDo: string; zrusene: string | null; otvorene: string | null; suhlas: string | null; suhlasKedy: string | null;
+  /** Čas SMS k odkazu z auditu; `null` = SMS neodišla. */
+  sms?: string | null;
 };
 export type OdpovedFotky = { id: number; token: string; text: string; kedy: string };
 
@@ -178,9 +180,16 @@ export function PoslatKlientovi({ meno, trener, fotky, onZrus, onHotovo, onOtvor
   );
 }
 
-/** Poslané odkazy a odpovede klienta — kedy, či otvoril, súhlas, čo napísal. */
-export function PoslaneKlientovi({ odkazy, odpovede, onZmena }: { odkazy: OdkazFotiek[]; odpovede: OdpovedFotky[]; onZmena: () => void }) {
+/**
+ * Odkazy klienta a jeho odpovede — kedy, či odišla SMS, či otvoril, súhlas.
+ *
+ * Do 2. 11. 2026 sa to volalo „Poslané klientovi" a SMS sa dala poslať len v okne
+ * hneď po vytvorení odkazu. Kto z neho odišiel, mal v zozname „poslaný" odkaz,
+ * ktorý klientovi nikdy neprišiel (Lukas Hanus, 1. 11.).
+ */
+export function PoslaneKlientovi({ meno, odkazy, odpovede, onZmena }: { meno: string; odkazy: OdkazFotiek[]; odpovede: OdpovedFotky[]; onZmena: () => void }) {
   const [chyba, setChyba] = useState("");
+  const [smsPre, setSmsPre] = useState<string | null>(null);
   if (!odkazy.length) return null;
   const zrus = async (o: OdkazFotiek) => {
     if (!window.confirm(`Zrušiť odkaz z ${denCz(o.vytvorene)}? Klient ho už neotvorí.`)) return;
@@ -192,7 +201,7 @@ export function PoslaneKlientovi({ odkazy, odpovede, onZmena }: { odkazy: OdkazF
   };
   return (
     <div>
-      <div style={nadpis}>Poslané klientovi</div>
+      <div style={nadpis}>Odkazy pre klienta</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {odkazy.map((o) => {
           const odp = odpovede.filter((x) => x.token === o.token).sort((a, b) => a.kedy.localeCompare(b.kedy));
@@ -202,17 +211,29 @@ export function PoslaneKlientovi({ odkazy, odpovede, onZmena }: { odkazy: OdkazF
               <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", fontSize: 12.5 }}>
                 <b style={{ fontSize: 13.5 }}>{denCz(o.vytvorene)}</b>
                 <span style={{ color: C.textMuted }}>{o.pocet} {o.pocet === 1 ? "fotka" : o.pocet < 5 ? "fotky" : "fotiek"}{o.kto ? ` · ${o.kto}` : ""}</span>
-                <span style={{ color: o.otvorene ? C.green : C.textDim }}>{o.otvorene ? `otvoril ${denCz(o.otvorene)}` : "zatiaľ neotvoril"}</span>
+                {!neplati && !o.sms && !o.otvorene && <span style={{ padding: "2px 8px", borderRadius: 99, background: mix(C.orange, 20), color: C.orange, fontSize: 12, fontWeight: 700 }}>SMS neodišla</span>}
+                {o.sms && <span style={{ color: C.textMuted }}>SMS {denCz(o.sms)}</span>}
+                {(o.sms || o.otvorene) && <span style={{ color: o.otvorene ? C.green : C.textDim }}>{o.otvorene ? `otvorené ${denCz(o.otvorene)}` : "zatiaľ neotvorené"}</span>}
                 {o.suhlas && <span style={{ color: o.suhlas === "ano" ? C.green : C.textMuted }}>{o.suhlas === "ano" ? "súhlasí so zverejnením" : "nesúhlasí so zverejnením"}</span>}
                 <span style={{ flexGrow: 1 }} />
                 {o.zrusene ? <span style={{ color: C.textDim }}>zrušený</span> : neplati ? <span style={{ color: C.textDim }}>po platnosti</span> : (
                   <>
+                    <button type="button" onClick={() => setSmsPre(smsPre === o.token ? null : o.token)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>{o.sms ? "poslať SMS znova" : "Poslať SMS"}</button>
                     <button type="button" onClick={() => void doSchranky(o.url)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>kopírovať</button>
                     <a href={`${o.url.replace(/^https:\/\/prosapiens\.cz/, "")}?nahlad=1`} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, `${o.url.replace(/^https:\/\/prosapiens\.cz/, "")}?nahlad=1`)} style={{ color: C.accentLight, fontSize: 12 }}>náhľad</a>
                     <button type="button" onClick={() => void zrus(o)} style={{ background: "none", border: "none", padding: 0, color: C.red, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}>zrušiť</button>
                   </>
                 )}
               </div>
+              {smsPre === o.token && !neplati && (
+                <div style={{ marginTop: 10 }}>
+                  <SmsKlientovi
+                    meno={meno} trener={o.trener || ""} vlozene druhAuditu="fotky"
+                    predvolenyText={textSmsFotiek(meno, o.url, TRENERI[o.trener || ""]?.krstne || "")}
+                    onOdoslane={() => { setSmsPre(null); onZmena(); }}
+                  />
+                </div>
+              )}
               {odp.map((x) => (
                 <div key={x.id} style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, background: C.bg, borderLeft: `3px solid ${C.accent}`, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
                   <div style={{ fontSize: 11, color: C.textDim, marginBottom: 3 }}>klient napísal {denCz(x.kedy)}</div>

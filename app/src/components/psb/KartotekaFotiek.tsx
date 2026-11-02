@@ -452,7 +452,7 @@ export function KartotekaFotiek({ meno, uzke, trener = "" }: { meno: string; uzk
       )}
 
       {/* ── POSLANÉ KLIENTOVI ── kedy, či otvoril, súhlas a jeho odpovede */}
-      <PoslaneKlientovi odkazy={d.odkazy || []} odpovede={d.odpovede || []} onZmena={() => void nacitaj()} />
+      <PoslaneKlientovi meno={meno} odkazy={d.odkazy || []} odpovede={d.odpovede || []} onZmena={() => void nacitaj()} />
 
       {/* ── NAHRATIE ── */}
       <div style={{ padding: 14, borderRadius: 12, background: C.surface, border: `1px solid ${mix(C.border, 120)}` }}>
