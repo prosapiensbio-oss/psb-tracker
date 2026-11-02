@@ -30,7 +30,7 @@ import { vokativ } from "./oslovenie";
  * Kovaříkovej SMS po úvodnom bez druhu — a Kokpit jej v ten deň zamlčal minutý
  * balíček.
  */
-export const DRUHY_SMS_MIMO_HODIN = ["uvodny", "ponuka", "kalendar", "fotky", "anamneza", "faktura"] as const;
+export const DRUHY_SMS_MIMO_HODIN = ["uvodny", "ponuka", "kalendar", "fotky", "anamneza", "faktura", "narodeniny"] as const;
 export type DruhSmsMimoHodin = (typeof DRUHY_SMS_MIMO_HODIN)[number];
 
 export function akciaSmsAuditu(v: { dotaznik?: boolean; hromadna?: unknown; druh?: unknown }): string {

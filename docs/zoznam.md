@@ -28,44 +28,32 @@ nezapadlo medzi úlohami bez termínu):
 
 ## NAŠLO SA PRI PREHĽADE KONVERZÁCIÍ — 2. 11. 2026
 
-Jerry: „na čo sme ešte zabudli, čo sme vynechali?“ Prešlo sa ~76 konverzácií od 10. 10. Nič z tohto v zozname nebolo. Do Websupportu, WordPressu ani Fintable sa nepozeralo; Gmail len hľadaním.
+Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej položke.
 
-**S termínom**
-- [ ] **20. 11. 2026 — Azure Speech (jazyková appka):** potvrdiť prechod na pay-as-you-go, inak kľúč výslovnosti prestane fungovať.
-
-**Peniaze a dohody**
-- [ ] **Postupné čerpanie výplaty vs. model A.** Jerry 2. 11.: „ostať pri tom mojom čerpaní“. Dohoda s Terezkou hovorí výplata 3. a strop zálohy (11/30 000, 12/20 000, 1/10 000, potom 0); `STROP_ZALOHY` v `strazcaVyberu.ts` ostáva, Strážca pošle „Záloha nad dohodu“. Prebrať s Terezkou; úprava Strážcu je 2. 11. rozrobená v inej session (necommitnuté).
-- [ ] **Chýbajúcich 100 Kč:** v zošite Jarek −10 000, Terka −4 000; Jerry: „chýbalo im každému 100 Kč“. Reálne 9 900 a 3 900? Riadky neopravené.
-- [ ] **Radek Baláž:** vrátené 15 500 (zošit) alebo 15 275 (platba)? Riadok je `mimo`, platba −15 275.
-- [ ] **Kasička čerpanie 57 k vs. Kokpit 65 735** za október — nevysvetlené.
-- [ ] **Poistka ČPP (Suchý):** zmluvu pred zaplatením 7 315 Kč skontrolovať (začiatok, bytový priestor, poistený). V Gmaile za 10 dní od neho nič.
-
-**Bezpečnosť**
-- [ ] **Výmena prístupových údajov** (rozbor 1. 11., pripomenuté 4×, bez odpovede): `info@`, SMS, Meta, Google servisný účet, Metricool, MailerLite, Google Ads, PageSpeed, tajomstvo webu. Zmazať `~/Downloads/psb-zaloha-2026-08-04.json` a `-08-08.json` (ešte tam sú).
-- [ ] **33 zastaraných pluginov** na webe (Wordfence 27. 10.; bezpečnostná oprava PixelYourSite, Yoast, WooCommerce). Na živom WP neoverené.
+**Otvorené**
+- [ ] **20. 11. 2026 — Azure Speech (jazyková appka):** účet jerrystranavsky@gmail.com, portál → Upgrade, plán „Basic – Zahrnuto“ (nie Vývojář $29). Stránku som Jerrymu otvoril, potvrdzuje a platí on.
+- [ ] **26 z 34 pluginov na webe má aktualizáciu** (29 aktívnych), overené vo WP 2. 11., Jerry myslel, že sú vymazané. Patrí sem PixelYourSite, Contact Form 7, WooCommerce, Jetpack, Klaviyo, Správce souborů WP. Čo sa nepoužíva, zmazať; zvyšok aktualizovať a po formulároch overiť dopyt.
+- [ ] **Gmail filter maže „Wordfence Alert / Problems found“** (online@prosapiens.cz). Po vlámaní z 19. 10. je to práve výstraha, ktorú treba vidieť. Čaká na Jerryho slovo. Filter na Google prihlásenia a Adobe Stock tiež ostáva.
+- [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
 - [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
-- [ ] **Gmail filter posiela do koša** `noreply-accounts@google.com`, `no-reply@stock.adobe.com`, `noreply@ptminder.com` (k 20. 10.). Môže zhltnúť odpoveď PTmindera o €90,97.
-
-**Vybavovačky** (do schránky jerrystranavsky sa nepozeralo)
-- [ ] Reedog: náhrada Cheerble Wicked Ball Air, zaplatených 711 Kč (31. 10.).
-- [ ] Klára, craft-line: cena DTG + výšivka a jej otázky z 22. 10. (31. 10.).
-- [ ] Mail pre Dárek pro Putina s fotkami: pripravený v `~/Downloads/Russke Horiace rafinerie/`, neodoslaný Claudom (26. 10.).
-- [ ] Zásielka LT069964211UA: telefonát na Poštu Brno 2 (2. 11.).
-- [ ] Kasička: korunový účet na vankúš; Fintable predplatné 72 € nikde nepotvrdené.
-
-**Neoverené naostro**
-- [ ] QR „V den splatnosti“ v bankovej appke (predvyplní budúci dátum?).
-- [ ] Okno dôvodu zrušenia + „započítať do dochádzky“: zatiaľ prešlo len bez započítania; po prvom „áno“ pozrieť, či hodina ubudla.
-- [ ] Večerné čítanie pošty, Terezkin pohľad a gestá na iPhone, prihlásenie po zrušení spoločného hesla.
-- [ ] Zvyšok auditu webu z 18. 10.: cookie lišta pre nového návštevníka, formulár klávesnicou, nenačítané obrázky.
-
-**Možno, Jerry rozhodne**
-- [ ] Marketingový plán s Terezkou z 3. 10. sa nenašiel; zapísať, keď ho prerozprávajú.
-- [ ] Rozhovory s Reginou a Annou (tehotné): Regina bola 15. 10. v 6.–7. mesiaci; súhlas písomne.
-- [ ] Reel Natália „lopatka“: hotový, bez reakcie, súhlas nezapísaný.
-- [ ] José/Guillermo: 2 tréningy v mínuse, čakala sa nová Blink adresa (14. 10.).
+- [ ] **Poistka ČPP (Suchý):** čaká sa na zmluvu; pred zaplatením 7 315 Kč skontrolovať (začiatok, bytový priestor, poistený).
+- [ ] **Mail Dárek pro Putina:** `podpora@proukrajinu.org`, text a fotky v `~/Downloads/Russke Horiace rafinerie/`. Jerry: „kľudne ho pošli“.
+- [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
+- [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.
+- [ ] **Reel Natália „lopatka“:** Natália súhlasí (Jerry 2. 11.), reel je `~/Downloads/Test strih videa/Natalia_reel_lopatka.mp4`, ešte nenaplánovaný.
+- [ ] **José/Guillermo:** 2 tréningy v mínuse, čaká sa na jeho odpoveď.
+- [ ] **Nový marketingový plán:** starý z 3. 10. sa nenašiel, Jerry: „ideme ďalej a vytvoríme nový“.
+- [ ] **Dátumy narodenia:** odkaz hotový (Workspace → Anamnézy), posiela Jerry.
+- [ ] Neoverené naostro: večerné čítanie pošty, prihlásenie po zrušení spoločného hesla. Zvyšok auditu webu z 18. 10.: cookie lišta pre nového návštevníka, formulár klávesnicou, nenačítané obrázky.
 - [ ] Investičná appka: odložená, „keď Budúcnosť stabilne drží 15 %“. Len evidencia, nestavať.
 - [ ] Drobnosti: „Treba urobiť“ dvakrát v Analýze Kasičky; `updated_at` na myšlienkovej mape; máj v Ahsokinom priemere; Irina Dyldina DYNAMIKA bez počtu hodín.
+
+**Vybavené 2. 11. (neotvárať)**
+- Postupné čerpanie: s Terezkou dohodnuté. Strážca: november limit 46 487, od decembra nárok podľa tempa, strop zálohy zrušený.
+- Staré zálohy `psb-zaloha-*` sú v Koši. Gmail: PTminder už nejde do koša, od ptminder.com hviezdička + dôležité.
+- Radek Baláž: vyplatených 15 500. Jarek −10 000 sedí, z tých peňazí hneď zaplatil Markétu (9 400); riadky ostávajú.
+- Reedog, Klára (craft-line), zásielka LT069964211UA: Jerry vybavil.
+- Okno „započítať hodinu“ a Terezkin pohľad na iPhone: Jerry: irelevantné, neoverovať.
 
 ## PORADIE OD 13. 10. 2026 (Jerry: „napíš celý zoznam a poradie“)
 

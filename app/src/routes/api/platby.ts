@@ -830,9 +830,11 @@ export const Route = createFileRoute("/api/platby")({
           const suma = Number(b.suma) || 0;
           if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });
           if (!datum) return Response.json({ ok: false, error: "Chýba dátum (RRRR-MM-DD)." }, { status: 400 });
-          if (suma <= 0) return Response.json({ ok: false, error: "Suma musí byť kladná." }, { status: 400 });
-          const stav = await DB.prepare("SELECT fio_id FROM platby WHERE id = ?").bind(id).first<{ fio_id: string | null }>();
+          const stav = await DB.prepare("SELECT fio_id, suma_czk FROM platby WHERE id = ?").bind(id).first<{ fio_id: string | null; suma_czk: number }>();
           if (!stav) return Response.json({ ok: false, error: "Platba sa nenašla." }, { status: 404 });
+          // Vrátenie klientovi je záporná platba a záporné aj ostane (Radek
+          // Baláž: vypočítaných 15 275, vyplatených 15 500; Jerry 2. 11. 2026).
+          if (stav.suma_czk < 0 ? suma >= 0 : suma <= 0) return Response.json({ ok: false, error: stav.suma_czk < 0 ? "Vrátenie musí ostať záporné." : "Suma musí byť kladná." }, { status: 400 });
           if (stav.fio_id) return Response.json({ ok: false, error: "Platbu z banky upraviť nejde — pravdou je výpis." }, { status: 400 });
           const sposob = SPOSOBY.includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
           await DB.prepare(

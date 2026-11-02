@@ -14,6 +14,8 @@ import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { fakturaPodlaTokenu, PREDPONA_FAKTURY } from "../lib/psb/fakturaOdkaz.server";
 import { fakturaStranka } from "../lib/psb/fakturaStranka";
+import { klientPodlaTokenuNarodenin, maNarodeniny, PREDPONA_NARODENIN, ulozNarodeninyZOdkazu } from "../lib/psb/narodeninyOdkaz.server";
+import { narodeninyStranka } from "../lib/psb/narodeninyStranka";
 import { fakturaDoPdf } from "../lib/psb/fakturaPdf.server";
 import { fakturaPodlaId } from "./api/vydane-faktury";
 import { jeZjavnyRobot } from "../lib/psb/kalendarMobil";
@@ -130,6 +132,14 @@ export const Route = createFileRoute("/v/$token")({
         // Token, ktorý na faktúru nesedí, ide ďalej ako odkaz klienta — aj
         // náhodný token klienta môže začínať na „fa".
         const idF = token.startsWith(PREDPONA_FAKTURY) ? await fakturaPodlaTokenu(DB, token) : null;
+        // Odkaz na dátum narodenia (`narodeninyOdkaz.server.ts`).
+        const kNar = token.startsWith(PREDPONA_NARODENIN) ? await klientPodlaTokenuNarodenin(DB, token) : null;
+        if (kNar) {
+          const stav = (await maNarodeniny(DB, kNar)) ? "uzMame" as const : "otazka" as const;
+          return new Response(narodeninyStranka({ klient: kNar, dnes: dnesPraha(), stav }), {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+          });
+        }
         const fa = idF ? await fakturaPodlaId(DB, idF) : null;
         if (fa) {
           const url = new URL(request.url);
@@ -411,6 +421,16 @@ export const Route = createFileRoute("/v/$token")({
           headers: { location: `/v/${encodeURIComponent(token)}${vdaka ? "?vdaka=1" : ""}`, "cache-control": "no-store" },
         });
         if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return new Response("Tento odkaz neplatí.", { status: 404 });
+        const kNar = token.startsWith(PREDPONA_NARODENIN) ? await klientPodlaTokenuNarodenin(DB, token) : null;
+        if (kNar) {
+          const hodnota = String((await request.formData().catch(() => null))?.get("narodeniny") || "");
+          const stav = await ulozNarodeninyZOdkazu(DB, kNar, hodnota);
+          if (stav === "hotovo") await audit(DB, { action: "narodeniny-od-klienta", predmet: kNar, neu: "vyplnené cez odkaz", actor: "klient" });
+          return new Response(narodeninyStranka({ klient: kNar, dnes: dnesPraha(), stav }), {
+            status: stav === "chyba" ? 400 : 200,
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+          });
+        }
 
         const r = await DB.prepare("SELECT klient FROM klient_odkazy WHERE token = ?1").bind(token).first<{ klient: string }>();
         if (!r) return new Response("Tento odkaz neplatí.", { status: 404 });

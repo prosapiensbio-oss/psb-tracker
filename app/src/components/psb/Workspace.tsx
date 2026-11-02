@@ -29,6 +29,7 @@ import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
 import { NaCeluObrazovku } from "./NaCeluObrazovku";
+import { NarodeninyKarta } from "./NarodeninyKarta";
 import { jeKontrolaPenazi, jeReklamaDozoru, rozpisKontrolyPenazi } from "../../lib/psb/kontrolaPenazi";
 import { platbyNaZaplatenie } from "../../lib/psb/platbyMesiaca";
 import { PlatbyMesiaca } from "./PlatbyMesiaca";
@@ -1116,6 +1117,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
                 </div>
               ) : (
                 <div>
+                  <NarodeninyKarta />
                   <button
                     onClick={() => setNovaAnamneza(true)}
                     style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600, marginBottom: 12 }}

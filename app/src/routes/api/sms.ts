@@ -10,6 +10,7 @@ import { bindings } from "../../lib/bindings.server";
 import { akciaSmsAuditu, chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
+import { zoznamBezNarodenin } from "../../lib/psb/narodeninyOdkaz.server";
 import { koloNaOdoslanie, tokenKlienta } from "../../lib/psb/dotaznik.server";
 
 /**
@@ -94,6 +95,11 @@ export const Route = createFileRoute("/api/sms")({
         try { b = (await request.json()) as Record<string, unknown>; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
         const kto = (await currentUser(request)) || "";
+
+        /** Kto nemá dátum narodenia, s odkazom a textom SMS. Nič neposiela. */
+        if (b.akcia === "narodeniny") {
+          return Response.json({ ok: true, zoznam: await zoznamBezNarodenin(DB, new URL(request.url).origin) });
+        }
 
         if (b.akcia === "nastav") {
           const brana = kus(b.brana, 40) || "smsmanager";
