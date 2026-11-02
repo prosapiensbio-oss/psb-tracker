@@ -192,6 +192,27 @@ export function sedeniaZKalendara(
 }
 
 /**
+ * Hodiny, ktoré sú v kalendári ešte len naplánované, po mesiacoch a trénerovi.
+ * `sedeniaZKalendara` budúce preskakuje (tréning sa ešte nekonal), takže z
+ * `data.sessions` sa nedajú zistiť — odhad nároku v Kasičke z nich od 1. 10.
+ * 2026 dostával vždy 0 h. Úvodné sa do mzdových hodín nerátajú (mzdoveHodiny).
+ */
+export function buduceHodiny(
+  udalosti: UdalostKalendara[],
+  teraz: string,
+): Record<string, { jerry: number; terezka: number }> {
+  const out: Record<string, { jerry: number; terezka: number }> = {};
+  for (const u of udalosti) {
+    if (!u.klient || u.typ !== "trening" || u.zaciatok.slice(0, 16) <= teraz) continue;
+    const e = (out[u.zaciatok.slice(0, 7)] ||= { jerry: 0, terezka: 0 });
+    const hodiny = minutyMedzi(u.zaciatok, u.koniec) / 60;
+    if (u.trener === "Jerry") e.jerry += hodiny;
+    else if (u.trener === "Terezka") e.terezka += hodiny;
+  }
+  return out;
+}
+
+/**
  * Spojí dve histórie na jednu: pred `od` PTminder, od `od` kalendár.
  * Vráti aj to, čo z PTmindera od `od` zostalo bokom — na kontrolu.
  */

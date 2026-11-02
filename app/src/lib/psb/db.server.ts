@@ -6,7 +6,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
-import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
+import { buduceHodiny, doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
 import { zapisPlatiZa } from "./platiZa";
@@ -352,6 +352,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     data.objednaneUvodne = ((kalOd.results as any[]) as UdalostKalendara[])
       .filter((u) => u.typ === "uvodny" && !!u.klient && String(u.zaciatok || "").slice(0, 16) > terazPraha)
       .map((u) => ({ klient: String(u.klient), den: String(u.zaciatok || "").slice(0, 10), trener: String(u.trener || "") }));
+    data.buduceHodiny = buduceHodiny((kalOd.results as any[]) as UdalostKalendara[], terazPraha);
     const { sessions: spojene, kontrola } = spojDochadzku(sessionsPtminder, zKalendara);
     data.sessions = spojene;
     data.sessionsPtminder = kontrola;

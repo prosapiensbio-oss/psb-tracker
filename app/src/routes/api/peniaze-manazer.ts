@@ -79,7 +79,7 @@ export const Route = createFileRoute("/api/peniaze-manazer")({
         const narok = narokJerryho(mzdoveHodiny(data.sessions.filter((s) => s.date.slice(0, 10) <= dnes)), od, mesiac, data.hodinyNavyse || {});
         // Termíny v kalendári do konca bežiaceho mesiaca (Jerry 30. 10. 2026): Kasička nimi
         // nahradí odhad podľa tempa — na konci mesiaca tempo rátalo hodiny, ktoré už neprídu.
-        const buduce = mzdoveHodiny(data.sessions.filter((s) => s.date.slice(0, 10) > dnes && s.date.slice(0, 7) === mesiac))[mesiac];
+        const buduce = data.buduceHodiny?.[mesiac];
         // Odhad celého mesiaca počíta LEN Kokpit (Jerry 31. 10. 2026: nárok na jednom mieste) —
         // Kasička ho ukazuje tak, ako príde: odrobené + v kalendári, tým istým vzorcom.
         for (const n of narok) {

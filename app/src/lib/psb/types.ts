@@ -303,6 +303,8 @@ export type PSBData = {
    * nasledujúce ráno a v appke neexistoval vôbec.
    */
   objednaneUvodne?: { klient: string; den: string; trener: string }[];
+  /** Hodiny v kalendári, ktoré sa ešte nekonali — `sessions` budúce neobsahuje. */
+  buduceHodiny?: Record<string, { jerry: number; terezka: number }>;
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
   vedomosti: VedomostRow[];
 };

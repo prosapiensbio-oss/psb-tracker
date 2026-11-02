@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { casPtminder, cenaHodiny, doplnHodinySpolu, sedeniaZKalendara, spojDochadzku, type BalicekKokpitu, type UdalostKalendara } from "./sedeniaZKalendara";
+import { buduceHodiny, casPtminder, cenaHodiny, doplnHodinySpolu, sedeniaZKalendara, spojDochadzku, type BalicekKokpitu, type UdalostKalendara } from "./sedeniaZKalendara";
 import type { SessionRow } from "./types";
 
 const u = (klient: string | null, zaciatok: string, extra: Partial<UdalostKalendara> = {}): UdalostKalendara => ({
@@ -166,5 +166,22 @@ describe("cenaHodiny — meno cez normName (21. 10. 2026)", () => {
     expect(cenaHodiny(b, "Jakub Stigut", "2026-10-02")).toBe(1165);
     expect(cenaHodiny(b, "jakub  štigut ", "2026-10-02")).toBe(1165);
     expect(cenaHodiny(b, "Jakub Novák", "2026-10-02")).toBe(0);
+  });
+});
+
+describe("buduceHodiny", () => {
+  const teraz = "2026-11-02T12:00";
+  it("ráta len budúce tréningy po mesiacoch a trénerovi, bez úvodných", () => {
+    const h = buduceHodiny([
+      u("Eva", "2026-11-02T09:00"),
+      u("Eva", "2026-11-02T15:00"),
+      u("Eva", "2026-11-20T09:00"),
+      u("Jana", "2026-11-20T10:00", { trener: "Terezka" }),
+      u("Nový", "2026-11-21T10:00", { typ: "uvodny" }),
+      u("Eva", "2026-12-01T09:00"),
+      u(null, "2026-11-22T09:00"),
+    ], teraz);
+    expect(h["2026-11"]).toEqual({ jerry: 2, terezka: 1 });
+    expect(h["2026-12"]).toEqual({ jerry: 1, terezka: 0 });
   });
 });
