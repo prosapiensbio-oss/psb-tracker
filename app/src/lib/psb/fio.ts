@@ -225,6 +225,16 @@ export const PRESUN = "presun";
  * (`jeUcetRezervy`), takže je istá a nečaká na potvrdenie.
  */
 export const REZERVA_FIRMY = "rezerva";
+/**
+ * MOJA REZERVA (Jerry, 2. 11. 2026): „Jerry Rezerva" z Fio na jeho sporiaci účet
+ * v Air Bank je jeho výplata, hoci odchádza priamo na sporenie. Účet je spoločný
+ * s Terezkou a ich vklad je 3 300 — ten ostáva podľa textu. Kasička z neho počíta
+ * Moju rezervu aj čerpanie, inak ho most nepošle.
+ */
+export const SPORIACI_UCET = "2323438022";
+export function jeVkladMojejRezervy(ucet: string | null | undefined, suma: number): boolean {
+  return suma < 0 && Math.abs(suma) !== 3300 && String(ucet || "").replace(/\s/g, "").split("/")[0].replace(/^0+/, "") === SPORIACI_UCET;
+}
 /** Výplata bez určenia človeka — zostáva kvôli starším zápisom. */
 export const VYPLATY = "vyplaty";
 // Výplata musí vedieť, KOMU patrí, inak sa z nej nedá počítať dlh voči
@@ -393,7 +403,8 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
     out.push({
       id: iId >= 0 ? (c[iId] || "").trim() : "",
       datum, suma, protistrana, poznamka: popis.slice(0, 200), typ,
-      kategoria: rezerva ? REZERVA_FIRMY : suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
+      kategoria: rezerva ? REZERVA_FIRMY : iProti >= 0 && jeVkladMojejRezervy(c[iProti], suma) ? VYPLATY_JERRY
+        : suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
     });
   }
 

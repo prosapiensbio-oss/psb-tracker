@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fioKluc, ocislujDuplicity, odhadniKategoriu, parseFio, type FioRiadok } from "./fio";
+import { fioKluc, jeVkladMojejRezervy, ocislujDuplicity, odhadniKategoriu, parseFio, type FioRiadok } from "./fio";
 
 // Presný tvar exportu „Pohyby na všech účtech" (13. 9. 2026) — bez ID operace.
 const POHYBY = [
@@ -86,5 +86,18 @@ describe("naučené pravidlá", () => {
     expect(odhadniKategoriu("BOLT.EU Nákup", pravidla)).toBe("vyplaty.jerry");
     // Perplexity s obchodníkom „PRO" chytí zabudované pravidlo podľa domény.
     expect(odhadniKategoriu("PRO Nákup: PRO, WWW.PERPLEXIT, US", pravidla)).toBe("fixne.apps.ai");
+  });
+});
+
+describe("Moja rezerva z Fio", () => {
+  test("text Jerry Rezerva je výplata, hoci obsahuje slovo rezerva", () => {
+    expect(odhadniKategoriu("Jerry Rezerva")).toBe("vyplaty.jerry");
+  });
+  test("účet spozná aj bez textu, spoločných 3 300 a príjem nechá tak", () => {
+    expect(jeVkladMojejRezervy("2323438022/3030", -10620)).toBe(true);
+    expect(jeVkladMojejRezervy("2323438022", -10620)).toBe(true);
+    expect(jeVkladMojejRezervy("2323438022/3030", -3300)).toBe(false);
+    expect(jeVkladMojejRezervy("2323438022/3030", 1000)).toBe(false);
+    expect(jeVkladMojejRezervy("2323438014/3030", -10620)).toBe(false);
   });
 });
