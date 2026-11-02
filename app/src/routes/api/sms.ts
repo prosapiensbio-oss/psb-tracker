@@ -98,7 +98,11 @@ export const Route = createFileRoute("/api/sms")({
 
         /** Kto nemá dátum narodenia, s odkazom a textom SMS. Nič neposiela. */
         if (b.akcia === "narodeniny") {
-          return Response.json({ ok: true, zoznam: await zoznamBezNarodenin(DB, new URL(request.url).origin) });
+          try {
+            return Response.json({ ok: true, zoznam: await zoznamBezNarodenin(DB, new URL(request.url).origin) });
+          } catch (e) {
+            return Response.json({ ok: false, error: `Zoznam sa nenačítal: ${String(e instanceof Error ? e.message : e)}` }, { status: 500 });
+          }
         }
 
         if (b.akcia === "nastav") {

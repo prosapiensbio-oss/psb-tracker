@@ -54,7 +54,7 @@ export async function zoznamBezNarodenin(DB: D1Database, origin: string): Promis
     DB.prepare("SELECT name, narodeniny FROM client_overrides"),
     DB.prepare("SELECT meno, narodeniny, telefon FROM ptminder_klienti"),
     DB.prepare("SELECT klient, telefon FROM klient_fakturacia"),
-    DB.prepare("SELECT predmet FROM vzas_audit WHERE action = 'sms-narodeniny'"),
+    DB.prepare("SELECT payment_id AS predmet FROM vzas_audit WHERE action = 'sms-narodeniny'"),
   ]);
   const riadky = <T,>(x: { results?: unknown[] }) => (x.results || []) as T[];
   const sDatumom = new Set([
