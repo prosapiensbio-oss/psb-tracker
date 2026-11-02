@@ -36,7 +36,7 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 - [ ] **Gmail filter maže „Wordfence Alert / Problems found“** (online@prosapiens.cz). Po vlámaní z 19. 10. je to práve výstraha, ktorú treba vidieť. Čaká na Jerryho slovo. Filter na Google prihlásenia a Adobe Stock tiež ostáva.
 - [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
 - [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
-- [ ] **Poistka ČPP (Suchý):** čaká sa na zmluvu; pred zaplatením 7 315 Kč skontrolovať (začiatok, bytový priestor, poistený).
+- [ ] **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo, potom nachystá zmluvu. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali. Pred zaplatením 7 315 Kč skontrolovať začiatok a poisteného.
 - [ ] **Mail Dárek pro Putina:** `podpora@proukrajinu.org`, text a fotky v `~/Downloads/Russke Horiace rafinerie/`. Jerry: „kľudne ho pošli“.
 - [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
 - [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.
@@ -126,13 +126,13 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 14. [x] Osobné profily — nahradené 19.–20. 10.: profily sú v Strižni (prepínač účtov, značky Metricoolu, farby) – Jerry to tak chcel (Jerry 13. 10.; otvorené otázky v sekcii 2).
 
 **E · Keď bude čas / keď sa niečo ukáže**
-15. [ ] Pocitovka – ~30. 10. pozrieť počet odpovedí.
+15. [ ] Pocitovka – overené 2. 11.: 0 odpovedí.
 16. [x] Prezentácia reportu – hotové 20. 10. 2026: telefón na výšku má vlastné rozloženie (720×1280, jeden stĺpec), „🖨 Tlačiť / PDF“ dá každý slajd na vlastnú stranu 16:9. Overené mimo appky na ukážkovom reporte; na skutočnom Jerryho telefóne ešte nie.
 17. [ ] Anonymný dotazník aj bývalým klientom.
 18. [x] Objem hľadania z Google Ads – hotové 20. 10. 2026: Marketing → Vyhľadávanie → „Čo ľudia hľadajú na Googli“ (Česko / Brno, 12 mesiacov, záujem rok proti roku, podobné výrazy, „+ Nápad“). Google počíta hľadanie pod jedným tvarom slova („bolest zad“ 0, „bolesti zad“ 2 400) – nula sa ukazuje ako „skús iný tvar“.
 19. [x] Zrušené tréningy z Google Calendar – hotové už od augusta 2026 (snímky kalendára → karta „Zrušené a presunuté“, „Bol tam, alebo nie?“, presuny podľa prvy_raz); položka bola len nevyškrtnutá (overené 20. 10.).
 20. [ ] NDA pri fotkách pred/po — blokované kontrolou súhlasov.
-21. [ ] Po vypnutí PTmindera: karta klienta dve čísla vedľa seba (sekcia 4).
+21. [x] (bezpredmetné: dvojité zobrazenie v profile odstránené 28.–29. 10.) Po vypnutí PTmindera: karta klienta dve čísla vedľa seba.
 
 **F · Fronty (práca, nie stavba)** — sekcia 5: 6 dôvodov odchodu, závery po
 termíne, čas prvej odpovede, zmeny v kalendári.
@@ -213,7 +213,7 @@ je kde pozrieť).
          Lucia. Overené 22. 10. simuláciou 27. 10. nad ostrými dátami: návrh
          „1h Balíček 1 450" na 27. 10., po založení offline tréning kryje 1h
          a online balíček sa nemíňa.
-4. [ ] *(1. 11. 2026: posledné reporty v `~/Downloads/PTminder archív 2026-11-01/`, platby od 3. 10. sedia s Kokpitom po vysvetlených rozdieloch; do D1 sa nenalievajú, od 1. 10. platí Kokpit. Client List a opravené sedenia doplnené večer, spolu 11 súborov; zostáva zrušiť predplatné.)* **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
+4. [x] *(1. 11. 2026: predplatné zrušené; posledné reporty v `~/Downloads/PTminder archív 2026-11-01/`, platby od 3. 10. sedia s Kokpitom po vysvetlených rozdieloch; do D1 sa nenalievajú, od 1. 10. platí Kokpit. Client List a opravené sedenia doplnené večer, spolu 11 súborov; zostáva zrušiť predplatné.)* **Uzávierka októbra (zač. novembra)** — ak sedí, Jerry PTminder zruší.
        **Jerry 27. 10. 2026: „PTminder zrušíme budúci týždeň.“** Čiže v týždni
        2.–8. 11., po uzávierke októbra. Posledná platba 2 287 Kč odišla 2. 10.;
        ďalšia by prišla 2. 11., takže zrušiť ideálne PRED druhým. Archív rokov
