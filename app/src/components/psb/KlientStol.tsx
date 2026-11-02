@@ -2817,7 +2817,8 @@ function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }
   onUloz: () => void;
   popis?: string;
 }) {
-  const platne = Number(p.suma) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.datum);
+  // Záporná suma je vrátenie klientovi; či sa smie, povie server (Radek Baláž, 2. 11. 2026).
+  const platne = Number(p.suma) !== 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.datum);
   return (
     <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: "11px 12px", borderRadius: 10, background: mix(C.border, 40) }}>
       <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
