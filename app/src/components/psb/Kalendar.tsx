@@ -1234,6 +1234,8 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   const VYSKA = ROZMER.hodina;
 
   const dnesIso = dnesPraha();
+  /** Červená posunutá k farbe textu, aby sa dátum čítal na svetlejšej karte v každej palete. */
+  const DNES_FARBA = `color-mix(in srgb, ${C.red} 78%, ${C.text})`;
   const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
 
   const trening = vZobrazeni.filter((u) => u.typ !== "sukromne" && u.typ !== "netrening");
@@ -1542,26 +1544,33 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 
       {/* Okraj -12 px patrí na rolovací obal: vnútri neho predlžoval obsah o 12 px
           za pravý okraj (321 px v 309 px) a posledný stĺpec bol orezaný. */}
-      <ScrollX style={uzke ? { marginLeft: -12, marginRight: -12 } : undefined}>
-        <div style={{ minWidth: uzke ? 0 : 620 }}>
+      {/* Odsadenie zhora a zdola drží miesto pre tieň dnešnej karty: rolovací obal by ho inak orezal. */}
+      <ScrollX style={{ paddingTop: 4, paddingBottom: 24, marginBottom: -24, ...(uzke ? { marginLeft: -12, marginRight: -12 } : {}) }}>
+        <div style={{ minWidth: uzke ? 0 : 620, position: "relative" }}>
+          {/* Dnešný deň je jedna karta cez hlavičku aj mriežku, tie sú dve samostatné mriežky. */}
+          {viditelne.includes(dnesIso) && (
+            <div style={{ position: "absolute", top: -3, bottom: -3, left: 0, right: 0, display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, pointerEvents: "none" }}>
+              <div style={{
+                gridColumn: viditelne.indexOf(dnesIso) + 2,
+                background: C.cardHover, border: `1px solid ${C.border}`, borderRadius: 12,
+                boxShadow: "0 8px 22px rgba(0,0,0,.3)",
+              }} />
+            </div>
+          )}
           {/* Hlavička dní */}
-          <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP }}>
+          <div style={{ display: "grid", gridTemplateColumns: `${PAS}px repeat(${POCET}, 1fr)`, gap: GAP, position: "relative" }}>
             <div />
             {viditelne.map((d) => {
               const i = dni.indexOf(d);
               const jeDnes = d === dnesIso;
               return (
                 <div key={d} style={{
-                  position: "relative",
                   textAlign: "center", fontSize: 11.5, paddingBottom: 5,
-                  color: jeDnes ? C.red : C.textMuted,
-                  background: jeDnes ? mix(C.red, 8) : undefined,
-                  borderRadius: jeDnes ? "7px 7px 0 0" : undefined,
+                  color: jeDnes ? DNES_FARBA : C.textMuted,
+                  fontWeight: jeDnes ? 600 : undefined,
                   borderBottom: `1px solid ${mix(C.border, 60)}`,
                 }}>
-                  {DNI_SK[i % 7]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? C.red : C.text }}>{Number(d.slice(8, 10))}</b>
-                  {/* Rám dnešného dňa: horná časť, pokračuje v stĺpci mriežky. */}
-                  {jeDnes && <div style={{ position: "absolute", inset: 0, bottom: -1, border: `2px solid ${C.red}`, borderBottom: "none", borderRadius: "7px 7px 0 0", pointerEvents: "none" }} />}
+                  {DNI_SK[i % 7]}<b style={{ display: "block", fontSize: 14, color: jeDnes ? DNES_FARBA : C.text }}>{Number(d.slice(8, 10))}</b>
                 </div>
               );
             })}
@@ -1576,7 +1585,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 </div>
               ))}
             </div>
-            {viditelne.map((d) => (
+            {viditelne.map((d, iDna) => (
               <div
                 key={d}
                 title="Klikni na voľný čas — nahodíš tréning do kalendára"
@@ -1590,17 +1599,14 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 }}
                 style={{
                   position: "relative", height: hodin * VYSKA,
-                  borderLeft: `1px solid ${mix(C.border, 60)}`,
+                  // Dnešná karta má vlastný okraj: čiara vedľa neho by pôsobila ako dvojitá.
+                  borderLeft: `1px solid ${d === dnesIso || viditelne[iDna - 1] === dnesIso ? "transparent" : mix(C.border, 60)}`,
                   overflow: "hidden", cursor: "copy",
-                  background: d === dnesIso ? mix(C.red, 8) : undefined,
-                  borderRadius: d === dnesIso ? "0 0 7px 7px" : undefined,
                 }}
               >
                 {Array.from({ length: hodin }, (_, i) => (
                   <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 45)}` }} />
                 ))}
-                {/* Prekrytie, nie okraj stĺpca: okraj by posunul výpočet času pri kliku a ťahu. */}
-                {d === dnesIso && <div style={{ position: "absolute", inset: 0, border: `2px solid ${C.red}`, borderTop: "none", borderRadius: "0 0 7px 7px", pointerEvents: "none" }} />}
                 {((vDni) => {
                   // Prekrývajúce sa hodiny vedľa seba, nie na sebe.
                   const miesta = rozlozUdalosti(vDni.map((u) => ({ od: minuty(u.zaciatok), do: minuty(u.koniec) })));
