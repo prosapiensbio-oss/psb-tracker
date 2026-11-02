@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { C } from "../../lib/psb/theme";
+
+/** Obsah vie, že je na celej obrazovke — napríklad aby zaplnil celú výšku. */
+export const JeNaCeluObrazovku = createContext(false);
 
 /**
  * KARTA NA CELÚ OBRAZOVKU (Jerry, 27. 10. 2026: „daj mi možnosť robiť dozor
@@ -32,6 +35,7 @@ export function NaCeluObrazovku({ nazov, children }: { nazov: string; children: 
     if (cela) {
       Object.assign(uzol.style, {
         position: "fixed", inset: "0", zIndex: "1000", overflowY: "auto",
+        display: "flex", flexDirection: "column",
         background: C.surface, padding: "14px clamp(12px, 3vw, 28px) 28px", boxSizing: "border-box",
       });
       document.body.appendChild(uzol);
@@ -65,11 +69,14 @@ export function NaCeluObrazovku({ nazov, children }: { nazov: string; children: 
       <div ref={miesto} />
       {uzol && createPortal(
         <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: cela ? "space-between" : "flex-end", gap: 10, marginBottom: 10 }}>
+          <div style={{ display: "flex", flex: "none", alignItems: "center", justifyContent: cela ? "space-between" : "flex-end", gap: 10, marginBottom: 10 }}>
             {cela && <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{nazov}</div>}
             {tlacidlo}
           </div>
-          {children}
+          {/* Ten istý prvok v oboch režimoch, inak by sa obsah postavil nanovo. */}
+          <div style={cela ? { flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column" } : undefined}>
+            <JeNaCeluObrazovku.Provider value={cela}>{children}</JeNaCeluObrazovku.Provider>
+          </div>
         </>,
         uzol,
       )}

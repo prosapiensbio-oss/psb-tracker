@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { RegisterItem } from "../../lib/psb/compute";
 import { adsManagerOdkaz } from "../../lib/psb/kampanPlan";
@@ -11,6 +11,7 @@ import { C, S, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3 } from "./ui";
 import { ChatConversation, type AssistantChat } from "./Assistant";
+import { JeNaCeluObrazovku } from "./NaCeluObrazovku";
 import { useUzke } from "./useUzke";
 import * as Sk from "../../lib/psb/sklonovanie";
 
@@ -234,7 +235,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
     if (v.ok) oznam("reklama");
   };
 
-  const pole = { ...S.input, width: 110, padding: "6px 10px", fontSize: 16 } as const;
+  const pole = { ...S.input, width: 135, padding: "6px 10px", fontSize: 16 } as const;
   const vyhodnotenia = (d?.vyhodnotenia || []).slice(0, 8);
   const nazvy = new Map((d?.kampane || []).map((k) => [k.id, k.nazov]));
 
@@ -299,6 +300,7 @@ export function DozorReklamKarta({ data }: { data: PSBData }) {
  * Kokpitu, WordPress a prehliadač ostávajú na Claude Code.
  */
 export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
+  const cela = useContext(JeNaCeluObrazovku);
   // Otázka z notifikácie: vyzdvihne sa pri pripojení aj keď príde, kým panel beží.
   useEffect(() => {
     const vyzdvihni = () => {
@@ -319,8 +321,9 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
   ];
   return (
     // Výška tak, aby sa debata vošla do karty Workspace — pevných 640 px v karte
-    // s výškou ~550 px dávalo rolovanie v rolovaní (rozbor, 1. 11. 2026).
-    <Card style={{ display: "flex", flexDirection: "column", height: "min(640px, max(420px, calc(72vh - 160px)))", padding: 0, overflow: "hidden" }}>
+    // s výškou ~550 px dávalo rolovanie v rolovaní (rozbor, 1. 11. 2026). Na celej
+    // obrazovke strop neplatí (Jerry, 2. 11. 2026: „stále je to zmenšené").
+    <Card style={{ display: "flex", flexDirection: "column", height: cela ? "100%" : "min(640px, max(420px, calc(72vh - 160px)))", padding: 0, overflow: "hidden" }}>
       <div style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <b style={{ color: C.text, fontSize: 15 }}>Reklama · Jarvis</b>
         <span style={{ fontSize: 11.5, color: C.textMuted }}>jedna stála debata o reklame · vidí do Mety · každú zmenu potvrdíš tlačidlom</span>
@@ -440,6 +443,10 @@ export function MetrikyReklamy({ data }: { data: PSBData }) {
 export function ReklamaPracovisko({ data, chat, onNavigate }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
   const uzke = useUzke();
   const siroke = useSiroka();
+  const cela = useContext(JeNaCeluObrazovku);
+  // Celá obrazovka: stĺpce na celú výšku a každý roluje sám, debata má najviac miesta.
+  const stlpec = cela ? { minHeight: 0, overflowY: "auto" as const, display: "grid" } : undefined;
+  const celaMriezka = cela ? { flex: "1 1 auto", minHeight: 420, gridTemplateRows: "minmax(0, 1fr)", alignItems: "stretch", marginBottom: 0 } : {};
   if (uzke || !chat) {
     return (
       <>
@@ -451,20 +458,20 @@ export function ReklamaPracovisko({ data, chat, onNavigate }: { data: PSBData; c
   }
   if (siroke) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.25fr) minmax(250px, 0.6fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
-        <DozorReklamKarta data={data} />
-        <ReklamnyAgent chat={chat} onNavigate={onNavigate} />
-        <MetrikyReklamy data={data} />
+      <div style={{ display: "grid", gridTemplateColumns: cela ? "minmax(320px, 0.8fr) minmax(0, 2fr) minmax(280px, 0.7fr)" : "minmax(0, 1fr) minmax(0, 1.25fr) minmax(250px, 0.6fr)", gap: 12, alignItems: "start", marginBottom: 12, ...celaMriezka }}>
+        <div style={stlpec}><DozorReklamKarta data={data} /></div>
+        <div style={stlpec}><ReklamnyAgent chat={chat} onNavigate={onNavigate} /></div>
+        <div style={stlpec}><MetrikyReklamy data={data} /></div>
       </div>
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)", gap: 12, alignItems: "start", marginBottom: 12 }}>
-      <div>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.1fr)", gap: 12, alignItems: "start", marginBottom: 12, ...celaMriezka }}>
+      <div style={cela ? { minHeight: 0, overflowY: "auto" } : undefined}>
         <DozorReklamKarta data={data} />
         <MetrikyReklamy data={data} />
       </div>
-      <ReklamnyAgent chat={chat} onNavigate={onNavigate} />
+      <div style={stlpec}><ReklamnyAgent chat={chat} onNavigate={onNavigate} /></div>
     </div>
   );
 }
