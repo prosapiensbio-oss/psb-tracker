@@ -85,7 +85,7 @@ Pravidlo: kým Terezka neprejde kruh (bod 8), žiadne nové formáty ani nástro
 10i. [x] (31. 10.) Pri kontrole kritiky dorobené: audit editora (Inšpektor na plnú výšku, strizna 732caec), editor pod pruhmi, scenár karty podľa účtu + háčiky účtu, hashtagy podľa účtu, Jarvis bez fáz štúdia pre osobné účty.
 10j. [ ] Naživo po prihlásení Clauda (`~/.local/bin/claude` → /login): Napísať, ✦ text titulky, scenár osobnej karty, prvý strih, feed iného účtu.
 - **10k** [ ] Montáž cvikov (1. 11. 2026): nahratie „jedno video“ z 3+ klipov bez reči strihá hneď Claude (aj podľa hudby), kontrola kamery, veta „O čom to je“, druhé kolo kontroly, texty + slovo za telom + zvuky. Overené na kópii. Ostáva: Jerry nahrá naostro a posúdi; kontrola po rendri zatiaľ nie je; hudba z Instagramu sa nedá vypočuť – test katalógu Metricoolu čaká na povolenie (createScheduledPost blokuje auto mode).
-- **10l** [ ] Terezka: dva profily v Strižni hotové (2. 11. 2026). Ostáva: Terezka potvrdí farby vo videu a či chce vo videu písma z carouselov (Cormorant Garamond + Jost, Inter Black; teraz Agrandir); na ktorý účet ide video s krkom.
+- **10l** [ ] Terezka: dva profily a jej písma vo videu hotové (2. 11. 2026), video s krkom je na FP účte. Ostáva: Terezka skontroluje texty („Proč postroj na hlavě?“, „Krk ve flexi, tělo ve výpadu“, „Functioneck + regen.trainer“, „Víc: FP Evidence a 10 Week Course“) a popis, zverejnenie cez Zverejniť.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
 12. [x] Analyzátor IG videa (hotové 19. 10., #/analyzator; YouTube/IG sťahovanie viď SPEC „yt-dlp je zamrznutý“) (háčik, strihy, popis) + popisy konkurentov z Metricoolu.
