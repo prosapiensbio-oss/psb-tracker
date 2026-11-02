@@ -20,6 +20,7 @@ nezapadlo medzi úlohami bez termínu):
 - **2. 11. 2026** — ranná dávka notifikácií má prvýkrát odísť o 6:30 Prahy (05:30Z, `ranne-push` v `automaty`) a automatické balíčky prvýkrát z plánovača (04:15Z). Overiť.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **do 1. 12. 2026** — PTminder je zrušený (1. 11. 2026, účet sa deaktivuje 1. 12., ďalšia platba neodíde). Čaká sa na rozhodnutie o vrátení €90,97, tiket v ich chate, Jerry žiadal odpoveď na prosapiens.bio@gmail.com. Dáta vymažú 3 mesiace po zrušení; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
+- **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
 - **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
   merania webu — 27. 10. 2026" nižšie).
 
