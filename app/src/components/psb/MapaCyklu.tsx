@@ -460,10 +460,6 @@ export function MapaCyklu({ data, chat, onNavigate, focus, onOdchodKJarvisovi }:
             </a>
             {/* Nástrely titulky: dvadsať skladieb vedľa seba. Vyberá sa z toho
                 prstom a na veľkej obrazovke — do modálu sa to porovnať nedá. */}
-            <a href="/navrhy-titulky" target="_blank" rel="noreferrer"
-              style={{ fontSize: 11.5, color: C.accentLight }}>
-              nástrely titulky ↗
-            </a>
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
             Klikni na riadok a otvorí sa ten istý editor ako z mriežky.
