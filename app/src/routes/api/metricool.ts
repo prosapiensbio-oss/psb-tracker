@@ -10,7 +10,7 @@ import {
   poliaSiete, riadkyNaPrispevky, rozsahMesiaca, SIETE, vyzeraAkoKluc, type PrispevokMc,
 } from "../../lib/psb/metricool";
 import { adresaPripojenia, odpoj, sedenieMcp, stavPripojenia } from "../../lib/psb/metricool.server";
-import { citajKonkurentov, nacitajKonkurentovApi, prehladApi, stavKluca, stiahniMesiacApi, ulozKluc, ulozKonkurentov, zmazKluc } from "../../lib/psb/metricoolApi.server";
+import { citajKonkurentov, nacitajKonkurentovApi, obnovPlanObsahu, prehladApi, stavKluca, stiahniMesiacApi, ulozKluc, ulozKonkurentov, zmazKluc } from "../../lib/psb/metricoolApi.server";
 import { vzoryZOdpovede, zadanieVzorov } from "../../lib/psb/konkurenti";
 
 // Metricool jedným ťuknutím v uzávierke (Jerry, 8. 10. 2026). Pripojenie:
@@ -69,6 +69,7 @@ export const Route = createFileRoute("/api/metricool")({
           if (!riadky) return Response.json({ ok: false, error: "API kľúč nie je uložený." }, { status: 409, headers: hlavicky });
           return Response.json({ ok: true, riadky }, { headers: hlavicky });
         }
+        if (b.akcia === "plan-obsahu") return Response.json({ ok: true, ...(await obnovPlanObsahu(DB)) }, { headers: hlavicky });
         if (b.akcia === "konkurenti") return Response.json({ ok: true, konkurenti: await citajKonkurentov(DB) }, { headers: hlavicky });
         if (b.akcia === "konkurenti-nacitaj") {
           const dni = [30, 60, 90].includes(Number(b.dni)) ? Number(b.dni) : 60;
@@ -172,6 +173,8 @@ export const Route = createFileRoute("/api/metricool")({
               .bind(crypto.randomUUID(), now, `metricool-priamo ${mesiac}`, vsetky.length));
             for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
 
+            // Dozor reklám a Jarvis majú ráno čerstvé, čo sa chystá. Výpadok nezhodí sťah čísel.
+            await obnovPlanObsahu(DB).catch((e) => console.error("plán obsahu", e));
             const siete = [...new Set(kanaly.map((k) => k.kanal))];
             const vysledok = { reels: reels.length, posty: posty.length, stories: stories.length, metrik: kanaly.length, siete, preskocene, zdroj };
             await audit(DB, { action: "metricool-stiahnute", predmet: mesiac, neu: `${vysledok.reels} reels, ${vysledok.posty} príspevkov, ${vysledok.stories} stories, ${vysledok.metrik} metrík · cez ${zdroj}`, actor: kto });

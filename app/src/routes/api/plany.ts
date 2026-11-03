@@ -46,11 +46,13 @@ export const Route = createFileRoute("/api/plany")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
+          // Prázdny profil = ProSapiens. Strižňa si pýta plány aktívneho účtu.
+          const profil = kus(new URL(request.url).searchParams.get("profil"), 60);
           const r = await DB.prepare(
-            `SELECT id, nazov, od, do_ AS do, ciel, preco, metriky, pristup, rozpocet,
+            `SELECT id, nazov, od, do_ AS do, ciel, preco, metriky, pristup, rozpocet, profil,
                     stav, vyhodnotenie, autor, created_at, updated_at
-               FROM mkt_plany ORDER BY od DESC, created_at DESC LIMIT 100`,
-          ).all();
+               FROM mkt_plany WHERE profil = ?1 ORDER BY od DESC, created_at DESC LIMIT 100`,
+          ).bind(profil).all();
           return Response.json({ ok: true, plany: r.results || [] });
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s prázdnym.
@@ -133,12 +135,12 @@ export const Route = createFileRoute("/api/plany")({
           const novy = `pl${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
           await DB.prepare(
             `INSERT INTO mkt_plany (id, nazov, od, do_, ciel, preco, metriky, pristup, rozpocet,
-                                    stav, vyhodnotenie, autor, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', ?11, ?12, ?12)`,
+                                    stav, vyhodnotenie, autor, created_at, updated_at, profil)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', ?11, ?12, ?12, ?13)`,
           ).bind(
             novy, nazov, String(b.od), String(b.do), text(b.ciel, 1000), text(b.preco, 1000),
             met.json, text(b.pristup, 4000), rozpocet ?? 0,
-            jeStav(b.stav) ? String(b.stav) : "navrh", autor, teraz,
+            jeStav(b.stav) ? String(b.stav) : "navrh", autor, teraz, kus(b.profil, 60),
           ).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový plán", neu: nazov, actor: autor || undefined });

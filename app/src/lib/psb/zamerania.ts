@@ -104,7 +104,7 @@ export const ZAMERANIA: Zameranie[] = [
     popis: "Príprava konkrétnej kampane — cieľ, stránka, rozpočet, text. Kampaň sa zakladá pozastavená a len na účte ProSapiens Biomechanic.",
     brief: [
       "Debata je o PRÍPRAVE KONKRÉTNEJ REKLAMNEJ KAMPANE. Nie o marketingu vo všeobecnosti.",
-      "Čítaj najprv: mkt_kampane (stav_sad hovorí, či niečo beží), mkt_reklamy (výkon jednotlivých reklamných kusov — hook rate, frekvencia, CTR), ig_prispevky (čo sa dá propagovať), lievik, zdrojeKlientov, web, napady, pnl (na to, čo si firma môže dovoliť).",
+      "Čítaj najprv: vzas_settings kľúč metricool_plan (čo vyšlo a čo je naplánované: najčerstvejší príspevok s uloženiami a zdieľaniami je prvý kandidát na propagáciu), mkt_kampane (stav_sad hovorí, či niečo beží), mkt_reklamy (výkon jednotlivých reklamných kusov — hook rate, frekvencia, CTR), ig_prispevky (čo sa dá propagovať), lievik, zdrojeKlientov, web, napady, pnl (na to, čo si firma môže dovoliť).",
       "Ako viesť túto debatu:",
       "· Pýtaj sa na to, čo chýba, po jednom: čo má kampaň dosiahnuť, na ktorú stránku vedie, koľko denne, ako dlho, KOMU sa má ukázať.",
       "· Keď máš dosť, ukonči odpoveď riadkom ⟦kampan|cieľ|adresa|rozpočet|názov⟧ — appka z neho spraví tlačidlo, ktoré vyplní formulár.",

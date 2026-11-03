@@ -1,3 +1,4 @@
+import type { PlanObsahuMc } from "../../lib/psb/prepojenieStrizne";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { RegisterItem } from "../../lib/psb/compute";
@@ -470,8 +471,51 @@ export function ReklamaPracovisko({ data, chat, onNavigate }: { data: PSBData; c
       <div style={cela ? { minHeight: 0, overflowY: "auto" } : undefined}>
         <DozorReklamKarta data={data} />
         <MetrikyReklamy data={data} />
+        <ObsahPreReklamu />
       </div>
       <div style={stlpec}><ReklamnyAgent chat={chat} onNavigate={onNavigate} /></div>
+    </div>
+  );
+}
+
+/**
+ * ČO SA PUBLIKUJE (Jerry, 3. 11. 2026): dozor reklám má radiť podľa skutočného
+ * obsahu. Hore príspevky, ktoré ľudia ukladajú a zdieľajú (kandidáti na reklamu),
+ * dole to, čo už je naplánované. Dáta z Metricoolu, nech ich naplánoval ktokoľvek.
+ */
+function ObsahPreReklamu() {
+  const [d, setD] = useState<(PlanObsahuMc & { chybaPlanu?: string }) | null>(null);
+  const [chyba, setChyba] = useState("");
+  useEffect(() => {
+    let zive = true;
+    void fetch("/api/metricool", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ akcia: "plan-obsahu" }) })
+      .then((r) => r.json())
+      .then((j: PlanObsahuMc & { ok?: boolean; error?: string; chybaPlanu?: string }) => { if (!zive) return; if (j.ok) setD(j); else setChyba(j.error || "Obsah sa nenačítal."); })
+      .catch((e) => { if (zive) setChyba(`Obsah sa nenačítal: ${String(e).slice(0, 120)}`); });
+    return () => { zive = false; };
+  }, []);
+  const riadok = { fontSize: 12.5, lineHeight: 1.45, padding: "6px 0", borderBottom: `1px solid ${C.border}`, color: C.text } as const;
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Čo vyšlo a čo sa oplatí propagovať</div>
+      <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>Posledných 14 dní, od toho, čo ľudia najviac ukladajú a zdieľajú.</div>
+      {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
+      {d && d.vyslo.length === 0 && <div style={{ fontSize: 12, color: C.textMuted }}>Za 14 dní nevyšlo nič, čo by sa dalo propagovať.</div>}
+      {d?.vyslo.slice(0, 5).map((p, i) => (
+        <div key={i} style={riadok}>
+          {p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ color: C.accentLight }}>{p.hook || "bez textu"}</a> : (p.hook || "bez textu")}
+          <div style={{ fontSize: 11, color: C.textMuted }}>{Number(p.datum.slice(8, 10))}. {Number(p.datum.slice(5, 7))}. · {p.ulozenia} uložení · {p.zdielania} zdieľaní · dosah {p.dosah}</div>
+        </div>
+      ))}
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 12 }}>Čo sa chystá</div>
+      {d?.chybaPlanu && <div style={{ fontSize: 12, color: C.orange }}>Plán sa nedá prečítať: {d.chybaPlanu}</div>}
+      {d && !d.chybaPlanu && d.naplanovane.length === 0 && <div style={{ fontSize: 12, color: C.textMuted }}>Na 30 dní nie je nič naplánované.</div>}
+      {d?.naplanovane.slice(0, 8).map((p, i) => (
+        <div key={i} style={riadok}>
+          <b>{Number(p.datum.slice(8, 10))}. {Number(p.datum.slice(5, 7))}. {p.datum.slice(11, 16)}</b>{p.koncept ? " · koncept" : ""} · {p.siete.join(", ")}
+          <div style={{ fontSize: 11.5, color: C.textMuted }}>{p.text || "bez textu"}</div>
+        </div>
+      ))}
     </div>
   );
 }

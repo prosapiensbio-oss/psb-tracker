@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { dnesPraha } from "./cas";
+import { KLUC_PLANU_MC, naplanovaneZApi, podlaHodnoty, type NaplanovanyPost, type PlanObsahuMc, type VysielanyPost } from "./prepojenieStrizne";
 import { KLUC_KONKURENTOV, prispevkyKonkurentov, uctyKonkurentov, type Konkurenti } from "./konkurenti";
 import {
   API_UZIVATEL, API_ZAKLAD, BRAND_PSB, hodnotaSerie, hodnotySerie, obdobieMesiacaApi, POCET_V_MESIACI, prispevkyZApi, riadokPrehladu, SERIE_API, sondyApi,
@@ -142,4 +143,30 @@ export async function citajKonkurentov(DB: D1Database): Promise<Konkurenti | nul
 export async function ulozKonkurentov(DB: D1Database, k: Konkurenti) {
   await DB.prepare("INSERT INTO vzas_settings (key, value, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
     .bind(KLUC_KONKURENTOV, JSON.stringify(k), new Date().toISOString()).run();
+}
+
+/** Čo sa chystá a čo vyšlo. Bez kľúča len to, čo vyšlo; výpadok API nesmie vyzerať ako „nič sa nechystá". */
+export async function obnovPlanObsahu(DB: D1Database): Promise<PlanObsahuMc & { chybaPlanu?: string }> {
+  const dnes = dnesPraha();
+  const od = new Date(Date.parse(`${dnes}T12:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10);
+  const doDna = new Date(Date.parse(`${dnes}T12:00:00Z`) + 30 * 86400000).toISOString().slice(0, 10);
+  const pr = await DB.prepare("SELECT datum, druh, hook, dosah, ulozenia, zdielania, url FROM mkt_prispevky WHERE datum >= ?1 AND druh <> 'story' ORDER BY datum DESC LIMIT 60")
+    .bind(od).all<VysielanyPost>();
+  const vyslo = [...(pr.results || [])].map((x) => ({ ...x, hook: String(x.hook || "").slice(0, 160) })).sort(podlaHodnoty);
+  let naplanovane: NaplanovanyPost[] = [];
+  let chybaPlanu: string | undefined;
+  const k = await citajKluc(DB);
+  if (!k) chybaPlanu = "API kľúč nie je uložený.";
+  else {
+    const r = await volaj(k.token, "/v2/scheduler/posts", { start: `${dnes}T00:00:00`, end: `${doDna}T23:59:59`, timezone: "Europe/Prague" });
+    if (r.status >= 200 && r.status < 300) naplanovane = naplanovaneZApi(zoznamZ(r.telo), `${dnes}T00:00`);
+    else chybaPlanu = `Metricool odpovedal ${r.status || "bez odpovede"}: ${r.text.slice(0, 160)}`;
+  }
+  const plan: PlanObsahuMc = { nacitane: new Date().toISOString(), naplanovane, vyslo };
+  // Pri výpadku sa starý plán neprepíše prázdnym.
+  if (!chybaPlanu) {
+    await DB.prepare("INSERT INTO vzas_settings (key, value, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
+      .bind(KLUC_PLANU_MC, JSON.stringify(plan), new Date().toISOString()).run();
+  }
+  return { ...plan, ...(chybaPlanu ? { chybaPlanu } : {}) };
 }

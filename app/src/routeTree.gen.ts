@@ -98,6 +98,7 @@ import { Route as ApiAnamnezaRouteImport } from './routes/api/anamneza'
 import { Route as ApiAlgoRouteImport } from './routes/api/algo'
 import { Route as ATokenRouteImport } from './routes/a.$token'
 import { Route as KTokenKalendarDoticsRouteImport } from './routes/k.$token.kalendar[.]ics'
+import { Route as ApiStriznaStatistikyRouteImport } from './routes/api/strizna.statistiky'
 import { Route as ApiStriznaNahrateSplatRouteImport } from './routes/api/strizna.nahrate.$'
 import { Route as ApiStriznaKniznicaSplatRouteImport } from './routes/api/strizna.kniznica.$'
 
@@ -546,6 +547,11 @@ const KTokenKalendarDoticsRoute = KTokenKalendarDoticsRouteImport.update({
   path: '/kalendar.ics',
   getParentRoute: () => KTokenRoute,
 } as any)
+const ApiStriznaStatistikyRoute = ApiStriznaStatistikyRouteImport.update({
+  id: '/api/strizna/statistiky',
+  path: '/api/strizna/statistiky',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStriznaNahrateSplatRoute = ApiStriznaNahrateSplatRouteImport.update({
   id: '/api/strizna/nahrate/$',
   path: '/api/strizna/nahrate/$',
@@ -646,6 +652,7 @@ export interface FileRoutesByFullPath {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
   '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
@@ -739,6 +746,7 @@ export interface FileRoutesByTo {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
   '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
@@ -833,6 +841,7 @@ export interface FileRoutesById {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
   '/api/strizna/nahrate/$': typeof ApiStriznaNahrateSplatRoute
@@ -928,6 +937,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
     | '/api/strizna/nahrate/$'
@@ -1021,6 +1031,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
     | '/api/strizna/nahrate/$'
@@ -1114,6 +1125,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
     | '/api/strizna/nahrate/$'
@@ -1208,6 +1220,7 @@ export interface RootRouteChildren {
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
+  ApiStriznaStatistikyRoute: typeof ApiStriznaStatistikyRoute
   ApiStriznaKniznicaSplatRoute: typeof ApiStriznaKniznicaSplatRoute
   ApiStriznaNahrateSplatRoute: typeof ApiStriznaNahrateSplatRoute
 }
@@ -1837,6 +1850,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KTokenKalendarDoticsRouteImport
       parentRoute: typeof KTokenRoute
     }
+    '/api/strizna/statistiky': {
+      id: '/api/strizna/statistiky'
+      path: '/api/strizna/statistiky'
+      fullPath: '/api/strizna/statistiky'
+      preLoaderRoute: typeof ApiStriznaStatistikyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/strizna/nahrate/$': {
       id: '/api/strizna/nahrate/$'
       path: '/api/strizna/nahrate/$'
@@ -1954,6 +1974,7 @@ const rootRouteChildren: RootRouteChildren = {
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
+  ApiStriznaStatistikyRoute: ApiStriznaStatistikyRoute,
   ApiStriznaKniznicaSplatRoute: ApiStriznaKniznicaSplatRoute,
   ApiStriznaNahrateSplatRoute: ApiStriznaNahrateSplatRoute,
 }

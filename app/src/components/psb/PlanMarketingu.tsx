@@ -28,6 +28,7 @@ import * as Sk from "../../lib/psb/sklonovanie";
 
 type PlanRiadok = Plan & { created_at?: string; updated_at?: string };
 
+const KLUC_KONCEPTU = "psb-plan-koncept";
 const dnesMesiac = () => dnesPraha().slice(0, 7);
 
 /** O rok dopredu od mesiaca — východzí koniec nového plánu. */
@@ -259,14 +260,28 @@ function Editor({ plan, data, clients, onUloz, onZavri, onJarvis, onDoMapy }: {
   onJarvis?: (p: Plan) => void;
   onDoMapy: () => void;
 }) {
-  const [nazov, setNazov] = useState(plan?.nazov || "");
-  const [od, setOd] = useState(plan?.od || dnesMesiac());
-  const [doM, setDoM] = useState(plan?.do || oMesiacov(dnesMesiac(), 3));
-  const [ciel, setCiel] = useState(plan?.ciel || "");
-  const [preco, setPreco] = useState(plan?.preco || "");
-  const [metriky, setMetriky] = useState(plan?.metriky || []);
-  const [pristup, setPristup] = useState(plan?.pristup || "");
-  const [rozpocet, setRozpocet] = useState(plan?.rozpocet || 0);
+  // ROZPÍSANÝ PLÁN SA NESTRATÍ (Jerry, 3. 11. 2026: „plánoval som, ale stratilo sa
+  // to"): kým nie je založený, drží sa v tomto prehliadači. Zavretie okna ani
+  // obnovenie stránky ho nezmaže, zmizne až po uložení.
+  const [koncept] = useState<Partial<Plan>>(() => {
+    if (plan) return {};
+    try { return JSON.parse(localStorage.getItem(KLUC_KONCEPTU) || "{}") as Partial<Plan>; } catch { return {}; }
+  });
+  const [nazov, setNazov] = useState(plan?.nazov || koncept.nazov || "");
+  const [od, setOd] = useState(plan?.od || koncept.od || dnesMesiac());
+  const [doM, setDoM] = useState(plan?.do || koncept.do || oMesiacov(dnesMesiac(), 3));
+  const [ciel, setCiel] = useState(plan?.ciel || koncept.ciel || "");
+  const [preco, setPreco] = useState(plan?.preco || koncept.preco || "");
+  const [metriky, setMetriky] = useState(plan?.metriky || koncept.metriky || []);
+  const [pristup, setPristup] = useState(plan?.pristup || koncept.pristup || "");
+  const [rozpocet, setRozpocet] = useState(plan?.rozpocet || koncept.rozpocet || 0);
+  useEffect(() => {
+    if (plan) return;
+    try {
+      const rozpisane = nazov.trim() || ciel.trim() || preco.trim() || pristup.trim() || metriky.length || rozpocet;
+      if (rozpisane) localStorage.setItem(KLUC_KONCEPTU, JSON.stringify({ nazov, od, do: doM, ciel, preco, metriky, pristup, rozpocet }));
+    } catch { /* bez pamäte prehliadača len do zatvorenia */ }
+  }, [plan, nazov, od, doM, ciel, preco, metriky, pristup, rozpocet]);
   const [stav, setStav] = useState<StavPlanu>(plan?.stav || "navrh");
   const [vyhodnotenie, setVyhodnotenie] = useState(plan?.vyhodnotenie || "");
   const [busy, setBusy] = useState(false);
@@ -300,11 +315,17 @@ function Editor({ plan, data, clients, onUloz, onZavri, onJarvis, onDoMapy }: {
     if (plan?.id) telo.id = plan.id;
     const ok = await onUloz(telo);
     setBusy(false);
-    if (ok) onZavri();
+    if (ok) {
+      if (!plan) { try { localStorage.removeItem(KLUC_KONCEPTU); } catch { /* nič */ } }
+      onZavri();
+    }
   };
 
   return (
     <div>
+      {!plan && Object.keys(koncept).length > 0 && (
+        <div style={{ fontSize: 11.5, color: C.accentLight, marginBottom: 8 }}>Vrátil som rozpísaný plán z minula. Uloží sa až tlačidlom dole.</div>
+      )}
       <label style={{ ...popis, marginTop: 0 }}>Názov plánu</label>
       <input value={nazov} onChange={(e) => setNazov(e.target.value)}
         placeholder="napr. Jeseň 2026 — zaplniť miesta po odídencoch" style={vstup} />

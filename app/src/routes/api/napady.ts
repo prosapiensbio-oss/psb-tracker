@@ -66,7 +66,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba, strizna FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
-          const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie, vetvy FROM mkt_mapy ORDER BY poradie, created_at").all();
+          const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie, vetvy, profil FROM mkt_mapy ORDER BY poradie, created_at").all();
           // BEZ KEŠE. Nápady sa čítajú hneď po zápise (mapa, mapa cyklu,
           // Jarvis) a odpoveď bez `cache-control` si prehliadač smie nechať
           // podľa vlastného uváženia — potom po presune bubliny prečíta
@@ -109,8 +109,8 @@ export const Route = createFileRoute("/api/napady")({
             // `pozicie` je prázdne: nová mapa nemá ručne posunuté bubliny,
             // rozloženie si spočíta appka. Stĺpec tu stojí kvôli stráži
             // zo zapisy.test.ts.
-            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie, pozicie, vetvy) VALUES (?1, ?2, ?3, ?4, '', '')")
-              .bind(idMapy, nazov, new Date().toISOString(), poradie?.p ?? 1).run();
+            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie, pozicie, vetvy, profil) VALUES (?1, ?2, ?3, ?4, '', '', ?5)")
+              .bind(idMapy, nazov, new Date().toISOString(), poradie?.p ?? 1, kus(b.profil, 60)).run();
             return Response.json({ ok: true, id: idMapy, nazov });
           }
           if (b.akcia === "mapa-premenuj") {
