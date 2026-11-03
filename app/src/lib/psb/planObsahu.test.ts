@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { klucHotoveho, planObsahu, rozdelPodlaHotovych, SKRY_DNI, type Clanok, type HookVysledok, type Prilezitost } from "./planObsahu";
+import { klucHotoveho, planObsahu, rozdelPodlaHotovych, SKRY_DNI, type Clanok, type HookVysledok, type Prilezitost, nahlaPrispevok } from "./planObsahu";
 
 /** Slovenský formát čísel používa pevnú medzeru — v teste ju zrovnáme. */
 const bezPevnej = (s: string) => s.replace(/\u00a0/g, " ");
@@ -262,5 +262,14 @@ describe("hotové návrhy", () => {
       expect(n.skryDni).toBeGreaterThan(0);
     }
     expect(new Set(v.map((x) => x.kluc)).size).toBe(v.length);
+  });
+});
+
+describe("nahlaPrispevok", () => {
+  it("do Strižne ide pripomenutie článku a typ začiatku, nie práca na webe ani tempo", () => {
+    expect(nahlaPrispevok({ zdroj: "web" })).toBe(true);
+    expect(nahlaPrispevok({ zdroj: "obsah" })).toBe(true);
+    expect(nahlaPrispevok({ zdroj: "vyhľadávanie" })).toBe(false);
+    expect(nahlaPrispevok({ zdroj: "tempo" })).toBe(false);
   });
 });

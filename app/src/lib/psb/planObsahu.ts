@@ -36,6 +36,13 @@ export type Prilezitost = { dopyt: string; kliky: number; zobrazenia: number; po
  * `zmienka` = slovo sa v texte mihne, ale vlastnú stránku nemá.
  * `null`    = na webe o tom nie je nič.
  */
+/**
+ * Dá sa z návrhu urobiť príspevok v Strižni? Web aj vyhľadávanie sú práca na stránke
+ * (titulok, nový článok), tempo je len pripomienka. Do Strižne by išli bez úžitku.
+ * „web“ je tu článok, ktorý sa má pripomenúť na Instagrame, „obsah“ je typ začiatku.
+ */
+export const nahlaPrispevok = (n: { zdroj: string }) => n.zdroj === "web" || n.zdroj === "obsah";
+
 export type Vlastnik = { url: string; titulok: string; druh: "titulok" | "zmienka" } | null;
 /**
  * Stránka, ktorú ľudia naozaj čítajú — meraná Search Console, nie interným

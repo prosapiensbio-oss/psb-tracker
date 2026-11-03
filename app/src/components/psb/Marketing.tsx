@@ -1233,7 +1233,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
               má naplniť. Opačné poradie robilo z obsahu samoúčel. */}
           <PlanMarketingu data={data} clients={clients} chat={chat} onNavigate={onNavigate} />
           <MapaCyklu data={data} focus={focus} />
-          <PlanObsahu data={data} onAck={onAck ? (k, z) => onAck(k, z) : undefined} />
+          <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} onAck={onAck ? (k, z) => onAck(k, z) : undefined} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
           <Napady chat={chat} />

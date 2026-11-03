@@ -4,9 +4,10 @@ import { clanky, prilezitosti, type Dopyt as GscDopytTyp } from "../../lib/psb/g
 import { GSC_DOPYTY, GSC_STRANY, marketingVerzia, WEB_STRANKY } from "../../lib/psb/marketing";
 import { obsahPredDopytmi, type Riadok } from "../../lib/psb/obsahDopyt";
 import { monthKey } from "../../lib/psb/format";
-import { klucHotoveho, planObsahu, rozdelPodlaHotovych, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
+import { klucHotoveho, nahlaPrispevok, planObsahu, rozdelPodlaHotovych, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import type { AssistantChat } from "./Assistant";
 import { Card, Empty, H3, Info } from "./ui";
 import * as Sk from "../../lib/psb/sklonovanie";
 
@@ -23,12 +24,12 @@ import * as Sk from "../../lib/psb/sklonovanie";
  *
  * Návrhy sú počítané, nie generované. Model by ich napísal krajšie, ale pri
  * každom otvorení inak — a to, čo sa mení bez toho, aby sa zmenili dáta, sa
- * nedá brať vážne. Z vybraného návrhu sa v Strižni stane karta a zadanie.
+ * nedá brať vážne. Návrh na príspevok ide do Strižne, návrh na web cez Jarvisa do zadania.
  */
 
 type IgPrispevok = { datum: string; mesiac: string; kategoria: string };
 
-export function PlanObsahu({ data, onAck }: { data: PSBData; onAck?: (kluc: string, zapnut: boolean) => void }) {
+export function PlanObsahu({ data, chat, onNavigate, onAck }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void; onAck?: (kluc: string, zapnut: boolean) => void }) {
   const [ig, setIg] = useState<IgPrispevok[]>([]);
 
   useEffect(() => {
@@ -121,9 +122,50 @@ export function PlanObsahu({ data, onAck }: { data: PSBData; onAck?: (kluc: stri
     // skladom a karta tvrdila, že web o téme nemá stránku.
   }, [ig, data.leads, marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Kokpit povie čo a prečo, vyrobí to Strižňa (Jerry, 3. 11. 2026). Návrh ide
-  // medzi nápady bez termínu a tie Strižňa vidí v Pláne. Po odoslaní sa odklepne,
-  // aby sa ten istý návrh nedal poslať druhýkrát.
+  const doZadania = (n: Navrh) => {
+    if (!chat) return;
+    // Zadanie sa rieši v Jarvisovom okne, nie v rohu obrazovky.
+    //
+    // Jerry, 17. 8. 2026: „presne toto by som chcel riešiť v tom samostatnom
+    // okne — keď kliknem zadanie, tak by ma tam preplo." Malý panel je dobrý
+    // na jednu otázku medzi prácou; nad zadaním sa sedí, dopytuje a vetví,
+    // a na to je 300 pixelov v rohu málo. Rozhovor je jeden a ten istý,
+    // takže sa nič nestráca — mení sa len okno, v ktorom je vidieť.
+    // NOVÝ rozhovor, nie pokračovanie toho, čo bolo otvorené.
+    //
+    // 17. 8. 2026 sa dve zadania prilepili do rozhovoru s názvom „Ktorá
+    // kategória hákov nám funguje najlepšie" — lebo `zachovajOkno` zabránilo
+    // oknu založiť nový a zadanie skončilo v tom, čo bolo náhodou otvorené.
+    // Nič sa nestratilo, ale nedalo sa to nájsť: názov rozhovoru sa berie
+    // z PRVEJ otázky a tá bola o niečom inom.
+    //
+    // Samotné `newChat` nestačí — nastavuje stav a `ask` beží ešte so starým
+    // zoznamom správ z uzáveru. Preto sa mu prázdna história odovzdáva rovno
+    // tretím parametrom; to je jediný spôsob, ako to platí okamžite.
+    chat.newChat("marketing");
+    if (onNavigate) { chat.zachovajOkno(); onNavigate("jarvis"); }
+    else chat.setFloatingOpen(true);
+    void chat.ask([
+      `Vyrob mi ZADANIE PRE CLAUDE PROJECT na tento obsah: ${n.co}`,
+      "",
+      `Prečo to navrhujem: ${n.preco}`,
+      `Číslo, na ktorom to stojí: ${n.dokaz}`,
+      "",
+      "Drž PEVNÝ TVAR ZADANIA (docs/tvar-zadania.md) — tieto kolónky v tomto poradí:",
+      "TÉMA · PREČO PRÁVE TOTO · ČÍSLA, NA KTORÝCH TO STOJÍ · PUBLIKUM A SYMPTÓM ·",
+      "FORMÁT A DĹŽKA · JAZYK · ČO NESMIE ZAZNIEŤ · HOTOVÉ VETY · ČO CHCEM SPÄŤ.",
+      "",
+      "Kto je PSB, tón hlasu, FP pravidlá a index brand-konfliktov do zadania NEPÍŠ —",
+      "Project ich má natrvalo v kánone. Zadanie nesie len to, čo je pre tento text nové.",
+      "Pri číslach vždy uveď zdroj a dátum. Project nevidí dáta Kokpitu, takže čo",
+      "nenapíšeš, to nemá. Do zadania nepatrí meno klienta ani zdravotný detail.",
+      "Najprv over, či čísla sedia — a keď nesedia, povedz to namiesto zadania.",
+    ].join("\n"), `Vyrob zadanie: ${n.co}`, []);
+  };
+
+  // Príspevok vyrobí Strižňa (Jerry, 3. 11. 2026). Návrh ide medzi nápady bez
+  // termínu a tie Strižňa vidí v mape nápadov PSB. Po odoslaní sa odklepne, aby sa
+  // ten istý návrh nedal poslať druhýkrát.
   const [posielam, setPosielam] = useState("");
   const [chybaPoslania, setChybaPoslania] = useState("");
   const doStrizne = async (n: Navrh) => {
@@ -205,15 +247,27 @@ export function PlanObsahu({ data, onAck }: { data: PSBData; onAck?: (kluc: stri
                     hotové
                   </button>
                 )}
-                <button onClick={() => void doStrizne(n)} disabled={!!posielam}
-                  style={{
-                    fontSize: 11.5, padding: "6px 11px", borderRadius: 6,
-                    border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10),
-                    color: C.accentLight, cursor: posielam ? "default" : "pointer",
-                    opacity: posielam ? 0.5 : 1, whiteSpace: "nowrap", fontFamily: "inherit",
-                  }}>
-                  {posielam === n.kluc ? "Posielam…" : "Poslať do Strižne →"}
-                </button>
+                {nahlaPrispevok(n) ? (
+                  <button onClick={() => void doStrizne(n)} disabled={!!posielam}
+                    style={{
+                      fontSize: 11.5, padding: "6px 11px", borderRadius: 6,
+                      border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10),
+                      color: C.accentLight, cursor: posielam ? "default" : "pointer",
+                      opacity: posielam ? 0.5 : 1, whiteSpace: "nowrap", fontFamily: "inherit",
+                    }}>
+                    {posielam === n.kluc ? "Posielam…" : "Poslať do Strižne →"}
+                  </button>
+                ) : n.zdroj === "vyhľadávanie" && chat ? (
+                  <button onClick={() => doZadania(n)} disabled={chat.busy}
+                    style={{
+                      fontSize: 11.5, padding: "6px 11px", borderRadius: 6,
+                      border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10),
+                      color: C.accentLight, cursor: chat.busy ? "default" : "pointer",
+                      opacity: chat.busy ? 0.5 : 1, whiteSpace: "nowrap", fontFamily: "inherit",
+                    }}>
+                    Zadanie →
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}
