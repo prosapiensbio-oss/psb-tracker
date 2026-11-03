@@ -1,3 +1,4 @@
+import { jeNapadPsb } from "../../lib/psb/mapaCyklu";
 import { useEffect, useMemo, useState } from "react";
 
 import { vloz } from "../../lib/psb/titulkaFoto";
@@ -58,7 +59,7 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
 
   const nacitaj = () => void fetch("/api/napady", { credentials: "same-origin" })
     .then((r) => r.json())
-    .then((j: { napady?: Napad[] }) => setNapady(j.napady || []))
+    .then((j: { napady?: (Napad & { strizna?: string | null })[] }) => setNapady((j.napady || []).filter(jeNapadPsb)))
     .catch(() => {})
     .finally(() => setNacitane(true));
   useEffect(nacitaj, []);

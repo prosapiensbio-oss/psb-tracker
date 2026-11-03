@@ -1,3 +1,4 @@
+import { SQL_NAPAD_PSB } from "../../lib/psb/mapaCyklu";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/api/tema")({
         try {
           const [hl, np] = await DB.batch([
             DB.prepare("SELECT dopyt, zobrazenia FROM gads_dopyty WHERE LENGTH(dopyt) > 14 ORDER BY zobrazenia DESC LIMIT 150"),
-            DB.prepare("SELECT text, zdroj FROM mkt_napady WHERE TRIM(COALESCE(text,'')) <> '' ORDER BY id DESC LIMIT 60"),
+            DB.prepare(`SELECT text, zdroj FROM mkt_napady WHERE TRIM(COALESCE(text,'')) <> '' AND ${SQL_NAPAD_PSB} ORDER BY id DESC LIMIT 60`),
           ]);
           const tema = temaDna({
             hladania: hl.results as unknown as { dopyt: string; zobrazenia: number }[],

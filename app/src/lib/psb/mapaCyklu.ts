@@ -419,3 +419,20 @@ export function poctyFaz(kusy: { faza: number }[]): Map<number, number> {
   for (const k of kusy) if (m.has(k.faza)) m.set(k.faza, (m.get(k.faza) || 0) + 1);
   return m;
 }
+
+/**
+ * Patrí nápad ProSapiens? Strižňa píše do tej istej tabuľky aj karty a mapy osobných
+ * účtov (`strizna.profil`). Kokpit pozná len ProSapiens, cudzie by mu skreslili plán.
+ * Bez profilu alebo s nečitateľným stavom je to ProSapiens: tak vznikli staré riadky.
+ */
+export function jeNapadPsb(n: { strizna?: string | null }): boolean {
+  try {
+    const profil = (JSON.parse(n.strizna || "{}") as { profil?: unknown })?.profil;
+    return !profil || profil === "psb";
+  } catch {
+    return true;
+  }
+}
+
+/** To isté pre dopyt do `mkt_napady`. */
+export const SQL_NAPAD_PSB = "COALESCE(json_extract(CASE WHEN json_valid(strizna) THEN strizna END, '$.profil'), 'psb') IN ('psb', '')";

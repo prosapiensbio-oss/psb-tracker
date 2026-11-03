@@ -20,7 +20,7 @@
  * po každom omylom stlačenom Tabe zostane v dátach prázdny riadok.
  *
  * Tu žije len to, čo sa dá otestovať: vetvy, strom, rozloženie a preklad do
- * textu. Obrazovka je v `components/psb/MapaNapadov.tsx`.
+ * textu. Obrazovka je od 3. 11. 2026 v Strižni, tu ostáva čítanie a zápis pre `/api/napady`.
  */
 
 export type Vetva = {

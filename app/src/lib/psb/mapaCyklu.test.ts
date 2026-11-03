@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FAZY, jeFaza, mesiacovDopredu, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject, POMER_IDEAL, podielFaz, poctyFaz } from "./mapaCyklu";
+import { FAZY, jeFaza, jeNapadPsb, mesiacovDopredu, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject, POMER_IDEAL, podielFaz, poctyFaz } from "./mapaCyklu";
 
 const kus = (mesiac: string, faza: number, hook = "h") => ({
   datum: `${mesiac}-05`, mesiac, faza, hook, dosah: 100, ulozenia: 1,
@@ -245,5 +245,18 @@ describe("dokedy siaha os mapy", () => {
   it("na nezmysel odpovie východzou hodnotou, nie NaN", () => {
     expect(mesiacovDopredu("2026-13")).toBe(4);
     expect(mesiacovDopredu("")).toBe(4);
+  });
+});
+
+describe("jeNapadPsb", () => {
+  it("bez profilu, s psb aj s nečitateľným stavom je to ProSapiens", () => {
+    expect(jeNapadPsb({})).toBe(true);
+    expect(jeNapadPsb({ strizna: "" })).toBe(true);
+    expect(jeNapadPsb({ strizna: "{}" })).toBe(true);
+    expect(jeNapadPsb({ strizna: '{"profil":"psb"}' })).toBe(true);
+    expect(jeNapadPsb({ strizna: "nie je json" })).toBe(true);
+  });
+  it("osobný účet nie", () => {
+    expect(jeNapadPsb({ strizna: '{"profil":"ahsoka"}' })).toBe(false);
   });
 });

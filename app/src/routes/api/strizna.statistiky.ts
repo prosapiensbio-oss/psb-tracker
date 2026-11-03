@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/strizna/statistiky")({
           ((await DB.prepare(sql).bind(...p).all().catch(() => null))?.results || []) as Record<string, unknown>[];
         const [dopyty, reklama, hladania, kanaly, konk] = await Promise.all([
           riadky("SELECT substr(date,1,7) mesiac, source zdroj, COUNT(*) pocet FROM leads WHERE date >= ?1 GROUP BY 1,2 ORDER BY 1 DESC, 3 DESC", `${mesiac(5)}-01`),
-          riadky("SELECT mesiac, ROUND(SUM(spend)) vydaj, SUM(vysledky) vysledky FROM mkt_kampane WHERE mesiac >= ?1 GROUP BY 1 ORDER BY 1 DESC", mesiac(5)),
+          riadky("SELECT mesiac, ROUND(SUM(spend)) vydaj FROM mkt_kampane WHERE mesiac >= ?1 GROUP BY 1 ORDER BY 1 DESC", mesiac(5)),
           riadky("SELECT dopyt, kliky, zobrazenia, pozicia FROM gsc_dopyty ORDER BY zobrazenia DESC LIMIT 15"),
           riadky("SELECT mesiac, metrika, hodnota FROM kanaly_mesiace WHERE kanal = 'Instagram' AND mesiac >= ?1 AND metrika IN ('Followers','Followers balance','Views','Reach','Saved','Shares') ORDER BY mesiac DESC", mesiac(2)),
           riadky("SELECT value FROM vzas_settings WHERE key = 'mkt_konkurenti'"),

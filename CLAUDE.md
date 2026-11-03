@@ -54,14 +54,14 @@ len ukázať.** Pred novou funkciou okolo obsahu sa spýtaj, koho je.
 
 | Kokpit | Strižňa |
 |---|---|
-| téma, fáza a mesiac karty, mapa cyklu | scenár, caption, úvodný záber, rozpis záberov, titulka |
+| marketingový plán ProSapiens, návrhy z dát, mapa cyklu na čítanie | téma, fáza a mesiac karty, mapa nápadov, plán marketingu každého profilu, zadanie pre Project, scenár, caption, úvodný záber, rozpis záberov, titulka |
 | štatistiky a vyhodnotenie PSB, prehľad konkurentov | strih, grafika, dátum a čas, publikovanie |
 | reklamy: príprava, spustenie, dozor | jednoduché výsledky všetkých účtov vrátane PSB, rozbor cudzieho videa |
 
 - **Štatistiky osobných účtov (@philipjerry, Filip, Ahsoka, Terezka) do Kokpitu
   nepatria.** Rozhodnuté 13. 10. a znova 3. 11. 2026, neotvárať.
-- Kokpit karta texty len číta a pri uložení ich NEPOSIELA: okno otvorené skôr by
-  prepísalo novšie vety zo Strižne.
+- Kartu v Kokpite sa nedá upraviť, len prečítať a otvoriť v Strižni (`strizna://karta/<id>`).
+  Z Kokpitu ide do Strižne len návrh z dát (tlačidlo Poslať do Strižne, nápad bez termínu).
 - Výnimky, ktoré prekrytím nie sú: editor v Kokpite (rozbor chôdze a behu klienta,
   porovnania do kartotéky) a „Nahrať do Strižne" (vstup z telefónu).
 - `ig_prispevky` z Mety ostáva vedľa `mkt_prispevky` z Metricoolu: nesie ručnú fázu

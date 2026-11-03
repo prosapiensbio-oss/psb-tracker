@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed } from "../lib/psb/auth.server";
 import { bindings } from "../lib/bindings.server";
-import { FAZA_MAPA } from "../lib/psb/mapaCyklu";
+import { FAZA_MAPA, SQL_NAPAD_PSB } from "../lib/psb/mapaCyklu";
 import { ZABER_MAPA } from "../lib/psb/zabery";
 
 /**
@@ -230,7 +230,7 @@ export const Route = createFileRoute("/natacaci-list")({
         const rs = ((await DB.prepare(
           `SELECT id, text, koncept, scenar, hotovy_text, sekvencia, zaber, faza, planovane_na, kto, uvodne_vety
              FROM mkt_napady
-            WHERE stav <> 'zamietnuty' AND faza > 0 AND planovane_na <> ''
+            WHERE stav <> 'zamietnuty' AND faza > 0 AND planovane_na <> '' AND ${SQL_NAPAD_PSB}
             ORDER BY planovane_na ASC, created_at ASC`,
         ).all()).results || []) as unknown as Riadok[];
 

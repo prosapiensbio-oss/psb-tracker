@@ -2,7 +2,6 @@ import { Konkurenti } from "./Konkurenti";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { MarketingPrehlad } from "./MarketingPrehlad";
 import { StriznaNahrat } from "./StriznaNahrat";
-import { MapaNapadov } from "./MapaNapadov";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -43,7 +42,6 @@ import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
-import { Zadanie } from "./Zadanie";
 import { PlanMarketingu } from "./PlanMarketingu";
 import { MapaCyklu } from "./MapaCyklu";
 import { PlanObsahu } from "./PlanObsahu";
@@ -1079,7 +1077,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
  * Marketing dlhovať niečo, tak zhrnutie, ktoré odpovie bez preklikávania —
  * to je záložka „Prehľad".
  */
-export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; chatReklama?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
+export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; chatReklama?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
   // potrebovala vlastné tri propy a jedna by ich časom nedostala.
@@ -1226,23 +1224,16 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
       )}
       {sub === "kanaly" && <Kanaly data={data} clients={clients} chat={chat} />}
 
-      {/* ČO PUBLIKOVAŤ — plánovanie. Poradie je poradie otázok: ako sa zadanie
-          odovzdá → čo do neho dať podľa dát → čo sa ľudia nahlas spýtali. */}
+      {/* ČO PUBLIKOVAŤ — smer a prehľad. Plánovanie a výroba sú od 3. 11. 2026
+          v Strižni; tu ostáva marketingový plán ProSapiens, plán obsahu na čítanie
+          a návrhy z dát, ktoré sa dajú poslať do Strižne. */}
       {sub === "navrhy" && (
         <>
-          <Zadanie chat={chat} nastaveneAt={data.anomalyAck?.["project|nastavene"]?.ackedAt || null} onNastavene={(hotovo) => onAck?.("project|nastavene", hotovo, "Claude Project nastavený")} />
           {/* Plán je NAD mapou: najprv cieľ a obdobie, potom obsah, ktorý ho
               má naplniť. Opačné poradie robilo z obsahu samoúčel. */}
           <PlanMarketingu data={data} clients={clients} chat={chat} onNavigate={onNavigate} />
-          {/* Myšlienková mapa hneď za plánom: cieľ je daný, teraz sa vysypú
-              nápady, ktoré ho majú naplniť. Až potom má zmysel mapa cyklu
-              (kam sa už chystá) a návrhy z dát. */}
-          <MapaNapadov chat={chat} />
-          {/* Mapa je nad počítanými návrhmi zámerne: najprv treba vidieť, kam
-              sa obsah chystá, až potom čítať, čo do toho dáta odporúčajú.
-              Opačné poradie robilo z návrhov zoznam bez miesta, kam ich dať. */}
-          <MapaCyklu data={data} chat={chat} onNavigate={onNavigate} focus={focus} onOdchodKJarvisovi={onOdchodKJarvisovi} />
-          <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} onAck={onAck ? (k, z) => onAck(k, z) : undefined} />
+          <MapaCyklu data={data} focus={focus} />
+          <PlanObsahu data={data} onAck={onAck ? (k, z) => onAck(k, z) : undefined} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
           <Napady chat={chat} />

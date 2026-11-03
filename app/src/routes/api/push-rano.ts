@@ -1,3 +1,4 @@
+import { SQL_NAPAD_PSB } from "../../lib/psb/mapaCyklu";
 import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -212,7 +213,7 @@ export const Route = createFileRoute("/api/push-rano")({
           // zabalí Cloudflare do svojej chybovej stránky, zvonku to vyzeralo
           // ako limit CPU. Prvý pohľad má patriť logu, nie domnienke.
           DB.prepare(`SELECT text, zdroj FROM mkt_napady
-                       WHERE TRIM(COALESCE(text,'')) <> '' ORDER BY id DESC LIMIT 60`),
+                       WHERE TRIM(COALESCE(text,'')) <> '' AND ${SQL_NAPAD_PSB} ORDER BY id DESC LIMIT 60`),
         ]);
         const tema = temaDna({
           hladania: (hl.results as unknown as { dopyt: string; zobrazenia: number }[]),

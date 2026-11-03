@@ -3442,7 +3442,7 @@ function skupinaFaktur(
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} chatReklama={chatReklama} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} chatReklama={chatReklama} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && btcNenacitane && (
           <div role="alert" style={{ margin: "0 0 12px", padding: "11px 14px", borderRadius: 10, background: mix(C.orange, 14), border: `1px solid ${mix(C.orange, 55)}`, color: C.text, fontSize: 13, lineHeight: 1.55 }}>
             <b>Bitcoinová kniha sa nenačítala</b> — náklady z faktúr zaplatených bitcoinom a výplaty v BTC v týchto číslach chýbajú,
