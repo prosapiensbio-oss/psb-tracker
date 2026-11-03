@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mesacneInstagram, riadkyNaPrispevky, riadkyZVysledku, rozoberOdpovedMcp, rozsahMesiaca } from "./metricool";
+import { mesacneInstagram, pocetPoloziek, riadkyNaPrispevky, riadkyZVysledku, riadokPrehladu, rozoberOdpovedMcp, rozsahMesiaca, sondyApi, verdiktKluca, vyzeraAkoKluc } from "./metricool";
 
 describe("Metricool cez MCP", () => {
   it("reels: ID ako v exporte, čas v ms, pomer v %", () => {
@@ -58,5 +58,37 @@ describe("ostatné siete", () => {
     const m = Object.fromEntries(mesacneSiete(yt, [r(3, 1, "20260905"), r(1, 0, "20260920")], "2026-09").map((x) => [x.metrika, x.hodnota]));
     expect(m["Followers balance"]).toBe(3);
     expect(jeInaZnacka(`Metricool: 403 Forbidden … "Access denied to blog: '2101108'"`)).toBe(true);
+  });
+});
+
+describe("API Metricoolu: kľúč a prehľad (3. 11. 2026)", () => {
+  it("kľúč sa posudzuje podľa odpovede a každá chyba povie, čo robiť", () => {
+    expect(verdiktKluca(200)).toEqual({ ok: true });
+    expect(verdiktKluca(401)).toMatchObject({ ok: false, chyba: expect.stringContaining("neprijal") });
+    expect(verdiktKluca(403)).toMatchObject({ ok: false, chyba: expect.stringContaining("Advanced") });
+    expect(verdiktKluca(500)).toMatchObject({ ok: false, chyba: expect.stringContaining("500") });
+    expect(vyzeraAkoKluc("abc def ghi")).toBe(false);
+    expect(vyzeraAkoKluc("kratky")).toBe(false);
+    expect(vyzeraAkoKluc("abcdef123456")).toBe(true);
+  });
+  it("obdobie je 90 dní dozadu v pražskom čase", () => {
+    const s = sondyApi("2026-11-03").find((x) => x.id === "recenzie")!;
+    expect(s.parametre.from).toBe("2026-08-05T00:00:00+01:00");
+    expect(s.parametre.to).toBe("2026-11-03T23:59:59+01:00");
+  });
+  it("počet z poľa, z data aj z mapy; nič iné sa netvári ako nula", () => {
+    expect(pocetPoloziek([1, 2])).toBe(2);
+    expect(pocetPoloziek({ data: [1] })).toBe(1);
+    expect(pocetPoloziek({ Brno: 3, Praha: 1 })).toBe(2);
+    expect(pocetPoloziek(null)).toBe(null);
+  });
+  it("riadok: chyba nesie začiatok odpovede, chýbajúce povolenie nie je úspech, obsah sa nevracia", () => {
+    const s = sondyApi("2026-11-03").find((x) => x.id === "komentare")!;
+    expect(riadokPrehladu(s, 403, null, "Forbidden: plan").poznamka).toContain("403: Forbidden");
+    expect(riadokPrehladu(s, 0, null, "").poznamka).toContain("neodpovedal");
+    expect(riadokPrehladu(s, 200, { data: [] }, "", ["instagram_manage_comments"])).toMatchObject({ ok: false, pocet: null });
+    const ok = riadokPrehladu(s, 200, { data: [{ text: "tajné" }] }, "");
+    expect(ok).toMatchObject({ ok: true, pocet: 1 });
+    expect(JSON.stringify(ok)).not.toContain("tajné");
   });
 });

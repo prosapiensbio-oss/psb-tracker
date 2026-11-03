@@ -233,3 +233,63 @@ export function mesacneSiete(s: Siet, rows: unknown[][], mesiac: string): { metr
 
 /** 403 „Access denied to blog" = Kokpit dostal prístup k inej značke než ProSapiens. */
 export const jeInaZnacka = (sprava: string) => /access denied to blog/i.test(sprava);
+
+/**
+ * API METRICOOLU (plán Advanced, Jerry 3. 11. 2026) — kľúč vedľa pripojenia cez MCP.
+ *
+ * MCP dáva čísla do uzávierky a ostáva, ako je. API navyše vie to, čo MCP nemá:
+ * text recenzií, komentáre a správy, konkurentov a odkiaľ sú sledovatelia.
+ * Prehľad nižšie vracia LEN POČTY — nič z obsahu neide do prehliadača ani do logu.
+ */
+export const API_ZAKLAD = "https://app.metricool.com/api";
+export const API_UZIVATEL = "1737317";
+
+export type VerdiktKluca = { ok: true } | { ok: false; chyba: string };
+
+/** Uloží sa len kľúč, ktorý Metricool prijal — zlý by sa ukázal až pri prvom sťahovaní. */
+export function verdiktKluca(status: number): VerdiktKluca {
+  if (status >= 200 && status < 300) return { ok: true };
+  if (status === 401) return { ok: false, chyba: "Metricool tento kľúč neprijal. Skopíruj ho znova celý: Nastavenia účtu → API." };
+  if (status === 402 || status === 403) return { ok: false, chyba: "Metricool pre tento účet API odmieta. Over, že je plán Advanced už aktívny." };
+  return { ok: false, chyba: `Metricool odpovedal chybou ${status}. Skús to o chvíľu.` };
+}
+
+export const vyzeraAkoKluc = (k: string): boolean => k.length >= 8 && !/\s/.test(k);
+
+export type SondaApi = { id: string; nazov: string; naco: string; cesta: string; parametre: Record<string, string>; opravnenie?: string };
+
+/** Čo Kokpit pri kľúči skúša. Z obdobia posledných 90 dní, značka PSB. */
+export function sondyApi(dnes: string): SondaApi[] {
+  const od = new Date(Date.parse(`${dnes}T12:00:00Z`) - 90 * 86400000).toISOString().slice(0, 10);
+  const obdobie = { from: `${od}T00:00:00+01:00`, to: `${dnes}T23:59:59+01:00`, timezone: "Europe/Prague" };
+  return [
+    { id: "reels", nazov: "Reels s dĺžkou pozerania", naco: "za koľko ľudia odskočia, reel po reeli", cesta: "/v2/analytics/reels/instagram", parametre: obdobie },
+    { id: "recenzie", nazov: "Recenzie na Google", naco: "text a hviezdičky, či sme odpovedali", cesta: "/v2/analytics/reviews/gbp", parametre: obdobie },
+    { id: "slova", nazov: "Čo ľudia hľadajú na Google profile", naco: "slová, cez ktoré nás našli", cesta: "/v2/analytics/keywords/gbp", parametre: obdobie },
+    { id: "komentare", nazov: "Komentáre na Instagrame", naco: "otázky pod príspevkami", cesta: "/v2/inbox/post-comments", parametre: { provider: "instagram" }, opravnenie: "/v2/inbox/post-comments/authorizations" },
+    { id: "spravy", nazov: "Správy na Instagrame", naco: "dopyty, ktoré prišli do DM", cesta: "/v2/inbox/conversations", parametre: { provider: "instagram" }, opravnenie: "/v2/inbox/conversations/authorizations" },
+    { id: "konkurenti", nazov: "Konkurenti na Instagrame", naco: "kto je sledovaný a čo mu funguje", cesta: "/v2/analytics/competitors/instagram", parametre: { ...obdobie, limit: "50" } },
+    { id: "mesta", nazov: "Mestá sledovateľov", naco: "koľko sledovateľov je z Brna", cesta: "/stats/city/instagram", parametre: {} },
+  ];
+}
+
+/** Metricool vracia raz pole, raz `{ data: … }`, raz mapu mesto → počet. */
+export function pocetPoloziek(telo: unknown): number | null {
+  const d = telo && typeof telo === "object" && !Array.isArray(telo) && "data" in telo ? (telo as { data: unknown }).data : telo;
+  if (Array.isArray(d)) return d.length;
+  if (d && typeof d === "object") return Object.keys(d).length;
+  return null;
+}
+
+export type RiadokPrehladu = { id: string; nazov: string; naco: string; ok: boolean; pocet: number | null; poznamka: string };
+
+/** Riadok prehľadu: stavový kód sám nič nehovorí, preto ide von aj začiatok odpovede. */
+export function riadokPrehladu(s: SondaApi, status: number, telo: unknown, text: string, chybaPovolenia: string[] = []): RiadokPrehladu {
+  const zaklad = { id: s.id, nazov: s.nazov, naco: s.naco };
+  if (status === 0) return { ...zaklad, ok: false, pocet: null, poznamka: "Metricool neodpovedal." };
+  if (status < 200 || status >= 300) {
+    return { ...zaklad, ok: false, pocet: null, poznamka: `Chyba ${status}: ${text.replace(/\s+/g, " ").trim().slice(0, 160) || "bez popisu"}` };
+  }
+  if (chybaPovolenia.length) return { ...zaklad, ok: false, pocet: null, poznamka: `Metricool na to nemá povolenie Instagramu: ${chybaPovolenia.join(", ").slice(0, 120)}` };
+  return { ...zaklad, ok: true, pocet: pocetPoloziek(telo), poznamka: "" };
+}

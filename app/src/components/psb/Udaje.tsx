@@ -118,6 +118,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieMailu />
         <NapojenieSms />
         <NapojenieMeta />
+        <NapojenieMetricool />
         <NapojenieMailer />
         <CoJarvisVieZvonku data={data} />
         <NapojenieGoogle />
@@ -1880,6 +1881,90 @@ function NapojenieGoogleAds() {
   );
 }
 
+
+/**
+ * KĽÚČ K API METRICOOLU (Jerry, 3. 11. 2026, plán Advanced). Uloží sa, len keď ho
+ * Metricool prijme, a von sa už nevráti. Hneď potom povie, čo z API účet naozaj
+ * dáva. Mesačné čísla ide ďalej cez „Pripojiť Metricool" v uzávierke.
+ */
+type RiadokApi = { id: string; nazov: string; naco: string; ok: boolean; pocet: number | null; poznamka: string };
+function NapojenieMetricool() {
+  const [stav, setStav] = useState<{ ulozeny: boolean; od?: string; kto?: string } | null>(null);
+  const [kluc, setKluc] = useState("");
+  const [robim, setRobim] = useState("");
+  const [chyba, setChyba] = useState("");
+  const [riadky, setRiadky] = useState<RiadokApi[] | null>(null);
+  const posli = (telo: Record<string, unknown>) => fetch("/api/metricool", {
+    method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+  }).then(async (r) => {
+    const t = await r.text();
+    try { return JSON.parse(t); } catch { return { ok: false, error: `Server odpovedal ${r.status}: ${t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)}` }; }
+  }).catch((e) => ({ ok: false, error: `Spojenie zlyhalo: ${String(e).slice(0, 160)}` }));
+
+  useEffect(() => {
+    void posli({ akcia: "api-stav" }).then((j) => { if (j.ok) setStav(j); else setChyba(j.error || "Stav sa nenačítal."); });
+  }, []);
+  const prehlad = async () => {
+    setRobim("prehlad"); setChyba(""); setRiadky(null);
+    const j = await posli({ akcia: "api-prehlad" });
+    setRobim("");
+    if (j.ok) setRiadky(j.riadky); else setChyba(j.error || "Prehľad sa nepodaril.");
+  };
+  const uloz = async () => {
+    setRobim("uloz"); setChyba("");
+    const j = await posli({ akcia: "api-uloz", token: kluc.trim() });
+    setRobim("");
+    if (!j.ok) { setChyba(j.error || "Kľúč sa neuložil."); return; }
+    setKluc("");
+    setStav(j);
+    await prehlad();
+  };
+  const zmaz = async () => {
+    if (!window.confirm("Zmazať kľúč k API Metricoolu z Kokpitu?")) return;
+    setRobim("zmaz"); setChyba("");
+    const j = await posli({ akcia: "api-zmaz" });
+    setRobim("");
+    if (!j.ok) { setChyba(j.error || "Nezmazalo sa."); return; }
+    setStav({ ulozeny: false });
+    setRiadky(null);
+  };
+  if (!stav && !chyba) return null;
+  const tl = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 };
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info label="Metricool — API kľúč" text="Kľúč nájdeš v Metricoole: Nastavenia účtu → API. Kokpit ho uloží, len keď ho Metricool prijme, a von ho už neukáže. Mesačné čísla do uzávierky idú ďalej cez „Pripojiť Metricool“. API navyše vie recenzie, komentáre, správy a konkurentov." />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+        Kľúč: <b style={{ color: stav?.ulozeny ? C.green : C.orange }}>{stav?.ulozeny ? "uložený" : "chýba"}</b>
+        {stav?.ulozeny && stav.od ? ` · od ${fmtDMY(stav.od.slice(0, 10))}${stav.kto ? ` · ${stav.kto}` : ""}` : ""}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          type="password" value={kluc} onChange={(e) => setKluc(e.target.value)} autoComplete="off" name="psb-metricool-api"
+          placeholder={stav?.ulozeny ? "vložiť nový kľúč…" : "vlož API kľúč z Metricoolu"}
+          style={{ ...S.input, width: 280, marginBottom: 0 }} />
+        <button disabled={!!robim || !kluc.trim()} style={tl} onClick={() => void uloz()}>{robim === "uloz" ? "overujem…" : "Uložiť kľúč"}</button>
+        {stav?.ulozeny && <button disabled={!!robim} style={tl} onClick={() => void prehlad()}>{robim === "prehlad" ? "skúšam…" : "Čo z API funguje"}</button>}
+        {stav?.ulozeny && <button disabled={!!robim} onClick={() => void zmaz()} style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontFamily: "inherit", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>zmazať kľúč</button>}
+      </div>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8, lineHeight: 1.5 }}>{chyba}</div>}
+      {robim === "prehlad" && <div style={{ fontSize: 12, color: C.textDim, marginTop: 8 }}>Skúšam jednotlivé časti, pár sekúnd…</div>}
+      {riadky && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 10 }}>
+          <div style={{ fontSize: 11.5, color: C.textDim }}>Posledných 90 dní, značka ProSapiens. Kokpit si zatiaľ nič z toho neukladá, len skúša, či to ide.</div>
+          {riadky.map((r) => (
+            <div key={r.id} style={{ fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+              <b style={{ color: r.ok ? C.green : C.orange }}>{r.ok ? "✓" : "✗"}</b> {r.nazov}
+              {r.ok && r.pocet !== null ? <b> · {r.pocet}</b> : null}
+              <span style={{ color: C.textDim }}> · {r.ok ? r.naco : r.poznamka}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function NapojenieMeta() {
   const [stav, setStav] = useState<{ maToken: boolean; tokenPlatiDo?: string; pristup?: { volani: number; chybovost: number; splna: boolean; chyba: string }; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);

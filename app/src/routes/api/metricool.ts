@@ -7,9 +7,10 @@ import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { jeMesiac } from "../../lib/psb/format";
 import {
   BRAND_PSB, jeInaZnacka, mesacneInstagram, mesacneSiete, POLIA_POSTS, POLIA_REELS, POLIA_STORIES, POLIA_VYVOJ,
-  poliaSiete, riadkyNaPrispevky, rozsahMesiaca, SIETE, type PrispevokMc,
+  poliaSiete, riadkyNaPrispevky, rozsahMesiaca, SIETE, vyzeraAkoKluc, type PrispevokMc,
 } from "../../lib/psb/metricool";
 import { adresaPripojenia, odpoj, sedenieMcp, stavPripojenia } from "../../lib/psb/metricool.server";
+import { prehladApi, stavKluca, ulozKluc, zmazKluc } from "../../lib/psb/metricoolApi.server";
 
 // Metricool jedným ťuknutím v uzávierke (Jerry, 8. 10. 2026). Pripojenie:
 // GET ?akcia=pripoj → Metricool → /api/metricool-spat. Potom POST stiahni.
@@ -17,6 +18,11 @@ import { adresaPripojenia, odpoj, sedenieMcp, stavPripojenia } from "../../lib/p
 //   POST { akcia: "stav" }      → { pripojene, od }
 //   POST { akcia: "stiahni", mesiac } → príspevky, reels, stories + mesačné čísla IG
 //   POST { akcia: "odpoj" }
+// API (plán Advanced, kľúč vkladá Jerry v Upload → Napojenia):
+//   POST { akcia: "api-stav" } → { ulozeny, od, kto }
+//   POST { akcia: "api-uloz", token } → uloží, len keď ho Metricool prijme
+//   POST { akcia: "api-prehlad" } → čo z API účet dáva, len počty
+//   POST { akcia: "api-zmaz" }
 export const Route = createFileRoute("/api/metricool")({
   server: {
     handlers: {
@@ -41,12 +47,31 @@ export const Route = createFileRoute("/api/metricool")({
         if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        const b = (await request.json().catch(() => ({}))) as { akcia?: string; mesiac?: string };
+        const b = (await request.json().catch(() => ({}))) as { akcia?: string; mesiac?: string; token?: string };
         if (odPlanovaca && b.akcia !== "stiahni") return unauthorized();
         const kto = odPlanovaca ? "kokpit-cron" : (await currentUser(request)) || undefined;
         const hlavicky = { "cache-control": "no-store" };
 
         if (b.akcia === "stav") return Response.json({ ok: true, ...(await stavPripojenia(DB)) }, { headers: hlavicky });
+        if (b.akcia === "api-stav") return Response.json({ ok: true, ...(await stavKluca(DB)) }, { headers: hlavicky });
+        if (b.akcia === "api-uloz") {
+          const token = String(b.token || "").trim();
+          if (!vyzeraAkoKluc(token)) return Response.json({ ok: false, error: "Toto nevyzerá ako kľúč. Skopíruj ho celý z Metricoolu: Nastavenia účtu → API." }, { status: 400 });
+          const v = await ulozKluc(DB, token, kto);
+          if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400, headers: hlavicky });
+          await audit(DB, { action: "metricool-api-kluc", predmet: "Metricool", neu: "uložený", actor: kto });
+          return Response.json({ ok: true, ...(await stavKluca(DB)) }, { headers: hlavicky });
+        }
+        if (b.akcia === "api-prehlad") {
+          const riadky = await prehladApi(DB);
+          if (!riadky) return Response.json({ ok: false, error: "API kľúč nie je uložený." }, { status: 409, headers: hlavicky });
+          return Response.json({ ok: true, riadky }, { headers: hlavicky });
+        }
+        if (b.akcia === "api-zmaz") {
+          await zmazKluc(DB);
+          await audit(DB, { action: "metricool-api-kluc", predmet: "Metricool", neu: "zmazaný", actor: kto });
+          return Response.json({ ok: true }, { headers: hlavicky });
+        }
         if (b.akcia === "odpoj") {
           await odpoj(DB);
           await audit(DB, { action: "metricool-odpojeny", predmet: "Metricool", actor: (await currentUser(request)) || undefined });

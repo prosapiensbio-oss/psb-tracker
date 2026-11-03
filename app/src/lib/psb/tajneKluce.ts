@@ -19,6 +19,7 @@ export const TAJNE_KLUCE = [
   "mailer_token",
   "meta_capi_token",
   "meta_token",
+  "metricool_api_token",
   "metricool_klient",
   "metricool_pkce",
   "metricool_token",
