@@ -74,12 +74,13 @@ export function rozhodni(
  * LIMIT CELÉHO MESIACA NAMIESTO ZÁLOHY (Jerry 2. 11. 2026): čerpá postupne, nie
  * jednou výplatou 3., takže výber po 5. nie je „záloha nad dohodu“. V takom
  * mesiaci sa stráži všetko čerpanie proti tomu, čo mu v ňom patrí: doplatok
- * za október 22 630 − nechané vo firme 6 143 + strop 30 000 (číslo z Kasičky).
+ * za október 22 630 − nechané vo firme 7 124 + strop 30 000 (číslo z uzávierky
+ * Kasičky, prepojené nie je: po jej zmene treba prepísať aj tu).
  * Od decembra sa stráži čerpanie proti nároku pri dnešnom tempe, ako pred
  * novembrom: postupné čerpanie je dohodnuté s Terezkou (Jerry 2. 11. 2026),
  * strop zálohy 20 000 / 10 000 / 0 tým padol.
  */
-export const LIMIT_MESIACA: Record<string, number> = { "2026-11": 46487 };
+export const LIMIT_MESIACA: Record<string, number> = { "2026-11": 45506 };
 
 export function limitMesiaca(mesiac: string): number | null {
   return LIMIT_MESIACA[mesiac] ?? null;

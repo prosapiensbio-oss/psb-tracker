@@ -49,14 +49,14 @@ describe("rozhodni", () => {
 
 describe("limit celého mesiaca", () => {
   test("platí len pre november; december ostáva na zálohách", () => {
-    expect(limitMesiaca("2026-11")).toBe(46487);
+    expect(limitMesiaca("2026-11")).toBe(45506);
     expect(limitMesiaca("2026-12")).toBeNull();
   });
   test("výber po 5. v limite je ticho, nad limitom sa ozve a potom po 5 000 Kč", () => {
-    expect(rozhodniLimit("2026-11", 46487, 46487, null).poslat).toBe(false);
-    const r = rozhodniLimit("2026-11", 47000, 46487, null);
+    expect(rozhodniLimit("2026-11", 45506, 45506, null).poslat).toBe(false);
+    const r = rozhodniLimit("2026-11", 46000, 45506, null);
     expect(r.poslat).toBe(true);
-    expect(rozhodniLimit("2026-11", 50000, 46487, { mesiac: "2026-11", prah: 1 }).poslat).toBe(false);
-    expect(rozhodniLimit("2026-11", 52000, 46487, { mesiac: "2026-11", prah: 1 }).poslat).toBe(true);
+    expect(rozhodniLimit("2026-11", 50000, 45506, { mesiac: "2026-11", prah: 1 }).poslat).toBe(false);
+    expect(rozhodniLimit("2026-11", 52000, 45506, { mesiac: "2026-11", prah: 1 }).poslat).toBe(true);
   });
 });
