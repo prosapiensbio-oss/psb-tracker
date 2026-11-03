@@ -224,18 +224,18 @@ export function PlanObsahu({ data, chat, onNavigate, onAck }: { data: PSBData; c
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
           {platne.map((n, i) => (
             <div key={n.co + i} style={{
-              display: "grid", gridTemplateColumns: "3px 1fr auto", gap: 0,
+              display: "flex", flexWrap: "wrap", alignItems: "center",
+              borderLeft: `3px solid ${farba[n.zdroj]}`,
               background: mix(C.text, 4), borderRadius: 8, overflow: "hidden",
             }}>
-              <div style={{ background: farba[n.zdroj] }} />
-              <div style={{ padding: "11px 14px", minWidth: 0 }}>
+              <div style={{ padding: "11px 14px", minWidth: 0, flex: "1 1 280px" }}>
                 <div style={{ fontSize: 14, fontWeight: 640, color: C.text, lineHeight: 1.4 }}>{n.co}</div>
                 <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 4, lineHeight: 1.5 }}>{n.preco}</div>
                 <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 5, fontVariantNumeric: "tabular-nums" }}>
                   {n.dokaz} · {n.zdroj}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px 0 6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px 8px 14px" }}>
                 {onAck && (
                   <button onClick={() => onAck(klucHotoveho(n.kluc), true)}
                     title={`Skryje sa na ${Sk.dni(n.skryDni)}. Ak sa téma nepohne, vráti sa.`}
