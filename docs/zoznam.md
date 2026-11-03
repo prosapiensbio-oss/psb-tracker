@@ -19,7 +19,6 @@ nezapadlo medzi úlohami bez termínu):
 
 - [x] **2. 11. 2026** — overené v `automaty`: ranná dávka odišla o 05:30Z (4 odbery), automatické balíčky z plánovača o 04:15Z (0 nových), všetkých 17 automatov bez chyby.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
-- **do 1. 12. 2026** — PTminder je zrušený (1. 11. 2026, účet sa deaktivuje 1. 12., ďalšia platba neodíde). Čaká sa na rozhodnutie o vrátení €90,97, tiket v ich chate, Jerry žiadal odpoveď na prosapiens.bio@gmail.com. Dáta vymažú 3 mesiace po zrušení; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
 - **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
 - **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
   merania webu — 27. 10. 2026" nižšie).
@@ -38,7 +37,6 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 - [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
 - [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
 - [ ] **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo. Jerry: „čakaj“, zatiaľ neodpovedať. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali.
-- [ ] **Mail Dárek pro Putina:** text pripravený v otvorenom okne Gmailu (2. 11.), Jerry priloží 3 fotky z `~/Downloads/Russke Horiace rafinerie/PRE-FOND/` (01, 02, 03) a odošle. Sedenie k priečinku nemá prístup.
 - [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
 - [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.
 - [ ] **Reel Natália „lopatka“:** Natália súhlasí (Jerry 2. 11.), reel je `~/Downloads/Test strih videa/Natalia_reel_lopatka.mp4`, ešte nenaplánovaný.
@@ -601,6 +599,8 @@ Otvorené:
 
 ## Zavreté (aby sa neotvárali odznova)
 
+- **PTminder vrátil €90,97** (overené 3. 11. 2026 v Gmaile: refund #3050-9287 a dobropis k faktúre 295B0AC8-0059, celkom 0 €). Účet sa deaktivuje 1. 12., dáta vymažú 3 mesiace po zrušení; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
+- **Mail s návrhmi tričiek odoslaný** (overené 3. 11. 2026 v odoslanej pošte: 2. 11. na podpora@proukrajinu.org, „Návrhy na trička — zadarmo, ak sa vám hodia", 12 príloh z PRE-FOND).
 - **Strižňa – body 10, 11, 13 z poradia 13. 10. hotové:** vyhľadávač tém na reakčné videá (obrazovka Reakcie),
   šablóna reakčného videa / repost, memy s bankou šablón (14. 10.). Overené v kóde 19. 10. 2026.
 - **Strižňa 15.–18. 10. 2026 (z rozhovoru, aby sa neponúkali znova):** pripomienky v appke, Vrstvy β (Video 1/2/3…,
