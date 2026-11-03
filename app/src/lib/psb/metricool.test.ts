@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mesacneInstagram, pocetPoloziek, riadkyNaPrispevky, riadkyZVysledku, riadokPrehladu, rozoberOdpovedMcp, rozsahMesiaca, sondyApi, verdiktKluca, vyzeraAkoKluc } from "./metricool";
+import { hodnotaSerie, hodnotySerie, mesacneInstagram, obdobieMesiacaApi, pocetPoloziek, POCET_V_MESIACI, prispevkyZApi, SERIE_API, riadkyNaPrispevky, riadkyZVysledku, riadokPrehladu, rozoberOdpovedMcp, rozsahMesiaca, sondyApi, verdiktKluca, vyzeraAkoKluc } from "./metricool";
 
 describe("Metricool cez MCP", () => {
   it("reels: ID ako v exporte, čas v ms, pomer v %", () => {
@@ -90,5 +90,39 @@ describe("API Metricoolu: kľúč a prehľad (3. 11. 2026)", () => {
     const ok = riadokPrehladu(s, 200, { data: [{ text: "tajné" }] }, "");
     expect(ok).toMatchObject({ ok: true, pocet: 1 });
     expect(JSON.stringify(ok)).not.toContain("tajné");
+  });
+});
+
+describe("API Metricoolu: mesiac v tvare, aký Kokpit už má (porovnané s októbrom 2026: 43 z 43 príspevkov, 50 z 50 metrík)", () => {
+  it("obdobie má pražský posun, október začína letným a končí zimným", () => {
+    expect(obdobieMesiacaApi("2026-10")).toEqual({ from: "2026-10-01T00:00:00+02:00", to: "2026-10-31T23:59:59+01:00", timezone: "Europe/Prague" });
+    expect(obdobieMesiacaApi("2026-02").to).toBe("2026-02-28T23:59:59+01:00");
+  });
+  it("reel: id ako v exporte, view rate z preskočenia, čas v ms", () => {
+    const [r] = prispevkyZApi("reel", [{ reelId: "401_488", publishedAt: { dateTime: "2026-10-29T17:01:40" }, url: "u", content: "A  B", views: 391, reach: 293, saved: 0, shares: 1, comments: 2, likes: 8, reelsSkipRate: 52.5, averageWatchTime: 8.583 }]);
+    expect(r).toMatchObject({ id: "401_488", druh: "reel", datum: "2026-10-29", mesiac: "2026-10", hook: "A B", views: 391, dosah: 293, viewRate: 47.5, watchTime: 8583 });
+  });
+  it("príbeh bez adresy sa zahodí, adresa je jeho id", () => {
+    const s = prispevkyZApi("story", [{ permalink: "https://x/1", publishedAt: { dateTime: "2026-10-30T11:59:53" }, impressions: 90, reach: 85 }, { publishedAt: { dateTime: "2026-10-30T11:59:53" }, reach: 1 }]);
+    expect(s).toHaveLength(1);
+    expect(s[0]).toMatchObject({ id: "https://x/1", url: "https://x/1", views: 90, dosah: 85 });
+  });
+  it("posledná hodnota je najnovšia, aj keď API radí od nej; prázdna suma je 0, prázdna posledná sa nezapíše", () => {
+    const f = SERIE_API.find((s) => s.ako === "posledna")!;
+    const g = SERIE_API.find((s) => s.ako === "sucet")!;
+    const b = hodnotySerie({ data: [{ values: [{ dateTime: "2026-10-31T12:00:00+0100", value: 1566 }, { dateTime: "2026-10-30T12:00:00+0100", value: 1560 }] }] });
+    expect(hodnotaSerie(f, b)).toBe(1566);
+    expect(hodnotaSerie(g, b)).toBe(3126);
+    expect(hodnotaSerie(g, [])).toBe(0);
+    expect(hodnotaSerie(f, [])).toBeNull();
+    expect(hodnotySerie({ data: [{ metric: "x", values: [] }] })).toEqual([]);
+    expect(hodnotySerie(null)).toEqual([]);
+  });
+  it("rozdiel: získaní mínus stratení", () => {
+    const y = SERIE_API.find((s) => s.minus)!;
+    expect(hodnotaSerie(y, [{ dateTime: "d", value: 5 }], [{ dateTime: "d", value: 2 }])).toBe(3);
+  });
+  it("počet v mesiaci berie len daný mesiac", () => {
+    expect(POCET_V_MESIACI([{ publishedAt: { dateTime: "2026-10-02T1" } }, { publishedAt: { dateTime: "2026-09-02T1" } }], "2026-10")).toBe(1);
   });
 });

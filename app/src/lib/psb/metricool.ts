@@ -72,9 +72,6 @@ export function mesacneInstagram(vyvoj: unknown[][], prispevky: PrispevokMc[], m
     .map((r) => ({ den: text(r[r.length - 1]), sled: r[0] == null ? null : cislo(r[0]), plus: cislo(r[1]), minus: cislo(r[2]), views: cislo(r[3]), dosah: cislo(r[4]) }))
     .filter((d) => /^\d{8}$/.test(d.den) && `${d.den.slice(0, 4)}-${d.den.slice(4, 6)}` === mesiac)
     .sort((a, b) => a.den.localeCompare(b.den));
-  const v = prispevky.filter((p) => p.mesiac === mesiac);
-  const druh = (d: PrispevokMc["druh"]) => v.filter((p) => p.druh === d);
-  const priemer = (xs: PrispevokMc[]) => (xs.length ? Math.round((xs.reduce((a, p) => a + p.dosah, 0) / xs.length) * 100) / 100 : 0);
   const posledni = [...dni].reverse().find((d) => d.sled != null);
   const out: { metrika: string; hodnota: number }[] = [];
   if (posledni) out.push({ metrika: "Followers", hodnota: posledni.sled as number });
@@ -83,7 +80,15 @@ export function mesacneInstagram(vyvoj: unknown[][], prispevky: PrispevokMc[], m
     out.push({ metrika: "Views", hodnota: dni.reduce((a, d) => a + d.views, 0) });
     out.push({ metrika: "Reach", hodnota: dni.reduce((a, d) => a + d.dosah, 0) });
   }
-  out.push(
+  return [...out, ...suhrnPrispevkov(prispevky, mesiac)];
+}
+
+/** Mesačné čísla Instagramu, ktoré sa počítajú z jednotlivých príspevkov. */
+function suhrnPrispevkov(prispevky: PrispevokMc[], mesiac: string): { metrika: string; hodnota: number }[] {
+  const v = prispevky.filter((p) => p.mesiac === mesiac);
+  const druh = (d: PrispevokMc["druh"]) => v.filter((p) => p.druh === d);
+  const priemer = (xs: PrispevokMc[]) => (xs.length ? Math.round((xs.reduce((a, p) => a + p.dosah, 0) / xs.length) * 100) / 100 : 0);
+  return [
     { metrika: "Posts", hodnota: druh("post").length },
     { metrika: "Reels", hodnota: druh("reel").length },
     { metrika: "Stories", hodnota: druh("story").length },
@@ -92,8 +97,7 @@ export function mesacneInstagram(vyvoj: unknown[][], prispevky: PrispevokMc[], m
     { metrika: "Avg reach per story", hodnota: priemer(druh("story")) },
     { metrika: "Saved", hodnota: v.reduce((a, p) => a + p.ulozenia, 0) },
     { metrika: "Shares", hodnota: v.reduce((a, p) => a + p.zdielania, 0) },
-  );
-  return out;
+  ];
 }
 
 /**
@@ -237,8 +241,9 @@ export const jeInaZnacka = (sprava: string) => /access denied to blog/i.test(spr
 /**
  * API METRICOOLU (plán Advanced, Jerry 3. 11. 2026) — kľúč vedľa pripojenia cez MCP.
  *
- * MCP dáva čísla do uzávierky a ostáva, ako je. API navyše vie to, čo MCP nemá:
- * text recenzií, komentáre a správy, konkurentov a odkiaľ sú sledovatelia.
+ * S kľúčom idú cezeň aj nočné čísla; MCP ostáva len ako záloha, kým kľúč nie je
+ * uložený. API navyše vie to, čo MCP nemá: text recenzií, komentáre a správy,
+ * konkurentov a odkiaľ sú sledovatelia.
  * Prehľad nižšie vracia LEN POČTY — nič z obsahu neide do prehliadača ani do logu.
  */
 export const API_ZAKLAD = "https://app.metricool.com/api";
@@ -293,3 +298,106 @@ export function riadokPrehladu(s: SondaApi, status: number, telo: unknown, text:
   if (chybaPovolenia.length) return { ...zaklad, ok: false, pocet: null, poznamka: `Metricool na to nemá povolenie Instagramu: ${chybaPovolenia.join(", ").slice(0, 120)}` };
   return { ...zaklad, ok: true, pocet: pocetPoloziek(telo), poznamka: "" };
 }
+
+/**
+ * MESAČNÉ ČÍSLA CEZ API. Názvy a podmety sú zistené porovnaním s tým, čo Kokpit
+ * už mal za október 2026: 42 metrík sedelo na číslo. `subject` API vyžaduje pri
+ * účte; bez neho vráti 400 a nie prázdno.
+ */
+export type SeriaApi = { kanal: string; metrika: string; network: string; metric: string; subject?: string; ako: "posledna" | "sucet"; minus?: string };
+
+const seria = (kanal: string, network: string, riadky: [string, string, string | undefined, SeriaApi["ako"], string?][]): SeriaApi[] =>
+  riadky.map(([metrika, metric, subject, ako, minus]) => ({ kanal, metrika, network, metric, ...(subject ? { subject } : {}), ako, ...(minus ? { minus } : {}) }));
+
+export const SERIE_API: SeriaApi[] = [
+  ...seria("Instagram", "instagram", [
+    ["Followers", "followers", "account", "posledna"], ["Followers balance", "delta_followers", "account", "sucet"],
+    ["Views", "views", "account", "sucet"], ["Reach", "reach", "account", "sucet"],
+  ]),
+  ...seria("Facebook", "facebook", [
+    ["Followers", "pageFollows", "account", "posledna"], ["Acquired", "page_daily_follows_unique", "account", "sucet"],
+    ["Lost", "page_daily_unfollows_unique", "account", "sucet"], ["Page visits", "pageViews", "account", "sucet"],
+    ["Views", "page_media_view", "account", "sucet"], ["Posts", "count", "posts", "sucet"], ["Reels", "count", "reels", "sucet"],
+    ["Video views", "blue_reels_play_count", "reels", "sucet"], ["Interactions", "interactions", "posts", "sucet"], ["Shares", "shares", "posts", "sucet"],
+  ]),
+  ...seria("TikTok", "tiktok", [
+    ["Followers", "followers_count", "account", "posledna"], ["Followers balance", "followers_delta_count", "account", "sucet"],
+    ["Videos", "videos", undefined, "sucet"], ["Views", "views", undefined, "sucet"], ["Reach", "reach", undefined, "sucet"],
+    ["Profile views", "profile_views", "account", "sucet"], ["Interactions", "interactions", undefined, "sucet"], ["Shares", "shares", undefined, "sucet"],
+  ]),
+  ...seria("YouTube", "youtube", [
+    ["Followers", "totalSubscribers", "account", "posledna"], ["Followers balance", "subscribersGained", undefined, "sucet", "subscribersLost"], ["Views", "views", undefined, "sucet"],
+  ]),
+  ...seria("LinkedIn", "linkedin", [
+    ["Followers", "followers", "account", "posledna"], ["Followers balance", "deltaFollowers", "account", "sucet"], ["Posts", "postsCount", "account", "sucet"],
+    ["Impressions", "impressionCount", "account", "sucet"], ["Interactions", "interactions", "posts", "sucet"],
+  ]),
+  ...seria("Threads", "threads", [
+    ["Followers", "followers_count", "account", "posledna"], ["Followers balance", "delta_followers", "account", "sucet"], ["Posts", "count", "posts", "sucet"],
+    ["Views", "views", "posts", "sucet"], ["Interactions", "interactions", "posts", "sucet"],
+  ]),
+  ...seria("Google Business", "gmb", [
+    ["Views search", "business_impressions_search", undefined, "sucet"], ["Views maps", "business_impressions_maps", undefined, "sucet"],
+    ["Website clicks", "website_clicks", undefined, "sucet"], ["Calls", "call_clicks", undefined, "sucet"], ["Directions", "business_direction_requests", undefined, "sucet"],
+  ]),
+];
+
+type BodApi = { dateTime?: string; value?: number | null };
+/** Hodnoty série z odpovede `{data:[{values:[…]}]}`. API ich dáva od najnovšej. */
+export function hodnotySerie(telo: unknown): BodApi[] {
+  const d = (telo as { data?: { values?: BodApi[] }[] } | null)?.data?.[0]?.values;
+  return Array.isArray(d) ? d.filter((b) => b && b.value != null) : [];
+}
+
+/** Hodnota metriky za mesiac. Prázdna suma je 0 (nič sa nestalo), prázdna „posledná" sa nezapíše. */
+export function hodnotaSerie(s: SeriaApi, body: BodApi[], minus: BodApi[] = []): number | null {
+  const sucet = (x: BodApi[]) => Math.round(x.reduce((a, b) => a + Number(b.value), 0) * 100) / 100;
+  if (s.ako === "sucet") return sucet(body) - sucet(minus);
+  if (!body.length) return null;
+  return Number([...body].sort((a, b) => String(b.dateTime).localeCompare(String(a.dateTime)))[0].value);
+}
+
+/** Začiatok a koniec mesiaca s pražským posunom (október začína letným a končí zimným časom). */
+export function obdobieMesiacaApi(mesiac: string): { from: string; to: string; timezone: string } {
+  const [r, m] = mesiac.split("-").map(Number);
+  const posledny = new Date(Date.UTC(r, m, 0)).getUTCDate();
+  const posun = (d: Date) => (new Intl.DateTimeFormat("en", { timeZone: "Europe/Prague", timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value || "GMT+01:00").replace("GMT", "");
+  const mm = String(m).padStart(2, "0");
+  return {
+    from: `${r}-${mm}-01T00:00:00${posun(new Date(Date.UTC(r, m - 1, 1, 12)))}`,
+    to: `${r}-${mm}-${String(posledny).padStart(2, "0")}T23:59:59${posun(new Date(Date.UTC(r, m - 1, posledny, 12)))}`,
+    timezone: "Europe/Prague",
+  };
+}
+
+type RiadokApi = Record<string, unknown>;
+const denApi = (x: RiadokApi) => text((x.publishedAt as { dateTime?: string } | undefined)?.dateTime).slice(0, 10);
+
+/**
+ * Príspevky z API v tom istom tvare ako z MCP a exportu. Id sú rovnaké, takže nič
+ * nezdvojí. Riadok bez id zahodí: príbeh bez adresy (MCP ho vynechával tiež).
+ */
+export function prispevkyZApi(druh: PrispevokMc["druh"], riadky: RiadokApi[]): PrispevokMc[] {
+  const out: PrispevokMc[] = [];
+  for (const x of riadky) {
+    const datum = denApi(x);
+    const id = text(druh === "reel" ? x.reelId : druh === "post" ? x.postId : x.permalink);
+    if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(datum)) continue;
+    const zaklad = { id, druh, datum, mesiac: datum.slice(0, 7) };
+    if (druh === "story") {
+      out.push({ ...zaklad, url: id, hook: "", views: cislo(x.impressions), dosah: cislo(x.reach), ulozenia: 0, zdielania: 0, komentare: 0, lajky: 0, spend: 0, viewRate: 0, watchTime: 0 });
+      continue;
+    }
+    const spolocne = { ...zaklad, url: text(x.url), hook: hook(x.content), views: cislo(x.views), dosah: cislo(x.reach), ulozenia: cislo(x.saved), zdielania: cislo(x.shares), komentare: cislo(x.comments), lajky: cislo(x.likes), spend: cislo(x.spend) };
+    out.push(druh === "reel"
+      // View rate je opak miery preskočenia. Priemerný čas je v sekundách, ukladá sa v ms.
+      ? { ...spolocne, viewRate: x.reelsSkipRate == null ? 0 : Math.round((100 - cislo(x.reelsSkipRate)) * 10) / 10, watchTime: Math.round(cislo(x.averageWatchTime) * 1000) }
+      : { ...spolocne, viewRate: 0, watchTime: 0 });
+  }
+  return out;
+}
+
+/** Súhrn z príspevkov pre Instagram; série ho doplnia o sledovateľov a dosah účtu. */
+export const suhrnInstagramuZApi = (prispevky: PrispevokMc[], mesiac: string) => suhrnPrispevkov(prispevky, mesiac);
+
+export const POCET_V_MESIACI = (riadky: RiadokApi[], mesiac: string) => riadky.filter((x) => denApi(x).startsWith(mesiac)).length;

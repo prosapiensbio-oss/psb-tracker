@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as NavrhyTitulkyRouteImport } from './routes/navrhy-titulky'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VTokenRouteImport } from './routes/v.$token'
@@ -34,15 +33,12 @@ import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUvodnyRouteImport } from './routes/api/uvodny'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiTreningZdarmaRouteImport } from './routes/api/trening-zdarma'
-import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
-import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
 import { Route as ApiTemaRouteImport } from './routes/api/tema'
 import { Route as ApiStrazcaVyberuRouteImport } from './routes/api/strazca-vyberu'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSmsRouteImport } from './routes/api/sms'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
-import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
 import { Route as ApiReportAkcieRouteImport } from './routes/api/report-akcie'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
@@ -59,7 +55,6 @@ import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiOpravaTextuRouteImport } from './routes/api/oprava-textu'
-import { Route as ApiObrazokPromptRouteImport } from './routes/api/obrazok-prompt'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiNapadObrazokRouteImport } from './routes/api/napad-obrazok'
 import { Route as ApiMetricoolSpatRouteImport } from './routes/api/metricool-spat'
@@ -114,11 +109,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NavrhyTitulkyRoute = NavrhyTitulkyRouteImport.update({
-  id: '/navrhy-titulky',
-  path: '/navrhy-titulky',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NatacaciListRoute = NatacaciListRouteImport.update({
@@ -231,16 +221,6 @@ const ApiTreningZdarmaRoute = ApiTreningZdarmaRouteImport.update({
   path: '/api/trening-zdarma',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTitulkaObrazokRoute = ApiTitulkaObrazokRouteImport.update({
-  id: '/api/titulka-obrazok',
-  path: '/api/titulka-obrazok',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTitulkaNavrhRoute = ApiTitulkaNavrhRouteImport.update({
-  id: '/api/titulka-navrh',
-  path: '/api/titulka-navrh',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiTemaRoute = ApiTemaRouteImport.update({
   id: '/api/tema',
   path: '/api/tema',
@@ -269,11 +249,6 @@ const ApiSmsRoute = ApiSmsRouteImport.update({
 const ApiSessionRoute = ApiSessionRouteImport.update({
   id: '/api/session',
   path: '/api/session',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSekvenciaNavrhRoute = ApiSekvenciaNavrhRouteImport.update({
-  id: '/api/sekvencia-navrh',
-  path: '/api/sekvencia-navrh',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReportAkcieRoute = ApiReportAkcieRouteImport.update({
@@ -354,11 +329,6 @@ const ApiOverrideRoute = ApiOverrideRouteImport.update({
 const ApiOpravaTextuRoute = ApiOpravaTextuRouteImport.update({
   id: '/api/oprava-textu',
   path: '/api/oprava-textu',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiObrazokPromptRoute = ApiObrazokPromptRouteImport.update({
-  id: '/api/obrazok-prompt',
-  path: '/api/obrazok-prompt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNapadyRoute = ApiNapadyRouteImport.update({
@@ -590,7 +560,6 @@ const ApiStriznaKniznicaSplatRoute = ApiStriznaKniznicaSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
-  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/a/$token': typeof ATokenRoute
@@ -635,7 +604,6 @@ export interface FileRoutesByFullPath {
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
-  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -652,15 +620,12 @@ export interface FileRoutesByFullPath {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
-  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
-  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/uvodny': typeof ApiUvodnyRoute
@@ -688,7 +653,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
-  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/a/$token': typeof ATokenRoute
@@ -733,7 +697,6 @@ export interface FileRoutesByTo {
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
-  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -750,15 +713,12 @@ export interface FileRoutesByTo {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
-  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
-  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/uvodny': typeof ApiUvodnyRoute
@@ -787,7 +747,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
-  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/a/$token': typeof ATokenRoute
@@ -832,7 +791,6 @@ export interface FileRoutesById {
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
-  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -849,15 +807,12 @@ export interface FileRoutesById {
   '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/report-akcie': typeof ApiReportAkcieRoute
-  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/strazca-vyberu': typeof ApiStrazcaVyberuRoute
   '/api/tema': typeof ApiTemaRoute
-  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
-  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/uvodny': typeof ApiUvodnyRoute
@@ -887,7 +842,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/natacaci-list'
-    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/a/$token'
@@ -932,7 +886,6 @@ export interface FileRouteTypes {
     | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
-    | '/api/obrazok-prompt'
     | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
@@ -949,15 +902,12 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/strazca-vyberu'
     | '/api/tema'
-    | '/api/titulka-navrh'
-    | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
     | '/api/uvodny'
@@ -985,7 +935,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/natacaci-list'
-    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/a/$token'
@@ -1030,7 +979,6 @@ export interface FileRouteTypes {
     | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
-    | '/api/obrazok-prompt'
     | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
@@ -1047,15 +995,12 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/strazca-vyberu'
     | '/api/tema'
-    | '/api/titulka-navrh'
-    | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
     | '/api/uvodny'
@@ -1083,7 +1028,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/natacaci-list'
-    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/a/$token'
@@ -1128,7 +1072,6 @@ export interface FileRouteTypes {
     | '/api/metricool-spat'
     | '/api/napad-obrazok'
     | '/api/napady'
-    | '/api/obrazok-prompt'
     | '/api/oprava-textu'
     | '/api/override'
     | '/api/pagespeed'
@@ -1145,15 +1088,12 @@ export interface FileRouteTypes {
     | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/report-akcie'
-    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/strazca-vyberu'
     | '/api/tema'
-    | '/api/titulka-navrh'
-    | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
     | '/api/uvodny'
@@ -1182,7 +1122,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NatacaciListRoute: typeof NatacaciListRoute
-  NavrhyTitulkyRoute: typeof NavrhyTitulkyRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ATokenRoute: typeof ATokenRoute
@@ -1227,7 +1166,6 @@ export interface RootRouteChildren {
   ApiMetricoolSpatRoute: typeof ApiMetricoolSpatRoute
   ApiNapadObrazokRoute: typeof ApiNapadObrazokRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
-  ApiObrazokPromptRoute: typeof ApiObrazokPromptRoute
   ApiOpravaTextuRoute: typeof ApiOpravaTextuRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPagespeedRoute: typeof ApiPagespeedRoute
@@ -1244,15 +1182,12 @@ export interface RootRouteChildren {
   ApiPushRanoRoute: typeof ApiPushRanoRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiReportAkcieRoute: typeof ApiReportAkcieRoute
-  ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiSmsRoute: typeof ApiSmsRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
   ApiStrazcaVyberuRoute: typeof ApiStrazcaVyberuRoute
   ApiTemaRoute: typeof ApiTemaRoute
-  ApiTitulkaNavrhRoute: typeof ApiTitulkaNavrhRoute
-  ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
   ApiTreningZdarmaRoute: typeof ApiTreningZdarmaRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiUvodnyRoute: typeof ApiUvodnyRoute
@@ -1291,13 +1226,6 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/navrhy-titulky': {
-      id: '/navrhy-titulky'
-      path: '/navrhy-titulky'
-      fullPath: '/navrhy-titulky'
-      preLoaderRoute: typeof NavrhyTitulkyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/natacaci-list': {
@@ -1454,20 +1382,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTreningZdarmaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/titulka-obrazok': {
-      id: '/api/titulka-obrazok'
-      path: '/api/titulka-obrazok'
-      fullPath: '/api/titulka-obrazok'
-      preLoaderRoute: typeof ApiTitulkaObrazokRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/titulka-navrh': {
-      id: '/api/titulka-navrh'
-      path: '/api/titulka-navrh'
-      fullPath: '/api/titulka-navrh'
-      preLoaderRoute: typeof ApiTitulkaNavrhRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/tema': {
       id: '/api/tema'
       path: '/api/tema'
@@ -1508,13 +1422,6 @@ declare module '@tanstack/react-router' {
       path: '/api/session'
       fullPath: '/api/session'
       preLoaderRoute: typeof ApiSessionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sekvencia-navrh': {
-      id: '/api/sekvencia-navrh'
-      path: '/api/sekvencia-navrh'
-      fullPath: '/api/sekvencia-navrh'
-      preLoaderRoute: typeof ApiSekvenciaNavrhRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/report-akcie': {
@@ -1627,13 +1534,6 @@ declare module '@tanstack/react-router' {
       path: '/api/oprava-textu'
       fullPath: '/api/oprava-textu'
       preLoaderRoute: typeof ApiOpravaTextuRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/obrazok-prompt': {
-      id: '/api/obrazok-prompt'
-      path: '/api/obrazok-prompt'
-      fullPath: '/api/obrazok-prompt'
-      preLoaderRoute: typeof ApiObrazokPromptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/napady': {
@@ -1968,7 +1868,6 @@ const KTokenRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NatacaciListRoute: NatacaciListRoute,
-  NavrhyTitulkyRoute: NavrhyTitulkyRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ATokenRoute: ATokenRoute,
@@ -2013,7 +1912,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMetricoolSpatRoute: ApiMetricoolSpatRoute,
   ApiNapadObrazokRoute: ApiNapadObrazokRoute,
   ApiNapadyRoute: ApiNapadyRoute,
-  ApiObrazokPromptRoute: ApiObrazokPromptRoute,
   ApiOpravaTextuRoute: ApiOpravaTextuRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPagespeedRoute: ApiPagespeedRoute,
@@ -2030,15 +1928,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPushRanoRoute: ApiPushRanoRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiReportAkcieRoute: ApiReportAkcieRoute,
-  ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiSmsRoute: ApiSmsRoute,
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
   ApiStrazcaVyberuRoute: ApiStrazcaVyberuRoute,
   ApiTemaRoute: ApiTemaRoute,
-  ApiTitulkaNavrhRoute: ApiTitulkaNavrhRoute,
-  ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
   ApiTreningZdarmaRoute: ApiTreningZdarmaRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiUvodnyRoute: ApiUvodnyRoute,

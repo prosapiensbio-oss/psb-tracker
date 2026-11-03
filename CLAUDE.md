@@ -45,6 +45,29 @@ otázka zle napísaná. Sú na nerozoznanie. Over si názvy stĺpcov
 (`pragma_table_info`) skôr, než z prázdna urobíš záver — obzvlášť keď ten
 záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
 
+## Kokpit rozhoduje a vyhodnocuje, Strižňa vyrába a púšťa von
+
+Jerry, 3. 11. 2026: „mne príde Kokpit ako analytická firma… a Strižňa social
+media manažér… nechcem redundancie." Hranica je chvíľa, keď sa z rozhodnutia
+stane konkrétny príspevok. **Každá vec má jedného majiteľa, druhá appka ju môže
+len ukázať.** Pred novou funkciou okolo obsahu sa spýtaj, koho je.
+
+| Kokpit | Strižňa |
+|---|---|
+| téma, fáza a mesiac karty, mapa cyklu | scenár, caption, úvodný záber, rozpis záberov, titulka |
+| štatistiky a vyhodnotenie PSB, prehľad konkurentov | strih, grafika, dátum a čas, publikovanie |
+| reklamy: príprava, spustenie, dozor | jednoduché výsledky všetkých účtov vrátane PSB, rozbor cudzieho videa |
+
+- **Štatistiky osobných účtov (@philipjerry, Filip, Ahsoka, Terezka) do Kokpitu
+  nepatria.** Rozhodnuté 13. 10. a znova 3. 11. 2026, neotvárať.
+- Kokpit karta texty len číta a pri uložení ich NEPOSIELA: okno otvorené skôr by
+  prepísalo novšie vety zo Strižne.
+- Výnimky, ktoré prekrytím nie sú: editor v Kokpite (rozbor chôdze a behu klienta,
+  porovnania do kartotéky) a „Nahrať do Strižne" (vstup z telefónu).
+- `ig_prispevky` z Mety ostáva vedľa `mkt_prispevky` z Metricoolu: nesie ručnú fázu
+  a kategóriu a reklama z neho vyberá príspevok. Nie je to omyl, zrušiť sa dá až
+  po ich presune.
+
 ## Ďalšie zásady, ktoré už v kóde platia
 
 - **Jedna definícia na jednom mieste.** Klient, kotva dát, okno mesiacov,
@@ -3320,4 +3343,20 @@ b76aef4). Čo z toho musí vedieť ďalšia session:
 - Klientom sa všade tyká (stránky, SMS, výpisový mail). Výnimka: mail s faktúrou má prepínač, firma má predvolené vykanie; PDF faktúry je formálne. Nový klientsky text patrí do `tykanie.test.ts`.
 - Zrušený automatický balíček sa na ten istý deň neobnoví (`zruseneAutomaty`); ďalší tréning na inom dátume založí podľa pravidla. Kto ruší balíček v kóde a má vzniknúť znova, pridá `ZNACKA_POSUNU_ZA_DOPLNENIE`.
 - Vrátenie za nákup vedený ako výplata patrí do tej istej výplaty (Dual Trade 979 Kč, Chata 11 000 Kč). Prevod na rezervný účet je `rezerva`. Papiež: doplnenie 3 h ostáva (oznámená dovolenka). Terezke sa záložky neskrývajú. Odhad pod break-even ostáva červený.
+
+## API Metricoolu: nočné čísla bez Clauda aj bez OAuth (3. 11. 2026)
+
+`stiahniMesiacApi` v `lib/psb/metricoolApi.server.ts`, séria metrík `SERIE_API`
+v `lib/psb/metricool.ts`. S kľúčom ide `stiahni` cez API, bez neho alebo pri jeho
+zlyhaní cez MCP. Audit `metricool-stiahnute` hovorí „cez API" alebo „cez MCP",
+pád API je v `metricool-api-zlyhalo`.
+
+- **Overené porovnaním s tým, čo Kokpit mal:** október 2026 43 z 43 príspevkov
+  a 50 z 50 metrík na číslo. September sa líši len tým, že staré príspevky medzitým
+  nazbierali zhliadnutia.
+- **`subject` je pri účte povinný** (`account`, `posts`, `reels`): bez neho vráti
+  400 a chybová hláška vymenuje povolené hodnoty, takže sa názvy metrík dajú zistiť
+  z nej. Swagger ich neuvádza presne: `page_media_view`, `totalSubscribers`,
+  `followers_count` sú zistené skúškou.
+- Hodnoty idú od najnovšej. Prázdna suma je 0, prázdna „posledná" sa nezapíše.
 

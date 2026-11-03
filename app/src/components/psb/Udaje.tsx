@@ -1885,7 +1885,7 @@ function NapojenieGoogleAds() {
 /**
  * KĽÚČ K API METRICOOLU (Jerry, 3. 11. 2026, plán Advanced). Uloží sa, len keď ho
  * Metricool prijme, a von sa už nevráti. Hneď potom povie, čo z API účet naozaj
- * dáva. Mesačné čísla ide ďalej cez „Pripojiť Metricool" v uzávierke.
+ * dáva. Od tej chvíle idú cezeň aj nočné čísla (stará cesta ostáva ako záloha).
  */
 type RiadokApi = { id: string; nazov: string; naco: string; ok: boolean; pocet: number | null; poznamka: string };
 function NapojenieMetricool() {
@@ -1933,7 +1933,7 @@ function NapojenieMetricool() {
   return (
     <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
-        <Info label="Metricool — API kľúč" text="Kľúč nájdeš v Metricoole: Nastavenia účtu → API. Kokpit ho uloží, len keď ho Metricool prijme, a von ho už neukáže. Mesačné čísla do uzávierky idú ďalej cez „Pripojiť Metricool“. API navyše vie recenzie, komentáre, správy a konkurentov." />
+        <Info label="Metricool — API kľúč" text="Kľúč nájdeš v Metricoole: Nastavenia účtu → API. Kokpit ho uloží, len keď ho Metricool prijme, a von ho už neukáže. S kľúčom idú nočné čísla a konkurenti cez API; bez neho ostáva staré „Pripojiť Metricool“ v uzávierke." />
       </div>
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
         Kľúč: <b style={{ color: stav?.ulozeny ? C.green : C.orange }}>{stav?.ulozeny ? "uložený" : "chýba"}</b>
@@ -1952,7 +1952,7 @@ function NapojenieMetricool() {
       {robim === "prehlad" && <div style={{ fontSize: 12, color: C.textDim, marginTop: 8 }}>Skúšam jednotlivé časti, pár sekúnd…</div>}
       {riadky && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 10 }}>
-          <div style={{ fontSize: 11.5, color: C.textDim }}>Posledných 90 dní, značka ProSapiens. Kokpit si zatiaľ nič z toho neukladá, len skúša, či to ide.</div>
+          <div style={{ fontSize: 11.5, color: C.textDim }}>Posledných 90 dní, značka ProSapiens. Toto len skúša, či to ide; z obsahu správ a komentárov sa nič neukladá.</div>
           {riadky.map((r) => (
             <div key={r.id} style={{ fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
               <b style={{ color: r.ok ? C.green : C.orange }}>{r.ok ? "✓" : "✗"}</b> {r.nazov}

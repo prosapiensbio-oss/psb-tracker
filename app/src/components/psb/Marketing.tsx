@@ -1,3 +1,4 @@
+import { Konkurenti } from "./Konkurenti";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { MarketingPrehlad } from "./MarketingPrehlad";
 import { StriznaNahrat } from "./StriznaNahrat";
@@ -1161,6 +1162,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
           // Rovnaký rez ako pri Web × Vyhľadávanie (18. 8. 2026).
           { id: "navrhy", label: "Čo publikovať", skupina: "Čo púšťame von" },
           { id: "obsah", label: "Reels & posty", skupina: "Čo púšťame von" },
+          { id: "konkurenti", label: "Konkurenti", skupina: "Čo púšťame von" },
           { id: "mail", label: "Mailer", skupina: "Čo púšťame von" },
           // Videá z telefónu pre Strižňu (Mac appka na strih, 12. 10. 2026).
           // Je tu, lebo natočené video je surovina obsahu; na telefóne je
@@ -1193,6 +1195,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
         }}
       />
 
+      {sub === "konkurenti" && <Konkurenti />}
       {sub === "prehlad" && <MarketingPrehlad data={data} clients={clients} onNavigate={onNavigate} />}
       {sub === "dopyty" && <Dopyty data={data} leads={leads} clients={clients} refresh={refresh} focus={focus} />}
 

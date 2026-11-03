@@ -12,12 +12,9 @@ import { C, mix } from "../../lib/psb/theme";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
-import { Titulka } from "./Titulka";
 import { Card, Donut, H3, Info, Modal, Select } from "./ui";
 import { pocetHashtagov } from "../../lib/psb/sekvencia";
-import { ZaberUkazka } from "./ZaberUkazka";
-import { Sekvencia } from "./Sekvencia";
-import { ZABER_MAPA, ZABERY, zaberyPreFazu } from "../../lib/psb/zabery";
+import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { CLAUDE_PROJECT } from "./Zadanie";
 import { dnesPraha } from "../../lib/psb/cas";
 
@@ -588,13 +585,15 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   const slot = vyber.druh === "slot" ? vyber.slot : null;
   const [koncept, setKoncept] = useState(slot?.koncept || "");
   const [kto, setKto] = useState(slot?.kto || "");
-  const [hotovyText, setHotovyText] = useState(slot?.hotovyText || "");
-  const [zaber, setZaber] = useState(slot?.zaber || "");
-  const [sekvencia, setSekvencia] = useState(slot?.sekvencia || "");
-  const [scenar, setScenar] = useState(slot?.scenar || "");
-  const [uvodneVety, setUvodneVety] = useState(slot?.uvodneVety || "");
+  // Texty karty píše Strižňa (Jerry, 3. 11. 2026): Kokpit rozhoduje, čo a prečo,
+  // výroba patrí tam. Tu sa len čítajú a pri uložení sa neposielajú, aby okno
+  // otvorené skôr neprepísalo novšie vety zo Strižne.
+  const hotovyText = slot?.hotovyText || "";
+  const zaber = slot?.zaber || "";
+  const sekvencia = slot?.sekvencia || "";
+  const scenar = slot?.scenar || "";
+  const uvodneVety = slot?.uvodneVety || "";
   const [kopirovane, setKopirovane] = useState(false);
-  const [titulka, setTitulka] = useState(false);
   const poleCaption = useRef<HTMLTextAreaElement>(null);
 
   // Rovnaké dve cesty ako v okne pre Project: clipboard API sa dá zakázať
@@ -668,15 +667,15 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   // ── Slot v pláne: nový alebo existujúci ───────────────────────────────────
   const f = FAZY.find((x) => x.id === faza);
   const zapis = async () => {
-    if (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim()) return;
+    if (!slot && !koncept.trim() && !kto.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar, uvodneVety })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar, uvodneVety,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -753,61 +752,38 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
       <input value={kto} onChange={(e) => setKto(e.target.value)}
         placeholder="klient / Jerry / Terezka" style={vstup} />
 
-      {/* Doladenie textu patrí do Projectu — ten má kánon značky, tón hlasu
-          aj FP pravidlá. Kokpit drží ZÁMER, Project z neho robí vety. */}
-      {/* ÚVODNÝ ZÁBER. Hák doteraz znamenal len prvú VETU — v reeli však
-          rozhoduje prvá sekunda OBRAZU a text sa číta až druhý. Ponuka je
-          filtrovaná na fázu: statický záber vo fáze 1 nikoho nezastaví
-          a švih vo fáze 5 pôsobí ako reklama. */}
-      <ZaberVyber faza={faza} hodnota={zaber} onZmena={setZaber} />
-
-      {/* Hotový text až POD prekliokom do Projectu — v tomto poradí sa to aj
-          robí: zámer → Project → vety späť sem. Bez tohto poľa končili vety
-          v okne prehliadača a v pláne po nich nezostala stopa. */}
-      {/* TRI TEXTY, NIE JEDEN. Scenár sa číta pri natáčaní, caption sa kopíruje
-          do Metricoolu a hashtagy sa menia nezávisle od oboch. Kým to bolo
-          jedno pole, muselo sa pred každým použitím ručne rozstrihať. */}
-      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "14px 0 4px" }}>
-        Scenár — čo hovoríš na kameru {scenar.trim() ? `(${scenar.trim().length} zn.)` : ""}
-      </label>
-      <textarea value={scenar} onChange={(e) => setScenar(e.target.value)} rows={scenar ? 7 : 3}
-        placeholder="hovorené slovo — z toho sa berú vety do sekvencie"
-        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
-
-      {/* ÚVODNÉ VETY AŽ ZA SCENÁROM. Sú to jeho varianty, nie samostatný text —
-          a čítajú sa pri statíve, keď prvá veta nesadne. */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "12px 0 4px" }}>
-        <label style={{ fontSize: 11.5, color: C.textMuted }}>
-          Alternatívne úvodné vety — jedna na riadok
-          {uvodneVety.trim() ? ` (${uvodneVety.split("\n").filter((r) => r.trim()).length})` : ""}
-        </label>
+      {/* VÝROBA JE V STRIŽNI (Jerry, 3. 11. 2026). Scenár, caption, úvodný záber,
+          rozpis záberov aj titulka sa robia na karte príspevku tam; tu sa len čítajú. */}
+      <div style={{ margin: "14px 0 0", fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
+        Scenár, caption, úvodný záber, rozpis záberov aj titulka sa robia v Strižni, na karte príspevku.
       </div>
-      <textarea value={uvodneVety} onChange={(e) => setUvodneVety(e.target.value)} rows={uvodneVety ? 4 : 2}
-        placeholder="čo skúsiť, keď prvá veta nesadne"
-        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
-
-      {/* CAPTION AJ S HASHTAGMI V JEDNOM POLI. Mal som ich rozdelené, lebo sa
-          menia nezávisle — z pohľadu použitia to bola chyba: do Metricoolu ide
-          celý blok jedným cmd+C a dve polia znamenali dve kopírovania. */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "12px 0 4px" }}>
-        <label style={{ fontSize: 11.5, color: C.textMuted }}>
-          Caption + hashtagy — kopíruje sa naraz
-          {hotovyText.trim() ? ` (${hotovyText.trim().length} zn. · ${pocetHashtagov(hotovyText)} #)` : ""}
-        </label>
-        {hotovyText.trim() && (
-          <button onClick={kopirujCaption}
-            style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
-            {kopirovane ? "skopírované ✓" : "skopírovať"}
-          </button>
-        )}
-      </div>
-      <textarea ref={poleCaption} value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 9 : 3}
-        placeholder="popis pod príspevkom, hashtagy na konci po prázdnom riadku"
-        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
-
-      {/* Rozpis záberov až POD hotovým textom: zábery sa priraďujú k VETÁM,
-          takže kým text nie je, niet čoho sa chytiť. */}
-      <Sekvencia faza={faza} hotovyText={hotovyText} scenar={scenar} hodnota={sekvencia} onZmena={setSekvencia} />
+      {!!ZABER_MAPA.get(zaber) && (
+        <div style={{ marginTop: 8, fontSize: 12, color: C.textMuted }}>Úvodný záber: <b style={{ color: C.text }}>{ZABER_MAPA.get(zaber)?.nazov}</b></div>
+      )}
+      {scenar.trim() && (
+        <>
+          <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>Scenár — čo hovoríš na kameru ({scenar.trim().length} zn.)</label>
+          <textarea readOnly value={scenar} rows={7} style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+        </>
+      )}
+      {uvodneVety.trim() && (
+        <>
+          <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>Alternatívne úvodné vety ({uvodneVety.split("\n").filter((r) => r.trim()).length})</label>
+          <textarea readOnly value={uvodneVety} rows={4} style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+        </>
+      )}
+      {hotovyText.trim() && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "12px 0 4px" }}>
+            <label style={{ fontSize: 11.5, color: C.textMuted }}>Caption + hashtagy ({hotovyText.trim().length} zn. · {pocetHashtagov(hotovyText)} #)</label>
+            <button onClick={kopirujCaption}
+              style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
+              {kopirovane ? "skopírované ✓" : "skopírovať"}
+            </button>
+          </div>
+          <textarea ref={poleCaption} readOnly value={hotovyText} rows={9} style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+        </>
+      )}
 
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
@@ -815,37 +791,12 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>
-        {(hotovyText.trim() || scenar.trim()) ? " — zadanie ponesie aj terajšie verzie na úpravu." : " — otvorí sa zadanie na skopírovanie."}
+        {" — hotové vety potom vlož do karty v Strižni."}
       </div>
-
-      {/* TITULKA AŽ TU, POD TEXTOM. Nadpis na titulke je prvá veta captionu —
-          kým text nie je, generátor by ponúkal prázdno a Jerry by ho vypĺňal
-          druhýkrát ručne. */}
-      <div style={{ marginTop: 6, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
-        <button
-          onClick={() => setTitulka(true)}
-          style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
-          vyrobiť titulku ↗
-        </button>
-        {" — 1080×1920 v PSB sadzbe, stiahne sa ako PNG."}
-      </div>
-      {titulka && (
-        <Titulka
-          zdroj={{ koncept, hotovyText, scenar }}
-          mesiac={mesiac}
-          faza={faza}
-          kluc={slot?.id || `${mesiac}|${faza}`}
-          ulozene={slot?.titulka || ""}
-          // Uložiť sa dá len k príspevku, ktorý už existuje. Kým nie je
-          // naplánovaný, nastavenie nemá kde bývať a okno to povie.
-          onUloz={slot ? (t) => onUloz({ id: slot.id, titulka: t }) : undefined}
-          onZavri={() => setTitulka(false)}
-        />
-      )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim())}
-          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim()) ? 0.5 : 1 }}>
+        <button onClick={zapis} disabled={busy || (!slot && !koncept.trim() && !kto.trim())}
+          style={{ ...tlacidlo(true), opacity: busy || (!slot && !koncept.trim() && !kto.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
         {/* Do zásobníka, nie do koša. Nápad, ktorý ešte nechceš vyhodiť, ale
@@ -1063,86 +1014,3 @@ function Kolace({ minulost, buducnost, vysloKusov, planKusov }: {
   );
 }
 
-/**
- * Výber úvodného záberu.
- *
- * PREČO FILTROVANÉ PODĽA FÁZY
- *
- * Nie každý pohyb sedí každému publiku. Statický záber vo fáze 1 nikoho
- * nezastaví; švih vo fáze 5 pôsobí ako reklama práve tam, kde má obsah
- * pôsobiť ako práca. Ponuka preto ukazuje len to, čo dáva zmysel — zvyšok
- * je za „ukázať všetky“ pre prípad, že to Jerry vidí inak.
- */
-function ZaberVyber({ faza, hodnota, onZmena }: {
-  faza: number; hodnota: string; onZmena: (v: string) => void;
-}) {
-  const [vsetky, setVsetky] = useState(false);
-  const vhodne = zaberyPreFazu(faza);
-  const ponuka = vsetky || vhodne.length === 0 ? ZABERY : vhodne;
-  const vybrany = ZABER_MAPA.get(hodnota);
-  // Vybraný záber sa musí dať zobraziť, aj keď pre túto fázu nie je v ponuke —
-  // inak by po presune slotu do inej fázy ticho zmizol z obrazovky.
-  const mimoPonuky = !!vybrany && !ponuka.some((z) => z.id === vybrany.id);
-
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-        <label style={{ fontSize: 11.5, color: C.textMuted }}>
-          Úvodný záber — čo je vidieť v prvej sekunde
-        </label>
-        {!vsetky && vhodne.length > 0 && vhodne.length < ZABERY.length && (
-          <button onClick={() => setVsetky(true)}
-            style={{ background: "none", border: 0, padding: 0, color: C.textDim, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
-            ukázať všetky
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-        <button onClick={() => onZmena("")}
-          style={{
-            background: hodnota === "" ? mix(C.accent, 0.25) : "none",
-            border: `1px solid ${hodnota === "" ? C.accent : C.border}`,
-            color: hodnota === "" ? C.text : C.textMuted,
-            borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer",
-          }}>zatiaľ neviem</button>
-        {[...ponuka, ...(mimoPonuky && vybrany ? [vybrany] : [])].map((z) => (
-          <button key={z.id} onClick={() => onZmena(z.id)}
-            style={{
-              background: hodnota === z.id ? mix(C.accent, 0.25) : "none",
-              border: `1px solid ${hodnota === z.id ? C.accent : C.border}`,
-              color: hodnota === z.id ? C.text : C.textMuted,
-              borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer",
-            }}>
-            {z.nazov}
-            {mimoPonuky && vybrany?.id === z.id && <span style={{ color: C.textDim }}> · iná fáza</span>}
-          </button>
-        ))}
-      </div>
-
-      {vybrany && (
-        <div style={{
-          display: "flex", gap: 16, marginTop: 10, padding: 12, borderRadius: 8,
-          background: mix(C.accent, 0.05), border: `1px solid ${mix(C.border, 0.9)}`, flexWrap: "wrap",
-        }}>
-          <div style={{ flex: "0 0 auto", width: 200 }}>
-            <ZaberUkazka pohyb={vybrany.pohyb} />
-          </div>
-          <div style={{ flex: "1 1 220px", display: "flex", flexDirection: "column", gap: 7 }}>
-            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>{vybrany.coRobi}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
-              <b style={{ color: C.textMuted }}>Ako na to: </b>{vybrany.akoNaTo}
-            </div>
-            <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{vybrany.prePSB}</div>
-            {vybrany.zdroj && (
-              <a href={vybrany.zdroj.url} target="_blank" rel="noreferrer"
-                style={{ fontSize: 11.5, color: C.accentLight }}>
-                {vybrany.zdroj.nazov} ↗
-              </a>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
