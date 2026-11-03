@@ -90,7 +90,7 @@ function Riadok({ p, mena, onZapisane }: { p: PolozkaBtc; mena: string[]; onZapi
       </div>
       {p.zdroj === "faktura" && <div style={{ fontSize: 11.5, color: C.green, marginTop: 2 }}>Blink hlási zaplatenú faktúru z odkazu.</div>}
       {p.zOdkazu && <div style={{ fontSize: 11.5, color: C.green, marginTop: 2 }}>Predvyplnená suma je z odkazu v SMS.</div>}
-      {!p.zOdkazu && !!p.diely.length && <div style={{ fontSize: 11.5, color: C.orange, marginTop: 2 }}>Suma nesedí na odkaz, predvyplnené je to, čo prišlo. Skontroluj ju.</div>}
+      {!p.zOdkazu && !!p.diely.length && <div style={{ fontSize: 11.5, color: C.orange, marginTop: 2 }}>Odkaz v SMS túto sumu nepýta, predvyplnené je to, čo prišlo. Skontroluj ju.</div>}
       {!!p.navrhy.length && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
           {p.navrhy.map((n) => (
