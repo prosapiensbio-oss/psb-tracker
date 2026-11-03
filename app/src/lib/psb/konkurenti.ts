@@ -49,7 +49,7 @@ export function zadanieVzorov(prispevky: PrispevokKonkurenta[]): string {
   const riadky = prispevky.slice(0, 40).map((p, i) => `${i + 1}. @${p.ucet} · ${p.interakcie} interakcií\n${p.text.slice(0, 400)}`).join("\n\n");
   return `Toto sú popisy príspevkov konkurentov štúdia ProSapiens Biomechanic na Instagrame, od najviac interakcií. Prečítaj ich a odpovedz PO SLOVENSKY IBA platným JSON bez \`\`\`:
 {"vzory":[{"vzor":"opakujúci sa vzor v popisoch (štruktúra, prvý riadok, dĺžka, tón, výzva, hashtagy)","priklad":"krátky doslovný úryvok do 12 slov","preco":"prečo to môže fungovať"}],"prePsb":["konkrétny nápad pre popisy PSB: forma, nie cudzí obsah; žiadne kopírovanie techník ani loga Functional Patterns"]}
-3 až 6 vzorov a 2 až 4 nápady. Nič si nevymýšľaj, len z toho, čo je v textoch. Keď je príspevkov málo, povedz menej.
+3 až 6 vzorov a 2 až 4 nápady, každá hodnota krátka, jedna veta. V hodnotách nepoužívaj rovné úvodzovky, rozbili by JSON. Nič si nevymýšľaj, len z toho, čo je v textoch. Keď je príspevkov málo, povedz menej.
 
 ${riadky}`;
 }

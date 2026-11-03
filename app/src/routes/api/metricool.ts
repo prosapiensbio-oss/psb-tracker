@@ -83,12 +83,13 @@ export const Route = createFileRoute("/api/metricool")({
                 const r = await fetch("https://api.anthropic.com/v1/messages", {
                   method: "POST",
                   headers: { "content-type": "application/json", "x-api-key": kluc, "anthropic-version": "2023-06-01" },
-                  body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 1500, messages: [{ role: "user", content: zadanieVzorov(k.prispevky) }] }),
+                  body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 4000, messages: [{ role: "user", content: zadanieVzorov(k.prispevky) }] }),
                   signal: AbortSignal.timeout(60000),
                 });
-                const j = (await r.json().catch(() => null)) as { content?: { type?: string; text?: string }[] } | null;
-                vzory = vzoryZOdpovede((j?.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join(""));
-                if (!vzory) upozornenie = `Čísla sú uložené, zhrnutie vzorov nevyšlo (Claude ${r.status}).`;
+                const j = (await r.json().catch(() => null)) as { content?: { type?: string; text?: string }[]; stop_reason?: string } | null;
+                const text = (j?.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
+                vzory = vzoryZOdpovede(text);
+                if (!vzory) upozornenie = `Čísla sú uložené, zhrnutie vzorov nevyšlo (Claude ${r.status}, ${j?.stop_reason || "bez dôvodu"}): ${text.replace(/\s+/g, " ").slice(0, 200)}`;
               } catch (e) {
                 upozornenie = `Čísla sú uložené, zhrnutie vzorov nevyšlo: ${String(e).slice(0, 120)}`;
               }
