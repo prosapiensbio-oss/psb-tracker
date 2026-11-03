@@ -21,7 +21,6 @@ nezapadlo medzi úlohami bez termínu):
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
 - **Prvá platba cez odkaz** — bitcoinová faktúra z `/v/` sa zapisuje do `ln_faktury` až pri skutočnom otvorení klientom a Blink ju hlási ako zaplatenú (3. 11. 2026). Túto časť sme ešte nevideli na ostrej platbe: pri ďalšej BTC platbe cez odkaz over, že sa v kroku Platby ukáže s „Blink hlási zaplatenú faktúru“ a sumou z odkazu.
-- **9. 11. 2026** — Josef Šnirych: po tréningu mu má sám vzniknúť SPECIAL 3 za 3 990 Kč a zaplatiť ho platba z 2. 11. (zostatok po tréningu 2 h). Hodiny mu boli 3. 11. opravené z 2 na 3, tréning 26. 10. nebol.
 - **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
   merania webu — 27. 10. 2026" nižšie).
 
