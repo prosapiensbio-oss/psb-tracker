@@ -458,8 +458,6 @@ export function MapaCyklu({ data, chat, onNavigate, focus, onOdchodKJarvisovi }:
               style={{ fontSize: 11.5, color: C.accentLight }}>
               natáčací list ↗
             </a>
-            {/* Nástrely titulky: dvadsať skladieb vedľa seba. Vyberá sa z toho
-                prstom a na veľkej obrazovke — do modálu sa to porovnať nedá. */}
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
             Klikni na riadok a otvorí sa ten istý editor ako z mriežky.
