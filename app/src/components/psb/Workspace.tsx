@@ -27,6 +27,7 @@ import { Zosit } from "./Zosit";
 import { Uzavierky } from "./Uzavierky";
 import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
+import { BtcPrijmyKarta, useBtcNaPotvrdenie } from "./BtcPrijmyKarta";
 import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { RegisterRow } from "./Dashboard";
 import { NaCeluObrazovku } from "./NaCeluObrazovku";
@@ -241,6 +242,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
   const [pocetSms, setPocetSms] = useState<number | null>(null);
   const [pocetDopytov, setPocetDopytov] = useState(0);
   const [pocetUzavierky, setPocetUzavierky] = useState(0);
+  const btcPrijmy = useBtcNaPotvrdenie();
   const [zdroje, setZdroje] = useState<typeof pamatKopy.zdroje>(pamatKopy.zdroje);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const hotoveRef = useRef(hotove);
@@ -1836,15 +1838,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
                         <div style={{ flexBasis: "100%", margin: "4px 0 6px", padding: "8px 10px", borderRadius: 9, border: `1px solid ${C.border}`, background: mix(C.card, 70) }}>
                           {/* BITCOINOVÝ KLIENT neplatí na účet (Jerry, 20. 10. 2026:
                               „jeho párovanie sa bude hľadať v BTC appke"). Platba
-                              z BTC knihy sa do Kokpitu zapíše sama (`btcNaPlatby`)
-                              a dlh zmizne; tu stačí vidieť, čo v knihe je. */}
+                              z BTC knihy čaká hore na potvrdenie (`BtcPrijmyKarta`)
+                              a po ňom dlh zmizne; tu stačí vidieť, čo v knihe je. */}
                           {!pary.length && data.clientOverrides?.[x.meno]?.bitcoin && (() => {
                             const k = normName(x.meno);
                             const btcK = (btc?.platby || []).filter((p) => p.klient && normName(p.klient) === k)
                               .sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3);
                             return (
                               <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>
-                                {x.meno} platí bitcoinom — platbu nájdeš v Bitcoin appke a do Kokpitu sa zapíše sama, len čo ju tam zaevidujete.
+                                {x.meno} platí bitcoinom. Platba sa ukáže hore v „Bitcoinové platby na potvrdenie“, len čo ju Blink alebo BTC kniha nahlási.
                                 {btcK.length
                                   ? <> Posledné v BTC knihe: {btcK.map((p) => `${fmtDMY(p.datum.slice(0, 10))} ${p.sats ? `${p.sats.toLocaleString("cs-CZ")} sats` : ""}${p.czk ? ` (≈ ${kc(p.czk)})` : ""}`).join(" · ")}.</>
                                   : <> V BTC knihe zatiaľ nie je ani jedna jeho platba.</>}
@@ -2130,10 +2132,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
       const cudzie = prijmyUInehoTrenera(zdroje?.platby || [], trenerKroku, (m) => clients[m]?.primaryTrainer || "")
         .map((x) => ({ ...x, riadky: x.riadky.filter((p) => !hotove.has(klucPolozky("platby", p))) }))
         .filter((x) => x.riadky.length);
-      const prazdne = !sekcie.length && !otazkyKrokuPlatby().spolu && !cudzie.length;
+      const prazdne = !sekcie.length && !otazkyKrokuPlatby().spolu && !cudzie.length && !btcPrijmy.polozky.length && !btcPrijmy.chyba;
       return (
         <>
           <div style={{ padding: "6px 0 10px" }}><FioStiahnutie onZapisane={poZapise} /></div>
+          <BtcPrijmyKarta polozky={btcPrijmy.polozky} chyba={btcPrijmy.chyba} mena={mena} onZapisane={poZapise} />
           <OtazkyPlatieb dlhy={data.dlhy} acks={data.anomalyAck || {}} balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} onKlient={naStol} />
           {sekcieKresli}
           {cudzie.map((x) => (
@@ -2191,7 +2194,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
       if (x.krok === "dopyty") return pocetDopytov;
       if (x.krok === "uzavierka") return pocetUzavierky;
       const sekcii = x.sekcie.reduce((a, y) => a + zostava(y), 0);
-      return x.krok === "platby" ? sekcii + otazkyKrokuPlatby().spolu : sekcii;
+      return x.krok === "platby" ? sekcii + otazkyKrokuPlatby().spolu + btcPrijmy.polozky.length : sekcii;
     }
     if (x.druh === "anamnezy") return anamnezyPodlaStavu(x.polozky as AnamnezaRiadok[]).naTrenera.length;
     if (x.druh === "reklamy") return (register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length;

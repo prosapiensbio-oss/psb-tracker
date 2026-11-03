@@ -76,8 +76,7 @@ const jeCitanieCezPost = (url: string, init?: RequestInit): boolean =>
  */
 const jeTichyPostPriStarte = (url: string, init?: RequestInit): boolean =>
   typeof init?.body === "string" && (
-    (url === "/api/platby" && init.body.includes('"akcia":"btc-import"'))
-    || (url === "/api/balicky" && init.body.includes('"akcia":"automaticky"'))
+    (url === "/api/balicky" && init.body.includes('"akcia":"automaticky"'))
   );
 
 const adresa = (input: RequestInfo | URL): string =>

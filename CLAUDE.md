@@ -2821,14 +2821,17 @@ neho tabuľka `platby`. Celý export ostáva v `data.paymentsPtminder`.
 - Rozhoduje SERVER (`akcia: "peniaze-od"`), tlačidlo len pýta. *(História: od 28. 10. 2026 je prepínač preč a `platby.ts` ho odmieta — peniaze od 10/2026 idú vždy z Kokpitu.)*
 - Od prepnutia sa ručný príjem (split `prijem`) do P&L nepripočíta — úvodný
   v hotovosti je platba klienta, inak by bol dvakrát.
-- **Bitcoin sa berie SÁM z BTC knihy** (`btcNaPlatby`, `akcia: "btc-import"`;
-  Jerry, 6. 10. 2026: „prečo sa BTC platby nečítajú, keď je na to celá
-  appka?"). Knihu sťahuje prehliadač (worker → worker padá na 522) a pošle
-  ju serveru najviac raz za 10 min. Zapíše sa len od `platby_od`, len
-  klient, ktorého meno `najdiKlienta` nájde jednoznačne, `fio_id` =
-  `btc:deň|meno|sats` (nič sa nezdvojí). Staršie BTC platby zámerne nie —
-  `jeVopred` z dnešného stavu by starej platbe dal „vopred" a tá by ticho
-  zaplatila budúci balíček. Prevod z cudzieho účtu a hotovosť ostávajú
+- **Bitcoin sa potvrdzuje ručne, ako platby z banky** (Jerry, 3. 11. 2026: „nech to
+  nie je automatické spárovanie"; od 6. 10. sa zapisoval sám). Workspace → Platby →
+  `BtcPrijmyKarta` číta `/api/btc-sledovanie`: riadky BTC knihy (väzba `BTC`) a
+  faktúry z odkazu, o ktorých Blink povedal, že sú zaplatené (`ln_faktury`, plánovač
+  xx:07 a xx:37, verify URL bez API kľúča). Nič z toho nepíše do `platby`, zapisuje
+  až `akcia: "btc-potvrd"`. `fio_id` je `btc:deň|meno|sats` alebo `btc:ln:<id>`.
+- **Suma pri BTC je dohodnutá suma z odkazu v SMS, nie prepočet kurzom** („zaplatili
+  10 tisíc“, aj keď prišlo za 9 765). Faktúra ju nesie sama, inak sa zloží ako stránka
+  `/v/` (`obsahOdkazu` + `rozpisFaktury`). Rozdiel nad 10 % kurz nevysvetlí, predvyplní
+  sa to, čo prišlo. Platba bez mena dostane meno aj v knihe (`POST /api/reserve`
+  v appke btc, vlastná správa v podpise). Prevod z cudzieho účtu a hotovosť ostávajú
   ručné (formulár „Zapísať platbu mimo banky").
 
 ## Editor fotiek a videa — karta Editor vo Workspace (6. 10. 2026)

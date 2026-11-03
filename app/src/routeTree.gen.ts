@@ -94,6 +94,7 @@ import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
 import { Route as ApiChybaPrehliadacaRouteImport } from './routes/api/chyba-prehliadaca'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiBtcSledovanieRouteImport } from './routes/api/btc-sledovanie'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiBalickyRouteImport } from './routes/api/balicky'
 import { Route as ApiAutomatBehRouteImport } from './routes/api/automat-beh'
@@ -530,6 +531,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBtcSledovanieRoute = ApiBtcSledovanieRouteImport.update({
+  id: '/api/btc-sledovanie',
+  path: '/api/btc-sledovanie',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBtcReserveRoute = ApiBtcReserveRouteImport.update({
   id: '/api/btc-reserve',
   path: '/api/btc-reserve',
@@ -594,6 +600,7 @@ export interface FileRoutesByFullPath {
   '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
+  '/api/btc-sledovanie': typeof ApiBtcSledovanieRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
@@ -691,6 +698,7 @@ export interface FileRoutesByTo {
   '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
+  '/api/btc-sledovanie': typeof ApiBtcSledovanieRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
@@ -789,6 +797,7 @@ export interface FileRoutesById {
   '/api/automat-beh': typeof ApiAutomatBehRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
+  '/api/btc-sledovanie': typeof ApiBtcSledovanieRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chyba-prehliadaca': typeof ApiChybaPrehliadacaRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
@@ -888,6 +897,7 @@ export interface FileRouteTypes {
     | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
+    | '/api/btc-sledovanie'
     | '/api/chat'
     | '/api/chyba-prehliadaca'
     | '/api/client-delete'
@@ -985,6 +995,7 @@ export interface FileRouteTypes {
     | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
+    | '/api/btc-sledovanie'
     | '/api/chat'
     | '/api/chyba-prehliadaca'
     | '/api/client-delete'
@@ -1082,6 +1093,7 @@ export interface FileRouteTypes {
     | '/api/automat-beh'
     | '/api/balicky'
     | '/api/btc-reserve'
+    | '/api/btc-sledovanie'
     | '/api/chat'
     | '/api/chyba-prehliadaca'
     | '/api/client-delete'
@@ -1180,6 +1192,7 @@ export interface RootRouteChildren {
   ApiAutomatBehRoute: typeof ApiAutomatBehRoute
   ApiBalickyRoute: typeof ApiBalickyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
+  ApiBtcSledovanieRoute: typeof ApiBtcSledovanieRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiChybaPrehliadacaRoute: typeof ApiChybaPrehliadacaRoute
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
@@ -1861,6 +1874,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/btc-sledovanie': {
+      id: '/api/btc-sledovanie'
+      path: '/api/btc-sledovanie'
+      fullPath: '/api/btc-sledovanie'
+      preLoaderRoute: typeof ApiBtcSledovanieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/btc-reserve': {
       id: '/api/btc-reserve'
       path: '/api/btc-reserve'
@@ -1958,6 +1978,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAutomatBehRoute: ApiAutomatBehRoute,
   ApiBalickyRoute: ApiBalickyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
+  ApiBtcSledovanieRoute: ApiBtcSledovanieRoute,
   ApiChatRoute: ApiChatRoute,
   ApiChybaPrehliadacaRoute: ApiChybaPrehliadacaRoute,
   ApiClientDeleteRoute: ApiClientDeleteRoute,

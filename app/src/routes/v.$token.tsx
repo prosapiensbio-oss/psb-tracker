@@ -21,6 +21,8 @@ import { fakturaPodlaId } from "./api/vydane-faktury";
 import { jeZjavnyRobot } from "../lib/psb/kalendarMobil";
 import { audit } from "../lib/psb/audit.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
+import { idFaktury, rozpisFaktury } from "../lib/psb/btcSledovanie";
+import { zapisFakturu } from "../lib/psb/btcImport.server";
 import { casKurzu, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import { czkZaPolozky } from "../lib/psb/platiZa";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
@@ -258,6 +260,11 @@ export const Route = createFileRoute("/v/$token")({
               adresa: LIGHTNING_ADRESA,
               bolt11: faktura?.bolt11,
             };
+            // Kto a na koľko korún: Blinku sa potom Kokpit pýta, či je zaplatená.
+            // Náhľad trénera nesleduje nič, klient mu faktúru nezaplatí.
+            if (faktura?.overit && !new URL(request.url).searchParams.has("nahlad")) {
+              await zapisFakturu(DB, { id: idFaktury(faktura.overit), klient: c.name, rozpis: rozpisFaktury(polozky, zlavaKlienta), czk, sats, overit: faktura.overit });
+            }
             // QR nesie faktúru, keď je; inak samotnú adresu — tú prečítajú
             // bežné peňaženky tiež, len si klient sumu zadá sám.
             const o = qrObrazok((faktura?.bolt11 || LIGHTNING_ADRESA).toUpperCase());

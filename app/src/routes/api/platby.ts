@@ -12,14 +12,10 @@ import {
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { prijmyNaOtazku } from "../../lib/psb/zositZdvojenia";
 import { zdvojeniaZoServera } from "../../lib/psb/zositZdvojenia.server";
-import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
+import { dlhyMien, jeVopred, potvrdBtc, skryBtc } from "../../lib/psb/btcImport.server";
 import { dnesPraha } from "../../lib/psb/cas";
-import { btcEsteNezapisane, btcNaPlatby, PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
-import { chybaDielov, menaPlatiZa, rozdelPodlaDlhov } from "../../lib/psb/platiZa";
-import { najdiKlienta } from "../../lib/psb/compute";
-import { loadData } from "../../lib/psb/db.server";
-import { ponukaVOdkaze } from "../../lib/psb/obsahOdkazu.server";
-import { osKlientaZoServera } from "../../lib/psb/osKlienta.server";
+import { PENIAZE_KLUC } from "../../lib/psb/peniazeZKokpitu";
+import { chybaDielov, menaPlatiZa } from "../../lib/psb/platiZa";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -291,36 +287,6 @@ function fakturyKokpitu(faktury: FakturaRiadok[], polozky: PolozkaRiadok[]): Fak
       ...(diely.size > 1 ? { diely: [...diely].map(([klient, suma]) => ({ klient, suma })) } : {}),
     };
   });
-}
-
-/**
- * JE TÁTO PLATBA VOPRED?
- *
- * Jerry, 4. 10. 2026: „ak klient zaplatí skôr, ako bude mať tréning, platba
- * sa zapíše, ale nový balíček má vzniknúť prvou odtrénovanou hodinou."
- * Balíček teda v tej chvíli ešte nie je a platba by sa pri počítaní dlhu
- * stratila (počítajú sa platby od prvého balíčka z Kokpitu). Príznak ju
- * udrží: platba je vopred, keď klient v čase priradenia NIČ NEDLŽÍ — ani
- * otvorený poplatok z PTmindera, ani nezaplatený balíček z Kokpitu.
- * Vtedy nepatrí ničomu, čo už existuje, a čaká na balíček, ktorý príde.
- */
-async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
-  return ((await dlhyMien(DB, [klient])).get(normName(klient)) || 0) === 0;
-}
-
-/** Koľko kto dlží — súčet položiek dlhu (`polozkyDlhovMien`). */
-async function dlhyMien(DB: D1Database, mena: string[]): Promise<Map<string, number>> {
-  const kluce = new Set(mena.map((m) => normName(m)).filter(Boolean));
-  const out = new Map<string, number>();
-  if (!kluce.size) return out;
-  const polozky = await polozkyDlhovMien(DB, mena);
-  for (const k of kluce) out.set(k, 0);
-  for (const x of polozky) {
-    const k = normName(x.klient);
-    if (kluce.has(k)) out.set(k, (out.get(k) || 0) + x.doplatit);
-  }
-  for (const [k, v] of out) out.set(k, Math.max(0, Math.round(v)));
-  return out;
 }
 
 /**
@@ -1013,86 +979,28 @@ export const Route = createFileRoute("/api/platby")({
         }
 
         /**
-         * BITCOIN Z BTC KNIHY → VLASTNÁ EVIDENCIA (`btcNaPlatby`).
-         *
-         * Knihu sťahuje PREHLIADAČ (worker → worker padá na 522, viď
-         * btc-reserve.ts) a posiela ju sem. Zapisuje sa od mesiaca, od
-         * ktorého sa súbežný chod súdi (`platby_od`) — staršie mesiace sa
-         * neporovnávajú a do dlhov by zasiahli bez dôvodu. Opakované
-         * načítanie nič nezdvojí: `fio_id` je kľúč zápisu v knihe a položka,
-         * ktorá už má pre svoj kľúč akýkoľvek riadok (aj zrušený), sa preskočí
-         * celá (`btcEsteNezapisane`) — rozdelenie sa počíta z dnešných dlhov
-         * a o týždeň by tá istá platba vyšla inak.
+         * BITCOINOVÁ PLATBA, KTORÚ POTVRDIL ČLOVEK (Jerry, 3. 11. 2026: „nech to nie
+         * je automatické spárovanie, chcem to spraviť ručne ako platby z Kokpitu").
+         * Čo čaká, hovorí `/api/btc-sledovanie`; zapisuje sa len odtiaľto.
          */
-        if (akcia === "btc-import") {
-          const kniha = Array.isArray(b.platby) ? (b.platby as { klient: string | null; datum: string; czk: number | null; sats?: number }[]).slice(0, 2000) : [];
-          const od = String((await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>().catch(() => null))?.value || "").replace(/"/g, "") || dnesPraha().slice(0, 7);
-          const [s1, s2] = await DB.batch([
-            DB.prepare(`SELECT DISTINCT client_name m FROM sessions WHERE date >= date('now','-400 days')
-              UNION SELECT DISTINCT klient FROM kal_udalosti WHERE klient IS NOT NULL AND zmizla_at IS NULL AND typ IN ('trening','uvodny') AND zaciatok >= date('now','-400 days')`),
-            DB.prepare("SELECT DISTINCT klient m FROM balicky WHERE zrusene_at IS NULL"),
-          ]);
-          const mena = [...new Set([...(s1.results || []), ...(s2.results || [])].map((x) => String((x as { m: string }).m || "")).filter(Boolean))];
-          const { zapisat: vKnihe, nesparovane } = btcNaPlatby(kniha, (m) => najdiKlienta(mena, m) || null, `${od}-01`);
-          // Bez `.catch`: prázdny zoznam pri výpadku D1 by znova otvoril všetky platby.
-          const zapisane = (await DB.prepare("SELECT DISTINCT fio_id FROM platby WHERE fio_id LIKE 'btc:%'").all<{ fio_id: string }>()).results || [];
-          const zapisat = btcEsteNezapisane(vKnihe, zapisane.map((r) => r.fio_id));
-          /**
-           * JEDEN PLATÍ ZA VIACERÝCH (Jerry, 21. 10. 2026: Jakub Kaňovský
-           * platí aj za Annu Kadličkovú). V knihe stojí jedno meno a jedna
-           * suma — zapísať ju celú platiteľovi by znamenalo, že jemu platba
-           * prebýva a druhému chýba. Delí sa podľa toho, koľko kto dlží, a
-           * len keď sa suma od ich súčtu nelíši o viac než desatinu (kurz).
-           */
-          const dvojice = new Map<string, string[]>();
-          for (const r of ((await DB.prepare("SELECT name, plati_za FROM client_overrides WHERE plati_za IS NOT NULL AND plati_za <> ''").all<{ name: string; plati_za: string }>().catch(() => null))?.results) || []) {
-            const za = menaPlatiZa(r.plati_za).map((m) => najdiKlienta(mena, m) || m);
-            if (za.length) dvojice.set(normName(r.name), za);
-          }
-          let nove = 0;
-          let rozdelenych = 0;
-          for (const z of zapisat) {
-            const za = dvojice.get(normName(z.klient)) || [];
-            let diely: { klient: string; suma: number }[] = [{ klient: z.klient, suma: z.suma }];
-            if (za.length) {
-              const dlhy = await dlhyMien(DB, [z.klient, ...za]);
-              /**
-               * Pri PLATITEĽOVI sa počíta aj ponuka nového balíčka — jeho
-               * stránka ju pýta vtedy, keď dočerpal a nový mu ešte nevznikol
-               * (vzniká až prvým tréningom). Bez toho by sa dvojica rozpadla
-               * presne v ten deň. Pri ostatných sa nič nedomýšľa: kto
-               * nedlží, v rozdelení nie je.
-               */
-              let ocakavaneOdNeho = dlhy.get(normName(z.klient)) || 0;
-              if (!ocakavaneOdNeho) {
-                // Tá istá ponuka, akú ukazuje jeho odkaz. Drahšie čítanie, ale
-                // stane sa to len pri novej platbe platiteľa, ktorý nič nedlží.
-                const data = await loadData(DB);
-                const { os, balicky } = await osKlientaZoServera(DB, data, z.klient);
-                ocakavaneOdNeho = Math.round(ponukaVOdkaze(z.klient, os, balicky, data, dnesPraha())?.cena || 0);
-              }
-              const r = rozdelPodlaDlhov(z.suma, [
-                { klient: z.klient, dlzi: ocakavaneOdNeho },
-                ...za.map((m) => ({ klient: m, dlzi: dlhy.get(normName(m)) || 0 })),
-              ]);
-              if (r) { diely = r; rozdelenych += 1; }
-            }
-            // Diely jednej platby idú naraz: keby druhý nedobehol, kľúč už má
-            // riadok a ďalší import by chýbajúci diel nikdy nedopísal.
-            const zapisy = await Promise.all(diely.map(async (d) => {
-              const popis = `z BTC knihy${z.sats ? ` · ${z.sats.toLocaleString("sk-SK")} sats` : ""}${diely.length > 1 ? ` · spoločná platba (${z.klient})` : ""}`;
-              return DB.prepare(
-                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'bitcoin',?,?,?,?,?)",
-              ).bind(uid(), d.klient, z.datum, d.suma, z.kluc, popis, teraz(), "btc-kniha", (await jeVopred(DB, d.klient)) ? 1 : 0);
-            }));
-            for (const r of await DB.batch(zapisy)) nove += r.meta?.changes || 0;
-          }
-          if (nove) await audit(DB, { action: "platby-btc-import", predmet: `${nove} z BTC knihy${rozdelenych ? ` · ${rozdelenych} rozdelená` : ""}`, neu: zapisat.map((z) => `${z.klient} ${z.datum} ${z.suma}`).join(" · ").slice(0, 300), actor: kto });
-          // Nespoznané mená sa ODLOŽIA — inak by ticho chýbali v tržbách a
-          // nikto by sa to nedozvedel. Karta Platieb ich ukáže (GET).
-          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('btc_nesparovane',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-            .bind(JSON.stringify(nesparovane.slice(0, 50))).run();
-          return Response.json({ ok: true, nove, nesparovane });
+        if (akcia === "btc-potvrd") {
+          const v = await potvrdBtc(DB, {
+            zdroj: b.zdroj as "kniha" | "bez-mena" | "faktura", datum: String(b.datum || ""), sats: Number(b.sats) || 0,
+            czk: b.czk == null ? null : Number(b.czk),
+            klientKnihy: b.klientKnihy ? String(b.klientKnihy) : undefined,
+            idKnihy: Number(b.idKnihy) || undefined,
+            idFaktury: b.idFaktury ? String(b.idFaktury) : undefined,
+            diely: Array.isArray(b.diely) ? (b.diely as { klient: string; suma: number }[]).slice(0, 6) : [],
+          }, kto);
+          if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400 });
+          return Response.json({ ok: true, nove: v.nove });
+        }
+        if (akcia === "btc-skry") {
+          const kluc = String(b.kluc || "");
+          if (!kluc.startsWith("btc:")) return Response.json({ ok: false, error: "Chýba položka." }, { status: 400 });
+          await skryBtc(DB, kluc);
+          await audit(DB, { action: "btc-nie-je-platba", predmet: kluc.slice(0, 120), actor: kto });
+          return Response.json({ ok: true });
         }
 
         /**

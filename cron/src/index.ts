@@ -51,6 +51,16 @@ const metaReklamy = (env: Env, akcia: "kampane" | "reklamy" | "dozor") =>
  * a P&L bežiaceho mesiaca mal tržby bez nákladov. Appka stiahne posledných
  * 35 dní a zapíše nové pohyby nepotvrdené — potvrdzuje ich Jerry v Banke.
  */
+// Bitcoin: spýta sa Blinku na zaplatené faktúry. Faktúra platí hodinu, tak častejšie
+// než banka. Do platieb nič nezapisuje, tie potvrdzuje človek vo Workspace.
+const btcSledovanie = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/btc-sledovanie", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+    }),
+  );
+
 const fioBanka = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/fio", {
@@ -333,6 +343,10 @@ export default {
     // Banka PRED rannou dávkou, aby notifikácie ráno nehlásili „výdavky
     // chýbajú" nad stavom zo včera. Vlastný spúšťač — ťažká práca patrí do
     // vlastnej požiadavky (limit CPU, 29. 8. 2026).
+    if (event.cron === "7,37 * * * *") {
+      ctx.waitUntil(ohlas(env, "btc-sledovanie", btcSledovanie(env)));
+      return;
+    }
     if (event.cron === "10 4 * * *") {  // 06:10 v lete, 05:10 v zime
       ctx.waitUntil(ohlas(env, "fio-banka", fioBanka(env)));
       return;
@@ -473,6 +487,14 @@ export default {
         out.push(`${akcia}: ${r.status} ${(await r.text()).slice(0, 200)}`);
       }
       return new Response(out.join("\n"), { status: 200 });
+    }
+    if (q.get("btc") === "1") {
+      let text = "";
+      await ohlas(env, "btc-sledovanie", btcSledovanie(env).then(async (r) => {
+        text = `${r.status} ${(await r.clone().text()).slice(0, 400)}`;
+        return r;
+      }));
+      return new Response(`BTC: ${text}`, { status: 200 });
     }
     // `?fio=1` stiahne pohyby z banky hneď — a zapíše beh do Zdravia Kokpitu
     // rovnako ako nočný, aby overenie nebolo len v konzole.

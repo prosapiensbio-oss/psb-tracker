@@ -115,12 +115,11 @@ describe("zdieľanie bežiaceho dopytu", () => {
     await f.pust();
   });
 
-  it("automatický import a balíčky pri štarte pamäť nezhodia; zmenu hlási volajúci cez oznam", async () => {
+  it("automatické balíčky pri štarte pamäť nezhodia; zmenu hlási volajúci cez oznam", async () => {
     const f = falosny();
     const z = vytvorZdielanie(f.fetch, { zdielane: zoznam });
     void z.fetch("/api/a");
     await f.pust();
-    void z.fetch("/api/platby", { method: "POST", body: JSON.stringify({ akcia: "btc-import", platby: [] }) });
     void z.fetch("/api/balicky", { method: "POST", body: JSON.stringify({ akcia: "automaticky" }) });
     await f.pust();
     void z.fetch("/api/a");
