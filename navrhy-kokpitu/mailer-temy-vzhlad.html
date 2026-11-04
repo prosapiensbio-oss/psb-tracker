@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mailer témy a vzhľad</title>
+<style>
+:root{--bg:#1a1e16;--card:#252b1f;--card2:#2d3426;--line:#6b8c4240;--text:#e0dcc8;--muted:#aaa995;--dim:#90927b;--acc:#d89a62;--light:#95c45a;--green:#8fbe52;--orange:#d4a04a;--red:#d0705a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--light)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+header.top{position:sticky;top:0;z-index:5;background:#1a1e16f2;border-bottom:1px solid var(--line)}
+header .in{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+header b{margin-right:10px}
+.tab{background:none;border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#231a10}
+section{display:none;padding-top:26px}section.on{display:block}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px}h2{font-size:20px;margin:30px 0 8px}h3{font-size:15px;margin:0 0 5px}
+p{margin:0 0 12px;max-width:780px}.mut{color:var(--muted)}.dim{color:var(--dim);font-size:13px}
+.lead{background:var(--card2);border-left:4px solid var(--acc);border-radius:0 12px 12px 0;padding:14px 16px;margin:0 0 18px;max-width:880px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table.t{border-collapse:collapse;width:100%;min-width:680px;font-size:13.5px}
+.t th,.t td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+.t th{color:var(--muted);font-weight:600;background:var(--card)}
+.t tr:last-child td{border-bottom:0}
+.t td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ok{color:var(--green);font-weight:600}.po{color:var(--orange);font-weight:600}.no{color:var(--red);font-weight:600}
+ul.c,ol.c{margin:0;padding-left:20px}ul.c li,ol.c li{margin-bottom:6px}
+.pil{display:inline-block;padding:2px 8px;border-radius:7px;font-size:12px;font-weight:700;white-space:nowrap;background:var(--card2)}
+.pP{color:#e6b070}.pK{color:#95c45a}.pZ{color:#8fc7c9}.pM{color:#d9a0c2}.pN{color:#e0d27a}
+.letters{display:flex;gap:8px;margin:0 0 14px}
+.let{width:64px;height:64px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--text);font-family:inherit;font-size:30px;font-weight:800;cursor:pointer}
+.let.on{background:var(--acc);border-color:var(--acc);color:#231a10}
+.reko{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;color:#231a10;background:var(--green);padding:3px 8px;border-radius:7px;vertical-align:middle}
+.zar{display:grid;grid-template-columns:minmax(0,640px) 372px;gap:18px;align-items:start;margin-top:12px}
+@media(max-width:1090px){.zar{grid-template-columns:minmax(0,1fr)}}
+.zn{font-size:12px;color:var(--dim);margin:0 0 6px}
+iframe.mail{display:block;width:100%;border:1px solid var(--line);border-radius:12px;background:#fff}
+.tel{width:372px;max-width:100%;border:6px solid #33392a;border-radius:28px;overflow:hidden;background:#fff}
+.tel iframe{display:block;width:100%;border:0}
+.quote{background:#fbfaf5;color:#1a2e24;border-radius:10px;padding:12px 14px;font-size:14px;margin:6px 0 10px;max-width:760px}
+.quote ins{text-decoration:none;background:#cfe6b0;padding:0 2px}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+<b>Mailer</b>
+<button class="tab on" data-s="s1">1 Dohodnuté</button>
+<button class="tab" data-s="s2">2 O čom písať</button>
+<button class="tab" data-s="s3">3 Plán 24 mailov</button>
+<button class="tab" data-s="s4">4 Vzhľad A–C</button>
+<button class="tab" data-s="s5">5 Formuláre a adresa</button>
+<button class="tab" data-s="s6">6 Čo potrebujem</button>
+</div></header>
+<div class="wrap">
+
+<section id="s1" class="on">
+<h1>Ako som ťa pochopil</h1>
+<div class="lead"><b>Oprava čísla:</b> 2 maily mesačne je <b>24 ročne</b>, nie vyše 100. Sto by bolo až pri dvoch týždenne. A každý človek by navyše nedostal všetkých 24, lebo idú rôznym skupinám. Na začiatok navrhujem <b>1 mail mesačne</b>, po troch mesiacoch vyhodnotiť a až potom ísť na 2.</div>
+<div class="scroll"><table class="t">
+<tr><th>Tvoj bod</th><th>Čo z toho postavím</th><th>Stav</th></tr>
+<tr><td>Štyri kroky, začiatok návrhom od Kokpitu</td><td>Kokpit navrhne komu a prečo, potom Nápad, Návrh, Skupina, Odoslanie</td><td class="ok">Rozhodnuté</td></tr>
+<tr><td>Odoslanie len po kliknutí</td><td>Skupiny sa počítajú samy, žiadny mail neodíde sám</td><td class="ok">Rozhodnuté</td></tr>
+<tr><td>Nie text na bielom pozadí</td><td>Vlastná šablóna PSB, tri návrhy v záložke 4</td><td class="po">Vyber vzhľad</td></tr>
+<tr><td>Zadefinovať témy</td><td>5 druhov mailov z tvojich dát a konkrétnych 24 tém, záložky 2 a 3</td><td class="po">Skontroluj</td></tr>
+<tr><td>Súhlas odoslaním vo Forminatore</td><td>Veta pri tlačidle na všetkých formulároch dokumentov, záložka 5</td><td class="po">Potvrď text</td></tr>
+<tr><td>Test postury aj na newsletter</td><td>Doplniť do tej istej vety pri odoslaní, záložka 5</td><td class="po">Potvrď text</td></tr>
+<tr><td>Označenie a odhlásenie viditeľne</td><td>Hneď navrchu mailu aj v päte, odhlásenie jedným klikom</td><td class="ok">Je vo všetkých vzhľadoch</td></tr>
+<tr><td>Odpoveď sa nesmie tváriť ako dopyt</td><td>Odpovede chodia na inú adresu než info@, Kokpit ich zobrazí pri mailovej kampani. Z odpovede spraví dopyt len tlačidlo</td><td class="ok">Rozhodnuté</td></tr>
+<tr><td>Špeciálna adresa</td><td>Napríklad filip@news.prosapiens.cz a terezka@news.prosapiens.cz, faktúry ostávajú na info@</td><td class="po">Potvrď názov</td></tr>
+</table></div>
+<p class="dim" style="margin-top:10px">Z predošlého návrhu ostáva: brzda 14 dní na človeka, nezaškrtnutý newsletter v anamnéze a odhlásení sú vynechaní, označenie „nechce maily" pri klientovi. Na tvoju odpoveď ešte čakajú anamnéza a meno klientky, ktorá maily nechce. Prvý mail pre 8 ľudí po jednom tréningu tiež ešte nie je potvrdený.</p>
+</section>
+
+<section id="s2">
+<h1>O čom sa oplatí písať</h1>
+<div class="lead"><b>Záver:</b> ľudia sa zaujímajú o <b>konkrétny problém vo vlastnom tele</b> a ďalej posielajú <b>príbehy klientov</b>. Abstraktná téma bez problému sa číta najmenej. Tém máš na roky, na webe je 47 článkov a 5 videí klientov.</div>
+
+<h2>Čo hovoria tvoje dáta</h2>
+<div class="g2">
+<div class="box"><h3>S čím ľudia prichádzajú</h3><p class="mut" style="margin:0 0 6px">53 dopytov s poznámkou, jeden môže spadať do viacerých:</p><ul class="c mut"><li><b>Bolesť</b> 23</li><li><b>Chrbát a krk</b> 17</li><li><b>Rameno a lopatka</b> 11</li><li><b>Koleno</b> 8, <b>kyčeľ a panva</b> 8</li><li><b>Držanie tela</b> 6</li></ul></div>
+<div class="box"><h3>Čo hľadajú na Googli</h3><p class="mut" style="margin:0 0 6px">Najnavštevovanejšie články z vyhľadávania:</p><ul class="c mut"><li>Čo je Functional Patterns: 283 klikov</li><li>Kolená padajúce dovnútra: 202</li><li>Anatomické vlaky: 174</li><li>Odstávajúce lopatky: 173</li><li>Panva, predsunutá hlava, rib flare: 104 až 118</li></ul></div>
+<div class="box"><h3>Čo ľudia posielajú ďalej na Instagrame</h3><ul class="c mut" style="margin-top:6px"><li>Príbeh „Nebolelo to tak...": <b>13 zdieľaní</b></li><li>„Nejvíc si vážím přístupu": 12</li><li>Jarek, „Nebyla to láska": 8</li><li>„Fyzioterapie funguje": 8</li></ul><p class="dim" style="margin:6px 0 0">Príbehy jednoznačne vedú.</p></div>
+<div class="box"><h3>Čo si ľudia ukladajú a komentujú</h3><ul class="c mut" style="margin-top:6px"><li>Bránica: 9 uložení</li><li>Stres a držanie tela: 6</li><li>Ťahá medzi lopatkami: 5</li><li>Sila, mobilita, stabilita: <b>11 komentárov</b></li></ul><p class="dim" style="margin:6px 0 0">Vysvetlenie sa ukladá, spor sa komentuje. Počty sú malé, ber to ako smer.</p></div>
+</div>
+<div class="box" style="margin-top:12px"><h3>Čo hovoria tvoje predošlé maily a knihy</h3><p class="mut" style="margin:0">Najviac klikov mal mail s darčekom (Biohacking, 7,1 %), najmenej všeobecné témy (0,7 %). Darček teda funguje, preto je medzi novinkami aj Protokol MFR. V knihe StoryBrand je pomer <b>3 užitočné maily na 1 ponuku</b> a odporúča sa zbierať príbehy „predtým a potom". Na to isté ukazujú tvoje zdieľania.</p></div>
+
+<h2>Päť druhov mailov</h2>
+<div class="scroll"><table class="t">
+<tr><th>Druh</th><th>Otázka, na ktorú odpovedá</th><th>Prečo ho máme</th><th class="n">Z 24</th></tr>
+<tr><td><span class="pil pP">Prečo ťa to bolí</span></td><td>„Kolená mi idú dovnútra, prečo?"</td><td>Sedí na dopyty aj Google, je najbližšie k rozhodnutiu prísť</td><td class="n">6</td></tr>
+<tr><td><span class="pil pK">Príbeh klienta</span></td><td>„Pomohlo to niekomu ako ja?"</td><td>Najviac zdieľaní. Len so súhlasom a skutočnými vetami</td><td class="n">5</td></tr>
+<tr><td><span class="pil pZ">Zaujímavosť z tela</span></td><td>„To som nevedel"</td><td>Fascie, bránica, mechanotransdukcia. Ľudia si to ukladajú</td><td class="n">4</td></tr>
+<tr><td><span class="pil pM">Mýtus</span></td><td>„Plank mi nepomohol, prečo?"</td><td>Vyvoláva reakciu a odpovede</td><td class="n">3</td></tr>
+<tr><td><span class="pil pN">Novinka alebo ponuka</span></td><td>„Čo si z toho môžem vziať?"</td><td>Služba, darček, termíny. Najviac 1 zo 4 mailov</td><td class="n">6</td></tr>
+</table></div>
+
+<h2>Pravidlá každého mailu</h2>
+<ol class="c mut">
+<li><b>Jedna myšlienka a jeden odkaz.</b> Mail nie je článok, má človeka zaujať a poslať ďalej.</li>
+<li><b>Začať konkrétne:</b> čo sa stalo jednému človeku alebo čo človek cíti v tele, až potom mechanizmus. Rovnaký zákon, aký je v tvojom textárovi.</li>
+<li><b>Text nevzniká od nuly.</b> Vychádza z článku alebo príbehu, ktorý už máš, takže jeden mail neznamená večer písania.</li>
+<li><b>Bez dôvodu sa neposiela.</b> Keď v danom mesiaci nemáš čo povedať, mail vynecháme. Plán je zásobník, nie povinnosť.</li>
+</ol>
+</section>
+
+<section id="s3">
+<h1>Plán na 24 mailov</h1>
+<p class="mut">Pri 1 maile mesačne vystačí na dva roky, pri 2 mesačne na jeden. Poradie sa dá meniť, je to zásobník. Texty sa pripravia až pred odoslaním. Skupinu navrhnem podľa témy pri každom maile.</p>
+<div class="scroll"><table class="t" id="plan"></table></div>
+<p class="dim" style="margin-top:9px">Čísla sú kliky z Googlu alebo zdieľania na Instagrame. Pri príbehoch treba pred mailom overiť súhlas klienta s použitím v maili. Videá Akisa, Jareka, Michala, Natálie a Tomáša sú už na webe, to však neznamená súhlas s mailom. Pri ponuke služby treba overiť, či ju v tom čase naozaj predávaš.</p>
+</section>
+
+<section id="s4">
+<h1>Ako by mal vyzerať mail</h1>
+<p class="mut">Je to skutočné HTML mailu s reálnym článkom a fotkami z webu. Agrandir sa zobrazí len v časti poštových appiek, Gmail a Outlook ukážu náhradné písmo. Preto vzhľad nestojí na písme, ale na farbách a stavbe. Mail vždy obsahuje text, aby dával zmysel aj pri zablokovaných obrázkoch.</p>
+<div class="letters"><button class="let on" data-m="A">A</button><button class="let" data-m="B">B</button><button class="let" data-m="C">C</button></div>
+<h2 id="mNazov" style="margin-top:4px"></h2>
+<p class="mut" id="mPopis"></p>
+<div class="zar">
+<div><p class="zn">Počítač</p><iframe class="mail" id="mPC" title="Mail na počítači" height="980"></iframe></div>
+<div><p class="zn">Telefón</p><div class="tel"><iframe id="mTel" title="Mail na telefóne" height="980"></iframe></div></div>
+</div>
+<h2>Ostatné druhy v návrhu A</h2>
+<p class="mut">Rám ostáva rovnaký, mení sa len vnútro. Tak každý mail spoznáš ako PSB a nemusíš nič kresliť.</p>
+<div class="g2">
+<div><p class="zn">Príbeh klienta</p><iframe class="mail" id="mK" title="Príbeh klienta" height="840"></iframe></div>
+<div><p class="zn">Novinka alebo ponuka</p><iframe class="mail" id="mN" title="Novinka" height="840"></iframe></div>
+</div>
+</section>
+
+<section id="s5">
+<h1>Formuláre a adresa</h1>
+<h2 style="margin-top:0">Texty na web</h2>
+<p class="mut">Pri 11 krátkych formulároch na dokumenty dnes pri tlačidle nestojí nič. Web na formulároch vyká, preto aj tieto vety. Samotné maily sú s tykaním, ako si rozhodol.</p>
+<p><b>Dokumenty</b> (Protokol, dýchanie, ďalšie dokumenty), malým písmom pod tlačidlom:</p>
+<div class="quote"><ins>Odesláním souhlasíte se zasíláním e-mailů od ProSapiens Biomechanic o tréninku a pohybu. Odhlásit se můžete jedním klikem přímo v každém e-mailu.</ins></div>
+<p><b>Test postury</b>, namiesto dnešnej vety:</p>
+<div class="quote">Odesláním souhlasíte se zpracováním osobních údajů za účelem kontaktování <ins>a se zasíláním e-mailů od ProSapiens Biomechanic o tréninku a pohybu. Odhlásit se můžete jedním klikem přímo v každém e-mailu.</ins> Data neposkytneme třetím stranám.</div>
+<div class="box" style="margin-top:14px"><h3 class="po">Riziko tvojej voľby, nech o ňom vieš</h3><p class="mut" style="margin:0">Súhlas odoslaním prinesie viac kontaktov a je jednoduchý. Slabina je, že dokument ani test sa bez súhlasu nedajú získať a súhlas nie je zvlášť. Podľa GDPR má byť súhlas slobodný a takéto spojenie môže úrad spochybniť. Bezpečnejšie je samostatné nezaškrtnuté políčko, ale prinesie menej kontaktov. Ide o obchodné a právne rozhodnutie, nie technické, a <b>nie som právnik</b>. Odporúčam túto vetu dať pred ostrým odoslaním skontrolovať.</p></div>
+<div class="box" style="margin-top:10px"><h3>Čo sa pri tom zmení v Kokpite</h3><ul class="c mut" style="margin-bottom:0"><li>Ku každému novému kontaktu sa uloží <b>dátum, stránka a presné znenie vety</b>, inak súhlas nevieš preukázať.</li><li>Dopytový formulár na úvodný tréning sa nemení.</li><li>Staré kontakty (13 z dokumentov, 3 z testu postury) ostávajú bez súhlasu, veta platí len dopredu.</li></ul></div>
+
+<h2>Špeciálna adresa a odpovede</h2>
+<div class="scroll"><table class="t">
+<tr><th></th><th>Návrh</th><th>Prečo</th></tr>
+<tr><td>Odosielateľ</td><td><b>filip@news.prosapiens.cz</b><br><b>terezka@news.prosapiens.cz</b></td><td>Keby kampaň označili ako spam, nedotkne sa to faktúr ani info@. Klient Terezky dostane mail od Terezky.</td></tr>
+<tr><td>Odoslanie</td><td>Resend cez Kokpit</td><td>Marketingový plán je zdarma do 1 000 kontaktov, máš ich 561.</td></tr>
+<tr><td>Odpoveď</td><td>Na rovnakú adresu, Kokpit ju dostane cez Resend</td><td>Čítanie dopytov z info@ ju vôbec neuvidí, takže sa nemôže tváriť ako dopyt. Bude pri kampani a príde ti upozornenie.</td></tr>
+<tr><td>Z odpovede dopyt</td><td>Tlačidlo „Urobiť z toho dopyt"</td><td>Keď niekto v odpovedi naozaj chce tréning, rozhodneš ty.</td></tr>
+</table></div>
+<p class="dim" style="margin-top:9px">Prijímanie mailov v Resende som overil v dokumentácii, nie je tam však napísané, či je v bezplatnom pláne. Overím to pri zakladaní. Keby nebolo, náhradou je samostatná schránka na Websupporte. Účet v Resende založíš ty, heslo ani kľúč nezadávam. Pri nastavení domény na Websupporte ťa prevediem po riadkoch.</p>
+</section>
+
+<section id="s6">
+<h1>Čo potrebujem od teba</h1>
+<div class="scroll"><table class="t">
+<tr><th>#</th><th>Otázka</th><th>Odporúčam</th></tr>
+<tr><td>1</td><td><b>Ktorý vzhľad?</b> A, B, C alebo kombinácia</td><td>A: nadväzuje na stránky, ktoré klienti poznajú zo SMS, a funguje aj bez fotky</td></tr>
+<tr><td>2</td><td><b>Sedia témy a pomer?</b> Niečo vyhodiť alebo pridať?</td><td>Áno, zásobník je stavaný z tvojich dát</td></tr>
+<tr><td>3</td><td><b>1 mail mesačne na začiatok?</b></td><td>Áno, po 3 mesiacoch vyhodnotiť</td></tr>
+<tr><td>4</td><td><b>Mám dať tie dve vety na web?</b> Súhlas odoslaním, alebo políčko?</td><td>Tvoju verziu po krátkej kontrole právnikom, alebo políčko, keď nechceš čakať</td></tr>
+<tr><td>5</td><td><b>Názov adresy</b> news.prosapiens.cz je v poriadku?</td><td>Áno</td></tr>
+<tr><td>6</td><td><b>Nezaškrtnutý newsletter v anamnéze</b> (30 klientov) brať ako „nepísať"?</td><td>Áno</td></tr>
+<tr><td>7</td><td><b>Kto bola klientka,</b> ktorá nechce maily?</td><td>Napíš meno</td></tr>
+<tr><td>8</td><td><b>Prvý mail?</b> Otázka 8 ľuďom po jednom tréningu, alebo mail o kolenách?</td><td>Otázka 8 ľuďom. Malá skupina, žiadne riziko a skúsime na nej celý postup</td></tr>
+</table></div>
+<p class="mut" style="margin-top:14px">Stačí napríklad: „vzhľad A, témy ok, 1 mesačne, veta áno, news áno, anamnéza áno, klientka X, prvý otázka". Potom to postavím v bete.</p>
+<p class="dim">Zdroje o súhlase: <a href="https://www.zakonyprolidi.cz/cs/2004-480">zákon 480/2004 Sb.</a>. Doručovanie a príjem: <a href="https://resend.com/pricing">Resend cenník</a>, <a href="https://resend.com/docs/dashboard/receiving/introduction">Resend prijímanie</a>. Dáta sú z ostrého Kokpitu k 4. 11. 2026.</p>
+</section>
+</div>
+
+<script>
+const IMG='https://www.prosapiens.cz/wp-content/themes/psb-spready/img/';
+const LOGO='https://kokpit.prosapiensbio.workers.dev/znacka-napis-mail.png';
+const FONT='<style>@font-face{font-family:Agrandir;src:url(https://kokpit.prosapiensbio.workers.dev/agrandir.woff2) format("woff2");font-weight:100 900}body{margin:0}a{color:inherit}@media(max-width:480px){.h1{font-size:27px!important}.pad{padding-left:20px!important;padding-right:20px!important}}</style>';
+const SANS="'Open Sans',Arial,Helvetica,sans-serif", HEAD="Agrandir,'Helvetica Neue',Arial,sans-serif";
+const kraj=(farba,odkaz)=>`<div style="font:12px/1.5 ${SANS};color:${farba};text-align:center;padding:9px 16px">Obchodní sdělení ProSapiens Biomechanic · <a href="#" style="color:${odkaz};font-weight:700">Odhlásit se jedním klikem</a></div>`;
+const pata=(farba,odkaz)=>`<div style="font:12px/1.6 ${SANS};color:${farba};text-align:center;padding:20px 24px 26px">Mgr. Filip Stráňavský, ProSapiens Biomechanic, Brno<br>Tento e-mail dostáváš kvůli staženému dokumentu nebo tréninku u nás. <a href="#" style="color:${odkaz};font-weight:700">Odhlásit se jedním klikem</a></div>`;
+const tlac=(text,bg,fg)=>`<a href="#" style="display:inline-block;background:${bg};color:${fg};text-decoration:none;font:700 15px/1 ${SANS};padding:15px 26px;border-radius:32px">${text}</a>`;
+const obal=(bg,vnutro)=>`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${FONT}</head><body style="background:${bg}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg}"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px"><tr><td>${vnutro}</td></tr></table></td></tr></table></body></html>`;
+const PRE='Možná to bereš jako detail. Nebo si myslíš, že tak prostě chodíš. Jenže nohy do X nejsou náhoda ani vrozená vlastnost.';
+const zn=[ 'Při běhu nebo na schodech ti kolena jdou dovnitř.','Ve stoje těžko hledáš stabilitu.','Po delší chůzi cítíš tlak na vnitřní straně kolene nebo na kotnících.'];
+const PO='Když nedrží pánev a kyčle, koleno uhýbá dovnitř. Když se zhroutí chodidlo, koleno ho následuje. Proto samotné posilování kolen problém neřeší.';
+const hlava=`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#1A2E24"><tr><td class="pad" style="padding:24px 32px 22px"><img src="${LOGO}" width="170" alt="ProSapiens Biomechanic" style="display:block;width:170px;height:auto">`;
+const oblouk=`<div style="height:24px;background:#1A2E24"><div style="height:24px;background:#F6F3EA;border-radius:24px 24px 0 0"></div></div>`;
+const podpis=(c)=>`<p style="margin:24px 0 0;font:15px/1.6 ${SANS};color:${c}">Stačí odpovědět na tenhle mail, přečtu si to sám.<br><b>Filip</b></p>`;
+
+const A=obal('#E9E5D8',
+ kraj('#5B6B60','#2D7D5A')+
+ `<div style="border-radius:18px 18px 0 0;overflow:hidden">`+hlava+
+ `<div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#9FBCA9;margin-top:24px">PROČ TĚ TO BOLÍ</div>
+ <div class="h1" style="font:700 32px/1.14 ${HEAD};color:#fff;margin-top:10px">Kolena ti utíkají dovnitř? Problém často začíná jinde.</div></td></tr></table>`+oblouk+`</div>
+ <div class="pad" style="background:#F6F3EA;padding:8px 32px 30px;color:#1A2E24;font:16px/1.65 ${SANS}">
+ <p style="margin:0 0 18px">Ahoj Martine,<br>${PRE}</p>
+ <div style="background:#E3EADB;border-radius:14px;padding:16px 18px;margin-bottom:20px"><div style="font:700 14px/1.3 ${SANS};color:#2D7D5A;margin-bottom:8px">Jak poznáš, že se to týká i tebe</div>${zn.map(x=>`<div style="padding:4px 0 4px 18px;font-size:15px;line-height:1.5"><span style="color:#2D7D5A;font-weight:700;margin-left:-18px;display:inline-block;width:18px">✓</span>${x}</div>`).join('')}</div>
+ <div style="border-left:4px solid #2D7D5A;padding:2px 0 2px 16px;font:700 22px/1.25 ${HEAD};margin-bottom:18px">Koleno není viník. Koleno je posel, který hlásí problém jinde.</div>
+ <p style="margin:0 0 22px">${PO}</p>${tlac('Přečíst celý článek','#2D7D5A','#fff')}${podpis('#3C4C42')}</div>
+ <div style="background:#1A2E24;border-radius:0 0 18px 18px">${pata('#9FBCA9','#fff')}</div><div style="height:18px"></div>`);
+
+const B=obal('#F6F3EA',
+ kraj('#5B6B60','#2D7D5A')+
+ `<div class="pad" style="padding:8px 32px 18px;font:700 13px/1 ${SANS};letter-spacing:3.4px;color:#1A2E24;text-align:center">PROSAPIENS BIOMECHANIC</div>
+ <img src="${IMG}adjust.jpg" alt="Trenér koriguje postavení klienta" width="600" style="display:block;width:100%;height:auto">
+ <div class="pad" style="padding:28px 32px 34px;color:#1A2E24;font:17px/1.7 Georgia,'Times New Roman',serif">
+ <div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#2D7D5A">PROČ TĚ TO BOLÍ</div>
+ <div class="h1" style="font:700 38px/1.08 ${HEAD};margin:12px 0 18px">Kolena ti utíkají dovnitř?</div>
+ <p style="margin:0 0 16px">Ahoj Martine,<br>${PRE}</p>
+ <p style="margin:0 0 6px;font-weight:700">Jak poznáš, že se to týká i tebe:</p>
+ ${zn.map((x,i)=>`<p style="margin:0 0 7px"><span style="color:#2D7D5A;font-weight:700">${i+1}.</span> ${x}</p>`).join('')}
+ <div style="border-top:2px solid #1A2E24;border-bottom:2px solid #1A2E24;padding:18px 0;margin:22px 0;font:700 26px/1.2 ${HEAD};text-align:center">Koleno není viník. Koleno je posel.</div>
+ <p style="margin:0 0 24px">${PO}</p><div style="text-align:center">${tlac('Přečíst celý článek','#1A2E24','#fff')}</div>${podpis('#3C4C42')}</div>
+ <div style="border-top:1px solid #D5D1C2">${pata('#5B6B60','#2D7D5A')}</div>`);
+
+const C=obal('#1A2E24',
+ kraj('#9FBCA9','#fff')+
+ `<div class="pad" style="padding:6px 28px 20px;text-align:center"><img src="${LOGO}" width="170" alt="ProSapiens Biomechanic" style="width:170px;height:auto"></div>
+ <div style="margin:0 12px;background:#F6F3EA;border-radius:22px;overflow:hidden">
+ <div style="background:#D89A62;padding:9px 24px;font:700 12px/1.2 ${SANS};letter-spacing:2px;color:#231a10">PROČ TĚ TO BOLÍ</div>
+ <div class="pad" style="padding:26px 26px 30px;color:#1A2E24;font:16px/1.65 ${SANS}">
+ <div class="h1" style="font:700 31px/1.12 ${HEAD};margin-bottom:16px">Kolena ti utíkají dovnitř? Problém často začíná jinde.</div>
+ <p style="margin:0 0 18px">Ahoj Martine,<br>${PRE}</p>
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px"><tr><td style="background:#1A2E24;border-radius:14px;padding:18px 20px;color:#fff;font:700 21px/1.25 ${HEAD}">Koleno není viník. Koleno je posel, který hlásí problém jinde.</td></tr></table>
+ <div style="font:700 14px/1.3 ${SANS};margin-bottom:6px">Jak poznáš, že se to týká i tebe</div>${zn.map(x=>`<div style="padding:5px 0;border-bottom:1px solid #DCD8C9;font-size:15px;line-height:1.45">${x}</div>`).join('')}
+ <p style="margin:18px 0 22px">${PO}</p>${tlac('Přečíst celý článek','#D89A62','#231a10')}${podpis('#3C4C42')}</div></div>
+ ${pata('#9FBCA9','#fff')}`);
+
+const K=obal('#E9E5D8',kraj('#5B6B60','#2D7D5A')+`<div style="border-radius:18px 18px 0 0;overflow:hidden">`+hlava+
+ `<div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#9FBCA9;margin-top:24px">PŘÍBĚH KLIENTA</div><div class="h1" style="font:700 30px/1.14 ${HEAD};color:#fff;margin-top:10px">„Nebyla to láska na první pohled."</div></td></tr></table>`+oblouk+`</div>
+ <div class="pad" style="background:#F6F3EA;padding:8px 32px 30px;color:#1A2E24;font:16px/1.65 ${SANS}">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="130" valign="top" style="padding-right:16px"><img src="${IMG}yt-nCjbWt7IsIs.jpg" alt="Jarek" width="130" style="display:block;width:130px;border-radius:14px"></td><td valign="top"><p style="margin:0">Jarek přišel s bolestí zad. Ne proto, že by málo cvičil. Ale proto, že cvičil špatně.</p><p style="margin:12px 0 0">Dvě hodiny denně. Posilovna, běh, kompenzační cviky.</p></td></tr></table>
+ <p style="margin:20px 0 22px">Celý příběh si můžeš pustit na videu.</p>${tlac('Pustit Jarkův příběh','#2D7D5A','#fff')}${podpis('#3C4C42')}</div><div style="background:#1A2E24;border-radius:0 0 18px 18px">${pata('#9FBCA9','#fff')}</div><div style="height:18px"></div>`);
+
+const N=obal('#E9E5D8',kraj('#5B6B60','#2D7D5A')+`<div style="border-radius:18px 18px 0 0;overflow:hidden">`+hlava+
+ `<div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#9FBCA9;margin-top:24px">PRO TEBE</div><div class="h1" style="font:700 30px/1.14 ${HEAD};color:#fff;margin-top:10px">Test postury zdarma</div></td></tr></table>`+oblouk+`</div>
+ <div class="pad" style="background:#F6F3EA;padding:8px 32px 30px;color:#1A2E24;font:16px/1.65 ${SANS}"><p style="margin:0 0 16px">Ahoj Martine,<br>možná nevíš, kde začít. Proto jsme na webu připravili krátký test. Odpovíš na pár otázek a my ti pošleme analýzu.</p>
+ <div style="background:#E3EADB;border-radius:14px;padding:16px 18px;margin-bottom:22px;font-size:15px"><b>Co dostaneš:</b> analýzu e-mailem. Pokud budeš chtít, tak i krátký hovor.</div>${tlac('Spustit test postury','#2D7D5A','#fff')}${podpis('#3C4C42')}</div><div style="background:#1A2E24;border-radius:0 0 18px 18px">${pata('#9FBCA9','#fff')}</div><div style="height:18px"></div>`);
+
+const NAVRHY={A:{h:A,n:'A · Zelená hlavička <span class="reko">odporúčam</span>',p:'Rovnaká tmavozelená hlavička s oblúkom ako stránky, ktoré klienti poznajú zo SMS. Teplé krémové telo. Výrazná veta a rámček na spoznanie sa. Funguje aj bez fotky.'},
+B:{h:B,n:'B · Časopis',p:'Veľká fotka z tréningu, článkové písmo, veľký nadpis. Najviac pôsobí ako odborný časopis. Slabina: pri zablokovaných obrázkoch stratí to najsilnejšie a potrebuje dobrú fotku ku každému mailu.'},
+C:{h:C,n:'C · Karta na zelenom',p:'Celé pozadie je zelené a text je na krémovej karte s oranžovým pásom. Najvýraznejšie v schránke. Slabina: najviac sa podobá reklame a v tmavom režime ho appka môže prefarbiť.'}};
+function ukaz(k){const n=NAVRHY[k];document.getElementById('mNazov').innerHTML=n.n;document.getElementById('mPopis').textContent=n.p;document.getElementById('mPC').srcdoc=n.h;document.getElementById('mTel').srcdoc=n.h;document.querySelectorAll('.let').forEach(b=>b.classList.toggle('on',b.dataset.m===k))}
+document.querySelectorAll('.let').forEach(b=>b.onclick=()=>ukaz(b.dataset.m));
+const vyska=f=>{try{f.height=f.contentDocument.documentElement.scrollHeight+2}catch(e){}};
+document.querySelectorAll('iframe').forEach(f=>f.addEventListener('load',()=>{vyska(f);[...f.contentDocument.images].forEach(i=>i.addEventListener('load',()=>vyska(f)));setTimeout(()=>vyska(f),500)}));
+ukaz('A');document.getElementById('mK').srcdoc=K;document.getElementById('mN').srcdoc=N;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.s));document.querySelectorAll('section.on iframe').forEach(vyska);window.scrollTo(0,0)});
+
+const DR={P:'Prečo ťa to bolí',K:'Príbeh klienta',Z:'Zaujímavosť',M:'Mýtus',N:'Novinka, ponuka'};
+const PLAN=[
+['P','Kolená padajúce dovnútra','článok, 202 klikov'],['K','Jarek: „Nebyla to láska na první pohled"','video, 8 zdieľaní'],['Z','Bránica nie je len nádych a výdych','príspevok, 9 uložení'],['N','Test postury zdarma','stránka testu'],
+['P','Odstávajúce lopatky a ťah medzi lopatkami','článok, 173 klikov'],['M','Prečo plank a sklapovačky nevyriešili chrbát','video, 5 uložení'],['K','„Nebolelo to tak, aby se muselo přestat"','video, 13 zdieľaní'],['N','Darček: Protokol MFR','dokument, 9 klikov'],
+['P','Predsunutá hlava','článok, 118 klikov'],['Z','Z čoho je fascia a čo robí','článok, 21 klikov'],['M','Fyzioterapia funguje. A prečo to niekedy nestačí','príspevok, 8 zdieľaní'],['N','Odporúčanie: −10 % na ďalší balíček','tvoje pravidlo'],
+['P','Panva naklonená dopredu','článok, 118 klikov'],['K','Michal: „Přišel bez velkých očekávání"','video, 4 zdieľania'],['Z','Mechanotransdukcia: ako sily formujú telo','článok, 65 klikov'],['N','Úvodný tréning: čo presne sa na ňom stane','stránka úvodného'],
+['P','Rib flare: vystrčené rebrá','článok, 104 klikov'],['M','Sila, mobilita, stabilita nestačia','príspevok, 11 komentárov'],['K','Akis: prečo trénuje roky','video, 5 zdieľaní'],['N','Online tréning, ak nie si z Brna','stránka služby'],
+['P','Skolióza je viac než zakrivenie','článok, 72 klikov'],['Z','Biotensegrita jednoducho','článok, 100 klikov'],['K','Natália alebo Tomáš','video na webe'],['N','Voľné termíny, keď sa uvoľní kapacita','podľa kalendára']];
+document.getElementById('plan').innerHTML='<tr><th style="width:42px">#</th><th style="width:170px">Druh</th><th>Téma</th><th>Prečo a z čoho</th></tr>'+PLAN.map((r,i)=>`<tr><td>${i+1}</td><td><span class="pil p${r[0]}">${DR[r[0]]}</span></td><td>${r[1]}</td><td class="mut">${r[2]}</td></tr>`).join('');
+</script>
+</body>
+</html>
