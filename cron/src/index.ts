@@ -51,8 +51,8 @@ const metaReklamy = (env: Env, akcia: "kampane" | "reklamy" | "dozor") =>
  * a P&L bežiaceho mesiaca mal tržby bez nákladov. Appka stiahne posledných
  * 35 dní a zapíše nové pohyby nepotvrdené — potvrdzuje ich Jerry v Banke.
  */
-// Bitcoin: spýta sa Blinku na zaplatené faktúry. Faktúra platí hodinu, tak častejšie
-// než banka. Do platieb nič nezapisuje, tie potvrdzuje človek vo Workspace.
+// Bitcoin: spýta sa Blinku na zaplatené faktúry a obnoví kurz v knihe. Faktúra platí
+// hodinu, tak častejšie než banka. Do platieb nič nezapisuje, tie potvrdzuje človek.
 const btcSledovanie = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/btc-sledovanie", {

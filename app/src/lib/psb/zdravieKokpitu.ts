@@ -62,7 +62,7 @@ export const MENA_AUTOMATOV: Record<string, string> = {
   "meta-reklamy": "Meta — reklamy",
   "meta-dozor": "Meta — dozor",
   "fio-banka": "Banka — pohyby z Fio",
-  "btc-sledovanie": "Bitcoin — zaplatené faktúry",
+  "btc-sledovanie": "Bitcoin — zaplatené faktúry a kurz",
   "balicky-automaticky": "Automatické balíčky",
   "strazca-vyberu": "Strážca výberov (Peniaze manažér)",
 };

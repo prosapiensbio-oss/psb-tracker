@@ -46,7 +46,7 @@ async function podpis(token: string, sprava: string): Promise<string> {
 const KNIHA = "https://btc.prosapiensbio.workers.dev/api/reserve";
 
 /** Kniha väzbou `BTC`, bez prehliadača. `null` = neodpovedala. */
-async function knihaZoServera(): Promise<{ platby: BtcZKnihy[]; bezMena: BtcBezMena[] } | null> {
+export async function knihaZoServera(): Promise<{ platby: BtcZKnihy[]; bezMena: BtcBezMena[]; kurzKedy: string | null } | null> {
   const env = bindings();
   const token = env.BTC_RESERVE_TOKEN;
   if (!token) return null;
@@ -54,8 +54,8 @@ async function knihaZoServera(): Promise<{ platby: BtcZKnihy[]; bezMena: BtcBezM
   const url = `${KNIHA}?exp=${exp}&sig=${await podpis(token, `exp=${exp}`)}&platby=1`;
   const r = env.BTC ? await env.BTC.fetch(new Request(url)) : await fetch(url);
   if (!r.ok) return null;
-  const j = (await r.json()) as { ok?: boolean; platby?: BtcZKnihy[]; platbyBezMena?: BtcBezMena[] };
-  return j.ok === false ? null : { platby: j.platby || [], bezMena: j.platbyBezMena || [] };
+  const j = (await r.json()) as { ok?: boolean; platby?: BtcZKnihy[]; platbyBezMena?: BtcBezMena[]; rateUpdatedAt?: string | null };
+  return j.ok === false ? null : { platby: j.platby || [], bezMena: j.platbyBezMena || [], kurzKedy: j.rateUpdatedAt ?? null };
 }
 
 /** Priradí v knihe platbu bez mena jednému klientovi, alebo ju rozdelí medzi viacerých. */
