@@ -99,7 +99,7 @@ describe("trasy používajú jeden zoznam", () => {
   it("migrácia auditu pozná presne ten istý zoznam", () => {
     const sql = zdroj("migrations/0131_audit_skry_tajomstva.sql");
     // Kľúč pridaný po tej migrácii sa cez `nastavenie` nikdy nezapisoval; v audite nič čitateľné nemá.
-    const novsie = new Set<string>(["metricool_api_token"]);
+    const novsie = new Set<string>(["metricool_api_token", "mail_resend_api_key", "mail_resend_webhook_secret"]);
     for (const k of TAJNE_KLUCE) if (!novsie.has(k)) expect(sql).toContain(`'${k}'`);
   });
   it("prehliadač tajný kľúč zo `settings` nečíta", () => {

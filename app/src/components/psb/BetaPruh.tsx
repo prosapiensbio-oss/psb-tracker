@@ -15,7 +15,7 @@ import { C } from "../../lib/psb/theme";
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  // Workspace celý naostro od 5. 10. 2026 — momentálne sa nič neskúša.
+  { text: "Mailer: štyri kroky a skupiny", tab: "marketing", sub: "mail" },
 ];
 
 /**

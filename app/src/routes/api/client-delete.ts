@@ -129,6 +129,7 @@ export const Route = createFileRoute("/api/client-delete")({
           ...platia.map((p) => DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
             .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).filter((x) => x !== name)))),
           DB.prepare("UPDATE mail_odberatelia SET klient = NULL WHERE klient = ?1").bind(name),
+          DB.prepare("UPDATE mail_prijemcovia SET klient = NULL WHERE klient = ?1").bind(name),
         ];
 
         /**

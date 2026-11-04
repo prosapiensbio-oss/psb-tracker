@@ -263,6 +263,8 @@ je kde pozrieť).
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
+**Postavené 4. 11. 2026, zatiaľ nikde nebeží:** kód je v repe (Marketing → Mailer len v bete, `MailerKroky.tsx`, `mailer.server.ts`, migrácia `0135`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Čaká:** 1. Jerryho slovo na migráciu 0135 a betu; 2. výber darčeka a znenie políčka; 3. účet Resend, kľúč, DNS; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`.
+
 **Rozhodnuté 4. 11. 2026:** návrhy Kokpitu ako vstup + štyri kroky, odoslanie len po kliknutí, označenie a odhlásenie navrchu mailu, špeciálna adresa mimo info@, odpovede sa nesmú tváriť ako dopyty. **Čaká na výber** v `navrhy-kokpitu/mailer-temy-vzhlad.html`: vzhľad mailu A–C, 5 druhov a 24 tém, 1 mail mesačne na začiatok, presné vety pre 11 formulárov a test postury (riziko súhlasu odoslaním vysvetlené), názov adresy, anamnéza, klientka, prvý mail.
 
 **Návrhy 4. 11. 2026 čakajú na Jerryho výber:** `navrhy-kokpitu/mailer.html` (analýza konkurencie, návrhy A–D, skupiny, 12 upozornení, 7 rozhodnutí). Odporúčané C + kroky z A, najviac 1–2 maily mesačne, brzda 14 dní, odosielanie len po kliknutí. **Prvé treba doplniť políčko súhlasu** do formulárov na dokumenty a test postury: dokumenty nemajú žiadnu vetu o súhlase, test len „za účelem kontaktování“, takže nové kontakty sa zatiaľ nedajú osloviť. Nič z toho ešte nie je postavené.

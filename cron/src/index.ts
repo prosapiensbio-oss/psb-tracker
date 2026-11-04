@@ -61,6 +61,16 @@ const btcSledovanie = (env: Env) =>
     }),
   );
 
+// Mailer: len dokončí mail, na ktorý Jerry už klikol. Sám nikdy nič nezačne.
+const mailFronta = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/mailer-vydania", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "fronta" }),
+    }),
+  );
+
 const fioBanka = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/fio", {
@@ -345,6 +355,10 @@ export default {
     // vlastnej požiadavky (limit CPU, 29. 8. 2026).
     if (event.cron === "7,37 * * * *") {
       ctx.waitUntil(ohlas(env, "btc-sledovanie", btcSledovanie(env)));
+      return;
+    }
+    if (event.cron === "20 8 * * *") {
+      ctx.waitUntil(ohlas(env, "mail-fronta", mailFronta(env)));
       return;
     }
     if (event.cron === "10 4 * * *") {  // 06:10 v lete, 05:10 v zime

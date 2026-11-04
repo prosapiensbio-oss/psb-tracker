@@ -16,6 +16,8 @@ export const TAJNE_KLUCE = [
   "gads_dev_token",
   "google_sa",
   "mail_heslo",
+  "mail_resend_api_key",
+  "mail_resend_webhook_secret",
   "mailer_token",
   "meta_capi_token",
   "meta_token",

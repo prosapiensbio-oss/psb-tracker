@@ -108,6 +108,7 @@ const TABULKY: Tabulka[] = [
   { tab: "editor_navrhy", stlpec: "klient" },
   // Mailový zoznam: `klient` je spárované meno z Kokpitu (27. 10. 2026).
   { tab: "mail_odberatelia", stlpec: "klient" },
+  { tab: "mail_prijemcovia", stlpec: "klient" },
 ];
 
 /**

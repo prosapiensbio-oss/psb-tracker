@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as TTokenRouteImport } from './routes/t.$token'
+import { Route as MTokenRouteImport } from './routes/m.$token'
 import { Route as KTokenRouteImport } from './routes/k.$token'
 import { Route as FTokenRouteImport } from './routes/f.$token'
 import { Route as DTokenRouteImport } from './routes/d.$token'
@@ -63,7 +64,10 @@ import { Route as ApiMetaMediaRouteImport } from './routes/api/meta-media'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
+import { Route as ApiMailerVydaniaRouteImport } from './routes/api/mailer-vydania'
 import { Route as ApiMailerRouteImport } from './routes/api/mailer'
+import { Route as ApiMailUdalostiRouteImport } from './routes/api/mail-udalosti'
+import { Route as ApiMailPrihlaskaRouteImport } from './routes/api/mail-prihlaska'
 import { Route as ApiMailDopytyRouteImport } from './routes/api/mail-dopyty'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
@@ -135,6 +139,11 @@ const UTokenRoute = UTokenRouteImport.update({
 const TTokenRoute = TTokenRouteImport.update({
   id: '/t/$token',
   path: '/t/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MTokenRoute = MTokenRouteImport.update({
+  id: '/m/$token',
+  path: '/m/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KTokenRoute = KTokenRouteImport.update({
@@ -372,9 +381,24 @@ const ApiMarketingRoute = ApiMarketingRouteImport.update({
   path: '/api/marketing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMailerVydaniaRoute = ApiMailerVydaniaRouteImport.update({
+  id: '/api/mailer-vydania',
+  path: '/api/mailer-vydania',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMailerRoute = ApiMailerRouteImport.update({
   id: '/api/mailer',
   path: '/api/mailer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailUdalostiRoute = ApiMailUdalostiRouteImport.update({
+  id: '/api/mail-udalosti',
+  path: '/api/mail-udalosti',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailPrihlaskaRoute = ApiMailPrihlaskaRouteImport.update({
+  id: '/api/mail-prihlaska',
+  path: '/api/mail-prihlaska',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMailDopytyRoute = ApiMailDopytyRouteImport.update({
@@ -601,7 +625,10 @@ export interface FileRoutesByFullPath {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/mail-dopyty': typeof ApiMailDopytyRoute
+  '/api/mail-prihlaska': typeof ApiMailPrihlaskaRoute
+  '/api/mail-udalosti': typeof ApiMailUdalostiRoute
   '/api/mailer': typeof ApiMailerRoute
+  '/api/mailer-vydania': typeof ApiMailerVydaniaRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
@@ -649,6 +676,7 @@ export interface FileRoutesByFullPath {
   '/d/$token': typeof DTokenRoute
   '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
+  '/m/$token': typeof MTokenRoute
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
@@ -695,7 +723,10 @@ export interface FileRoutesByTo {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/mail-dopyty': typeof ApiMailDopytyRoute
+  '/api/mail-prihlaska': typeof ApiMailPrihlaskaRoute
+  '/api/mail-udalosti': typeof ApiMailUdalostiRoute
   '/api/mailer': typeof ApiMailerRoute
+  '/api/mailer-vydania': typeof ApiMailerVydaniaRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
@@ -743,6 +774,7 @@ export interface FileRoutesByTo {
   '/d/$token': typeof DTokenRoute
   '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
+  '/m/$token': typeof MTokenRoute
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
@@ -790,7 +822,10 @@ export interface FileRoutesById {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/mail-dopyty': typeof ApiMailDopytyRoute
+  '/api/mail-prihlaska': typeof ApiMailPrihlaskaRoute
+  '/api/mail-udalosti': typeof ApiMailUdalostiRoute
   '/api/mailer': typeof ApiMailerRoute
+  '/api/mailer-vydania': typeof ApiMailerVydaniaRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
@@ -838,6 +873,7 @@ export interface FileRoutesById {
   '/d/$token': typeof DTokenRoute
   '/f/$token': typeof FTokenRoute
   '/k/$token': typeof KTokenRouteWithChildren
+  '/m/$token': typeof MTokenRoute
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
@@ -886,7 +922,10 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/mail-dopyty'
+    | '/api/mail-prihlaska'
+    | '/api/mail-udalosti'
     | '/api/mailer'
+    | '/api/mailer-vydania'
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
@@ -934,6 +973,7 @@ export interface FileRouteTypes {
     | '/d/$token'
     | '/f/$token'
     | '/k/$token'
+    | '/m/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
@@ -980,7 +1020,10 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/mail-dopyty'
+    | '/api/mail-prihlaska'
+    | '/api/mail-udalosti'
     | '/api/mailer'
+    | '/api/mailer-vydania'
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
@@ -1028,6 +1071,7 @@ export interface FileRouteTypes {
     | '/d/$token'
     | '/f/$token'
     | '/k/$token'
+    | '/m/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
@@ -1074,7 +1118,10 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/mail-dopyty'
+    | '/api/mail-prihlaska'
+    | '/api/mail-udalosti'
     | '/api/mailer'
+    | '/api/mailer-vydania'
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
@@ -1122,6 +1169,7 @@ export interface FileRouteTypes {
     | '/d/$token'
     | '/f/$token'
     | '/k/$token'
+    | '/m/$token'
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
@@ -1169,7 +1217,10 @@ export interface RootRouteChildren {
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiMailDopytyRoute: typeof ApiMailDopytyRoute
+  ApiMailPrihlaskaRoute: typeof ApiMailPrihlaskaRoute
+  ApiMailUdalostiRoute: typeof ApiMailUdalostiRoute
   ApiMailerRoute: typeof ApiMailerRoute
+  ApiMailerVydaniaRoute: typeof ApiMailerVydaniaRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
   ApiMeraniaRoute: typeof ApiMeraniaRoute
   ApiMetaRoute: typeof ApiMetaRoute
@@ -1217,6 +1268,7 @@ export interface RootRouteChildren {
   DTokenRoute: typeof DTokenRoute
   FTokenRoute: typeof FTokenRoute
   KTokenRoute: typeof KTokenRouteWithChildren
+  MTokenRoute: typeof MTokenRoute
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
@@ -1274,6 +1326,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$token'
       fullPath: '/t/$token'
       preLoaderRoute: typeof TTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/m/$token': {
+      id: '/m/$token'
+      path: '/m/$token'
+      fullPath: '/m/$token'
+      preLoaderRoute: typeof MTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/k/$token': {
@@ -1605,11 +1664,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMarketingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mailer-vydania': {
+      id: '/api/mailer-vydania'
+      path: '/api/mailer-vydania'
+      fullPath: '/api/mailer-vydania'
+      preLoaderRoute: typeof ApiMailerVydaniaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/mailer': {
       id: '/api/mailer'
       path: '/api/mailer'
       fullPath: '/api/mailer'
       preLoaderRoute: typeof ApiMailerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mail-udalosti': {
+      id: '/api/mail-udalosti'
+      path: '/api/mail-udalosti'
+      fullPath: '/api/mail-udalosti'
+      preLoaderRoute: typeof ApiMailUdalostiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mail-prihlaska': {
+      id: '/api/mail-prihlaska'
+      path: '/api/mail-prihlaska'
+      fullPath: '/api/mail-prihlaska'
+      preLoaderRoute: typeof ApiMailPrihlaskaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mail-dopyty': {
@@ -1923,7 +2003,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
   ApiMailDopytyRoute: ApiMailDopytyRoute,
+  ApiMailPrihlaskaRoute: ApiMailPrihlaskaRoute,
+  ApiMailUdalostiRoute: ApiMailUdalostiRoute,
   ApiMailerRoute: ApiMailerRoute,
+  ApiMailerVydaniaRoute: ApiMailerVydaniaRoute,
   ApiMarketingRoute: ApiMarketingRoute,
   ApiMeraniaRoute: ApiMeraniaRoute,
   ApiMetaRoute: ApiMetaRoute,
@@ -1971,6 +2054,7 @@ const rootRouteChildren: RootRouteChildren = {
   DTokenRoute: DTokenRoute,
   FTokenRoute: FTokenRoute,
   KTokenRoute: KTokenRouteWithChildren,
+  MTokenRoute: MTokenRoute,
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
