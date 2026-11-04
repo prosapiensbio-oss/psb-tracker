@@ -3001,7 +3001,8 @@ export type RegisterItem = {
   /** Odpoveď staršia než tento čas sa nepočíta — viď `stavPolozkyRegistra`. */
   platneOd?: string;
   /** Tlačidlo „Poslať SMS" priamo v notifikácii (notifikaciaHodin.ts). */
-  sms?: { meno: string; trener: string; zostatok: number };
+  /** `naDalsi`: tlačidlo „Na ďalší balíček" — klient má poslednú hodinu a faktúra ešte nečaká. */
+  sms?: { meno: string; trener: string; zostatok: number; naDalsi?: boolean };
   /** SMS po úvodnom: najbližší tréning z kalendára (`YYYY-MM-DDTHH:MM`), predvyplní okno. */
   dalsiTrening?: string;
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
@@ -3157,6 +3158,8 @@ export function dnesneTreningy(
   kal: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null; nazov?: string }[]; zmeny?: ZmenaVKalendari[] } | undefined,
   ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
   dnes: Date = new Date(),
+  /** Klienti, ktorých faktúra už čaká na ďalší balíček (`data.fakturyNaDalsi`). */
+  fakturyNaDalsi: string[] = [],
 ): RegisterItem[] {
   const out: RegisterItem[] = [];
   const stavPolozky = (key: string, rodina?: string) => stavPolozkyRegistra(key, ack, rodina, dnes);
@@ -3202,7 +3205,7 @@ export function dnesneTreningy(
         else if (pred <= 0) dovody.push(`hodiny má minuté — s dnešným tréningom ${textNadRamec(1 - pred)}${odkial}`);
         // Tlačidlo „Poslať SMS" aj tu (9. 10. 2026) — samostatná notifikácia
         // „posledná hodina / mínus" o tom istom človeku vtedy ustúpi.
-        if (pred <= 1 && c.packageTotal > 0) sms = { meno: c.name, trener: c.primaryTrainer, zostatok: c.packageRemaining };
+        if (pred <= 1 && c.packageTotal > 0) sms = { meno: c.name, trener: c.primaryTrainer, zostatok: c.packageRemaining, naDalsi: pred >= 0 && !fakturyNaDalsi.includes(c.name) };
       }
       // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
       // z fázy a mesiaca druhýkrát a inak než Prevádzka.

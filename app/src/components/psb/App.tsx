@@ -122,6 +122,8 @@ export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => Promise<boolean>;
   ackAnomaly: (key: string, note: string, ack?: boolean) => void;
+  /** Otvorí vo Workspace faktúru na ďalší balíček predvyplnenú pre klienta. */
+  fakturaNaDalsi: (meno: string) => void;
   ingest: (files: { filename: string; text: string }[]) => Promise<IngestResult[]>;
   refresh: () => Promise<void>;
   /**
@@ -2195,7 +2197,7 @@ function skupinaFaktur(
     // buď vybavená, alebo prepadla.
     // Dnešné tréningy — výpočet je v lib/psb/compute.ts, aby ho okrem
     // obrazovky videla aj ranná dávka notifikácií na telefón.
-    out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}));
+    out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}, undefined, data.fakturyNaDalsi));
 
     return out;
   }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal, pravidloNesedi, zamknuteMesiace]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2365,8 +2367,8 @@ function skupinaFaktur(
   // Posledná hodina / mínus s tlačidlom na SMS (Jerry, 9. 10. 2026) — tá
   // istá funkcia ako v rannej správe na telefón (registerServer).
   const hodinyPolozky = useMemo(
-    () => (smsOdoslane ? polozkyHodin(clients, kalUdalosti, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}) : []),
-    [clients, kalUdalosti, data.platbyKokpit, data.balickyKokpit, smsOdoslane, data.anomalyAck],
+    () => (smsOdoslane ? polozkyHodin(clients, kalUdalosti, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, undefined, data.fakturyNaDalsi) : []),
+    [clients, kalUdalosti, data.platbyKokpit, data.balickyKokpit, smsOdoslane, data.anomalyAck, data.fakturyNaDalsi],
   );
 
   const registerAll = useMemo(() => {
@@ -3015,6 +3017,7 @@ function skupinaFaktur(
         }
         return ok;
       },
+      fakturaNaDalsi: (meno) => { setFakturaPredvolba({ klient: meno, popis: "", cena: 0, naDalsi: true }); setActive("workspace"); },
       ackAnomaly: (key, note, ack = true) => {
         const predtym = dataRef.current.anomalyAck[key];
         setData((prev) => {

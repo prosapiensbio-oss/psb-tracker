@@ -39,6 +39,8 @@ export function polozkyHodin(
   odoslaneUtc: Record<string, string>,
   ack: Ack,
   dnes: Date = new Date(),
+  /** Klienti, ktorých faktúra už čaká na ďalší balíček (`data.fakturyNaDalsi`). */
+  fakturyNaDalsi: string[] = [],
 ): RegisterItem[] {
   const terazP = terazPraha(dnes);
   const mena = Object.keys(clients);
@@ -64,7 +66,7 @@ export function polozkyHodin(
       client: u.meno,
       oKom: u.meno,
       platneOd,
-      sms: { meno: u.meno, trener: u.trener, zostatok: u.zostatok },
+      sms: { meno: u.meno, trener: u.trener, zostatok: u.zostatok, naDalsi: u.stav !== "minus" && !fakturyNaDalsi.includes(u.meno) },
       ...stavPolozkyRegistra(key, ack, "hodiny", dnes, platneOd),
     };
   });

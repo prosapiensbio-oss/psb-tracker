@@ -2728,6 +2728,9 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               {smsOtvorene ? "Zavrieť" : "Poslať SMS"}
             </button>
           )}
+          {item.sms?.naDalsi && !item.acked && (
+            <button onClick={() => actions.fakturaNaDalsi(item.sms!.meno)} style={{ ...linkBtn, color: C.green }}>Na ďalší balíček</button>
+          )}
           {jeSms && !item.acked && (
             <button onClick={() => setUvOtvoreny((o) => !o)} style={{ ...linkBtn, color: uvOtvoreny ? C.accentLight : C.green }}>
               {uvOtvoreny ? "Zavrieť" : "Poslať SMS po úvodnom"}

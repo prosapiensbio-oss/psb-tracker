@@ -15,7 +15,13 @@ import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 import { dnesPraha, posunDen } from "../../lib/psb/cas";
-import { faktureUhradeneBalickom, fakturyUhradeneRozdelenim } from "../../lib/psb/fakturaUhradena";
+import { faktureUhradeneBalickom, fakturyNaDalsiUhradene, fakturyUhradeneRozdelenim } from "../../lib/psb/fakturaUhradena";
+import { BALICKY_NA_DALSI, popisNaDalsi, prvyTreningNovehoBalicka } from "../../lib/psb/fakturaNaDalsi";
+import { loadData } from "../../lib/psb/db.server";
+import { deriveClients } from "../../lib/psb/compute";
+import { osKlientaZoServera } from "../../lib/psb/osKlienta.server";
+import { ponukaVOdkaze } from "../../lib/psb/obsahOdkazu.server";
+import { terazPraha } from "../../lib/psb/cas";
 import { tokenFaktury } from "../../lib/psb/fakturaOdkaz.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { polozkyDlhovMien } from "../../lib/psb/dlhyMien.server";
@@ -141,7 +147,8 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           const f = await DB.prepare(
             `SELECT id, cislo, klient, balicek_id, vystavene, splatnost, popis, ks, cena_czk, celkom_czk,
                     odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email,
-                    poznamka, odoslane_at, odoslane_komu, uhradene_at, platba_id, storno_at, storno_dovod, created_at
+                    poznamka, odoslane_at, odoslane_komu, uhradene_at, platba_id, storno_at, storno_dovod, created_at,
+                    na_dalsi_balicek, dalsi_nazov
              FROM vydane_faktury ORDER BY cislo DESC`,
           ).all();
           /**
@@ -151,7 +158,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
            * „čaká na zaplatenie". Chyba tu zoznam faktúr nezhodí.
            */
           try {
-            type R = { id: string; klient: string; balicek_id: string | null; vystavene: string; celkom_czk: number; ks: number; cena_czk: number; uhradene_at: string | null; storno_at: string | null; platba_id: string | null };
+            type R = { id: string; klient: string; balicek_id: string | null; vystavene: string; celkom_czk: number; ks: number; cena_czk: number; uhradene_at: string | null; storno_at: string | null; platba_id: string | null; na_dalsi_balicek: number };
             const riadky = (f.results || []) as unknown as R[];
             // Faktúra s položkami za iných sa uhrádza LEN rozdeleným prevodom
             // (`fakturyUhradeneRozdelenim`) — zaplatený balíček hlavného
@@ -160,14 +167,15 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const otvoreneVsetky = riadky.filter((r) => !r.uhradene_at && !r.storno_at);
             const otvorene = otvoreneVsetky.filter((r) => r.balicek_id && !sPolozkami.has(r.id));
             const spolocne = otvoreneVsetky.filter((r) => sPolozkami.has(r.id));
-            if (otvorene.length || spolocne.length) {
+            const naDalsi = otvoreneVsetky.filter((r) => r.na_dalsi_balicek && !r.balicek_id && !sPolozkami.has(r.id));
+            if (otvorene.length || spolocne.length || naDalsi.length) {
               const mena = [...new Set(otvorene.map((r) => r.klient))];
               const [zive, pl] = await DB.batch([
                 DB.prepare(`SELECT id FROM balicky WHERE zrusene_at IS NULL AND id IN (SELECT value FROM json_each(?1))`).bind(JSON.stringify(otvorene.map((r) => r.balicek_id))),
-                DB.prepare("SELECT id, klient, datum, suma_czk, fio_id FROM platby WHERE zrusene_at IS NULL"),
+                DB.prepare("SELECT id, klient, datum, suma_czk, fio_id, vopred FROM platby WHERE zrusene_at IS NULL"),
               ]);
-              const platby = ((pl.results || []) as { id: string; klient: string; datum: string; suma_czk: number; fio_id: string | null }[])
-                .map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0, fioId: x.fio_id }));
+              const platby = ((pl.results || []) as { id: string; klient: string; datum: string; suma_czk: number; fio_id: string | null; vopred: number | null }[])
+                .map((x) => ({ id: x.id, klient: x.klient, datum: String(x.datum).slice(0, 10), suma: Number(x.suma_czk) || 0, fioId: x.fio_id, vopred: x.vopred }));
               const uhradit = [
                 ...(otvorene.length ? faktureUhradeneBalickom(
                   otvorene.map((r) => ({ id: r.id, klient: r.klient, balicekId: r.balicek_id, vystavene: String(r.vystavene).slice(0, 10), celkom: Number(r.celkom_czk) || 0, uhradeneAt: r.uhradene_at, stornoAt: r.storno_at })),
@@ -186,10 +194,15 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                   }),
                   platby,
                 ),
+                ...fakturyNaDalsiUhradene(
+                  naDalsi.map((r) => ({ id: r.id, klient: r.klient, vystavene: String(r.vystavene).slice(0, 10), celkom: Number(r.celkom_czk) || 0 })),
+                  platby,
+                  new Set(riadky.filter((r) => !r.storno_at && r.platba_id).map((r) => String(r.platba_id))),
+                ),
               ];
               for (const u of uhradit) {
                 await DB.prepare("UPDATE vydane_faktury SET uhradene_at = ?2, platba_id = ?3 WHERE id = ?1 AND uhradene_at IS NULL").bind(u.id, u.den, u.platbaId).run();
-                await audit(DB, { action: "faktura-uhradena-auto", predmet: u.id, neu: `uhradená ${u.den} — ${sPolozkami.has(u.id) ? "rozdelený prevod sedí na všetky položky" : "balíček zaplatený"}` });
+                await audit(DB, { action: "faktura-uhradena-auto", predmet: u.id, neu: `uhradená ${u.den} — ${sPolozkami.has(u.id) ? "rozdelený prevod sedí na všetky položky" : naDalsi.some((r) => r.id === u.id) ? "platba vopred na ďalší balíček" : "balíček zaplatený"}` });
                 const r = riadky.find((x) => x.id === u.id);
                 if (r) { r.uhradene_at = u.den; r.platba_id = u.platbaId; }
               }
@@ -489,6 +502,34 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             return Response.json({ ok: true });
           }
 
+          /**
+           * Čo predvyplniť na faktúru na ďalší balíček. Tá istá ponuka ako
+           * stránka za odkazom a ten istý automat, ktorý balíček založí.
+           */
+          if (b.akcia === "navrh-na-dalsi") {
+            const klient = await kanonickeMeno(DB, kus(b.klient, 120));
+            if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
+            const data = await loadData(DB);
+            const c = deriveClients(data)[klient];
+            const { os, kalUdalosti, balicky } = await osKlientaZoServera(DB, data, klient);
+            const ponuka = ponukaVOdkaze(klient, os, balicky, data, dnesPraha());
+            const nazov = ponuka?.nazov || "";
+            const faktury = ((await DB.prepare(
+              "SELECT popis, cislo, klient, na_dalsi_balicek, balicek_id FROM vydane_faktury WHERE storno_at IS NULL ORDER BY vystavene DESC, cislo DESC",
+            ).all()).results || []) as { popis: string; cislo: string; klient: string; na_dalsi_balicek: number; balicek_id: string | null }[];
+            const moje = faktury.filter((f) => normName(f.klient) === normName(klient));
+            const teraz_ = terazPraha();
+            return Response.json({
+              ok: true, klient, nazov, hodiny: ponuka?.hodiny ?? null, cena: ponuka?.cena ?? null,
+              popis: popisNaDalsi(moje.map((f) => String(f.popis || "")), nazov),
+              prvyTrening: prvyTreningNovehoBalicka(
+                kalUdalosti.filter((u) => u.typ === "trening" && String(u.zaciatok).slice(0, 16) > teraz_).map((u) => String(u.zaciatok).slice(0, 16)),
+                c?.packageTotal ? c.packageRemaining : 0, c?.packageValidTo,
+              ),
+              uzCaka: moje.find((f) => f.na_dalsi_balicek && !f.balicek_id)?.cislo ?? null,
+            });
+          }
+
           // ── nová faktúra ─────────────────────────────────────────────
           if (b.akcia === "vystav") {
             const klient = await kanonickeMeno(DB, kus(b.klient, 120));
@@ -580,14 +621,21 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               .map((r) => String((r as { cislo: string }).cislo));
             const cislo = dalsieCislo(vystavene, rada);
 
+            // Na ďalší balíček: len balíček z cenníka, nech z neho automat vie založiť platnosť.
+            const naDalsi = kus(b.naDalsi, 60) ? BALICKY_NA_DALSI.find((s) => s.nazov === kus(b.naDalsi, 60)) : null;
+            if (kus(b.naDalsi, 60) && !naDalsi) return Response.json({ ok: false, error: "Taký balíček v cenníku nie je." }, { status: 400 });
+            if (naDalsi && kus(b.balicekId, 40)) return Response.json({ ok: false, error: "Faktúra je buď na hotový balíček, alebo na ďalší." }, { status: 400 });
+
             const id = uid();
             await DB.prepare(
               `INSERT INTO vydane_faktury (id, cislo, klient, balicek_id, vystavene, splatnost, popis, ks, cena_czk, celkom_czk,
-                 odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email, poznamka, created_at, autor)
-               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)`,
+                 odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email, poznamka, created_at, autor,
+                 na_dalsi_balicek, dalsi_nazov, dalsi_hodiny)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)`,
             ).bind(id, cislo, klient, kus(b.balicekId, 40) || null, vystavene, splatnost, popis, ks, cena,
               celkom, odb.firma, odb.ico, odb.dic, odb.ulica, odb.psc, odb.mesto,
-              odb.stat, odb.email, String(b.poznamka ?? "").slice(0, 600), teraz(), kto).run();
+              odb.stat, odb.email, String(b.poznamka ?? "").slice(0, 600), teraz(), kto,
+              naDalsi ? 1 : 0, naDalsi?.nazov ?? null, naDalsi?.hodiny ?? null).run();
             if (dalsie.length) {
               await DB.batch(dalsie.map((d, i) => DB.prepare(
                 `INSERT INTO vydane_faktury_polozky (id, faktura_id, poradie, klient, balicek_id, popis, ks, cena_czk, celkom_czk, na_doklade)

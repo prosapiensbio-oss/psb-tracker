@@ -1,3 +1,5 @@
+import { balicekBerieFakturu, balicekZFaktury } from "../../lib/psb/fakturaNaDalsi";
+import { cakajucaFaktura, pripojFakturuKBalicku } from "../../lib/psb/fakturaNaDalsi.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { KOKPIT_OD } from "../../lib/psb/sedeniaZKalendara";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -73,6 +75,14 @@ async function nacitaj(DB: D1Database) {
  * Doplnenie členstva presun nedostane: to nie je ďalší balíček, len
  * predĺžené staré hodiny.
  */
+/** Čakajúca faktúra určuje balíček: klient má dostať to, čo má na doklade. */
+async function podlaFaktury(DB: D1Database, klient: string, nazov: string, hodiny: number | null, od: string) {
+  const f = await cakajucaFaktura(DB, klient);
+  if (!f || !balicekBerieFakturu(nazov, hodiny, f)) return null;
+  const z = balicekZFaktury(f, od);
+  return z && { ...z, veta: `podľa faktúry ${f.cislo}` };
+}
+
 async function zapisBalicek(
   DB: D1Database,
   b: { klient: string; nazov: string; hodiny: number | null; od: string; doDna: string | null; cena: number | null; poznamka: string | null },
@@ -102,6 +112,7 @@ async function zapisBalicek(
      VALUES (?,?,?,?,?,?,?,'rucne',NULL,?,?,?) ON CONFLICT DO NOTHING`,
   ).bind(id, b.klient, b.nazov, hodinySpolu, b.od, b.doDna, b.cena, poznamkaSpolu, teraz(), kto || null).run();
   if (!zapis.meta?.changes) return { id, prenesene: 0, vznikol: false };
+  await pripojFakturuKBalicku(DB, { id, klient: b.klient, nazov: b.nazov, hodiny: b.hodiny }, kto);
   if (caka.length) {
     await DB.batch(caka.map((x) => DB.prepare(
       "UPDATE balicky_presun SET pouzite_balicek_id = ?1, pouzite_at = ?2 WHERE id = ?3",
@@ -378,8 +389,12 @@ export const Route = createFileRoute("/api/balicky")({
               p.nevycerpane > p.prenos ? `zostalo ${p.nevycerpane} h, prenášajú sa najviac 2` : "",
               p.cenaPoznamka || "",
             ].filter(Boolean).join(" · ");
-            const { vznikol } = await zapisBalicek(DB, { klient: p.klient, nazov: p.nazov, hodiny: p.hodiny, od: p.odDna, doDna: p.doDna, cena: p.cena, poznamka },
-              kto || "kokpit", "balicek-predplatne-pokracuje");
+            const podlaFa = await podlaFaktury(DB, p.klient, p.nazov, p.hodiny, p.odDna);
+            const { vznikol } = await zapisBalicek(DB, {
+              klient: p.klient, nazov: podlaFa?.nazov ?? p.nazov, hodiny: podlaFa?.hodiny ?? p.hodiny, od: p.odDna,
+              doDna: podlaFa ? podlaFa.doDna : p.doDna, cena: podlaFa?.cena ?? p.cena,
+              poznamka: podlaFa ? `${poznamka} · ${podlaFa.veta}`.slice(0, 400) : poznamka,
+            }, kto || "kokpit", "balicek-predplatne-pokracuje");
             zapisane = true;
             if (vznikol) vznikli.push({ klient: p.klient, nazov: p.nazov, od: p.odDna, navrat: false });
           }
@@ -396,9 +411,11 @@ export const Route = createFileRoute("/api/balicky")({
               n.navrat ? `návrat po ${n.pauzaDni} dňoch — over, či sedí` : "",
               n.cenaPoznamka || "",
             ].filter(Boolean).join(" · ");
+            const podlaFa = await podlaFaktury(DB, n.klient, n.nazov, n.hodiny, n.odDna);
             const { vznikol } = await zapisBalicek(DB, {
-              klient: n.klient, nazov: n.nazov, hodiny: n.hodiny, od: n.odDna,
-              doDna: n.platnostDo || null, cena: n.cena, poznamka,
+              klient: n.klient, nazov: podlaFa?.nazov ?? n.nazov, hodiny: podlaFa?.hodiny ?? n.hodiny, od: n.odDna,
+              doDna: podlaFa ? podlaFa.doDna : n.platnostDo || null, cena: podlaFa?.cena ?? n.cena,
+              poznamka: podlaFa ? `${poznamka} · ${podlaFa.veta}`.slice(0, 400) : poznamka,
             }, kto || "kokpit", "balicek-automaticky");
             if (vznikol) vznikli.push({ klient: n.klient, nazov: n.nazov, od: n.odDna, navrat: n.navrat });
           }

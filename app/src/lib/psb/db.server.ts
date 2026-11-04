@@ -36,6 +36,7 @@ import { nacitajDozor } from "./reklamaDozor.server";
 import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
 import { znamiKlienti } from "./nahodTrening.server";
 import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
+import { klientiSCakajucouFakturou } from "./fakturaNaDalsi.server";
 
 const uid = () => crypto.randomUUID();
 
@@ -506,6 +507,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     firma: String(r.firma || ""), ico: String(r.ico || ""), dic: String(r.dic || ""),
     ulica: String(r.ulica || ""), psc: String(r.psc || ""), mesto: String(r.mesto || ""), email: String(r.email || ""),
   }));
+
+  data.fakturyNaDalsi = await klientiSCakajucouFakturou(DB).catch((e) => { volitelna("faktúry na ďalší balíček")(e); return []; });
 
   if (chybySekcii.length) data.chybySekcii = chybySekcii;
   return data;

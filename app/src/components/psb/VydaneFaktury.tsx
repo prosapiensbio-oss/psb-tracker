@@ -12,6 +12,7 @@ import {
 import { Card, Info } from "./ui";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dlhyNaFakturu } from "../../lib/psb/fakturaDlhy";
+import { BALICKY_NA_DALSI, terminSlovom } from "../../lib/psb/fakturaNaDalsi";
 import type { DlhPolozka } from "../../lib/psb/zaplatene";
 import { dnesPraha } from "../../lib/psb/cas";
 import { fmtCZK } from "../../lib/psb/format";
@@ -29,6 +30,7 @@ import { fmtCZK } from "../../lib/psb/format";
 
 type Riadok = {
   id: string; cislo: string; klient: string; balicek_id: string | null;
+  na_dalsi_balicek?: number; dalsi_nazov?: string | null;
   vystavene: string; splatnost: string; popis: string; ks: number;
   cena_czk: number; celkom_czk: number;
   odb_firma: string; odb_ico: string; odb_dic: string; odb_ulica: string;
@@ -57,7 +59,7 @@ type Udaje = {
 };
 
 /** `dlh`: suma je to, čo klient na balíček dlží (`fakturaZBalicka`), nie jeho cena. */
-export type FakturaPredvolba = { klient: string; popis: string; cena: number; balicekId?: string; dlh?: boolean };
+export type FakturaPredvolba = { klient: string; popis: string; cena: number; balicekId?: string; dlh?: boolean; naDalsi?: boolean };
 
 const PRAZDNE_UDAJE: Omit<Udaje, "klient"> = {
   stat: "Česká republika", firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "",
@@ -156,6 +158,11 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
    * text sa odteraz mení sám, suma len keď ju nikto nenastavil.
    */
   const [cenaBalicka, setCenaBalicka] = useState<number | null>(null);
+  /**
+   * Faktúra na ďalší balíček (Jerry, 4. 11. 2026): balíček vznikne až prvým
+   * tréningom, faktúra čaká a on si ju pri vzniku priradí (`fakturaNaDalsi.ts`).
+   */
+  const [naDalsi, setNaDalsi] = useState<{ nazov: string; prvyTrening: string | null; uzCaka: string | null } | null>(null);
   // Suma predvoľby je dlh, nie cena balíčka — upozornenie potom hovorí „zostáva doplatiť".
   const [cenaZDlhu, setCenaZDlhu] = useState(false);
   const [u, setU] = useState<Omit<Udaje, "klient">>(PRAZDNE_UDAJE);
@@ -188,8 +195,31 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   // Príchod z balíčka: formulár sa otvorí predvyplnený. Jerry, 26. 9. 2026:
   // „pri vytvorení balíčka vznikne možnosť vytvoriť faktúru, pre ktorú keď sa
   // rozhodnem, tak sa automaticky všetko vyplní."
+  const zapniNaDalsi = useCallback(async (klient: string) => {
+    setPracujem("na-dalsi"); setChyba(""); setHlaska("");
+    const j = await fetch("/api/vydane-faktury", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "navrh-na-dalsi", klient }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "Návrh sa nenačítal — skús znova." })) as
+      { ok?: boolean; error?: string; nazov?: string; cena?: number | null; popis?: string; prvyTrening?: string | null; uzCaka?: string | null };
+    setPracujem("");
+    if (!j.ok) { setChyba(j.error || "Návrh sa nenačítal — skús znova."); return; }
+    setNaDalsi({ nazov: j.nazov || "", prvyTrening: j.prvyTrening ?? null, uzCaka: j.uzCaka ?? null });
+    setF((s) => ({ ...s, popis: j.popis || "", ks: "1", cena: j.cena ? String(Math.round(j.cena)) : "", balicekId: "" }));
+    setCenaBalicka(j.cena ? Math.round(j.cena) : null);
+    setCenaZDlhu(false);
+  }, []);
+  const vyberBalicekNaDalsi = (nazov: string) => {
+    const s = BALICKY_NA_DALSI.find((x) => x.nazov === nazov);
+    // Vlastný text pre firmu ostáva, názov predošlého balíčka sa vymení.
+    setF((x) => ({ ...x, cena: String(s?.cena ?? ""), popis: !x.popis || BALICKY_NA_DALSI.some((y) => y.nazov === x.popis) ? nazov : x.popis }));
+    setCenaBalicka(s?.cena ?? null);
+    setNaDalsi((n) => n && { ...n, nazov });
+  };
+
   useEffect(() => {
     if (!predvolba) return;
+    setNaDalsi(null);
     setF((s) => ({
       ...s, klient: predvolba.klient, popis: predvolba.popis,
       cena: predvolba.cena ? String(Math.round(predvolba.cena)) : "",
@@ -198,8 +228,9 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     setCenaBalicka(predvolba.balicekId && predvolba.cena > 0 ? Math.round(predvolba.cena) : null);
     setCenaZDlhu(!!predvolba.dlh);
     setOtvorenaNova(true);
+    if (predvolba.naDalsi) void zapniNaDalsi(predvolba.klient);
     onPredvolbaSpracovana?.();
-  }, [predvolba, onPredvolbaSpracovana]);
+  }, [predvolba, onPredvolbaSpracovana, zapniNaDalsi]);
 
   // Fakturačné údaje vybraného klienta sa nalejú do formulára údajov.
   const udajeKlienta = useMemo(() => udaje.find((x) => x.klient === f.klient), [udaje, f.klient]);
@@ -213,9 +244,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
   /** Dlhy, ktoré „nie" odmietol — pre túto faktúru sa už neponúknu. */
   const [odmietnuteDlhy, setOdmietnuteDlhy] = useState<string[]>([]);
   const ponukaDlhov = useMemo(
-    () => dlhyNaFakturu(dlhy, [f.klient, ...dalsie.map((d) => d.klient)], [f.balicekId, ...dalsie.map((d) => d.balicekId)])
+    // Balíček z inej živej faktúry sa neponúka: tá ho už pýta (faktúra na ďalší balíček).
+    () => dlhyNaFakturu(dlhy, [f.klient, ...dalsie.map((d) => d.klient)], [f.balicekId, ...dalsie.map((d) => d.balicekId), ...(riadky || []).filter((r) => !r.storno_at).flatMap((r) => [r.balicek_id, ...(r.dalsie || []).map((d) => d.balicekId)])])
       .filter((d) => !odmietnuteDlhy.includes(d.kluc)),
-    [dlhy, f.klient, f.balicekId, dalsie, odmietnuteDlhy],
+    [dlhy, f.klient, f.balicekId, dalsie, odmietnuteDlhy, riadky],
   );
   const pridajDlhy = (co: typeof ponukaDlhov) => setDalsie((s) => [
     ...s,
@@ -231,7 +263,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     return out;
   }, [riadky, f.klient]);
   const vybrana = dalsieFirmy.find((o) => o.id === odberatelId) || null;
-  useEffect(() => { setOdberatelId(""); }, [f.klient]);
+  useEffect(() => { setOdberatelId(""); setNaDalsi(null); }, [f.klient]);
   useEffect(() => {
     setU(udajeKlienta ? { ...PRAZDNE_UDAJE, ...udajeKlienta } : PRAZDNE_UDAJE);
     setUpravujemUdaje(!udajeKlienta && !!f.klient);
@@ -324,6 +356,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
       cena: Number(f.cena) || 0, vystavene: f.vystavene,
       splatnostDni: Number(f.splatnostDni) || SPLATNOST_DNI,
       poznamka: f.poznamka, balicekId: f.balicekId || undefined,
+      naDalsi: naDalsi?.nazov || undefined,
       odberatelId: vybrana?.id || undefined,
       dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0, naDoklade: d.naDoklade, balicekId: d.balicekId || undefined })),
     }, "vystav");
@@ -335,7 +368,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
     }
     setDalsie([]);
     setOdmietnuteDlhy([]);
-    setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
+    setHlaska(naDalsi
+      ? `Vystavená faktúra ${j.cislo}. Balíček vznikne prvým tréningom a faktúra sa k nemu pripojí sama.`
+      : `Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
+    setNaDalsi(null);
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
     setCenaBalicka(null);
@@ -557,6 +593,32 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
               </div>
             );
           })}
+          {f.klient.trim() && !f.balicekId && !naDalsi && (
+            <button type="button" disabled={pracujem === "na-dalsi"} onClick={() => void zapniNaDalsi(f.klient.trim())}
+              style={{ padding: "6px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), color: C.accentLight, fontFamily: "inherit", marginBottom: 10 }}>
+              {pracujem === "na-dalsi" ? "pripravujem…" : "Na ďalší balíček"}
+            </button>
+          )}
+          {naDalsi && (
+            <div style={{ padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accent, 50)}`, background: mix(C.accent, 8), marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+                <b style={{ fontSize: 12.5, color: C.text }}>Na ďalší balíček</b>
+                <select value={naDalsi.nazov} onChange={(e) => vyberBalicekNaDalsi(e.target.value)} style={{ ...poleStyl, width: "auto", colorScheme: "dark" }}>
+                  {!naDalsi.nazov && <option value="">vyber balíček</option>}
+                  {BALICKY_NA_DALSI.map((s) => <option key={s.nazov} value={s.nazov}>{s.nazov}</option>)}
+                </select>
+                <button type="button" onClick={() => setNaDalsi(null)} style={{ ...odkazStyl, color: C.textMuted }}>zrušiť</button>
+              </div>
+              <div style={{ fontSize: 12, color: C.textMuted }}>
+                {naDalsi.prvyTrening
+                  ? <>Balíček vznikne prvým tréningom: <b style={{ color: C.text }}>{terminSlovom(naDalsi.prvyTrening)}</b>. </>
+                  : "Ďalší tréning v kalendári zatiaľ nie je, balíček vznikne, keď príde. "}
+                Vznikne podľa tejto faktúry a faktúra sa k nemu pripojí sama. Dátum na doklade nebude, takže presun tréningu nič nepokazí.
+              </div>
+              {naDalsi.uzCaka && <div style={{ fontSize: 12, color: C.orange, marginTop: 5 }}>Na ďalší balíček už čaká faktúra {naDalsi.uzCaka}. Táto by čakala na balíček po ňom.</div>}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
             <button
               type="button"
@@ -659,7 +721,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
           <button
             type="button"
             onClick={() => void vystav()}
-            disabled={pracujem === "vystav" || !f.klient || f.popis.trim().length < 3 || !(Number(f.cena) > 0)}
+            disabled={pracujem === "vystav" || !f.klient || f.popis.trim().length < 3 || !(Number(f.cena) > 0) || (!!naDalsi && !naDalsi.nazov)}
             style={{
               padding: "9px 16px", borderRadius: 9, fontSize: 13.5, fontWeight: 600,
               cursor: pracujem === "vystav" ? "default" : "pointer",
@@ -860,6 +922,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana,
                 <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 160px" }}>
                   {r.odb_firma && r.odb_firma !== r.klient ? `${r.odb_firma} · ${r.klient}` : r.klient}
                   {!!r.dalsie?.length && <span style={{ color: C.accentLight }}> + {[...new Set(r.dalsie.map((d) => d.klient))].join(", ")}</span>}
+                  {!!r.na_dalsi_balicek && !r.balicek_id && !r.storno_at && <span style={{ color: C.accentLight }}> · na ďalší balíček ({r.dalsi_nazov}), čaká na prvý tréning</span>}
                   <span style={{ color: C.textDim }}> — {r.popis.length > 46 ? `${r.popis.slice(0, 44)}…` : r.popis}</span>
                 </span>
                 {/* Pevná šírka a zarovnanie vpravo: sumy pod sebou sa dajú porovnať očami. */}

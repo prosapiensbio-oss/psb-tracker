@@ -45,6 +45,33 @@ export function faktureUhradeneBalickom(
 }
 
 /**
+ * FAKTÚRA NA ĎALŠÍ BALÍČEK JE UHRADENÁ PLATBOU VOPRED (Jerry, 4. 11. 2026).
+ *
+ * Balíček ešte nie je, takže pravidlo „zaplatený balíček" nemá čo čítať. Platí
+ * platba na sumu faktúry od jej vystavenia, ktorú Kokpit označil ako vopred
+ * (klient v tej chvíli nič nedlžil) a nie je už na inej faktúre. Platba, ktorá
+ * išla na starý dlh, faktúru neuhradí; to rozhodne až balíček.
+ */
+export function fakturyNaDalsiUhradene(
+  faktury: { id: string; klient: string; vystavene: string; celkom: number }[],
+  platby: { id: string; klient: string; datum: string; suma: number; vopred?: number | boolean | null }[],
+  pouzite: Set<string>,
+): { id: string; den: string; platbaId: string }[] {
+  const out: { id: string; den: string; platbaId: string }[] = [];
+  const vzate = new Set(pouzite);
+  for (const f of [...faktury].sort((a, b) => a.vystavene.localeCompare(b.vystavene))) {
+    const p = platby
+      .filter((x) => x.vopred && !vzate.has(x.id) && normName(x.klient) === normName(f.klient)
+        && Math.abs(Math.round(x.suma) - Math.round(f.celkom)) <= 1 && x.datum >= f.vystavene)
+      .sort((a, b) => a.datum.localeCompare(b.datum))[0];
+    if (!p) continue;
+    vzate.add(p.id);
+    out.push({ id: f.id, den: p.datum, platbaId: p.id });
+  }
+  return out;
+}
+
+/**
  * FAKTÚRA ZA VIACERÝCH JE UHRADENÁ, KEĎ Z JEDNÉHO PREVODU DOSTAL SVOJ DIEL KAŽDÝ.
  *
  * Jerry, 29. 10. 2026 nad Branislavom a Lindou. Pravidlo „zaplatený balíček

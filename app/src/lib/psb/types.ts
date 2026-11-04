@@ -232,6 +232,8 @@ export type PSBData = {
   fotkyKlientov?: import("./fotkyOdkazy").FotkyKlientov;
   /** Fakturačné údaje, ktoré klient vyplnil sám cez odkaz po úvodnom (posledných 30 dní). */
   fakturyOdKlientov?: import("./fakturaKlienta").FakturaOdKlienta[];
+  /** Klienti s faktúrou, ktorá čaká na ďalší balíček (`fakturaNaDalsi.server.ts`). */
+  fakturyNaDalsi?: string[];
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;
