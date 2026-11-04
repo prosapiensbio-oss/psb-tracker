@@ -262,6 +262,8 @@ je kde pozrieť).
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
+**Návrhy 4. 11. 2026 čakajú na Jerryho výber:** `navrhy-kokpitu/mailer.html` (analýza konkurencie, návrhy A–D, skupiny, 12 upozornení, 7 rozhodnutí). Odporúčané C + kroky z A, najviac 1–2 maily mesačne, brzda 14 dní, odosielanie len po kliknutí. **Prvé treba doplniť políčko súhlasu** do formulárov na dokumenty a test postury: dokumenty nemajú žiadnu vetu o súhlase, test len „za účelem kontaktování“, takže nové kontakty sa zatiaľ nedajú osloviť. Nič z toho ešte nie je postavené.
+
 Jerry: „MailerLite — nedala by sa podobná aplikácia postaviť?" a „vedel by si
 to niekde do Kokpitu uložiť a pripraviť stavbu maileru niekedy v budúcnosti?"
 

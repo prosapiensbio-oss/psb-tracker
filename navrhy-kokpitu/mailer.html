@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mailer návrhy</title>
+<style>
+:root{--bg:#1a1e16;--card:#252b1f;--card2:#2d3426;--line:#6b8c4240;--text:#e0dcc8;--muted:#aaa995;--dim:#90927b;--acc:#d89a62;--acc2:#6b8c42;--light:#95c45a;--green:#8fbe52;--orange:#d4a04a;--red:#d0705a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--light)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+header.top{position:sticky;top:0;z-index:5;background:#1a1e16f2;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+header .in{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+header b{margin-right:10px;font-size:15px}
+.tab{background:none;border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:9px;font:600 13px/1 inherit;font-family:inherit;cursor:pointer}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#231a10}
+section{display:none;padding-top:26px}
+section.on{display:block}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px}
+h2{font-size:20px;margin:30px 0 8px}
+h3{font-size:15px;margin:0 0 5px}
+p{margin:0 0 12px;max-width:760px}
+.mut{color:var(--muted)}.dim{color:var(--dim);font-size:13px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.lead{background:var(--card2);border-left:4px solid var(--acc);border-radius:0 12px 12px 0;padding:14px 16px;margin:0 0 18px;max-width:860px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;background:var(--card)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ok{color:var(--green);font-weight:600}.po{color:var(--orange);font-weight:600}.no{color:var(--red);font-weight:600}
+ol.clean,ul.clean{margin:0;padding-left:20px}ol.clean li,ul.clean li{margin-bottom:7px}
+.letters{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.let{width:64px;height:64px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--text);font-family:inherit;font-size:30px;font-weight:800;line-height:1;cursor:pointer}
+.let.on{background:var(--acc);border-color:var(--acc);color:#231a10}
+.navrh{display:none}.navrh.on{display:block}
+.reko{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;color:#231a10;background:var(--green);padding:3px 8px;border-radius:7px;vertical-align:middle}
+.zar{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start;margin-top:14px}
+@media(max-width:940px){.zar{grid-template-columns:minmax(0,1fr)}}
+.zn{font-size:12px;color:var(--dim);margin:0 0 6px}
+.pc{background:#14170f;border:1px solid var(--line);border-radius:14px;padding:14px;min-height:430px;overflow:hidden}
+.tel{background:#14170f;border:7px solid #33392a;border-radius:30px;padding:14px 11px;min-height:600px;max-width:340px;width:100%;overflow:hidden;font-size:13.5px}
+.ucard{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:9px}
+.hd{font-weight:700;font-size:16px;margin:0 0 3px}
+.kroky{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
+.krok{flex:1 1 90px;background:var(--card);border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:8px;font:600 12.5px/1.2 inherit;font-family:inherit;cursor:pointer;text-align:left}
+.krok.on{background:var(--acc);border-color:var(--acc);color:#231a10}
+.pole{display:block;width:100%;background:#1a1e16;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin:4px 0 10px;min-height:34px}
+.lb{font-size:12px;color:var(--muted);font-weight:600}
+.btn{display:inline-block;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:600;margin:0 5px 5px 0}
+.btn.p{background:#4c6a2c;border-color:#6b8c42;color:#eef5df}
+.chip{display:inline-block;font-size:11.5px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--muted);margin-right:4px}
+.chip.ok{color:var(--green);font-weight:600}.chip.po{color:var(--orange);font-weight:600}.chip.no{color:var(--red);font-weight:600}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.row:last-child{border-bottom:0}
+.mailv{background:#fbfaf5;color:#1a2e24;border-radius:10px;padding:13px 14px;font-size:13px;line-height:1.55}
+.mailv .pr{font-weight:700;margin-bottom:8px}
+.mailv .pa{margin-top:12px;padding-top:8px;border-top:1px solid #d9d6c8;font-size:11px;color:#5b6b60}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media(max-width:640px){.cols,.kan{grid-template-columns:1fr}}
+.kk{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px;min-height:220px}
+.kk h4{margin:0 0 7px;font-size:12px;color:var(--muted)}
+.kl{background:var(--card2);border-radius:8px;padding:7px 8px;font-size:12px;margin-bottom:6px}
+.flow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 2px;font-size:13px}
+.flow span{background:var(--card2);border-radius:8px;padding:5px 9px}
+.flow i{font-style:normal;color:var(--dim)}
+.wn{border-left:3px solid var(--orange);padding:9px 12px;background:#d4a04a14;border-radius:0 9px 9px 0;margin:8px 0;font-size:13.5px}
+.bar{height:7px;background:var(--card2);border-radius:4px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--light)}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+<b>Mailer</b>
+<button class="tab on" data-s="s1">1 Zhrnutie</button>
+<button class="tab" data-s="s2">2 Konkurencia</button>
+<button class="tab" data-s="s3">3 Návrhy A–D</button>
+<button class="tab" data-s="s4">4 Skupiny a automatika</button>
+<button class="tab" data-s="s5">5 Na čo si zabudol</button>
+<button class="tab" data-s="s6">6 Rozhodnutia</button>
+</div></header>
+<div class="wrap">
+
+<!-- 1 ZHRNUTIE -->
+<section id="s1" class="on">
+<h1>Čo z toho vyšlo</h1>
+<div class="lead"><b>Stavať sa to oplatí, ale týždenne neposielaj.</b> Tvoja výhoda oproti všetkým týmto appkám je, že Kokpit vie, kto trénuje, kto skončil a kto bol len na úvodnom. Najprv však treba opraviť jednu vec: formuláre na dokumenty nemajú žiadnu vetu o súhlase.</div>
+
+<div class="g3">
+<div class="box"><h3>Tvoj bod 2: ako často</h3><p class="mut" style="margin:0">Máš pravdu v oboch smeroch. Navrhujem <b>najviac 1 až 2 maily mesačne</b> a brzdu: nikto nedostane dva hromadné maily do 14 dní. A mail bez odpovede na otázku „prečo to ten človek chce dostať?" sa nedá odoslať.</p></div>
+<div class="box"><h3>Tvoj bod 5: Forminator</h3><p class="mut" style="margin:0"><span class="ok">Áno, už to funguje.</span> Od 22. 9. 2026 prišlo do Kokpitu 15 kontaktov z dokumentov aj s názvom dokumentu. Do zoznamu na maily ale tieto kontakty nejdú: z 13 nových nie sú v ňom 11. <span class="po">Bez súhlasu im newsletter posielať nemôžeš.</span></p></div>
+<div class="box"><h3>Tvoj bod 6: test postury</h3><p class="mut" style="margin:0">Skupina sa dá vytvoriť hneď: 3 kontakty z webu a 9 ľudí zo starej skupiny Postura. Veta vo formulári ale hovorí „za účelem kontaktování". Na výsledok testu to stačí, na newsletter nie.</p></div>
+</div>
+
+<h2>Čo hovoria tvoje vlastné maily</h2>
+<div class="scroll"><table>
+<tr><th>Kampaň</th><th>Dátum</th><th class="n">Adresátov</th><th class="n">Otvorilo</th><th class="n">Kliklo</th><th class="n">Odhlásilo</th></tr>
+<tr><td>Biohacking, ďakovný mail</td><td>13. 6. 2025</td><td class="n">452</td><td class="n">35 %</td><td class="n">7,1 %</td><td class="n">2,0 %</td></tr>
+<tr><td>Článok o funkčnom tréningu</td><td>22. 6. 2025</td><td class="n">444</td><td class="n">40 %</td><td class="n">4,1 %</td><td class="n">3,2 %</td></tr>
+<tr><td><b>Prvý mail, menšia skupina</b></td><td>16. 10. 2025</td><td class="n"><b>149</b></td><td class="n"><b class="ok">61 %</b></td><td class="n"><b class="ok">6,0 %</b></td><td class="n">2,0 %</td></tr>
+<tr><td>Prvý mail, väčšia skupina</td><td>20. 10. 2025</td><td class="n">426</td><td class="n">25 %</td><td class="n">0,7 %</td><td class="n">2,8 %</td></tr>
+<tr><td>Štruktúra pred technikou</td><td>19. 7. 2026</td><td class="n">414</td><td class="n">20 %</td><td class="n">0,7 %</td><td class="n">1,0 %</td></tr>
+</table></div>
+<p class="dim" style="margin-top:8px">Rovnaký mail mal v menšej skupine 2,4-krát vyššie otvorenie a asi 8-krát vyšší preklik. Veľkosť skupiny (149) zodpovedá skupinám klientov zo septembra 2025, adresátov tej kampane však Kokpit nemá uložených, takže je to dobrý odhad, nie dôkaz. Otvorenia sú navyše len hrubý údaj, lebo niektoré poštové appky ich zapisujú samé.</p>
+<div class="lead" style="margin-top:12px"><b>Z toho plynie celý návrh:</b> menej mailov, menšie skupiny a konkrétny dôvod. Práve tak sa to dá zladiť s tým, že sám nechceš byť tých 65 tisíc mailov v niečej schránke.</div>
+
+<h2>Čo odporúčam</h2>
+<ol class="clean">
+<li><b>Návrh C + kroky z A:</b> Kokpit sám navrhne dôvod napísať, potom prejdeš tvoje štyri kroky. Pozri záložku 3.</li>
+<li><b>Skupiny počíta Kokpit sám, odosielaš ty.</b> Rovnako ako pri BTC platbách a SMS: appka pripraví, človek potvrdí.</li>
+<li><b>Najprv veta o súhlase vo formulároch.</b> Každý deň bez nej pribúdajú kontakty, ktorým nemôžeš písať.</li>
+<li><b>Prvý mail malej skupine,</b> nie 396 ľuďom. Vyhodnotíme odpovede a odhlásenia a až potom rozšírime.</li>
+</ol>
+</section>
+
+<!-- 2 KONKURENCIA -->
+<section id="s2">
+<h1>Ako fungujú tieto appky</h1>
+<p class="mut">Všetky stoja na štyroch veciach: skupiny ľudí, spúšťač, čakanie alebo podmienka a odoslanie. Líšia sa len tým, ako ďaleko to dotiahli.</p>
+<div class="scroll"><table>
+<tr><th>Appka</th><th>V čom je silná</th><th>Čo od nej zobrať</th><th>Čo nebrať</th></tr>
+<tr><td><b>MailerLite</b><br><span class="dim">ten, čo si mal</span></td><td>Jednoduchý editor. Spúšťače: vstup do skupiny, klik, formulár, dátum, nákup. Rozdelenie podľa správania.</td><td><span class="ok">Vstup do skupiny spúšťa ďalší krok.</span> A krok „interné upozornenie" namiesto odoslania.</td><td>Ručné skupiny. Tvoja „Klienti aktívny sep.25" je dnes už neplatná.</td></tr>
+<tr><td><b>Kit</b><br><span class="dim">pre tvorcov</span></td><td>Vizuálna mapa cesty človeka, štítky, vetvenie podľa kliku alebo nečinnosti.</td><td><span class="ok">Vetvenie podľa správania</span> a séria mailov po dokumente.</td><td>Veľký kresliaci nástroj. Pri tvojom počte ľudí je to viac práce než úžitku.</td></tr>
+<tr><td><b>Ecomail</b><br><span class="dim">česká</span></td><td>Český jazyk, automatizácie aj SMS. Od 200 Kč mesačne pri plnom pláne, skutočná cena podľa počtu kontaktov.</td><td><span class="ok">Vzor, ako riešiť české maily.</span> Slúži aj ako porovnanie ceny.</td><td>Košíky a správanie na e-shope.</td></tr>
+<tr><td><b>SmartEmailing</b><br><span class="dim">česká</span></td><td>Podľa recenzií silnejšia automatizácia a analytika, ale drahšia.</td><td>Len pre porovnanie: oproti Ecomailu pre tvoj rozsah nič podstatné nepridá.</td><td>Cenu. Za pokročilé funkcie by si platil, ale nevyužil by si ich.</td></tr>
+<tr><td><b>Buttondown</b></td><td>Obyčajný text bez návrhára, krátky mail od človeka.</td><td><span class="ok">Písanie ako list, nie ako leták.</span> Sedí to k tomu, čo o mailoch hovoríš.</td><td>Nemá prepojenie na tréningy.</td></tr>
+<tr><td><b>Loops</b></td><td>Mail spúšťa udalosť v appke, nie kalendár.</td><td><span class="ok">Spúšťač je udalosť:</span> „prvý tréning", „skončil balíček", „neprišiel 60 dní".</td><td>Je pre softvérové firmy a jeho cena pre tento rozsah nedáva zmysel.</td></tr>
+</table></div>
+
+<h2>Čo si zoberieme</h2>
+<div class="g2">
+<div class="box"><h3>1. Skupiny, ktoré sa počítajú samy</h3><p class="mut" style="margin:0">Človek sa presúva podľa toho, čo sa naozaj stalo. Žiadne „Klienti sep.25".</p></div>
+<div class="box"><h3>2. Udalosť ako spúšťač</h3><p class="mut" style="margin:0">Kokpit ich už pozná: úvodný, prvý balíček, koniec balíčka, dokument, test postury.</p></div>
+<div class="box"><h3>3. Upozornenie namiesto odoslania</h3><p class="mut" style="margin:0">„Ozvať sa 8 ľuďom po úvodnom?" príde ako notifikácia. Rozhodneš ty.</p></div>
+<div class="box"><h3>4. Mail ako list</h3><p class="mut" style="margin:0">Text, podpis, jeden odkaz. Žiadne bannery, ľahko sa píše a dobre sa doručuje.</p></div>
+</div>
+
+<h2>Čo nestaviame</h2>
+<p class="mut">Kreslenie mailov z blokov, porovnávanie dvoch verzií predmetu (pri 400 ľuďoch to nič spoľahlivo nepovie), vyskakovacie okná, košíky a kreslenú mapu automatizácií. Dá sa to doplniť, keď sa ukáže, že to chýba.</p>
+
+<h2>Postaviť alebo kúpiť?</h2>
+<div class="scroll"><table>
+<tr><th></th><th>Postaviť v Kokpite</th><th>Kúpiť Ecomail</th></tr>
+<tr><td>Cena</td><td><b>Pravdepodobne 0 Kč:</b> Resend má marketingový plán zdarma do 1 000 kontaktov</td><td>Od 200 Kč mesačne bez DPH, skutočná cena podľa počtu kontaktov</td></tr>
+<tr><td>Skupiny podľa tréningov</td><td class="ok">Sú tam od prvého dňa</td><td class="po">Kokpit by ich tam musel neustále posielať</td></tr>
+<tr><td>Kontakty</td><td class="ok">Na jednom mieste</td><td class="po">Dve evidencie, ktoré sa môžu rozísť</td></tr>
+<tr><td>Práca</td><td class="po">Odhad z 27. 10.: 2 až 3 dni a nastavenie domény, ďalej údržba</td><td class="ok">Hneď, vrátane editora</td></tr>
+<tr><td>Doručovanie</td><td class="ok">Rieši služba, ty len doménu</td><td class="ok">Rieši Ecomail</td></tr>
+</table></div>
+<p class="dim" style="margin-top:8px"><b>Odporúčam postaviť</b>, lebo hlavná hodnota sú skupiny z Kokpitu. Keby si však chcel posielať len jeden newsletter celému zoznamu, Ecomail by ti stačil a bol by rýchlejší.</p>
+
+<h2>Zdroje</h2>
+<p class="dim">Z oficiálnych stránok som overil MailerLite, Kit, ceny Ecomailu a Resendu, pravidlá Gmailu a zákon. SmartEmailing, Buttondown a Loops sú z recenzií a porovnaní, ich ceny a detaily ber orientačne.<br>
+<a href="https://www.mailerlite.com/features/automation">MailerLite: automatizácie</a> · <a href="https://kit.com/features/automations">Kit: automatizácie</a> · <a href="https://ecomail.cz/cenik">Ecomail: cenník</a> · <a href="https://www.arecenze.cz/e-mailingove-nastroje/smartemailing/">SmartEmailing: recenzia</a> · <a href="https://toolradar.com/compare/buttondown-vs-loops">Buttondown a Loops: porovnanie</a> · <a href="https://resend.com/pricing">Resend: cenník</a> · <a href="https://support.google.com/a/answer/81126">Gmail: pravidlá pre odosielateľov</a> · <a href="https://www.zakonyprolidi.cz/cs/2004-480">Zákon 480/2004 Sb.</a></p>
+</section>
+
+<!-- 3 NÁVRHY -->
+<section id="s3">
+<h1>Ako by to mohlo vyzerať</h1>
+<p class="mut">Čísla v ukážkach sú skutočné, meno v mailoch je vymyslené a text je pracovný. Nič z toho ešte nebeží. Kliknutím na písmeno prepínaš, pri návrhu A sa dajú klikať aj kroky.</p>
+<div class="letters">
+<button class="let on" data-n="nA">A</button><button class="let" data-n="nB">B</button><button class="let" data-n="nC">C</button><button class="let" data-n="nD">D</button>
+</div>
+
+<!-- A -->
+<div class="navrh on" id="nA">
+<h2 style="margin-top:4px">A · Štyri kroky <span class="mut" style="font-weight:400;font-size:14px">Tvoj návrh: vždy len jedna otázka na obrazovke.</span></h2>
+<div class="zar">
+<div><p class="zn">Počítač</p><div class="pc">
+<div class="kroky" data-kroky="a">
+<button class="krok on" data-k="a1">1 Nápad</button><button class="krok" data-k="a2">2 Návrh</button><button class="krok" data-k="a3">3 Skupina</button><button class="krok" data-k="a4">4 Odoslanie</button>
+</div>
+<div data-kv="a1">
+<div class="hd">Čo chceš povedať?</div><p class="dim">Nápad môže prísť od teba, od Jarvisa alebo z návrhov Kokpitu.</p>
+<label class="lb">Téma</label><div class="pole">Ako je ľuďom po úvodnom tréningu</div>
+<label class="lb">Prečo to ten človek chce dostať? <span class="po">povinné</span></label><div class="pole">Po úvodnom neprišli a nikto sa ich nespýtal prečo. Dostanú otázku, nie ponuku.</div>
+<div class="wn"><b>Test schránky:</b> keby si tento mail dostal ty, otvoril by si ho? Keď nie, nepokračuj.</div>
+<span class="btn p">Ďalej: napísať text</span>
+</div>
+<div data-kv="a2" hidden>
+<div class="cols"><div>
+<div class="hd">Text</div>
+<label class="lb">Predmet</label><div class="pole">Jak ti je po úvodním tréninku?</div>
+<label class="lb">Text</label><div class="pole" style="min-height:130px">Ahoj {oslovení},<br><br>od úvodního tréninku uplynul nějaký čas. Nepíšu, abych ti něco prodával. Změnilo se od té doby něco, co tě tehdy trápilo?<br><br>Stačí odpovědět na tenhle mail, přečtu si to sám.<br><br>Filip</div>
+<span class="btn">Navrhnúť s Jarvisom</span><span class="btn p">Ďalej: komu</span>
+</div><div>
+<p class="zn">Takto to príde</p>
+<div class="mailv"><div class="pr">Jak ti je po úvodním tréninku?</div>Ahoj Martine,<br><br>od úvodního tréninku uplynul nějaký čas. Nepíšu, abych ti něco prodával. Změnilo se od té doby něco, co tě tehdy trápilo?<br><br>Stačí odpovědět na tenhle mail, přečtu si to sám.<br><br>Filip<div class="pa">Obchodní sdělení ProSapiens Biomechanic. Odhlásit se jedním klikem</div></div>
+</div></div>
+</div>
+<div data-kv="a3" hidden>
+<div class="hd">Komu</div><p class="dim">Skupiny sa počítajú samy. Vidíš, koľkým naozaj smieš napísať a prečo nie ostatným.</p>
+<div class="row"><span><input type="checkbox" checked disabled> <b>Bol len na jednom tréningu</b></span><span class="ok">8 z 12</span></div>
+<div class="row"><span><input type="checkbox" disabled> Skončil po viacerých tréningoch</span><span>43 z 48</span></div>
+<div class="row"><span><input type="checkbox" disabled> Trénuje teraz</span><span>44 z 58</span></div>
+<div class="row"><span><input type="checkbox" disabled> Stiahol si dokument v roku 2025</span><span>396</span></div>
+<div class="row mut"><span><input type="checkbox" disabled> Dokument od 9/2026 <span class="chip no">bez súhlasu</span></span><span>0 z 13</span></div>
+<div class="row mut"><span><input type="checkbox" disabled> Test postury <span class="chip no">len kontaktovanie</span></span><span>0 z 3</span></div>
+<p class="dim" style="margin-top:9px">Vynechaní: 4 odmietli maily v anamnéze. Nedostal mail do 14 dní: všetci.</p>
+<span class="btn p">Ďalej: kontrola</span>
+</div>
+<div data-kv="a4" hidden>
+<div class="hd">Kontrola a odoslanie</div>
+<div class="row"><span>Odkaz na odhlásenie a označenie „obchodní sdělení"</span><span class="ok">v poriadku</span></div>
+<div class="row"><span>Oslovenie sedí všetkým</span><span class="ok">8 z 8</span></div>
+<div class="row"><span>Skúšobný mail tebe</span><span class="po">poslať</span></div>
+<div class="row"><span>Nikto nedostal mail v posledných 14 dňoch</span><span class="ok">v poriadku</span></div>
+<p style="margin-top:12px"><span class="btn">Poslať skúšobný</span><span class="btn">Naplánovať</span><span class="btn p">Odoslať 8 ľuďom</span></p>
+<p class="dim">Po odoslaní sa tu ukážu odpovede, odhlásenia a kto potom prišiel na tréning.</p>
+</div>
+</div></div>
+<div><p class="zn">Telefón</p><div class="tel">
+<div class="kroky"><span class="krok on" style="flex:1">1 Nápad</span><span class="krok" style="flex:1">2</span><span class="krok" style="flex:1">3</span><span class="krok" style="flex:1">4</span></div>
+<div class="hd">Čo chceš povedať?</div>
+<label class="lb">Téma</label><div class="pole">Ako je ľuďom po úvodnom tréningu</div>
+<label class="lb">Prečo to ten človek chce dostať?</label><div class="pole" style="min-height:80px">Po úvodnom neprišli a nikto sa ich nespýtal prečo. Dostanú otázku, nie ponuku.</div>
+<div class="wn">Keby si tento mail dostal ty, otvoril by si ho?</div>
+<span class="btn p" style="display:block;text-align:center">Ďalej</span>
+</div></div>
+</div>
+<p class="dim" style="margin-top:12px"><b>Dobré na:</b> Terezka to zvládne sama, nič sa nedá preskočiť. <b>Slabina:</b> čistý list papiera. Musíš prísť s nápadom sám a mail sa ľahko odkladá.</p>
+</div>
+
+<!-- B -->
+<div class="navrh" id="nB">
+<h2 style="margin-top:4px">B · Jedna strana <span class="mut" style="font-weight:400;font-size:14px">Všetko naraz: píšeš vľavo, náhľad a adresáti sú vpravo.</span></h2>
+<div class="zar">
+<div><p class="zn">Počítač</p><div class="pc">
+<div class="cols">
+<div><div class="hd">Nový mail</div>
+<label class="lb">Predmet</label><div class="pole">Jak ti je po úvodním tréninku?</div>
+<label class="lb">Text</label><div class="pole" style="min-height:185px">Ahoj {oslovení},<br><br>od úvodního tréninku uplynul nějaký čas. Nepíšu, abych ti něco prodával. Změnilo se od té doby něco, co tě tehdy trápilo?<br><br>Stačí odpovědět na tenhle mail, přečtu si to sám.<br><br>Filip</div>
+<label class="lb">Prečo to ten človek chce dostať?</label><div class="pole">Dostane otázku, nie ponuku.</div>
+</div>
+<div><label class="lb">Komu</label><div class="pole">Bol len na jednom tréningu <span class="ok">· 8 ľudí</span></div>
+<div class="mailv"><div class="pr">Jak ti je po úvodním tréninku?</div>Ahoj Martine,<br><br>od úvodního tréninku uplynul nějaký čas...<div class="pa">Obchodní sdělení. Odhlásit se</div></div>
+<p style="margin-top:10px"><span class="chip ok">odhlásenie</span><span class="chip ok">14 dní</span><span class="chip po">skúšobný neodišiel</span></p>
+<span class="btn">Skúšobný</span><span class="btn p">Odoslať</span>
+</div></div>
+</div></div>
+<div><p class="zn">Telefón</p><div class="tel">
+<div class="hd">Nový mail</div><label class="lb">Komu</label><div class="pole">Len na jednom tréningu · 8</div>
+<label class="lb">Predmet</label><div class="pole">Jak ti je po úvodním tréninku?</div>
+<label class="lb">Text</label><div class="pole" style="min-height:190px">Ahoj {oslovení},<br><br>od úvodního tréninku uplynul nějaký čas...</div>
+<span class="btn">Náhľad</span><span class="btn p">Odoslať</span>
+</div></div>
+</div>
+<p class="dim" style="margin-top:12px"><b>Dobré na:</b> najrýchlejšie, keď už vieš, čo chceš napísať. <b>Slabina:</b> všetky kontroly sú len malé značky a na telefóne je to tesné. Sám seba tak ľahko preskočíš.</p>
+</div>
+
+<!-- C -->
+<div class="navrh" id="nC">
+<h2 style="margin-top:4px">C · Kokpit navrhuje dôvod <span class="reko">odporúčam</span> <span class="mut" style="font-weight:400;font-size:14px">Začínaš od toho, komu a prečo má zmysel napísať.</span></h2>
+<div class="zar">
+<div><p class="zn">Počítač</p><div class="pc">
+<div class="hd">Komu má zmysel napísať</div>
+<p class="dim">Kokpit sleduje skupiny. Mail sa nezačína prázdnym listom, ale dôvodom. Tieto štyri sú zo skutočných čísel dnes.</p>
+<div class="ucard"><b>8 ľudí bolo len na jednom tréningu</b><div class="dim">Môžeš im napísať, nikto sa ich zatiaľ nespýtal, čo sa stalo.</div><p style="margin:8px 0 0"><span class="btn p">Napísať im</span><span class="btn">Teraz nie</span><span class="btn">Nikdy</span></p></div>
+<div class="ucard"><b>43 ľudí skončilo po viacerých tréningoch</b><div class="dim">Odišli v rôznom čase. Dá sa rozdeliť podľa toho, ako dávno.</div><p style="margin:8px 0 0"><span class="btn p">Napísať im</span><span class="btn">Teraz nie</span></p></div>
+<div class="ucard"><b>396 ľudí si stiahlo dokument a od 19. 7. nič nedostali</b><div class="dim">Najväčšia skupina, najnižší záujem. Začať po malých častiach, najprv 121 ľuďmi, čo otvorili aspoň 2 maily.</div><p style="margin:8px 0 0"><span class="btn p">Napísať im</span><span class="btn">Teraz nie</span></p></div>
+<div class="ucard" style="border-color:#d4a04a66"><b class="po">13 nových z dokumentov sa nedá osloviť</b><div class="dim">Formulár nemá vetu o súhlase.</div><p style="margin:8px 0 0"><span class="btn">Ukázať opravu formulára</span></p></div>
+<p class="dim">Po kliknutí „Napísať im" je skupina vybraná a dôvod vyplnený. Pokračuješ krokmi z návrhu A: text, kontrola, odoslanie.</p>
+</div></div>
+<div><p class="zn">Telefón</p><div class="tel">
+<div class="hd">Komu má zmysel napísať</div>
+<div class="ucard"><b>8 ľudí len na jednom tréningu</b><div class="dim">Nikto sa ich nespýtal, čo sa stalo.</div><p style="margin:8px 0 0"><span class="btn p">Napísať</span><span class="btn">Neskôr</span></p></div>
+<div class="ucard"><b>43 ľudí skončilo</b><div class="dim">Dá sa rozdeliť podľa toho, ako dávno.</div><p style="margin:8px 0 0"><span class="btn p">Napísať</span><span class="btn">Neskôr</span></p></div>
+<div class="ucard"><b>396 ľudí s dokumentom</b><div class="dim">Od 19. 7. nič nedostali.</div><p style="margin:8px 0 0"><span class="btn p">Napísať</span><span class="btn">Neskôr</span></p></div>
+<div class="ucard"><b class="po">13 nových bez súhlasu</b><div class="dim">Treba opraviť formulár.</div></div>
+</div></div>
+</div>
+<p class="dim" style="margin-top:12px"><b>Dobré na:</b> rieši tvoj hlavný problém, teda „bez dôvodu nepíšem". Prácu ti aj šetrí, nemusíš vymýšľať, komu písať. Dobre to vyzerá aj na telefóne. <b>Slabina:</b> treba postaviť pravidlá, ktoré dôvody vyberajú. Vlastný nápad potrebuje malé tlačidlo „Nový mail" navrchu.</p>
+</div>
+
+<!-- D -->
+<div class="navrh" id="nD">
+<h2 style="margin-top:4px">D · Nástenka <span class="mut" style="font-weight:400;font-size:14px">Každý mail je kartička, ktorá sa posúva zľava doprava.</span></h2>
+<div class="zar">
+<div><p class="zn">Počítač</p><div class="pc">
+<div class="hd" style="margin-bottom:9px">Maily</div>
+<div class="kan">
+<div class="kk"><h4>Nápady · 2</h4><div class="kl">Ako je ľuďom po úvodnom</div><div class="kl">Dýchanie: čo sa pýtajú najčastejšie</div></div>
+<div class="kk"><h4>Píše sa · 1</h4><div class="kl">Štruktúra, druhá časť<br><span class="dim">Jerry</span></div></div>
+<div class="kk"><h4>Čaká na kontrolu · 1</h4><div class="kl">Pre tých, čo skončili<br><span class="dim">43 ľudí · Terezka</span></div></div>
+<div class="kk"><h4>Odoslané · 1</h4><div class="kl">Štruktúra pred technikou<br><span class="dim">19. 7. · 414 ľudí<br>20 % otvorilo</span></div></div>
+</div>
+</div></div>
+<div><p class="zn">Telefón</p><div class="tel">
+<div class="hd" style="margin-bottom:8px">Maily</div>
+<div class="kroky"><span class="krok on">Nápady</span><span class="krok">Píše sa</span><span class="krok">Kontrola</span></div>
+<div class="kl">Ako je ľuďom po úvodnom</div><div class="kl">Dýchanie: čo sa pýtajú najčastejšie</div>
+<span class="btn p" style="margin-top:8px">Nový nápad</span>
+</div></div>
+</div>
+<p class="dim" style="margin-top:12px"><b>Dobré na:</b> keď na mailoch robíte s Terezkou spolu a máte ich v rozrobenom stave viac. <b>Slabina:</b> pri 1 až 2 mailoch mesačne bude skoro prázdna. Prácu ti neušetrí, len ju pekne ukáže.</p>
+</div>
+
+<h2>Porovnanie</h2>
+<div class="scroll"><table>
+<tr><th></th><th>A Kroky</th><th>B Jedna strana</th><th>C Dôvod <span class="ok">odporúčam</span></th><th>D Nástenka</th></tr>
+<tr><td>Zvládne Terezka sama</td><td class="ok">Áno</td><td class="po">S pomocou</td><td class="ok">Áno</td><td class="po">S pomocou</td></tr>
+<tr><td>Bráni mailu bez dôvodu</td><td class="ok">Áno</td><td class="po">Slabšie</td><td class="ok">Najviac</td><td class="no">Nie</td></tr>
+<tr><td>Šetrí prácu</td><td class="po">Trochu</td><td class="po">Keď už vieš čo</td><td class="ok">Najviac</td><td class="no">Nie</td></tr>
+<tr><td>Telefón</td><td class="ok">Dobrý</td><td class="po">Tesný</td><td class="ok">Dobrý</td><td class="po">Priemerný</td></tr>
+</table></div>
+<p style="margin-top:12px"><b>Odporúčam C ako vstup a A ako postup po kliknutí.</b> Nápad, návrh, skupina a odoslanie ostávajú, len prvý krok za teba často pripraví Kokpit.</p>
+</section>
+
+<!-- 4 SKUPINY -->
+<section id="s4">
+<h1>Skupiny a automatika</h1>
+<div class="lead"><b>Odpoveď na tvoj bod 4:</b> áno, Kokpit vie ľudí zaraďovať sám. Mail od klienta má z fakturačných údajov, anamnézy alebo dopytu. Keď je po úvodnom a neprišiel, je v jednej skupine, keď pokračuje, v druhej. Dokument a test postury prídu z formulára. Skupinu si drží sám, nič sa neprepisuje ručne.</div>
+<div class="scroll"><table>
+<tr><th>Skupina</th><th>Kto v nej je a odkiaľ to vieme</th><th class="n">S mailom</th><th class="n">Smieš napísať</th><th>Prečo</th></tr>
+<tr><td><b>Trénuje teraz</b></td><td>Stav klienta Aktívny alebo Sporadický</td><td class="n">58</td><td class="n ok">44</td><td>Tvoj zákazník, 14 odmietlo v anamnéze</td></tr>
+<tr><td><b>Pauza</b></td><td>Stav klienta Pauza</td><td class="n">3</td><td class="n ok">1</td><td>Zákazník, 2 odmietli</td></tr>
+<tr><td><b>Bol len na jednom tréningu</b></td><td>Jeden tréning, ďalej nepokračoval</td><td class="n">12</td><td class="n ok">8</td><td>Zákazník, 4 odmietli</td></tr>
+<tr><td><b>Skončil po viacerých</b></td><td>Viac tréningov, dnes neaktívny</td><td class="n">48</td><td class="n ok">43</td><td>Zákazník, 5 odmietlo</td></tr>
+<tr><td><b>Dokument 2025</b></td><td>Starý zoznam z MailerLite, bez klientov: Fascie 334, MFR 54, Biomechanika 23, Postura 9, Mechanotransdukce 3, Strečing 3</td><td class="n">396</td><td class="n po">396</td><td>Odhlásení vynechaní. Treba dohľadať, čo presne odsúhlasili</td></tr>
+<tr><td><b>Dokument od 9/2026</b></td><td>Forminator, známe aj ktorý dokument</td><td class="n">13</td><td class="n no">0</td><td>Vo formulári nie je veta o súhlase</td></tr>
+<tr><td><b>Test postury</b></td><td>Formulár testu</td><td class="n">3</td><td class="n no">0</td><td>Súhlas len „za účelem kontaktování"</td></tr>
+<tr><td><b>Dopyt, neprišiel</b></td><td>Vyplnil dopyt, tréning nebol</td><td class="n">6</td><td class="n no">0</td><td>Súhlas na vybavenie dopytu, nie na newsletter</td></tr>
+</table></div>
+<p class="dim" style="margin-top:8px">Počty sú z ostrých dát k 4. 11. 2026 a sú približné, lebo mailu a menu sa nie vždy dá priradiť človek. Ľudia z dokumentov môžu byť vo viacerých podskupinách, 396 je počet bez duplicít. Stĺpec „Smieš napísať" je môj výklad zákona uvedený nižšie, nie právne stanovisko.</p>
+
+<h2>Čo sa deje samo a čo nie</h2>
+<div class="g2">
+<div class="box"><h3 class="ok">Samo</h3><ul class="clean mut">
+<li>Zaradenie do skupiny a presun medzi skupinami</li>
+<li>Odhlásenie, tvrdé nedoručenie, sťažnosť: človek je hneď vyradený</li>
+<li>Návrh „Komu má zmysel napísať" a upozornenie</li>
+<li>Výsledky: odpovede, odhlásenia, kto potom prišiel</li>
+</ul></div>
+<div class="box"><h3 class="po">Až po tvojom kliknutí</h3><ul class="clean mut">
+<li>Každý hromadný mail</li>
+<li>Prvé spustenie série mailov</li>
+<li>Dokument po vyplnení formulára chodí sám ako doteraz, to je služba a nie newsletter</li>
+</ul></div>
+</div>
+
+<h2>Príklady ciest</h2>
+<div class="box" style="margin-bottom:10px"><b>Úvodný tréning</b>
+<div class="flow"><span>Bol na úvodnom</span><i>→</i><span>14 dní nič</span><i>→</i><span>skupina „Len na jednom"</span><i>→</i><span>upozornenie tebe</span><i>→</i><span>klikneš, mail odíde</span></div>
+<div class="dim">Keď medzitým príde na tréning, zo skupiny vypadne a mail nedostane.</div></div>
+<div class="box"><b>Dokument</b>
+<div class="flow"><span>Stiahol si protokol MFR a súhlasil</span><i>→</i><span>skupina „MFR"</span><i>→</i><span>po 7 dňoch krátky list k téme</span><i>→</i><span>keď klikne, ponuka úvodného</span></div>
+<div class="dim">Bez súhlasu dostane len samotný dokument. Sériu by som zapol až po prvých výsledkoch ručných mailov.</div></div>
+
+<h2>Oprava formulárov: hotový text</h2>
+<div class="box">
+<p><b>Dokumenty</b> (dnes tam je len meno, mail a tlačidlo), nepovinné políčko, predvolene nezaškrtnuté:</p>
+<p class="mailv" style="max-width:560px">☐ Chci občas dostat e-mail o tréninku a pohybu od ProSapiens. Odhlásit se můžeš jedním klikem.</p>
+<p style="margin-top:12px"><b>Test postury</b> dnes hovorí „za účelem kontaktování". Pridať rovnaké samostatné políčko, tá veta môže ostať.</p>
+<p class="dim" style="margin:0">Dokument musí dať aj tomu, kto políčko nezaškrtne. Podmieňovať stiahnutie súhlasom s newsletterom je rizikové. Počet súhlasov bude nižší než počet stiahnutí, ale budú to ľudia, ktorí mail naozaj chcú.</p>
+</div>
+</section>
+
+<!-- 5 NA ČO SI ZABUDOL -->
+<section id="s5">
+<h1>Na čo si zabudol</h1>
+<div class="g2">
+<div class="box"><h3 class="no">1. Zákon je prísnejší, než sa zdá</h3><p class="mut" style="margin:0">Zákon 480/2004 chce predchádzajúci súhlas, alebo musí ísť o tvojho zákazníka a tvoje obdobné služby. Každý mail musí mať označenie obchodného oznámenia, skutočného odosielateľa a jednoduché odhlásenie. Zákon uvádza pri firme alebo živnostníkovi pokutu až 10 miliónov Kč, skutočné pokuty v malých prípadoch boli rádovo tisíce až desaťtisíce. <b>Nie som právnik:</b> skupinu Dokument 2025 aj znenie políčka by som dal pred prvým mailom skontrolovať.</p></div>
+<div class="box"><h3 class="no">2. Klientka, ktorá nechce maily</h3><p class="mut" style="margin:0">Pri klientovi chýba jednoduché „neposielať maily". Treba ho doplniť, aj odpoveď typu „nechcem" musí končiť týmto príznakom. Zistiť treba aj to, kto to bola, lebo v dátach to nie je.</p></div>
+<div class="box"><h3 class="no">3. Zdravotné údaje sa do skupín nedávajú</h3><p class="mut" style="margin:0">Výsledok testu postury, „bolí chrbát" alebo odpovede z anamnézy nesmú tvoriť skupinu. Skupina „bolí ho chrbát" by bola spracovanie citlivých údajov, a na to súhlas nemáš.</p></div>
+<div class="box"><h3 class="po">4. Dôkaz súhlasu</h3><p class="mut" style="margin:0">Zákon chce, aby si súhlas vedel preukázať. Export z MailerLite má dátum prihlásenia a skupinu, ale nie znenie formulára, a účet je podľa zoznamu zrušený. Odteraz treba ku každému kontaktu ukladať kedy, kde a akú vetu odsúhlasil.</p></div>
+<div class="box"><h3 class="po">5. Odpoveď na mail</h3><p class="mut" style="margin:0">Maily majú vyzývať na odpoveď. Keď pôjde na info@, Kokpit ju môže vziať ako nový dopyt. Treba ju spoznať a priradiť k pôvodnému mailu. Kampaň zároveň nesmie odchádzať z info@, aby neohrozila faktúry.</p></div>
+<div class="box"><h3 class="po">6. Doména a rozbeh</h3><p class="mut" style="margin:0">Vlastná adresa ako news.prosapiens.cz, overenie domény a prvé odoslania po malých dávkach. Pri nastavení domény budem potrebovať teba. Sťažnosti na spam treba držať pod 0,1 %. Pri 0,3 % a viac už Gmail začne maily obmedzovať.</p></div>
+<div class="box"><h3 class="po">7. Ako merať úspech</h3><p class="mut" style="margin:0">Otvorenia sú nepresné. Hlavné čísla by mali byť odpovede, odhlásenia a kto prišiel na tréning do 30 dní. Podľa poznámok sa z 525 ľudí z dokumentov nestal žiaden klient, takže cieľom série musí byť krok k tréningu, nie ďalšie PDF.</p></div>
+<div class="box"><h3>8. Kto píše a pod kým</h3><p class="mut" style="margin:0">Klient Terezky má dostať mail od Terezky, nie od Filipa. Znamená to odosielateľa podľa trénera, oslovenie v piatom páde a tykanie.</p></div>
+<div class="box"><h3>9. Jeden človek, viac adries</h3><p class="mut" style="margin:0">Ten istý človek môže byť klientom aj v starom zozname a mať dva maily. Nesmie dostať mail dvakrát. Keď sa jedna adresa odhlási, treba sa spýtať, čo s druhou.</p></div>
+<div class="box"><h3>10. Kde je hranica medzi Kokpitom a Strižňou</h3><p class="mut" style="margin:0">Dohodli ste, že Kokpit rozhoduje a Strižňa vyrába. Mailer by som dal celý do Kokpitu, lebo potrebuje klientov a server na odosielanie. Nápady zo Strižne sa doň môžu dostať neskôr.</p></div>
+<div class="box"><h3>11. Zoznam stále nerastie sám</h3><p class="mut" style="margin:0">Bez políčka súhlasu vo formulároch ostane v budúcnosti len starý zoznam a klienti. Z pohľadu rastu je táto malá oprava dôležitejšia než samotný Mailer.</p></div>
+<div class="box"><h3>12. Prehľad pre Jarvisa a zdravie Kokpitu</h3><p class="mut" style="margin:0">Jarvis musí poznať kampane aj skupiny a plánovač musí hlásiť, či odosielanie funguje. Ráta sa s tým v odhade, netreba to teraz riešiť.</p></div>
+</div>
+</section>
+
+<!-- 6 ROZHODNUTIA -->
+<section id="s6">
+<h1>Čo potrebujem od teba</h1>
+<div class="scroll"><table>
+<tr><th>#</th><th>Otázka</th><th>Odporúčam</th></tr>
+<tr><td>1</td><td><b>Ktorý návrh?</b> A, B, C, D alebo kombinácia</td><td>C ako vstup a A ako kroky</td></tr>
+<tr><td>2</td><td><b>Ako často?</b></td><td>Najviac 1 až 2 maily mesačne, brzda 14 dní na človeka</td></tr>
+<tr><td>3</td><td><b>Mám doplniť políčko súhlasu</b> do formulárov na dokumenty a test postury? Texty sú v záložke 4</td><td>Áno, hneď. Nezávisí to od zvyšku a už odteraz sa zbierajú použiteľné kontakty</td></tr>
+<tr><td>4</td><td><b>Nezaškrtnutý newsletter v anamnéze</b> (30 klientov) brať ako „nepísať"?</td><td>Áno. Stojí to pár adresátov, no je to bezpečné a slušné</td></tr>
+<tr><td>5</td><td><b>Maily odosielať len po kliknutí?</b> Automaticky len zaradenie do skupín</td><td>Áno, série prípadne až po prvých výsledkoch</td></tr>
+<tr><td>6</td><td><b>Kto bola klientka,</b> ktorá nechce maily?</td><td>Napíš mi meno, označím ju ako prvú</td></tr>
+<tr><td>7</td><td><b>Prvý mail?</b></td><td>Otázka 8 ľuďom po jednom tréningu: malá skupina, jasný dôvod, žiadna ponuka</td></tr>
+</table></div>
+<p style="margin-top:14px" class="mut">Stačí napísať napríklad: „C+A, 1–2 mesačne, políčko áno, anamnéza áno, len po kliknutí, klientka je X". Potom to postavím v bete, kde to vyskúšaš na vlastnej adrese.</p>
+</section>
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.s));window.scrollTo(0,0)});
+document.querySelectorAll('.let').forEach(b=>b.onclick=()=>{document.querySelectorAll('.let').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.navrh').forEach(n=>n.classList.toggle('on',n.id===b.dataset.n))});
+document.querySelectorAll('[data-kroky] .krok').forEach(b=>b.onclick=()=>{const r=b.parentElement;r.querySelectorAll('.krok').forEach(x=>x.classList.toggle('on',x===b));r.parentElement.querySelectorAll('[data-kv]').forEach(v=>v.hidden=v.dataset.kv!==b.dataset.k)});
+</script>
+</body>
+</html>
