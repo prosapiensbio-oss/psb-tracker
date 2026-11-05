@@ -26,6 +26,13 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  // Mailer: rozpísaný mail ešte nemá skúšku ani odoslanie; nový kontakt ešte
+  // nedostal žiadny mail. Prázdna hodnota a nula z migrácie sú správny začiatok.
+  mail_vydania: {
+    skuska_at: "rozpísaný mail ešte nemá skúšku; zapisuje sa až po skúšobnom maile",
+    odoslane_at: "rozpísaný mail ešte neodišiel; zapisuje sa až po kliknutí na odoslanie",
+  },
+  mail_odberatelia: { odoslanych: "nový kontakt ešte nedostal žiadny mail, nula z migrácie je správny začiatok" },
   faktura_polozky: {
     potvrdene_at: "potvrdenie kategórie v uzávierke — pri importe faktúry je len návrh",
     potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at, nie pri importe",
@@ -191,7 +198,7 @@ function subory(): { meno: string; zdroj: string }[] {
   }
   // Verejné stránky klienta: tu sa píše bez prihlásenia a chyba sa nemá komu ohlásiť.
   const routesDir = join(import.meta.dir, "../../routes");
-  for (const t of ["u", "v", "a", "f", "t", "d", "k"]) {
+  for (const t of ["u", "v", "a", "f", "t", "d", "k", "m"]) {
     const f = `${t}.$token.tsx`;
     out.push({ meno: `routes/${f}`, zdroj: readFileSync(join(routesDir, f), "utf8") });
   }
