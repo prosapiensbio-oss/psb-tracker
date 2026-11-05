@@ -18,7 +18,8 @@ import { SKUPINY, spocitajSkupiny, type Skupina } from "./mailSkupiny";
 
 export const ZAKLAD_ODKAZOV = "https://kokpit.prosapiensbio.workers.dev";
 const API = "https://api.resend.com";
-const PREDVOLENY_ODOSIELATEL = "Filip Stráňavský <filip@news.prosapiens.cz>";
+// Jerry, 5. 11. 2026: mail má prísť od ProSapiens, nie od Filipa Stráňavského.
+const PREDVOLENY_ODOSIELATEL = "ProSapiens Biomechanic <prosapiens@news.prosapiens.cz>";
 const PREDVOLENY_LIMIT = 90;
 
 export type NastavenieMailera = {
