@@ -264,7 +264,7 @@ je kde pozrieť).
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
-**Postavené 4. 11. 2026, zatiaľ nikde nebeží:** kód je v repe (Marketing → Mailer len v bete, `MailerKroky.tsx`, `mailer.server.ts`, migrácia `0135`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Čaká:** 1. Jerryho slovo na migráciu 0135 a betu; 2. výber darčeka a znenie políčka; 3. účet Resend, kľúč, DNS; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`.
+**Nasadené 5. 11. 2026:** migrácia 0135 aplikovaná, kód v ostrom aj v bete, obrazovka Marketing → Mailer viditeľná len v bete (`MailerKroky.tsx`, `mailer.server.ts`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Čaká:** 1. kľúč Resendu v bete, doména a DNS; 2. výber darčeka, potvrdzovací mail a znenie políčka; 3. skúšobný mail a overenie obrazovky na ostrých dátach; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`.
 
 **Rozhodnuté 4. 11. 2026:** návrhy Kokpitu ako vstup + štyri kroky, odoslanie len po kliknutí, označenie a odhlásenie navrchu mailu, špeciálna adresa mimo info@, odpovede sa nesmú tváriť ako dopyty. **Čaká na výber** v `navrhy-kokpitu/mailer-temy-vzhlad.html`: vzhľad mailu A–C, 5 druhov a 24 tém, 1 mail mesačne na začiatok, presné vety pre 11 formulárov a test postury (riziko súhlasu odoslaním vysvetlené), názov adresy, anamnéza, klientka, prvý mail.
 
