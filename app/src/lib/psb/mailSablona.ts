@@ -1,7 +1,7 @@
 import { oslovenieKlienta } from "./oslovenie";
 
 /**
- * VZHĽAD MAILU A — zelená hlavička, krémové telo (Jerry, 4. 11. 2026: „vzhľad A",
+ * VZHĽAD MAILU A — zelené pásy cez celú šírku, krémové telo (Jerry, 4. 11. 2026: „vzhľad A",
  * „dúfam že ten mail nebude text na bielom pozadí").
  *
  * Text sa píše obyčajne, šablónu nikto neupravuje:
@@ -128,14 +128,28 @@ export function mailHtml(v: VstupMailu): string {
   const kicker = DRUHY_MAILU[v.druh] || "";
   const odhl = esc(v.odhlasitUrl);
   const telo = blokyMailu(dosadOslovenie(v.telo, v.meno)).map(blokHtml).join("");
+  // Vzhľad A s pásmi cez celú šírku (Jerry, 6. 11. 2026: „vyhráva A"). Karta
+  // 600 bodov nechávala v Gmaile na počítači okolo seba prázdnu plochu; pásy
+  // idú od kraja po kraj a text ostáva v stĺpci 640 bodov, aby sa dobre čítal.
+  const stlpec = (vnutro: string, pad: string) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px"><tr><td class="pad" style="padding:${pad}">${vnutro}</td></tr></table></td></tr></table>`;
+  const pas = (farba: string, vnutro: string) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${farba}" style="background:${farba}"><tr><td>${vnutro}</td></tr></table>`;
   const horny = v.bezOznacenia ? "" :
-    `<div style="font:12px/1.5 ${SANS};color:#5B6B60;text-align:center;padding:9px 16px">Obchodní sdělení ProSapiens Biomechanic · <a href="${odhl}" style="color:#2D7D5A;font-weight:700">Odhlásit se jedním klikem</a></div>`;
+    `<div style="font:12px/1.5 ${SANS};color:#9FBCA9;text-align:right;padding-top:10px">Obchodní sdělení ProSapiens Biomechanic · <a href="${odhl}" style="color:#fff;font-weight:700">Odhlásit se jedním klikem</a></div>`;
   const pata = v.bezOznacenia
     ? `Mgr. Filip Stráňavský, ProSapiens Biomechanic, Brno<br>${esc(v.pataText || "")}`
     : `Mgr. Filip Stráňavský, ProSapiens Biomechanic, Brno<br>${v.dovodVMaili ? `Tento e-mail dostáváš ${esc(v.dovodVMaili)}. ` : ""}<a href="${odhl}" style="color:#fff;font-weight:700">Odhlásit se jedním klikem</a>`;
   const pred = v.predhlavicka
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(v.predhlavicka)}</div>` : "";
-  return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(v.predmet || v.nadpis)}</title><style>@font-face{font-family:Agrandir;src:url(${zaklad}/agrandir.woff2) format("woff2");font-weight:100 900}body{margin:0}@media(max-width:480px){.h1{font-size:27px!important}.pad{padding-left:20px!important;padding-right:20px!important}}</style></head><body style="margin:0;background:#E9E5D8">${pred}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9E5D8"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px"><tr><td>${horny}<div style="border-radius:18px 18px 0 0;overflow:hidden${v.bezOznacenia ? ";margin-top:16px" : ""}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#1A2E24"><tr><td class="pad" style="padding:24px 32px 22px"><img src="${logo}" width="170" alt="ProSapiens Biomechanic" style="display:block;width:170px;height:auto">${kicker ? `<div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#9FBCA9;margin-top:24px">${esc(kicker)}</div>` : ""}<div class="h1" style="font:700 32px/1.14 ${HEAD};color:#fff;margin-top:10px">${esc(v.nadpis)}</div></td></tr></table><div style="height:24px;background:#1A2E24"><div style="height:24px;background:#F6F3EA;border-radius:24px 24px 0 0"></div></div></div><div class="pad" style="background:#F6F3EA;padding:8px 32px 14px;color:#1A2E24;font:16px/1.65 ${SANS}">${telo}</div><div style="background:#1A2E24;border-radius:0 0 18px 18px"><div style="font:12px/1.6 ${SANS};color:#9FBCA9;text-align:center;padding:20px 24px 26px">${pata}</div></div><div style="height:18px"></div></td></tr></table></td></tr></table></body></html>`;
+  const hlavicka = `${horny}<div style="padding:${v.bezOznacenia ? "26px" : "18px"} 0 34px"><img src="${logo}" width="170" alt="ProSapiens Biomechanic" style="display:block;width:170px;height:auto">${kicker ? `<div style="font:700 12px/1 ${SANS};letter-spacing:2px;color:#9FBCA9;margin-top:24px">${esc(kicker)}</div>` : ""}<div class="h1" style="font:700 36px/1.14 ${HEAD};color:#fff;margin-top:10px">${esc(v.nadpis)}</div></div>`;
+  return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(v.predmet || v.nadpis)}</title><style>@font-face{font-family:Agrandir;src:url(${zaklad}/agrandir.woff2) format("woff2");font-weight:100 900}body{margin:0}@media(max-width:480px){.h1{font-size:28px!important}.pad{padding-left:20px!important;padding-right:20px!important}}</style></head><body style="margin:0;background:#F6F3EA">${pred}${
+    pas("#1A2E24", stlpec(hlavicka, "0 32px"))
+  }${
+    pas("#F6F3EA", stlpec(`<div style="color:#1A2E24;font:17px/1.65 ${SANS}">${telo}</div>`, "30px 32px 14px"))
+  }${
+    pas("#1A2E24", stlpec(`<div style="font:12px/1.6 ${SANS};color:#9FBCA9;text-align:center">${pata}</div>`, "22px 32px 26px"))
+  }</body></html>`;
 }
 
 /** Textová verzia: lepšie doručovanie a čitateľnosť bez HTML. */
