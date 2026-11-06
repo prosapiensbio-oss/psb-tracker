@@ -30,6 +30,9 @@ const STLPCE: Record<string, { stlpec: string; pocitadlo?: string }> = {
 async function zapisUdalost(DB: D1Database, typ: string, data: any, kedy: string) {
   const s = STLPCE[typ];
   if (!s || !data?.email_id) return;
+  // Resend meria aj klik na odhlásenie (6. 11. 2026 v skúšobnom maili). To nie je
+  // záujem o obsah: klik na `/m/` sa do klikov nepočíta, odhlásenie zapíše stránka.
+  if (typ === "email.clicked" && /\/m\/[op][A-Za-z0-9]{15}/.test(String(data?.click?.link || ""))) return;
   const p = await DB.prepare("SELECT token, email, skuska FROM mail_prijemcovia WHERE resend_id = ?1")
     .bind(String(data.email_id)).first<{ token: string; email: string; skuska: number }>();
   if (!p) return;
