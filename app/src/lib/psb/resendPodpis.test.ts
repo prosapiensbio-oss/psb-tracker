@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { jeAutomatickaOdpoved, overPodpis, rozoberOdosielatela, vypocitajPodpis } from "./resendPodpis";
+import { jeAutomatickaOdpoved, klucAdresy, orezCitaciu, overPodpis, rozoberOdosielatela, vypocitajPodpis } from "./resendPodpis";
 
 const TAJ = "whsec_" + btoa("tajomstvo-na-test-1234");
 const T = 1_800_000_000;
@@ -23,5 +23,25 @@ describe("webhook z Resendu", () => {
     expect(rozoberOdosielatela("jana@x.cz")).toEqual({ meno: "", email: "jana@x.cz" });
     expect(jeAutomatickaOdpoved("Automatická odpověď: Jak ti je")).toBe(true);
     expect(jeAutomatickaOdpoved("Re: Jak ti je")).toBe(false);
+  });
+});
+
+describe("odpoveď bez citácie", () => {
+  it("odreže citovaný mail v slovenskom Gmaile", () => {
+    const t = "Super\n\npi 6. 11. 2026 o 8:11 ProSapiens Biomechanic <prosapiens@news.prosapiens.cz>\nnapísal(a):\n\n> Koleno není viník.";
+    expect(orezCitaciu(t)).toBe("Super");
+  });
+  it("odreže anglickú a českú hlavičku", () => {
+    expect(orezCitaciu("Díky\n\nOn Thu, Nov 6, 2026 at 8:11 AM ProSapiens <x@y.cz> wrote:\n> a")).toBe("Díky");
+    expect(orezCitaciu("Ahoj\nOd: ProSapiens <x@y.cz>\nPředmět: a")).toBe("Ahoj");
+  });
+  it("bez citácie nechá celý text a prázdny výsledok nevráti", () => {
+    expect(orezCitaciu("Bolí mě koleno.\nFilip")).toBe("Bolí mě koleno.\nFilip");
+    expect(orezCitaciu("> len citácia")).toBe("> len citácia");
+  });
+  it("Gmail s bodkou a bez je jedna adresa", () => {
+    expect(klucAdresy("Prosapiens.Bio@gmail.com")).toBe("prosapiensbio@gmail.com");
+    expect(klucAdresy("jana+psb@gmail.com")).toBe("jana@gmail.com");
+    expect(klucAdresy("jana.nova@seznam.cz")).toBe("jana.nova@seznam.cz");
   });
 });

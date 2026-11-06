@@ -5,7 +5,7 @@ import { bindings } from "../../lib/bindings.server";
 import { audit } from "../../lib/psb/audit.server";
 import { nastavenieMailera, textPrijatehoMailu, zakazAdresu } from "../../lib/psb/mailer.server";
 import { pushTrenerovi } from "../../lib/psb/ponukaTerminov.server";
-import { jeAutomatickaOdpoved, overPodpis, rozoberOdosielatela } from "../../lib/psb/resendPodpis";
+import { jeAutomatickaOdpoved, klucAdresy, orezCitaciu, overPodpis, rozoberOdosielatela } from "../../lib/psb/resendPodpis";
 import { zasifruj } from "../../lib/psb/sifra.server";
 
 /**
@@ -53,11 +53,15 @@ async function zapisOdpoved(DB: D1Database, data: any, kluc: string, tajomstvo: 
   if (!id) return;
   const { meno, email } = rozoberOdosielatela(data?.from);
   const predmet = String(data?.subject || "").slice(0, 300);
-  const text = await textPrijatehoMailu(kluc, id);
+  const text = orezCitaciu(await textPrijatehoMailu(kluc, id));
   const sifra = await zasifruj(text, tajomstvo);
-  const p = await DB.prepare(
-    "SELECT vydanie, meno FROM mail_prijemcovia WHERE email = ?1 AND odoslane_at <> '' ORDER BY odoslane_at DESC LIMIT 1",
-  ).bind(email).first<{ vydanie: string; meno: string }>();
+  // Gmail berie prosapiens.bio@ aj prosapiensbio@ ako jednu schránku a odpoveď
+  // príde z tej druhej (6. 11. 2026). Páruje sa podľa kľúča, nie doslovne.
+  const domena = email.split("@")[1] === "googlemail.com" ? "gmail.com" : email.split("@")[1] || "";
+  const kandidati = ((await DB.prepare(
+    "SELECT vydanie, meno, email FROM mail_prijemcovia WHERE odoslane_at <> '' AND email LIKE ?1 ORDER BY odoslane_at DESC LIMIT 400",
+  ).bind(`%@${domena}`).all<{ vydanie: string; meno: string; email: string }>()).results || []);
+  const p = kandidati.find((k) => klucAdresy(k.email) === klucAdresy(email)) || null;
   const automat = jeAutomatickaOdpoved(predmet);
   await DB.prepare(
     `INSERT OR IGNORE INTO mail_odpovede (id, vydanie, email, meno, predmet, text, prijate_at, vybavene_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)`,

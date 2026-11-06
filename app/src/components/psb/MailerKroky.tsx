@@ -378,6 +378,49 @@ function NastavenieKarta({ n, onZmena }: { n: Nastavenie; onZmena: () => void })
   );
 }
 
+/** Odpovede na hromadné maily. Mimo dopytov; dopyt vznikne len tlačidlom. */
+function OdpovedeZoznam({ odpovede, onZmena }: { odpovede: Odpoved[]; onZmena: () => void }) {
+  const p = { odpovede };
+  const nacitaj = onZmena;
+  const neriesene = odpovede.filter((o) => !o.vybavene_at);
+  return (
+    <Card>
+        <H3>Odpovede ({neriesene.length})</H3>
+        <p style={{ fontSize: 12.5, color: C.textMuted, marginTop: 0 }}>Nie sú to dopyty a nerátajú sa do nich. Dopyt z odpovede vznikne len tvojím tlačidlom.</p>
+        {!p.odpovede.length && <div style={{ fontSize: 13, color: C.textDim }}>Zatiaľ žiadne.</div>}
+        {p.odpovede.map((o) => (
+          <div key={o.id} style={{ borderTop: `1px solid ${C.border}`, padding: "9px 0", opacity: o.vybavene_at ? 0.6 : 1 }}>
+            <div style={{ fontSize: 13.5, color: C.text, fontWeight: 600 }}>{o.meno || o.email} <span style={{ fontWeight: 400, fontSize: 11.5, color: C.textDim }}>{fmtDMY(o.prijate_at.slice(0, 10))}{!o.vydanie ? " · nie je z nášho mailu" : ""}</span></div>
+            <div style={{ fontSize: 12, color: C.textMuted }}>{o.predmet}</div>
+            <div style={{ fontSize: 13, color: C.text, whiteSpace: "pre-wrap", margin: "6px 0", maxHeight: 180, overflow: "auto" }}>{o.text}</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <a style={{ ...btn("outline"), textDecoration: "none" }} href={`mailto:${o.email}?subject=${encodeURIComponent(`Re: ${o.predmet}`)}`}>Odpísať</a>
+              {!o.vybavene_at && <button style={btn("outline")} onClick={async () => { await posli("odpoved-vybavena", { id: o.id }); void nacitaj(); }}>Vybavené</button>}
+              {!o.lead_id && <button style={btn("ghost")} onClick={async () => { await posli("odpoved-dopyt", { id: o.id }); void nacitaj(); }}>Urobiť z toho dopyt</button>}
+              {o.lead_id && <span style={{ fontSize: 12, color: C.green, alignSelf: "center" }}>V dopytoch</span>}
+            </div>
+          </div>
+        ))}
+    </Card>
+  );
+}
+
+/**
+ * Odpovede aj v ostrom Kokpite (6. 11. 2026). Mailer s krokmi je zatiaľ len
+ * v bete, ale beta nemá kľúč na čítanie šifrovaného textu, takže odpoveď by sa
+ * nedala prečítať nikde.
+ */
+export function MailerOdpovede() {
+  const [odpovede, setOdpovede] = useState<Odpoved[] | null>(null);
+  const nacitaj = useCallback(async () => {
+    const j = await fetch("/api/mailer-vydania", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+    if (j?.ok) setOdpovede(j.odpovede || []);
+  }, []);
+  useEffect(() => { void nacitaj(); }, [nacitaj]);
+  if (!odpovede || !odpovede.length) return null;
+  return <OdpovedeZoznam odpovede={odpovede} onZmena={nacitaj} />;
+}
+
 const percent = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)} %` : "–");
 
 export function MailerKroky() {
@@ -410,7 +453,6 @@ export function MailerKroky() {
   const temy = ZASOBNIK_TEM.filter((t) => !pouzite.has(t.tema));
   const poslednyDatum = odoslane.reduce((a, v) => (v.odoslane_at > a ? v.odoslane_at : a), "");
   const dniOdPosledneho = poslednyDatum ? Math.floor((Date.now() - Date.parse(poslednyDatum)) / 86400000) : null;
-  const neriesene = p.odpovede.filter((o) => !o.vybavene_at);
   const navrhy = navrhySkupin(skupiny || []);
 
   const zacni = (v: Partial<Vydanie> & { skupinyPole?: string[] }) => setOtvorene({ ...v, kluc: v.id || crypto.randomUUID() });
@@ -500,24 +542,7 @@ export function MailerKroky() {
         </Card>
       )}
 
-      <Card>
-        <H3>Odpovede ({neriesene.length})</H3>
-        <p style={{ fontSize: 12.5, color: C.textMuted, marginTop: 0 }}>Nie sú to dopyty a nerátajú sa do nich. Dopyt z odpovede vznikne len tvojím tlačidlom.</p>
-        {!p.odpovede.length && <div style={{ fontSize: 13, color: C.textDim }}>Zatiaľ žiadne.</div>}
-        {p.odpovede.map((o) => (
-          <div key={o.id} style={{ borderTop: `1px solid ${C.border}`, padding: "9px 0", opacity: o.vybavene_at ? 0.6 : 1 }}>
-            <div style={{ fontSize: 13.5, color: C.text, fontWeight: 600 }}>{o.meno || o.email} <span style={{ fontWeight: 400, fontSize: 11.5, color: C.textDim }}>{fmtDMY(o.prijate_at.slice(0, 10))}{!o.vydanie ? " · nie je z nášho mailu" : ""}</span></div>
-            <div style={{ fontSize: 12, color: C.textMuted }}>{o.predmet}</div>
-            <div style={{ fontSize: 13, color: C.text, whiteSpace: "pre-wrap", margin: "6px 0", maxHeight: 180, overflow: "auto" }}>{o.text}</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <a style={{ ...btn("outline"), textDecoration: "none" }} href={`mailto:${o.email}?subject=${encodeURIComponent(`Re: ${o.predmet}`)}`}>Odpísať</a>
-              {!o.vybavene_at && <button style={btn("outline")} onClick={async () => { await posli("odpoved-vybavena", { id: o.id }); void nacitaj(); }}>Vybavené</button>}
-              {!o.lead_id && <button style={btn("ghost")} onClick={async () => { await posli("odpoved-dopyt", { id: o.id }); void nacitaj(); }}>Urobiť z toho dopyt</button>}
-              {o.lead_id && <span style={{ fontSize: 12, color: C.green, alignSelf: "center" }}>V dopytoch</span>}
-            </div>
-          </div>
-        ))}
-      </Card>
+      <OdpovedeZoznam odpovede={p.odpovede} onZmena={nacitaj} />
 
       <NastavenieKarta n={p.nastavenie} onZmena={nacitaj} />
     </>

@@ -50,3 +50,37 @@ export function rozoberOdosielatela(v: unknown): { meno: string; email: string }
 /** Automatická odpoveď nie je človek, čo odpísal. */
 export const jeAutomatickaOdpoved = (predmet: unknown) =>
   /^(automatic|auto[- ]?reply|out of office|nepřítomn|nepritomn|automatick|mimo kancelář|dovolená)/i.test(String(predmet ?? "").trim());
+
+/**
+ * Odpoveď bez citovaného pôvodného mailu. Gmail, Apple Mail aj Outlook pridajú
+ * pod odpoveď celý náš mail; v Kokpite má byť len to, čo človek napísal.
+ * Keď by orezanie nechalo prázdno, vráti sa celý text: radšej viac než nič.
+ */
+const ZACIATKY_CITACIE = [
+  /^On .{4,200} wrote:\s*$/m,
+  /^.{0,200}\s(napísal\(a\)|napsal\(a\)|napísal|napsal|napisał\(a\)|schrieb)\s?:\s*$/m,
+  /^-{2,}\s*(Original Message|Pôvodná správa|Původní zpráva)/im,
+  /^(From|Od):\s.+$/m,
+  /^>/m,
+];
+export function orezCitaciu(text: string): string {
+  const t = String(text || "").replace(/\r/g, "");
+  let koniec = t.length;
+  for (const v of ZACIATKY_CITACIE) {
+    const m = v.exec(t);
+    if (m && m.index < koniec) koniec = m.index;
+  }
+  const vlastne = t.slice(0, koniec).trim();
+  return vlastne || t.trim();
+}
+
+/** Gmail ignoruje bodky a časť za „+": prosapiens.bio@ a prosapiensbio@ je jedna schránka. */
+export function klucAdresy(email: string): string {
+  const e = String(email || "").trim().toLowerCase();
+  const [meno, domena] = e.split("@");
+  if (!domena) return e;
+  if (domena === "gmail.com" || domena === "googlemail.com") {
+    return `${meno.split("+")[0].replace(/\./g, "")}@gmail.com`;
+  }
+  return `${meno.split("+")[0]}@${domena}`;
+}
