@@ -18,7 +18,7 @@
  */
 
 import { zostavaHodin } from "./mailKlientovi";
-import { vokativ } from "./oslovenie";
+import { vokativ, zaKoho } from "./oslovenie";
 
 /**
  * POD AKOU AKCIOU SPRÁVA PÔJDE DO AUDITU.
@@ -179,6 +179,12 @@ export function textSms(v: {
    * ako variabilným symbolom — to isté, aké je na doklade.
    */
   faktura?: { cislo: string; suma: number; splatnost: string };
+  /**
+   * Celé meno klienta, keď správa ide INÉMU človeku (Jerry, 6. 11. 2026: „nie
+   * Ahoj Richard, ale Ahoj Katarina, posielam ti prehlad za Richarda"). Oslovenie
+   * je potom meno príjemcu.
+   */
+  zaKoho?: string;
 }): string {
   /**
    * O QR SA PÍŠE LEN VTEDY, KEĎ NA STRÁNKE NAOZAJ JE.
@@ -191,14 +197,17 @@ export function textSms(v: {
    */
   const za = v.datum ? ` za balíček z ${v.datum}` : "";
   const fa = v.faktura;
+  const zk = v.zaKoho?.trim() ? zaKoho(v.zaKoho) : "";
   const dd = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.`;
   const telo = fa && v.odkaz
     ? `posilam fakturu c. ${fa.cislo} na ${Math.round(fa.suma).toLocaleString("cs-CZ").replace(/\s/g, " ")} Kc se splatnosti ${dd(fa.splatnost)}, PDF i QR na platbu: ${v.odkaz}`
+    : v.odkaz && zk
+    ? `posílám ti přehled hodin ${zk}${v.sQr ? ` a QR na platbu${za}` : ""}: ${v.odkaz}`
     : v.odkaz
     ? (v.sQr ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}` : `tady máš přehled hodin: ${v.odkaz}`)
     : v.sMailom
-      ? `v mailu najdeš docházku i QR na platbu${za}.`
-      : `ozvi se mi, projdeme si hodiny${za}.`;
+      ? `v mailu najdeš docházku${zk ? ` ${zk}` : ""} i QR na platbu${za}.`
+      : `ozvi se mi, projdeme si hodiny${zk ? ` ${zk}` : ""}${za}.`;
   // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
   // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.
   const o = vokativ(v.oslovenie);

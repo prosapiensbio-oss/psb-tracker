@@ -169,7 +169,15 @@ export const Route = createFileRoute("/v/$token")({
           }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
         }
 
-        const r = await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
+        /**
+         * ODKAZ PRE INÉHO ČLOVEKA (`klient_odkazy_pre`, 6. 11. 2026): ten istý
+         * prehľad klienta, rozsah balíčkov z jeho riadku, ale stránka osloví
+         * príjemcu a nepýta sa ho na pocity ani nepošle históriu na mail klienta.
+         */
+        const preRiadok = await DB.prepare(
+          "SELECT p.klient, p.prijemca, k.balickov FROM klient_odkazy_pre p LEFT JOIN klient_odkazy k ON k.klient = p.klient WHERE p.token = ?1",
+        ).bind(token).first<{ klient: string; prijemca: string; balickov: number | null }>().catch(() => null);
+        const r = preRiadok || await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
           .bind(token).first<{ klient: string; balickov: number | null }>();
         if (!r) return prec("Tento odkaz neplatí. Ozvi se nám a pošleme ti nový.", 404);
 
@@ -359,7 +367,7 @@ export const Route = createFileRoute("/v/$token")({
          * a nič sa nerozhoduje. Pri dochodenom balíčku je to iný okamih:
          * vtedy sa rozhoduje, či bude pokračovať.
          */
-        const pocity = (vypis.zostatok ?? 1) > 0 ? "" : blokPocitovky({
+        const pocity = preRiadok || (vypis.zostatok ?? 1) > 0 ? "" : blokPocitovky({
           oblasti: oblastiKlienta,
           minule: posledneHodnoty(merania),
           zUvodneho,
@@ -381,6 +389,7 @@ export const Route = createFileRoute("/v/$token")({
           pocitovka: pocity,
           logoUrl: `${origin}/znacka-napis-tmava.svg`,
           historiaPoslana: new URL(request.url).searchParams.get("historia") === "1",
+          preKoho: preRiadok ? { prijemca: preRiadok.prijemca, klient: preRiadok.klient } : undefined,
         });
 
         /**
@@ -401,7 +410,8 @@ export const Route = createFileRoute("/v/$token")({
         // Klepnutie na „Aktualizovat kurz" je to isté otvorenie, nie ďalšie.
         const jeObnovaKurzu = new URL(request.url).searchParams.get("kurz") === "1";
         if (!jeNahlad && !jeObnovaKurzu) {
-          await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
+          // Otvorenie príjemcom sa počíta pri jeho tokene, nie klientovi.
+          await DB.prepare(`UPDATE ${preRiadok ? "klient_odkazy_pre" : "klient_odkazy"} SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2`)
             .bind(new Date().toISOString(), token).run().catch(() => null);
         }
 

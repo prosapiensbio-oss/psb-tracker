@@ -181,3 +181,19 @@ describe("SMS k faktúre (29. 10. 2026)", () => {
     expect(dlzkaSpravy(t).sprav).toBe(1);
   });
 });
+
+describe("SMS za niekoho iného", () => {
+  const odkaz = "https://prosapiens.cz/v/AbCdEfGhJkLm";
+  it("oslovuje príjemcu a hovorí, za koho je prehľad", () => {
+    const t = textSms({ oslovenie: "Katarína", trener: "Jerry", odkaz, sQr: true, datum: "12. 10. 2026", zaKoho: "Richard Matl" });
+    expect(t).toBe(`Ahoj Katarino, posilam ti prehled hodin za Richarda a QR na platbu za balicek z 12. 10. 2026: ${odkaz} Jerry`);
+    expect(dlzkaSpravy(t).sprav).toBe(1);
+  });
+  it("bez QR a pri mene, ktoré nevie skloňovať", () => {
+    expect(textSms({ oslovenie: "", trener: "Jerry", odkaz, zaKoho: "Panagiotis Kos" }))
+      .toBe(`Ahoj, posilam ti prehled hodin (Panagiotis Kos): ${odkaz} Jerry`);
+  });
+  it("klientovi samému ostáva pôvodné znenie", () => {
+    expect(textSms({ oslovenie: "Richard", trener: "Jerry", odkaz })).toBe(`Ahoj Richarde, tady mas prehled hodin: ${odkaz} Jerry`);
+  });
+});

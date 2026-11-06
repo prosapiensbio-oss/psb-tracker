@@ -134,6 +134,18 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * napísané v políčku).
    */
   const platnyKomu = komu === meno || jeJine || vsetkyKontakty.some((x) => x.klient === komu);
+  /**
+   * „Jiné" bez vlastného čísla klienta je nový človek SÁM (číslo z dopytu), nie
+   * niekto tretí. Pri ručnom výbere „Jiné" sa príznak zhodí.
+   */
+  const [jineJeKlient, setJineJeKlient] = useState(false);
+  /**
+   * PRE KOHO JE ODKAZ (Jerry, 6. 11. 2026: „nie Ahoj Richard, ale Ahoj Katarina,
+   * posielam ti prehlad za Richarda"). `null` = klient sám, '' = „Jiné",
+   * inak meno príjemcu. Kým sa meno len píše, odkaz sa nemení.
+   */
+  const preIneho = platnyKomu && komu !== meno && !(jeJine && jineJeKlient);
+  const prijemcaOdkazu: string | null = preIneho ? (jeJine ? "" : komu) : null;
   const [text, setText] = useState("");
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
@@ -177,7 +189,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       setVsetkyKontakty(u);
       setDopyty(d);
       const svoje = String(u.find((x) => x.klient === meno)?.telefon || "");
-      if (!svoje && cisloNovehoCloveka) { setKomu(JINE_PRIJEMCA); setTelefon(cisloNovehoCloveka); return; }
+      if (!svoje && cisloNovehoCloveka) { setKomu(JINE_PRIJEMCA); setJineJeKlient(true); setTelefon(cisloNovehoCloveka); return; }
       setTelefon(svoje);
     });
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
@@ -192,19 +204,32 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         if (j?.ok && j.url) { setOdkaz(j.url); setStavStranky({ sQr: true }); }
         if (j?.nahlad) setNahlad(j.nahlad);
       }).catch(() => null);
-    } else if (!predvolenyText) {
-      void fetch("/api/sms", {
-        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ akcia: "odkaz", klient: meno }),
-      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string; balickov?: number; stav?: { sQr: boolean } | null }) => {
-        if (j?.ok && j.url) setOdkaz(j.url);
-        if (j?.stav) setStavStranky(j.stav);
-        if (j?.nahlad) setNahlad(j.nahlad);
-        if (typeof j?.balickov === "number") setBalickov(j.balickov);
-      }).catch(() => null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otvorene, meno, predvolenyText, cisloNovehoCloveka, nahladOdkazu, faktura?.id]);
+
+  /**
+   * Odkaz na prehľad /v/ — klientov, alebo príjemcov, keď správa ide inému
+   * človeku (vlastný token, stránka osloví jeho). Pri zmene príjemcu sa starý
+   * odkaz hneď zahodí, aby neodišiel s novým oslovením.
+   */
+  useEffect(() => {
+    if (!otvorene || nahladOdkazu || faktura || predvolenyText || !platnyKomu) return;
+    let zive = true;
+    setOdkaz("");
+    void fetch("/api/sms", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "odkaz", klient: meno, ...(prijemcaOdkazu !== null ? { prijemca: prijemcaOdkazu } : {}) }),
+    }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string; balickov?: number; stav?: { sQr: boolean } | null }) => {
+      if (!zive) return;
+      if (j?.ok && j.url) setOdkaz(j.url);
+      if (j?.stav) setStavStranky(j.stav);
+      if (j?.nahlad) setNahlad(j.nahlad);
+      if (typeof j?.balickov === "number") setBalickov(j.balickov);
+    }).catch(() => null);
+    return () => { zive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otvorene, meno, prijemcaOdkazu, platnyKomu, predvolenyText, nahladOdkazu, faktura?.id]);
 
   /**
    * Predvolený text sa skladá znova pri zmene rodu aj po príchode odkazu.
@@ -213,7 +238,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    */
   useEffect(() => {
     if (!otvorene) return;
-    const oslovenie = meno.split(" ")[0];
+    // Inému človeku sa píše jeho menom a povie sa, za koho je prehľad.
+    const oslovenie = preIneho ? (jeJine ? "" : komu.split(" ")[0]) : meno.split(" ")[0];
     setText(
       predvolenyText
         || textSms({
@@ -232,12 +258,13 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
           // Odpoveď príde do sekundy a text sa preskladá.
           sQr: stavStranky ? stavStranky.sQr : false,
           faktura,
+          zaKoho: preIneho && !faktura ? meno : undefined,
         }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz, stavStranky, faktura?.cislo]);
+  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz, stavStranky, faktura?.cislo, preIneho, komu]);
 
   /**
    * Rozsah sa ULOŽÍ, až potom sa prekreslí náhľad. Keď zápis zlyhá, číslo
@@ -259,6 +286,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   /** Výber príjemcu: klient zo zoznamu dostane svoje číslo, „Jiné" prázdne políčko. */
   const vyberKomu = (kto: string) => {
     setKomu(kto);
+    setJineJeKlient(false);
     setHlaska("");
     if (kto === JINE_PRIJEMCA) { setTelefon(""); setUpravaCisla(""); return; }
     setUpravaCisla(null);

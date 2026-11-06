@@ -1,4 +1,5 @@
 import { cesky, type VypisKlienta } from "./mailKlientovi";
+import { oslovenieKlienta, zaKoho } from "./oslovenie";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — prehľad pre klienta.
@@ -63,15 +64,15 @@ const hod = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1).replace("."
  * zostatok nad nulou, dochodený balíček a hodiny nad rámec nie sú to isté
  * a klient si to vie prerátať.
  */
-function hlavnyStav(v: VypisKlienta): { velke: string; pod: string; cervene?: boolean } {
-  if (v.zostatok == null) return { velke: "Tvoje tréninky", pod: "Přehled posledního balíčku." };
-  if (v.zostatok > 0) return { velke: `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
+function hlavnyStav(v: VypisKlienta, preIneho = false): { velke: string; pod: string; cervene?: boolean } {
+  if (v.zostatok == null) return { velke: preIneho ? "Tréninky" : "Tvoje tréninky", pod: "Přehled posledního balíčku." };
+  if (v.zostatok > 0) return { velke: preIneho ? `Zbývá ${hod(v.zostatok)}` : `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
   // Ukončil a dostal peniaze späť: „Poslední hodina, balíček máš dochozený“ by
   // bola nepravda (Radek Baláž, 1. 11. 2026). Mínus po ukončení je ďalej mínus.
   if (v.zostatok === 0 && v.ukonceny) return { velke: "Balíček ukončen", pod: "je uzavřený, žádné hodiny na něm nezbývají" };
   // Skončený balíček nemusí byť dochozený: hodiny mohly propadnout (Tomáš Dvořák).
   if (v.zostatok === 0 && v.platnostSkoncila) return { velke: "Bez aktivního balíčku", pod: "poslední balíček už skončil" };
-  if (v.zostatok === 0) return { velke: "Poslední hodina", pod: "balíček máš dochozený" };
+  if (v.zostatok === 0) return { velke: "Poslední hodina", pod: preIneho ? "balíček je dochozený" : "balíček máš dochozený" };
   /**
    * „NEZAPLACENO", NIE „NAD RÁMEC" (Jerry, 8. 10. 2026).
    *
@@ -218,11 +219,11 @@ ${riadky}
  * stránkach je návod zaplatiť dvakrát. Mlčať sa ale tiež nedá: v nadpise
  * stojí „Nezaplaceno 1 h" a klient by nevedel, čo s tým má robiť.
  */
-function blokPlatiZaNeho(kto: string): string {
+function blokPlatiZaNeho(kto: string, preIneho = false): string {
   const s = SADZBA;
   return `<div id="platba" style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:18px 20px;text-align:center">
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">Platba</div>
-<div style="margin-top:6px;font-size:15px;line-height:1.6;color:${s.pozadie}">Balíček za tebe platí <b>${esc(kto)}</b> — ty nemusíš posílat nic.</div>
+<div style="margin-top:6px;font-size:15px;line-height:1.6;color:${s.pozadie}">${preIneho ? `Tento balíček platí <b>${esc(kto)}</b>, QR na platbu je v jeho přehledu.` : `Balíček za tebe platí <b>${esc(kto)}</b> — ty nemusíš posílat nic.`}</div>
 </div>`;
 }
 
@@ -641,9 +642,20 @@ export function klientStranka(v: VypisKlienta & {
   logoUrl?: string;
   /** `true` = práve sme odoslali celú históriu mailom. */
   historiaPoslana?: boolean;
+  /**
+   * Odkaz pre INÉHO človeka (6. 11. 2026): stránka ho osloví („Ahoj Katarino,
+   * posílám ti přehled za Richarda") a nehovorí mu „zbývá ti". Žiadosť o celú
+   * históriu sa nekreslí: išla by na mail klienta, nie príjemcu.
+   */
+  preKoho?: { prijemca: string; klient: string };
 }): string {
   const s = SADZBA;
-  const stav = hlavnyStav(v);
+  const pre = v.preKoho;
+  const stav = hlavnyStav(v, !!pre);
+  const oslov = pre ? oslovenieKlienta(pre.prijemca) : "";
+  const uvodPre = pre
+    ? `<div style="margin-bottom:12px;font-size:15px;line-height:1.6;color:${s.tlmeny}">Ahoj${oslov ? ` ${esc(oslov)}` : ""}, posílám ti přehled hodin ${esc(zaKoho(pre.klient))}.</div>`
+    : "";
   const logo = v.logoUrl
     ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="200" style="width:200px;max-width:62%;height:auto;display:block">`
     : `<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:12px;letter-spacing:3.4px;color:${s.tlmeny}">PROSAPIENS BIOMECHANIC</div>`;
@@ -695,15 +707,15 @@ details[open] .psb-sip{transform:rotate(90deg)}
 
 <div style="padding:26px 0 20px">${logo}</div>
 
-<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${stav.cervene ? s.minus : s.biela}">${esc(stav.velke)}</h1>
+${uvodPre}<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${stav.cervene ? s.minus : s.biela}">${esc(stav.velke)}</h1>
 <div style="margin-top:6px;font-size:15px;color:${s.tlmeny}">${esc(stav.pod)}</div>
 ${dalsi}
 ${ctaNaPlatbu(v)}
 
 ${blokOsi(v, false)}
-${v.platiZaNeho ? blokPlatiZaNeho(v.platiZaNeho) : v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl, v.qrNaSplatnost)}
+${v.platiZaNeho ? blokPlatiZaNeho(v.platiZaNeho, !!pre) : v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl, v.qrNaSplatnost)}
 ${pocitovka}
-${blokHistorie(!!v.historiaPoslana)}
+${pre ? "" : blokHistorie(!!v.historiaPoslana)}
 
 <div style="margin-top:38px;padding-top:24px;border-top:1px solid ${s.ramik}">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.2;color:${s.biela}">${esc(v.trener)}</div>

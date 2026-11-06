@@ -72,6 +72,7 @@ export const Route = createFileRoute("/api/client-delete")({
           ["ptminder_historia", "klient"],
           ["ptminder_klienti", "meno"],
           ["klient_odkazy", "klient"],
+          ["klient_odkazy_pre", "klient"],
           ["uvodne_odkazy", "klient"],
           ["fotky_odkazy", "klient"],
           ["fotky_odpovede", "klient"],

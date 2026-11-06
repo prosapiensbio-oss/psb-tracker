@@ -134,15 +134,34 @@ export const Route = createFileRoute("/api/sms")({
         if (b.akcia === "odkaz") {
           const klient = kus(b.klient, 120);
           if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
+          // Bez 0/O/I/l/1 — token sa občas prepisuje ručne z telefónu.
+          const novyToken = () => {
+            const abeceda = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+            return [...crypto.getRandomValues(new Uint8Array(12))].map((x) => abeceda[x % abeceda.length]).join("");
+          };
           let riadok = await DB.prepare("SELECT token FROM klient_odkazy WHERE klient = ?1").bind(klient).first<{ token: string }>();
           if (!riadok) {
-            // Bez 0/O/I/l/1 — token sa občas prepisuje ručne z telefónu.
-            const abeceda = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-            const nahodne = crypto.getRandomValues(new Uint8Array(12));
-            const token = [...nahodne].map((x) => abeceda[x % abeceda.length]).join("");
+            const token = novyToken();
             await DB.prepare("INSERT INTO klient_odkazy (token, klient, vytvorene) VALUES (?1, ?2, ?3)")
               .bind(token, klient, new Date().toISOString()).run();
             riadok = { token };
+          }
+          /**
+           * PRE INÉHO ČLOVEKA VLASTNÝ TOKEN (6. 11. 2026). Stránka ho osloví
+           * a nehovorí mu „zbývá ti". Rozsah balíčkov ostáva pri klientovi.
+           */
+          const preKoho = b.prijemca === undefined ? null : kus(b.prijemca, 120);
+          const tokenKlienta = riadok.token;
+          if (preKoho !== null) {
+            let pre = await DB.prepare("SELECT token FROM klient_odkazy_pre WHERE klient = ?1 AND prijemca = ?2")
+              .bind(klient, preKoho).first<{ token: string }>();
+            if (!pre) {
+              const token = novyToken();
+              await DB.prepare("INSERT INTO klient_odkazy_pre (token, klient, prijemca, vytvorene) VALUES (?1, ?2, ?3, ?4)")
+                .bind(token, klient, preKoho, new Date().toISOString()).run();
+              pre = { token };
+            }
+            riadok = pre;
           }
           // Krátka adresa — viď verejnyOdkaz.ts; v SMS ide o jednu správu.
           // `nahlad` je tá istá stránka pre okno pred odoslaním: ide priamo
@@ -150,7 +169,7 @@ export const Route = createFileRoute("/api/sms")({
           // a nezdvíha počítadlo otvorení.
           const origin = new URL(request.url).origin;
           const rozsah = await DB.prepare("SELECT balickov FROM klient_odkazy WHERE token = ?1")
-            .bind(riadok.token).first<{ balickov: number | null }>().catch(() => null);
+            .bind(tokenKlienta).first<{ balickov: number | null }>().catch(() => null);
           /**
            * STAV STRÁNKY Z TOHO ISTÉHO VÝPOČTU, KTORÝ JU KRESLÍ (`obsahOdkazu`).
            *

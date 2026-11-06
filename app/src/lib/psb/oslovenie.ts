@@ -70,6 +70,52 @@ export function vokativ(meno: string): string {
   return m;
 }
 
+/**
+ * ZA KOHO — KRSTNÉ MENO VO 4. PÁDE („přehled za Richarda", „za Kateřinu").
+ * Jerry, 6. 11. 2026: SMS niekomu za niekoho iného má znieť „Ahoj Katarino,
+ * posílám ti přehled za Richarda". Rovnaká opatrnosť ako pri 5. páde: keď si
+ * funkcia nie je istá, vráti PRÁZDNO a veta sa zloží bez skloňovania. Zlý tvar
+ * je horší než žiadny.
+ *  • -a → -u (Kateřina → Kateřinu, Honza → Honzu), nie -ia ani -ová;
+ *  • -ie → -ii (Lucie → Lucii, Marie → Marii);
+ *  • -ěk → -ňka/-ďka/-ťka, -ek → -ka (Zdeněk → Zdeňka, Radek → Radka);
+ *  • -š -ž -č -ř -c -j -x → +e (Tomáš → Tomáše, Matěj → Matěje);
+ *  • ostatné spoluhlásky → +a (Richard → Richarda, Petr → Petra, Daniel → Daniela);
+ *  • ženské mená na spoluhlásku sa nemenia (Nikol, Dagmar);
+ *  • iné samohlásky a -s → prázdno.
+ */
+const AKUZATIV: Record<string, string> = {
+  tomas: "Tomáše", lukas: "Lukáše", matus: "Matúše", jiri: "Jiřího", peter: "Petra",
+  pavel: "Pavla", karel: "Karla", havel: "Havla", marketa: "Markétu",
+  bez: "", nezname: "", neznamy: "",
+};
+
+export function akuzativ(meno: string): string {
+  const m = (meno || "").trim();
+  if (!m || /\s/.test(m) || m.length < 2) return "";
+  const k = bez(m);
+  if (Object.prototype.hasOwnProperty.call(AKUZATIV, k)) return AKUZATIV[k];
+  if (ZENSKE_NA_SPOLUHLASKU.has(k)) return m;
+  const male = m.slice(-1).toLowerCase();
+  if (male === "a") return /ia$/i.test(m) || /ova$/i.test(k) ? "" : `${m.slice(0, -1)}u`;
+  if (/ie$/i.test(m)) return `${m.slice(0, -1)}i`;
+  if (/[aeiouyáéíóúůýě]/i.test(male) || male === "s") return "";
+  if (/ěk$/i.test(m)) return `${m.slice(0, -2).replace(/n$/, "ň").replace(/d$/, "ď").replace(/t$/, "ť")}ka`;
+  if (/ek$/i.test(m)) return `${m.slice(0, -2)}ka`;
+  if (/[šžčřcjx]/i.test(male)) return `${m}e`;
+  if (/[bdfghklmnprtvwzďťň]/i.test(male)) return `${m}a`;
+  return "";
+}
+
+/**
+ * „za Richarda" pre vetu, alebo celé meno v zátvorke, keď 4. pád nie je istý
+ * („přehled hodin (Panagiotis Kos)"). Celé meno = celé meno klienta z Kokpitu.
+ */
+export function zaKoho(celeMeno: string): string {
+  const a = akuzativ(krstne(celeMeno || ""));
+  return a ? `za ${a}` : `(${(celeMeno || "").trim()})`;
+}
+
 /** Krstné meno na oslovenie. Pri „Ing. arch. Anna Nová" je to Anna. */
 export function krstne(meno: string): string {
   const kusy = meno.trim().split(/\s+/).filter((k) => !k.endsWith(".") && k.length > 1);

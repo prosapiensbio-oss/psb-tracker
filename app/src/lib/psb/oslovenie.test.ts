@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { oslovenieKlienta, vokativ } from "./oslovenie";
+import { akuzativ, oslovenieKlienta, vokativ, zaKoho } from "./oslovenie";
 
 // Jerry, 15. 10. 2026: „postav to naostro aj so skloňovaním" — stránka
 // kalendára oslovovala „Michal, jedním klepnutím…".
@@ -42,5 +42,25 @@ describe("oslovenie v 5. páde", () => {
     expect(oslovenieKlienta("Michal Knapčok")).toBe("Michale");
     expect(oslovenieKlienta("Ing. arch. Anna Nová")).toBe("Anno");
     expect(oslovenieKlienta("")).toBe("");
+  });
+});
+
+describe("za koho vo 4. páde", () => {
+  it("bežné mená", () => {
+    const ocakavane: Record<string, string> = {
+      Richard: "Richarda", Petr: "Petra", Michal: "Michala", Jan: "Jana", Jakub: "Jakuba", Filip: "Filipa",
+      Patrik: "Patrika", Daniel: "Daniela", Pavel: "Pavla", Radek: "Radka", Zdeněk: "Zdeňka", Tomáš: "Tomáše",
+      Tomas: "Tomáše", Matěj: "Matěje", Jiří: "Jiřího", Honza: "Honzu", Kateřina: "Kateřinu", Katarína: "Katarínu",
+      Monika: "Moniku", Lucie: "Lucii", Marie: "Marii", Nikol: "Nikol", Dagmar: "Dagmar",
+    };
+    for (const [m, a] of Object.entries(ocakavane)) expect(akuzativ(m)).toBe(a);
+  });
+  it("keď si nie je istá, nevymýšľa", () => {
+    for (const m of ["Lucia", "Natália", "Panagiotis", "Nováková", "Pepe", "", "Anna Nová"]) expect(akuzativ(m)).toBe("");
+  });
+  it("veta z celého mena", () => {
+    expect(zaKoho("Richard Matl")).toBe("za Richarda");
+    expect(zaKoho("Ing. Michal Knapčok")).toBe("za Michala");
+    expect(zaKoho("Panagiotis Kos")).toBe("(Panagiotis Kos)");
   });
 });

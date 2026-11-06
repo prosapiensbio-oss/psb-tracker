@@ -89,6 +89,7 @@ const TABULKY: Tabulka[] = [
   { tab: "klient_fakturacia", stlpec: "klient", unik: [] },
   { tab: "klient_odberatelia", stlpec: "klient" },
   { tab: "klient_odkazy", stlpec: "klient", unik: [] },
+  { tab: "klient_odkazy_pre", stlpec: "klient", unik: ["prijemca"] },
   { tab: "uvodne_odkazy", stlpec: "klient", unik: ["druh"] },
   { tab: "fotky_odkazy", stlpec: "klient" },
   { tab: "fotky_odpovede", stlpec: "klient" },
