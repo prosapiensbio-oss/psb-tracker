@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { dnesPraha } from "../../lib/psb/cas";
 import { fmtDMY, monthLabel } from "../../lib/psb/format";
 import {
   aktivni, mieryKampane, prihlaseniaPoMesiacoch, zostavaZoznamu,
@@ -41,7 +42,7 @@ export function Mail() {
       .finally(() => setNacitane(true));
   }, []);
 
-  const rad = useMemo(() => prihlaseniaPoMesiacoch(odb), [odb]);
+  const rad = useMemo(() => prihlaseniaPoMesiacoch(odb, dnesPraha().slice(0, 7)), [odb]);
 
   /**
    * Koľko odberateľov sú klienti — od 27. 10. 2026 sa to NEHÁDA na obrazovke.
@@ -232,7 +233,7 @@ function ZoznamPoExporte({ zostava, odhlaseni }: {
         Zoznam <b style={{ color: C.text }}>číta {citaPct} %</b> aktívnych ({zostava.citaju} z {zostava.aktivni})
         a <b style={{ color: C.text }}>{zostava.klientov}</b> z nich sú klienti PSB. To je publikum, ktoré
         sa dá osloviť bez platenia za dosah — a jediné, ktoré po zrušení MailerLite zostáva v Kokpite.
-        Posielať sa z neho zatiaľ nedá: Kokpit odosielanie kampaní nemá postavené.
+        Posiela sa z neho cez Mailer vyššie.
       </div>
       <button onClick={() => setOtvorene(!otvorene)} style={{ ...btn(), marginTop: 10 }}>
         {otvorene ? "Skryť odhlásených" : `Ukázať odhlásených (${odhlaseni.length})`}

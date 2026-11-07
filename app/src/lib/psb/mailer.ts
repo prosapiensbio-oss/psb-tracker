@@ -53,7 +53,7 @@ export function mieryKampane(k: MailKampan) {
  * preskočil prázdne obdobie a plochý rad by vyzeral ako rastúci — čo je presne
  * tá otázka, na ktorú má odpovedať.
  */
-export function prihlaseniaPoMesiacoch(odberatelia: Odberatel[]): { m: string; v: number }[] {
+export function prihlaseniaPoMesiacoch(odberatelia: Odberatel[], doMesiaca?: string): { m: string; v: number }[] {
   const dni = odberatelia.map((o) => o.prihlaseny?.slice(0, 7)).filter(Boolean).sort();
   if (!dni.length) return [];
   const podla = new Map<string, number>();
@@ -61,7 +61,10 @@ export function prihlaseniaPoMesiacoch(odberatelia: Odberatel[]): { m: string; v
 
   const von: { m: string; v: number }[] = [];
   let [r, mm] = dni[0].split("-").map(Number);
-  const koniec = dni[dni.length - 1];
+  // Rad končí dneškom, nie posledným prihlásením (7. 11. 2026): inak karta
+  // tvrdila „odberatelia pribúdajú", hoci posledný prišiel pred rokom.
+  const posledne = dni[dni.length - 1];
+  const koniec = doMesiaca && /^\d{4}-\d{2}$/.test(doMesiaca) && doMesiaca > posledne ? doMesiaca : posledne;
   for (let i = 0; i < 240; i++) {
     const kluc = `${r}-${String(mm).padStart(2, "0")}`;
     von.push({ m: kluc, v: podla.get(kluc) || 0 });

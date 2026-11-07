@@ -59,4 +59,9 @@ describe("aktívni", () => {
   it("odhlásení sa nepočítajú", () => {
     expect(aktivni([o("2026-01-01", "a@b.cz"), o("2026-01-02", "c@d.cz", "unsubscribed")])).toBe(1);
   });
+  it("rad pokračuje do dnešného mesiaca, aby ticho bolo vidieť", () => {
+    const v = prihlaseniaPoMesiacoch([o("2025-09-03")], "2025-12");
+    expect(v.map((x) => x.v)).toEqual([1, 0, 0, 0]);
+    expect(v.at(-1)?.m).toBe("2025-12");
+  });
 });

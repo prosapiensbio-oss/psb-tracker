@@ -3362,11 +3362,12 @@ pád API je v `metricool-api-zlyhalo`.
 
 ## Mailer (4. 11. 2026)
 
-Marketing → Mailer. Mail odchádza výhradne po Jerryho kliknutí, automat `mail-fronta` len dokončí to, čo sa nevošlo do denného limitu. Jediný automatický mail je potvrdenie prihlásenia z webu, je to odpoveď na žiadosť toho človeka.
+Marketing → Mailer, naostro od 7. 11. 2026. Mail odchádza výhradne po Jerryho kliknutí, automat `mail-fronta` len dokončí to, čo sa nevošlo do denného limitu. Jediný automatický mail je potvrdenie prihlásenia z webu, je to odpoveď na žiadosť toho človeka.
 
 - **Skupiny** počíta `mailSkupiny.ts`, obrazovka aj odoslanie to isté. Odoslanie overí počet ešte raz; keď nesedí, nič nejde von.
 - **Nesmie sa:** odhlásený, nedoručiteľný, nezaškrtnutý newsletter v anamnéze, nové kontakty z webu bez začiarknutia a potvrdenia, kto dostal mail do 14 dní.
 - **Odoslať sa dá len znenie, ktoré Jerry videl:** úprava textu maže `skuska_at`.
-- **Odpovede** idú do `mail_odpovede`, šifrované, mimo `leads`. Dopyt vznikne len tlačidlom. V bete sa nedajú čítať, nemá `ANAMNEZA_KLUC`.
+- **Odpovede** idú do `mail_odpovede`, šifrované, mimo `leads`. Dopyt vznikne len tlačidlom. V bete sa nedajú čítať, nemá `ANAMNEZA_KLUC`. Odpoveď sa páruje cez `klucAdresy` (Gmail bez bodiek) a ukladá bez citácie (`orezCitaciu`).
+- **Klik na `/m/` sa do klikov nepočíta** — Resend meria aj odkaz na odhlásenie.
 - **Odkaz `/m/` nič nezapíše pri GET,** lebo poštové filtre odkazy otvárajú samy. Zapíše POST.
 - **Znenie súhlasu** je v `mailSuhlas.ts` s verziou. Pri zmene vety pridaj verziu, starú nemeň.

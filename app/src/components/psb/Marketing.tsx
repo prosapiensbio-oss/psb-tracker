@@ -42,8 +42,7 @@ import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
-import { MailerKroky, MailerOdpovede } from "./MailerKroky";
-import { jeBeta } from "../../lib/psb/beta";
+import { MailerKroky } from "./MailerKroky";
 import { PlanMarketingu } from "./PlanMarketingu";
 import { MapaCyklu } from "./MapaCyklu";
 import { PlanObsahu } from "./PlanObsahu";
@@ -1264,7 +1263,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
         </>
       )}
 
-      {sub === "mail" && (<>{jeBeta() ? <MailerKroky /> : <MailerOdpovede />}<Mail /></>)}
+      {sub === "mail" && (<><MailerKroky /><Mail /></>)}
       {sub === "nahrat" && <StriznaNahrat />}
 
       {/* Vyhľadávanie = kto ma hľadá a či klikne. Google Ads sem patrí:
