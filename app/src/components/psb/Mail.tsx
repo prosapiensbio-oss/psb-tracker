@@ -102,7 +102,7 @@ export function Mail() {
           <b style={{ color: C.text }}>Čo z toho čítať:</b>{" "}
           {suchoMesiacov >= 2 ? (
             <>
-              Za posledné <b style={{ color: C.red }}>{suchoMesiacov} mesiace</b> sa neprihlásil nikto.
+              Za {suchoMesiacov < 5 ? "posledné" : "posledných"} <b style={{ color: C.red }}>{suchoMesiacov} {suchoMesiacov < 5 ? "mesiace" : "mesiacov"}</b> sa neprihlásil nikto.
               To potvrdzuje, čo hlási onboarding: formulár na <b style={{ color: C.text }}>/dychani</b> síce
               ľudia vidia, ale neodošlú — a kampaň, ktorá naň mierila, platila prekliky do prázdna.
             </>
