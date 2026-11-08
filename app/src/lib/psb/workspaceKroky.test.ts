@@ -115,6 +115,9 @@ describe("zoznam SMS", () => {
     const zm = { Minus: "2026-10-04T09:00:00.000Z" };
     expect(zoznamSms([c("Minus", -2)], {}, { Minus: "2026-10-04T10:00:00.000Z" }, zm, new Set(), dnes)).toHaveLength(0);
     expect(zoznamSms([c("Minus", -3)], {}, { Minus: "2026-10-04T10:00:00.000Z" }, { Minus: "2026-10-05T09:00:00.000Z" }, new Set(), dnes)).toHaveLength(1);
+    // Faktúra na ďalší balíček (Jan Kral, 8. 11. 2026): na nule bez dlhu netreba písať, mínus a dlh ostávajú.
+    const naDalsi = zoznamSms([c("Nula", 0), c("Minus", -1), c("PlusDlh", 2)], { PlusDlh: 7790 }, {}, {}, new Set(), dnes, [], ["Nula", "Minus", "PlusDlh"]);
+    expect(naDalsi.map((r) => r.meno).sort()).toEqual(["Minus", "PlusDlh"]);
   });
   it("kto dlho netrénoval a nič nemá objednané, tam nie je", () => {
     expect(zoznamSms([c("Dávno", -1, { lastSession: "2026-06-01" })], {}, {}, {}, new Set(), dnes)).toHaveLength(0);

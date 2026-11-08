@@ -2104,6 +2104,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
             clients={clients} dlhy={dlhyPodlaMena} udalosti={kalUdalosti || []}
             balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} onPocet={setPocetSms}
             bezHodin={bezHodinPreSms}
+            fakturyNaDalsi={data.fakturyNaDalsi}
             onNetrebaPisat={(meno) => {
               const x = bezHodinPreSms.find((b) => b.meno === meno);
               if (x) void vybavBezBalicka(klucPolozky("bezBalicka", x), x);

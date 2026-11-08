@@ -161,15 +161,15 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
      */
     ...(volby.mesacne ? [
       ...(pre("Terezka") ? [krok("dopyty", "Dopyty", "kto čaká na odpoveď, čo z dopytu bolo a odkiaľ prišli noví", [])] : []),
-      krok("uzavierka", "Uzávierka mesiaca", volby.ja === "Terezka"
-        ? "prehľad mesiaca a tvoje odpovede — odkiaľ prišli noví a otázky mesiaca"
-        : "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
-      // Kontrola peňazí (Jerry, 27. 10. 2026: „z týchto platobných notifikácií
+      // Kontrola peňazí PRED uzávierkou (Jerry, 8. 11. 2026); (27. 10. 2026: „z týchto platobných notifikácií
       // mi sprav kartu") — náklady, čo vyskočili, staré pohyby proti novým
       // pravidlám, dvojité zápisy. Na Dnes sa už neukazujú (`jeKontrolaPenazi`).
       ...(pre("Jerry") ? [
         krok("kontroly", "Kontrola peňazí", "náklady, ktoré nesedia, a staré zaradenia proti novým pravidlám", []),
       ] : []),
+      krok("uzavierka", "Uzávierka mesiaca", volby.ja === "Terezka"
+        ? "prehľad mesiaca a tvoje odpovede — odkiaľ prišli noví a otázky mesiaca"
+        : "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
     ] : []),
     ...daj("faktury"),
     ...daj("anamnezy"),

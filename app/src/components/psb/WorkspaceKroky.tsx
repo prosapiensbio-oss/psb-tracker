@@ -301,7 +301,7 @@ export function TyzdenKalendara({ den, trener, zvyraznenia }: { den: string; tre
 
 /* ───────────────────────── 2 · SMS PRE KLIENTOV ──────────────────────────── */
 
-export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezHodin, onNetrebaPisat, onPocet }: {
+export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezHodin, onNetrebaPisat, onPocet, fakturyNaDalsi }: {
   clients: Record<string, ClientAgg>;
   dlhy: Record<string, number>;
   udalosti: UdalostKroku[];
@@ -314,6 +314,8 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezH
   /** Zapíše „netreba písať“; riadok zmizne, keď sa ho `bezHodin` zbaví. */
   onNetrebaPisat?: (meno: string) => void;
   onPocet?: (n: number) => void;
+  /** Klienti s faktúrou na ďalší balíček — na nule bez dlhu im netreba písať. */
+  fakturyNaDalsi?: string[];
 }) {
   const [odoslane, setOdoslane] = useState<Record<string, string> | null>(null);
   const [otvoreny, setOtvoreny] = useState("");
@@ -369,10 +371,10 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezH
     for (const b of balicky) posun(b.klient, b.created_at || `${b.platnost_od}T00:00:00.000Z`);
     const vsetky = zoznamSms(
       Object.values(clients).filter((c) => !trener || c.primaryTrainer === trener),
-      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes, bezHodin,
+      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes, bezHodin, fakturyNaDalsi,
     );
     return vsetky;
-  }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz, bezHodin]);
+  }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz, bezHodin, fakturyNaDalsi]);
 
   useEffect(() => { if (!odoslaneChyba) onPocet?.(riadky.length); }, [riadky.length, onPocet, odoslaneChyba]);
 

@@ -94,6 +94,8 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
   const [chyba, setChyba] = useState("");
   const vstup = useRef<HTMLInputElement>(null);
   const [nadZonou, setNadZonou] = useState(false);
+  /** Z ktorej zóny sa nahrávalo — tam sa ukáže náhľad (hore / dole pri bitcoine). */
+  const [odkial, setOdkial] = useState<"hore" | "dole">("hore");
 
   const nacitaj = useCallback(() => {
     void fetch("/api/faktury", { credentials: "same-origin", cache: "no-store" })
@@ -212,29 +214,43 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
   const nevybavene = new Set((polozky || []).filter((p) => !p.potvrdene).map((p) => p.faktura)).size;
   const platbyMesiaca = useMemo(() => (btc?.platby || []).filter((p) => String(p.datum).slice(0, 7) === mesiac), [btc, mesiac]);
 
-  const nadpis = (n: string, t: string) => (
-    <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: "14px 0 6px" }}>{n} · {t}</div>
+  /**
+   * Zóna na PDF — hore v kroku 1 aj dole pri platbách bitcoinom. Vstup je jeden
+   * (`vstup`); náhľad nahratých sa ukáže pri tej zóne, z ktorej sa nahrávalo.
+   */
+  const zona = (dole: boolean) => (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setNadZonou(true); }}
+      onDragLeave={() => setNadZonou(false)}
+      onDrop={(e) => { e.preventDefault(); setNadZonou(false); setOdkial(dole ? "dole" : "hore"); void nahraj([...e.dataTransfer.files]); }}
+      onClick={() => { setOdkial(dole ? "dole" : "hore"); vstup.current?.click(); }}
+      style={{ border: `1.5px dashed ${nadZonou ? C.accent : C.border}`, borderRadius: 12, padding: dole ? "11px 14px" : "16px 14px", textAlign: "center", cursor: "pointer", background: nadZonou ? mix(C.accent, 8) : "transparent", fontSize: 12.5, color: C.textMuted }}
+    >
+      {dole
+        ? "Chýba platbe faktúra? Pretiahni sem PDF z Alzy, alebo klikni a vyber."
+        : "Pretiahni sem PDF faktúry z Alzy (aj viac naraz), alebo klikni a vyber. Alza → Môj účet › Objednávky › Faktúra."}
+    </div>
   );
-
-  return (
-    <div>
-      {nadpis("1", "Nahraj faktúry z Alzy (PDF)")}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setNadZonou(true); }}
-        onDragLeave={() => setNadZonou(false)}
-        onDrop={(e) => { e.preventDefault(); setNadZonou(false); void nahraj([...e.dataTransfer.files]); }}
-        onClick={() => vstup.current?.click()}
-        style={{ border: `1.5px dashed ${nadZonou ? C.accent : C.border}`, borderRadius: 12, padding: "16px 14px", textAlign: "center", cursor: "pointer", background: nadZonou ? mix(C.accent, 8) : "transparent", fontSize: 12.5, color: C.textMuted }}
-      >
-        Pretiahni sem PDF faktúry z Alzy (aj viac naraz), alebo klikni a vyber. Alza → Môj účet › Objednávky › Faktúra.
-        <input ref={vstup} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => { void nahraj([...(e.target.files || [])]); e.target.value = ""; }} />
-      </div>
+  const nahravanie = (
+    <>
+      {zona(odkial === "dole")}
       {chyby.length > 0 && <div style={{ fontSize: 12, color: C.orange, marginTop: 6 }}>{chyby.join(" · ")}</div>}
       {nove.length > 0 && (
         <div style={{ marginTop: 10 }}>
           <FakturyNahlad faktury={nove} uzZapisane={new Set((polozky || []).map((p) => p.faktura))} btcPlatby={platbyMesiaca.map((x) => ({ id: x.id, datum: x.datum, czk: x.czk || 0, poznamka: x.poznamka }))} onZmena={(i, f) => setNove((p) => p.map((x, j) => (j === i ? f : x)))} onHotovo={() => { setNove([]); nacitaj(); }} onZahod={() => { setNove([]); setChyby([]); }} />
         </div>
       )}
+    </>
+  );
+  const nadpis = (n: string, t: string) => (
+    <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: "14px 0 6px" }}>{n} · {t}</div>
+  );
+
+  return (
+    <div>
+      <input ref={vstup} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => { void nahraj([...(e.target.files || [])]); e.target.value = ""; }} />
+      {nadpis("1", "Nahraj faktúry z Alzy (PDF)")}
+      {odkial === "hore" ? nahravanie : zona(false)}
 
       {nadpis("2", `Faktúry za ${mesiacCely(mesiac)} — rozdeľ položky`)}
       {polozky === null ? (
@@ -272,6 +288,9 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       {btc ? (
         <BtcParovanie platby={platbyMesiaca} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} vsetkyMesiaca={btc.vsetkyMesiaca} />
       ) : <div style={{ fontSize: 12, color: C.textDim }}>Bitcoinová kniha nie je načítaná.</div>}
+      {/* Nahrávanie aj tu (Jerry, 8. 11. 2026): chýbajúcu faktúru vidí pri
+          platbe bitcoinom, nie o dve sekcie vyššie. Ten istý vstup a náhľad. */}
+      <div style={{ marginTop: 10 }}>{odkial === "dole" ? nahravanie : zona(true)}</div>
     </div>
   );
 }

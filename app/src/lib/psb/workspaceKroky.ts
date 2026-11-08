@@ -508,7 +508,14 @@ export function zoznamSms(
   objednane: Set<string>,
   dnes: string,
   bezHodin: Pick<BezBalicka, "meno" | "dovod" | "objednanych" | "vMinuse">[] = [],
+  /**
+   * Klienti s faktúrou na ďalší balíček (Jerry, 8. 11. 2026, Jan Kral: „to
+   * isté"). Na nule bez dlhu je ďalší balíček už vyfakturovaný — SMS by mu
+   * len oznamovala, čo dostal faktúrou. Pri mínuse alebo dlhu ostáva.
+   */
+  fakturyNaDalsi: string[] = [],
 ): RiadokSms[] {
+  const naDalsi = new Set(fakturyNaDalsi.map(normName));
   const out: RiadokSms[] = [];
   const bezPodlaMena = new Map(bezHodin.map((x) => [normName(x.meno), x]));
   for (const c of clients) {
@@ -521,6 +528,7 @@ export function zoznamSms(
     // Karta 0/0 mínus nenesie; ten istý počet, aký stojí v profile, dáva os.
     const zostatok = naKarte === 0 && bez && bez.vMinuse > 0 ? -bez.vMinuse : naKarte;
     if (zostatok > 0 && dlh <= 0) continue;
+    if (zostatok === 0 && dlh <= 0 && naDalsi.has(normName(c.name))) continue;
     const nedavno = !!c.lastSession && dniMedzi(c.lastSession, dnes) <= NAVRAT_PO_DNOCH;
     if (!nedavno && !objednane.has(normName(c.name))) continue;
     const sms = odoslane[c.name];
