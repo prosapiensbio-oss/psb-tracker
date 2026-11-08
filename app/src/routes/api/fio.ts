@@ -124,7 +124,7 @@ export const Route = createFileRoute("/api/fio")({
             // treba vidieť, či ho niekto vybavil (Jerry, 7. 10. 2026).
             DB.prepare(
               `SELECT f.date, f.amount_czk, f.counterparty, f.note, f.typ, f.category, f.dedup_key,
-                      p.klienti, CASE WHEN n.fio_id IS NULL THEN 0 ELSE 1 END nie_klient, f.potvrdene_at, f.created_at
+                      p.klienti, CASE WHEN n.fio_id IS NULL THEN 0 ELSE 1 END nie_klient, f.potvrdene_at, f.created_at, f.moja_poznamka
                  FROM fio_transactions f
                  LEFT JOIN (SELECT fio_id, group_concat(klient, ', ') klienti FROM platby
                              WHERE fio_id IS NOT NULL AND zrusene_at IS NULL GROUP BY fio_id) p ON p.fio_id = f.id
@@ -138,6 +138,7 @@ export const Route = createFileRoute("/api/fio")({
             pohyby: (t.results as Record<string, unknown>[]).map((r) => ({
               datum: r.date, suma: r.amount_czk, protistrana: r.counterparty,
               poznamka: r.note, typ: r.typ, kategoria: r.category, kluc: r.dedup_key,
+              mojaPoznamka: r.moja_poznamka || "",
               klienti: r.klienti || "", nieKlient: !!r.nie_klient,
               potvrdene: !!r.potvrdene_at,
               // Kedy sa pohyb zapísal — kontrola „nové pravidlo vs. staršie
@@ -160,10 +161,25 @@ export const Route = createFileRoute("/api/fio")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[]; kluce?: string[];
-          stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; zrus?: boolean; potvrd?: boolean; hromadnePravidlo?: boolean };
+          stav?: { kluc: string; kategoria: string; potvrdene: boolean }[]; rozdelene?: string[]; kluc?: string; zrus?: boolean; potvrd?: boolean; hromadnePravidlo?: boolean };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
         if (odPlanovaca && b.akcia !== "auto") return unauthorized();
+
+        /**
+         * VLASTNÁ POZNÁMKA K POHYBU (8. 11. 2026). Text z banky ostáva, poznámka
+         * je vedľa neho. Kategóriu ani potvrdenie nemení a dá sa dopísať aj
+         * v uzavretom mesiaci: čísla sa ňou nehýbu.
+         */
+        if (b.akcia === "poznamka") {
+          const kluc = String(b.kluc || "");
+          if (!kluc) return Response.json({ ok: false, error: "Chýba pohyb." }, { status: 400 });
+          const text = String(b.text ?? "").trim().slice(0, 400);
+          const r = await DB.prepare("UPDATE fio_transactions SET moja_poznamka = ?2 WHERE dedup_key = ?1").bind(kluc, text || null).run();
+          if (!r.meta?.changes) return Response.json({ ok: false, error: "Taký pohyb v banke nie je." }, { status: 404 });
+          await audit(DB, { action: "pohyb-poznamka", predmet: kluc, neu: text || "(zmazaná)", actor: (await currentUser(request)) || undefined });
+          return Response.json({ ok: true });
+        }
 
         /**
          * AUTOMATICKÉ STIAHNUTIE POHYBOV — každú noc z plánovača (Jerry,

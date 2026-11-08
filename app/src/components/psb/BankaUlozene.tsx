@@ -33,6 +33,8 @@ type Pohyb = {
   klienti?: string; nieKlient?: boolean;
   /** Výdavok: Jerry potvrdil kategóriu (inak je to len návrh Kokpitu). */
   potvrdene?: boolean;
+  /** Vlastná poznámka — text z banky (`poznamka`) ostáva nedotknutý. */
+  mojaPoznamka?: string;
 };
 type Pravidlo = { vzor: string; kategoria: string };
 
@@ -151,7 +153,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
     if (skryPotvrdene && jePotvrdeny(p, maSplit(p))) return false;
     if (hladat.trim()) {
       const h = hladat.trim().toLowerCase();
-      if (!`${p.protistrana} ${p.poznamka}`.toLowerCase().includes(h)) return false;
+      if (!`${p.protistrana} ${p.poznamka} ${p.mojaPoznamka || ""}`.toLowerCase().includes(h)) return false;
     }
     return true;
   });
@@ -212,6 +214,17 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       setSprava(r.error || "Zmena sa nepodarila.");
       nacitaj();
     }
+  };
+
+  /** Vlastná poznámka k pohybu — kategóriu ani potvrdenie nemení. */
+  const ulozPoznamku = async (kluc: string, text: string): Promise<boolean> => {
+    const r = await fetch("/api/fio", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "poznamka", kluc, text }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "Poznámka sa neuložila — skús znova." })) as { ok?: boolean; error?: string };
+    if (!r.ok) { setSprava(r.error || "Poznámka sa neuložila — skús znova."); return false; }
+    setPohyby((s) => s.map((p) => (p.kluc === kluc ? { ...p, mojaPoznamka: text.trim() } : p)));
+    return true;
   };
 
   /**
@@ -464,17 +477,10 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
                     <td style={{ ...S.td, fontSize: 12 }}>
                       <div onClick={() => oznacRovnake(p.protistrana)} title={`Označiť všetky pohyby „${p.protistrana}"`}
                         style={{ color: C.text, cursor: "pointer" }}>{p.protistrana || "—"}</div>
-                      {/* Poznámka sa dá dopísať aj po zápise — text z banky
-                          často nepovie, čo to bolo, a o pol roka si to už
-                          nikto nepamätá. Ukladá sa pri opustení poľa. */}
-                      <input
-                        defaultValue={p.poznamka || ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== (p.poznamka || "")) void zmen(p.kategoria, [p.kluc], e.target.value);
-                        }}
-                        placeholder="+ poznámka"
-                        style={{ marginTop: 2, width: "100%", maxWidth: 460, background: "transparent", border: "none", borderBottom: `1px dashed ${mix(C.border, 80)}`, color: p.poznamka ? C.textMuted : C.accentLight, fontSize: 12, padding: "2px 0" }}
-                      />
+                      {/* Text z banky sa už neprepisuje (8. 11. 2026): do 8. 11. tu bolo
+                          políčko, ktoré ho menilo, a nevyzeralo ako poznámka. */}
+                      {p.poznamka && <div title={p.poznamka} style={{ fontSize: 11.5, color: C.textDim, maxWidth: 460, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.poznamka}</div>}
+                      <MojaPoznamka text={p.mojaPoznamka || ""} onUloz={(t) => ulozPoznamku(p.kluc, t)} />
                     </td>
                     <td style={{ ...S.td, padding: "3px 6px" }}>
                       {(() => {
@@ -662,5 +668,48 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       document.body,
     )}
     </div>
+  );
+}
+
+/**
+ * Vlastná poznámka k pohybu (Jerry, 8. 11. 2026): „pri potvrdzovaní platieb by
+ * som chcel mať možnosť priradiť poznámku, aby som to mohol vidieť vo VZAS".
+ * Ten istý riadok je v Kontrole peňazí aj vo VZAS → Zapísané pohyby.
+ * Enter alebo odchod z poľa uloží, Escape zahodí. „Uložené" až po odpovedi servera.
+ */
+function MojaPoznamka({ text, onUloz }: { text: string; onUloz: (t: string) => Promise<boolean> }) {
+  const [pise, setPise] = useState(false);
+  const [hodnota, setHodnota] = useState(text);
+  const [bezi, setBezi] = useState(false);
+  useEffect(() => { if (!pise) setHodnota(text); }, [text, pise]);
+  const uloz = async () => {
+    if (bezi) return;
+    if (hodnota.trim() === text) { setPise(false); return; }
+    setBezi(true);
+    const ok = await onUloz(hodnota);
+    setBezi(false);
+    if (ok) setPise(false);
+  };
+  if (pise) {
+    return (
+      <input
+        autoFocus value={hodnota} disabled={bezi} maxLength={400}
+        onChange={(e) => setHodnota(e.target.value)}
+        onBlur={() => void uloz()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); void uloz(); }
+          if (e.key === "Escape") { setHodnota(text); setPise(false); }
+        }}
+        placeholder="napr. za čo to bolo, pre koho"
+        aria-label="Poznámka k pohybu"
+        style={{ marginTop: 3, width: "100%", maxWidth: 460, background: C.bg, border: `1px solid ${C.accent}`, borderRadius: 6, color: C.text, fontSize: 12, padding: "3px 7px", fontFamily: "inherit", boxSizing: "border-box" }}
+      />
+    );
+  }
+  return (
+    <button type="button" onClick={() => setPise(true)} title={text ? "Upraviť poznámku" : "Pridať vlastnú poznámku"}
+      style={{ display: "block", marginTop: 2, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", fontFamily: "inherit", fontSize: 12, color: text ? C.accentLight : C.textMuted, maxWidth: 460 }}>
+      {text ? `✎ ${text}` : "+ poznámka"}
+    </button>
   );
 }

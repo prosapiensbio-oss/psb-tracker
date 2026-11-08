@@ -59,6 +59,7 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   fio_transactions: {
     potvrdene_at: "potvrdenie výdavku v uzávierke — pri importe je kategória len návrh",
     potvrdil: "kto potvrdil — zapisuje sa spolu s potvrdene_at",
+    moja_poznamka: "vlastná poznámka sa píše až po importe, výpis z banky ju nemá",
   },
   // Nové konto začína na DEFAULT 0 a stĺpec môže chýbať, kým nebeží migrácia 0129.
   users: {
