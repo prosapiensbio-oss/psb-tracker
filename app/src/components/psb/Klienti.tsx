@@ -131,8 +131,17 @@ function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodno
  * Je to nevratná operácia nad reálnymi tréningami a platbami. Náhľad s počtami
  * je jediná príležitosť všimnúť si, že sa premenúva niekto iný, než sa myslelo.
  */
-export function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: string) => void | Promise<void> }) {
-  const [otvorene, setOtvorene] = useState(false);
+export function Premenovanie({ meno, onHotovo, vzdy }: {
+  meno: string;
+  onHotovo: (nove: string) => void | Promise<void>;
+  /**
+   * Pole s menom je vidno hneď (Upraviť profil, Jerry 8. 11. 2026: „pri
+   * úprave chcem mať možnosť aj zmeniť meno") — bez odkazu „Premenovať
+   * klienta", ktorý v okne nikto nenašiel. Ukladá sa stále cez náhľad.
+   */
+  vzdy?: boolean;
+}) {
+  const [otvorene, setOtvorene] = useState(!!vzdy);
   const [nove, setNove] = useState(meno);
   const [nahlad, setNahlad] = useState<{ spolu: number; dotknute: Record<string, number> } | null>(null);
   const [chyba, setChyba] = useState("");
@@ -161,20 +170,24 @@ export function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove
   }
 
   return (
-    <div style={{ padding: "10px 12px", marginBottom: 12, borderRadius: 8, background: mix(C.accent, 6), border: `1px solid ${mix(C.accent, 28)}` }}>
-      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 7 }}>
-        Nové meno — celé a s diakritikou. Zmení sa všade vrátane kľúčov,
-        takže sa najbližší export napojí na existujúce riadky namiesto toho, aby klienta založil druhýkrát.
-      </div>
+    <div style={vzdy ? { marginBottom: 10 } : { padding: "10px 12px", marginBottom: 12, borderRadius: 8, background: mix(C.accent, 6), border: `1px solid ${mix(C.accent, 28)}` }}>
+      {(!vzdy || nove.trim() !== meno) && (
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 7 }}>
+          Nové meno — celé a s diakritikou. Zmení sa všade vrátane kľúčov,
+          takže sa najbližší export napojí na existujúce riadky namiesto toho, aby klienta založil druhýkrát.
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         <input value={nove} onChange={(e) => { setNove(e.target.value); setNahlad(null); }}
           style={{ ...S.input, flex: "1 1 200px", marginBottom: 0 }} />
-        <button onClick={() => void posli(!!nahlad)} disabled={robim || !nove.trim() || nove.trim() === meno}
+        {(!vzdy || nove.trim() !== meno) && <button onClick={() => void posli(!!nahlad)} disabled={robim || !nove.trim() || nove.trim() === meno}
           style={{ padding: "6px 13px", borderRadius: 7, border: `1px solid ${C.accent}`, background: nahlad ? C.accent : "transparent", color: nahlad ? C.onAccent : C.accentLight, fontSize: 12, fontWeight: 600, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1, fontFamily: "inherit" }}>
           {nahlad ? `Naozaj premenovať (${nahlad.spolu})` : "Skontrolovať"}
-        </button>
-        <button onClick={() => { setOtvorene(false); setNahlad(null); setChyba(""); setNove(meno); }}
-          style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
+        </button>}
+        {(!vzdy || nove.trim() !== meno) && (
+          <button onClick={() => { setOtvorene(!!vzdy); setNahlad(null); setChyba(""); setNove(meno); }}
+            style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>{vzdy ? "späť" : "zavrieť"}</button>
+        )}
       </div>
       {nahlad && (
         <div style={{ fontSize: 11.5, color: C.text, marginTop: 8, lineHeight: 1.6 }}>

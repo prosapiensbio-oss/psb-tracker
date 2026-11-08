@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { Udalost } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
-import { kandidatiPlatby, klucOtazkyPlatby, navrhNovehoBalicka, otazkyPlatieb, samostatnaHodina, ZNACKA_POSUNU_ZA_DOPLNENIE, zoznamSms, zruseneAutomaty } from "./workspaceKroky";
+import { kandidatiPlatby, klucOtazkyPlatby, predplateniKlienti, navrhNovehoBalicka, otazkyPlatieb, samostatnaHodina, ZNACKA_POSUNU_ZA_DOPLNENIE, zoznamSms, zruseneAutomaty } from "./workspaceKroky";
 import { dlhyKlientov } from "./zaplatene";
 
 const trening = (den: string): Udalost => ({ druh: "trening", den, cas: "11:00" });
@@ -118,6 +118,13 @@ describe("zoznam SMS", () => {
     // Faktúra na ďalší balíček (Jan Kral, 8. 11. 2026): na nule bez dlhu netreba písať, mínus a dlh ostávajú.
     const naDalsi = zoznamSms([c("Nula", 0), c("Minus", -1), c("PlusDlh", 2)], { PlusDlh: 7790 }, {}, {}, new Set(), dnes, [], ["Nula", "Minus", "PlusDlh"]);
     expect(naDalsi.map((r) => r.meno).sort()).toEqual(["Minus", "PlusDlh"]);
+    // Predplatený ďalší balíček (Richard Matl, 8. 11. 2026): 7 011 na balíček od 28. 9. a 7 790 vopred 5. 11.
+    const b = (klient: string, od: string, cena: number) => ({ klient, platnost_od: od, cena_czk: cena, zrusene_at: null, nazov: "6h Balíček" });
+    const p = (klient: string, datum: string, suma: number) => ({ klient, datum, suma_czk: suma, zrusene_at: null });
+    expect(predplateniKlienti(
+      [b("Richard Matl", "2026-08-10", 7790), b("Richard Matl", "2026-09-28", 7011), b("Monika Čechova", "2026-10-20", 7790)],
+      [p("Richard Matl", "2026-08-23", 7790), p("Richard Matl", "2026-09-29", 7011), p("Richard Matl", "2026-11-05", 7790), p("Monika Čechova", "2026-11-06", 7790)],
+    )).toEqual(["richard matl"]);
   });
   it("kto dlho netrénoval a nič nemá objednané, tam nie je", () => {
     expect(zoznamSms([c("Dávno", -1, { lastSession: "2026-06-01" })], {}, {}, {}, new Set(), dnes)).toHaveLength(0);

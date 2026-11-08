@@ -17,6 +17,7 @@ import type { BezBalicka } from "./bezBalicka";
 import { CENNIK, platnostDo, type Sablona } from "./cennik";
 import { UVODNY } from "./uvodnaStranka";
 import { fmtCZK, normName } from "./format";
+import { posunDen } from "./cas";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { NAZOV_PRENESENYCH } from "./platnostZostatok";
@@ -500,6 +501,43 @@ export type RiadokSms = {
  * pravidlo ako `patriDoZoznamu`). Okno „trénoval za 60 dní alebo má termín“
  * a „po odoslaní zmizne“ platí rovnako ako pre ostatných.
  */
+/**
+ * KTO MÁ ĎALŠÍ BALÍČEK UŽ ZAPLATENÝ (Jerry, 8. 11. 2026: „Richard Matl je tiež
+ * zaplatený a tiež mi ho vyhadzuje"). Richard je na nule, ale 5. 11. poslal
+ * 7 790 Kč na ďalší balíček, ktorý vznikne až prvým tréningom. SMS by mu
+ * oznamovala niečo, čo už zaplatil.
+ *
+ * Meria sa preplatok na POSLEDNOM balíčku: platby od troch týždňov pred jeho
+ * začiatkom mínus jeho cena. Aspoň 30 % ceny = ďalší je zaplatený (ten istý
+ * prah, od ktorého čiastočná platba dáva hodiny, `bezHodinZDlhov`).
+ */
+export function predplateniKlienti(
+  balicky: { klient: string; platnost_od: string; cena_czk: number | null; zrusene_at: string | null; nazov?: string }[],
+  platby: { klient: string; datum: string; suma_czk: number; zrusene_at: string | null }[],
+): string[] {
+  const posledny = new Map<string, { od: string; cena: number }>();
+  for (const b of balicky) {
+    if (b.zrusene_at || !(Number(b.cena_czk) > 0) || /doplnen|prenesen/i.test(b.nazov || "")) continue;
+    const k = normName(b.klient);
+    const od = String(b.platnost_od).slice(0, 10);
+    const x = posledny.get(k);
+    if (!x || od > x.od) posledny.set(k, { od, cena: Number(b.cena_czk) });
+  }
+  const out: string[] = [];
+  const zaplatene = new Map<string, number>();
+  for (const p of platby) {
+    if (p.zrusene_at) continue;
+    const k = normName(p.klient);
+    const b = posledny.get(k);
+    if (!b || String(p.datum).slice(0, 10) < posunDen(b.od, -21)) continue;
+    zaplatene.set(k, (zaplatene.get(k) || 0) + (Number(p.suma_czk) || 0));
+  }
+  for (const [k, b] of posledny) {
+    if ((zaplatene.get(k) || 0) - b.cena >= b.cena * 0.3) out.push(k);
+  }
+  return out;
+}
+
 export function zoznamSms(
   clients: KlientPreSms[],
   dlhy: Record<string, number>,
@@ -515,6 +553,7 @@ export function zoznamSms(
    */
   fakturyNaDalsi: string[] = [],
 ): RiadokSms[] {
+  // Mená môžu prísť už normalizované (`predplateniKlienti`) — normName je idempotentné.
   const naDalsi = new Set(fakturyNaDalsi.map(normName));
   const out: RiadokSms[] = [];
   const bezPodlaMena = new Map(bezHodin.map((x) => [normName(x.meno), x]));

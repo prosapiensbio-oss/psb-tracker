@@ -110,6 +110,16 @@ const TABULKY: Tabulka[] = [
   // Mailový zoznam: `klient` je spárované meno z Kokpitu (27. 10. 2026).
   { tab: "mail_odberatelia", stlpec: "klient" },
   { tab: "mail_prijemcovia", stlpec: "klient" },
+  // Doplnené 8. 11. 2026 (Jerry: „zmeniť univerzálne pre všetko, kde sa meno
+  // toho klienta používa"): kontrola stĺpcov v schéme našla štyri miesta.
+  // Kto ho odporučil inému klientovi a ktorého dopytu je odporúčateľ, adresát
+  // odkazu pre rodiča (Lenka Přinosilová za Matyho) a bitcoinové faktúry.
+  // `ln_faktury.rozpis_json` meno nesie tiež, ale v JSON — ten sa nemení,
+  // je to záznam toho, čo stránka v tej chvíli ukázala.
+  { tab: "client_overrides", stlpec: "zdroj_kto" },
+  { tab: "leads", stlpec: "referrer" },
+  { tab: "klient_odkazy_pre", stlpec: "prijemca", unik: ["klient"] },
+  { tab: "ln_faktury", stlpec: "klient" },
 ];
 
 /**

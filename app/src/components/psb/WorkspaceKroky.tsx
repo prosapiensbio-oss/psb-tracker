@@ -26,7 +26,7 @@ import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { SOURCES } from "./Klienti";
 import type { PSBData } from "../../lib/psb/types";
 import { nechceHovor } from "../../lib/psb/dopytTestPostury";
-import { klucOtazkyPlatby, otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
+import { klucOtazkyPlatby, otazkyPlatieb, predplateniKlienti, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 import { podlaRodu } from "../../lib/psb/rodKlienta";
@@ -371,7 +371,7 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, bezH
     for (const b of balicky) posun(b.klient, b.created_at || `${b.platnost_od}T00:00:00.000Z`);
     const vsetky = zoznamSms(
       Object.values(clients).filter((c) => !trener || c.primaryTrainer === trener),
-      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes, bezHodin, fakturyNaDalsi,
+      dlhy, { ...odoslane, ...teraz }, zmena, objednane, dnes, bezHodin, [...(fakturyNaDalsi || []), ...predplateniKlienti(balicky, platby)],
     );
     return vsetky;
   }, [clients, dlhy, udalosti, balicky, platby, trener, odoslane, teraz, bezHodin, fakturyNaDalsi]);

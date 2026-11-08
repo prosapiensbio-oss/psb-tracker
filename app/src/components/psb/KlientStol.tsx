@@ -1465,6 +1465,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               telefon={kontaktTelefon}
               zapis={zapisOverride}
               onUlozene={() => { oznam("klienti"); oznam("peniaze"); }}
+              onPremenovane={(nove) => { setMeno(nove); oznam("klienti"); oznam("peniaze"); oznam("kalendar"); }}
             />
           </div>
         )}
@@ -2190,13 +2191,15 @@ function tyzdne(n: number): string {
  *    sem len pripája. Mlčky premenovať klienta spolu s narodeninami by
  *    znamenalo nevratnú operáciu schovanú v bežnom uložení.
  */
-function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
+function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene, onPremenovane }: {
   meno: string;
   c: { narodeniny?: string; zdroj?: string; zdrojKto?: string } | null;
   email: string;
   telefon: string;
   zapis: (kluc: string, hodnota: unknown) => Promise<void>;
   onUlozene: () => void;
+  /** Po premenovaní ostane profil otvorený — pod novým menom. */
+  onPremenovane?: (nove: string) => void;
 }) {
   const [otvorene, setOtvorene] = useState(false);
   const [f, setF] = useState({ email: "", telefon: "", narodeniny: "", zdroj: "", zdrojKto: "" });
@@ -2278,6 +2281,10 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
   return (
     <div style={{ marginTop: 10, padding: "12px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 32)}`, background: mix(C.accent, 7) }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: C.text }}>Upraviť profil</div>
+      {/* Meno ide prvé, ale s vlastným uložením: mení sa vo všetkých tabuľkách
+          naraz (`/api/premenuj`) a pred zápisom ukáže, koľko riadkov sa dotkne. */}
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 3 }}>meno</div>
+      <Premenovanie vzdy meno={meno} onHotovo={(nove) => { setOtvorene(false); onUlozene(); onPremenovane?.(nove); }} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
         {polia.map((x) => (
           <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
@@ -2306,10 +2313,6 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
         }}>zavrieť</button>
       </div>
       {hlaska && <div style={{ fontSize: 11.5, color: hlaska === "Uložené." ? C.green : C.orange, marginTop: 7 }}>{hlaska}</div>}
-      {/* Meno má vlastnú cestu — nevratná operácia nepatrí do bežného uloženia. */}
-      <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
-        <Premenovanie meno={meno} onHotovo={() => { setOtvorene(false); onUlozene(); }} />
-      </div>
     </div>
   );
 }
