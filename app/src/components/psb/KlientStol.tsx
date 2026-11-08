@@ -18,6 +18,7 @@ import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { UVODNY } from "../../lib/psb/uvodnaStranka";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
+import { treningyDoplneni } from "../../lib/psb/doplnenieTreningy";
 import { mesiacovVztahu, priemerDochadzky, sedeniaPoMesiacoch, skupinaKlienta, tempoMesacne, type SkupinaZoznamu } from "../../lib/psb/profil";
 import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
@@ -353,8 +354,29 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       if (!usek) continue;
       (m.get(usek) || m.set(usek, []).get(usek)!).push(u);
     }
+    /**
+     * Doplnenie z PTmindera nemá úsek — jeho tréningy prezradí cena 0 Kč
+     * v exporte (`treningyDoplneni`, Jerry 8. 11. 2026). Len keď mu os nedala
+     * žiadne vlastné.
+     */
+    const k = normName(meno);
+    const doplnenia = os.filter((u) => u.druh === "balicekOd" && u.doplnenie && !m.get(u.den)?.length)
+      .map((u) => ({
+        den: u.den,
+        hodin: (data.historiaBalickov || []).find((h) => normName(h.client) === k && /doplnenie/i.test(h.package)
+          && String(h.added || "").slice(0, 10) === u.den)?.total ?? null,
+      }));
+    if (doplnenia.length) {
+      const sedenia = (data.sessions || []).filter((x) => normName(x.client) === k)
+        .map((x) => ({ den: String(x.date).slice(0, 10), cena: Number(x.price) || 0, uvodny: /uvodn/i.test(x.sessionName || "") || undefined }));
+      const treningPodlaDna = new Map(os.filter((u) => u.druh === "trening" && !u.zKalendara).map((u) => [u.den, u]));
+      for (const [den, xs] of treningyDoplneni(doplnenia, sedenia)) {
+        const riadky = xs.map((x) => treningPodlaDna.get(x.den)).filter((u): u is (typeof os)[number] => !!u);
+        if (riadky.length) m.set(den, riadky);
+      }
+    }
     return m;
-  }, [os, stavy]);
+  }, [os, stavy, meno, data.historiaBalickov, data.sessions]);
 
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
@@ -2383,6 +2405,11 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
       </div>
       {rozbalene && !!treningy?.length && (
         <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${mix(C.text, 10)}` }}>
+          {u.doplnenie && !u.zKokpitu && (
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 3 }}>
+              Podľa PTmindera: tréningy, ktoré v exporte stoja 0 Kč — tak PTminder zapisuje hodinu z doplnenia.
+            </div>
+          )}
           {treningy.map((t, i) => (
             <div key={i} style={{ display: "flex", gap: 8, fontSize: 11.5, color: C.textMuted, padding: "2px 0" }}>
               <span style={{ minWidth: 92, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{denVTyzdni(t.den)} {fmtDMY(t.den)}</span>
