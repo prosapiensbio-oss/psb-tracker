@@ -100,7 +100,10 @@ d1() {
 }
 if [ "${1:-}" = "--migracia-hotova" ] && [ -n "${2:-}" ]; then
   d1 "INSERT INTO d1_migrations (name, applied_at) VALUES ('$2', datetime('now'))" >/dev/null \
-    && echo "✓ $2 zapísaná do evidencie" || echo "✗ zápis zlyhal"
+    && echo "✓ $2 zapísaná do evidencie" || { echo "✗ zápis zlyhal"; exit 1; }
+  # Evidencia v repe pre build po pushi (scripts/straz-migracii.mjs).
+  grep -qx "$2" migrations/aplikovane.txt || echo "$2" >> migrations/aplikovane.txt
+  echo "  → commitni migrations/aplikovane.txt spolu s kódom, inak automatický build po pushi spadne."
   exit 0
 fi
 evidencia=$(d1 "SELECT name FROM d1_migrations" | grep -o '"name": "[^"]*"' | sed 's/"name": "//; s/"$//')

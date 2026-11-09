@@ -39,7 +39,7 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 - [ ] **UpdraftPlus (2. 11.):** posledná záloha 21. 10., ďalšia plánovaná 4. 11. o 9:30; v nastavení varovanie „nadbytečné mezery, môže poškodiť zálohy“ a v logu `popen failed`. Overiť, že záloha 4. 11. prešla a dá sa z nej obnoviť.
 - [x] Gmail filter mazal výstrahy Wordfence: zrušený 2. 11. Filter na Google prihlásenia a Adobe Stock ostáva.
 - [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
-- [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
+- [x] *(9. 11. 2026: build po pushi spustí `scripts/straz-migracii.mjs` proti `migrations/aplikovane.txt`; chýbajúca migrácia build zastaví — overené falošným súborom.)* **Stráž migrácií pri automatickom nasadení po pushi**.
 - [x] *(Jerry 9. 11.: vyriešené)* **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo. Jerry: „čakaj“, zatiaľ neodpovedať. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali.
 - [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
 - [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.

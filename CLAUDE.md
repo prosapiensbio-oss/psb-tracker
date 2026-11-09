@@ -85,9 +85,13 @@ len ukázať.** Pred novou funkciou okolo obsahu sa spýtaj, koho je.
   odovzdáva `-c wrangler.jsonc` výslovne. Druhý config už nezakladaj.
   Workers Builds sú ŽIVÉ:
   push na main → `bun install && bun run build` → `npx wrangler deploy`
-  (root /app) → nasadené za ~2 min. POZOR: CI deploy NEMÁ stráž migrácií ani
-  testovú bránu z nasad.sh — migrácie aplikuj VŽDY pred pushom a testy pusti
-  lokálne; nasad.sh zostáva primárna cesta, buildy sú poistka.
+  (root /app) → nasadené za ~2 min. POZOR: CI deploy NEMÁ testovú bránu z nasad.sh
+  — testy pusti lokálne; nasad.sh zostáva primárna cesta, buildy sú poistka.
+  **Stráž migrácií v CI od 9. 11. 2026:** `bun run build` najprv spustí
+  `scripts/straz-migracii.mjs`, ktorý porovná `migrations/*.sql`
+  s `migrations/aplikovane.txt` a pri chýbajúcej migrácii build zastaví.
+  `nasad.sh --migracia-hotova <súbor>` zapíše do DB aj do toho súboru —
+  commitni ho spolu s kódom, inak spadne aj tvoj vlastný build.
   **Pasca (15. 10. 2026):** CI build zo STARŠIEHO pushu vie doraziť sekundu
   po nasad.sh a prepísať ho starším kódom — nasad.sh hlási úspech, naživo
   beží predošlá verzia. Pri dvoch pushoch tesne po sebe over zmenu naživo
