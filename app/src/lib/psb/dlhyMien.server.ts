@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { normName } from "./format";
-import { dlhyKlientov, type DlhPolozka } from "./zaplatene";
+import { DOPYT_VIAZANYCH_PLATIEB, dlhyKlientov, viazaneZRiadkov, type DlhPolozka } from "./zaplatene";
 
 /**
  * POLOŽKY DLHU PRE ZOPÁR MIEN NARAZ — tým istým pravidlom ako `loadData`
@@ -17,7 +17,7 @@ export async function polozkyDlhovMien(DB: D1Database, mena: string[]): Promise<
   // Len riadky týchto klientov (LIKE na prvé písmeno priezviska by bolo krehké;
   // tabuľky sú malé). História môže chýbať (pred migráciou 0095) — vtedy
   // poistka beží bez nej; ide súbežne, nech platba nečaká na dve kolá.
-  const [[bal, pl, pop, ptp], hist] = await Promise.all([
+  const [[bal, pl, pop, ptp], hist, viaz] = await Promise.all([
     DB.batch([
       DB.prepare("SELECT id, klient, nazov, cena_czk, platnost_od, zdroj, poznamka, zrusene_at FROM balicky"),
       DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby"),
@@ -26,6 +26,7 @@ export async function polozkyDlhovMien(DB: D1Database, mena: string[]): Promise<
       DB.prepare("SELECT client_name, date, amount_czk FROM payments"),
     ]),
     DB.prepare("SELECT klient, od FROM ptminder_historia").all().catch(() => ({ results: [] })),
+    DB.prepare(DOPYT_VIAZANYCH_PLATIEB).all().catch(() => ({ results: [] })),
   ]);
   type B = { id: string; klient: string; nazov: string; cena_czk: number | null; platnost_od: string; zdroj: string; poznamka: string | null; zrusene_at: string | null };
   type P = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; zrusene_at: string | null; vopred: number | null };
@@ -44,5 +45,6 @@ export async function polozkyDlhovMien(DB: D1Database, mena: string[]): Promise<
       .map((p) => ({ klient: p.client_name, datum: String(p.date || "").slice(0, 10), suma: Number(p.amount_czk) || 0 })),
     ptHistoria: moje((hist.results || []) as unknown as H[], (x) => x.klient)
       .map((h) => ({ klient: h.klient, od: String(h.od || "").slice(0, 10) })),
+    viazane: viazaneZRiadkov(viaz.results || []),
   }).polozky;
 }

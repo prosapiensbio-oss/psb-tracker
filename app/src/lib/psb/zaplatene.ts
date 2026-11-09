@@ -54,6 +54,20 @@ import { normName } from "./format";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { poplatkyPoOdrataniPlatieb, type Platba } from "./platbyEvidencia";
 
+/**
+ * Väzby platba → balíček z uhradených faktúr (pre `VstupDlhov.viazane`).
+ * Jeden dopyt pre `loadData` aj `polozkyDlhovMien`, nech sa nerozídu.
+ */
+export const DOPYT_VIAZANYCH_PLATIEB = `SELECT balicek_id, platba_id FROM vydane_faktury
+  WHERE storno_at IS NULL AND platba_id IS NOT NULL AND balicek_id IS NOT NULL
+  UNION ALL
+  SELECT pol.balicek_id, f.platba_id FROM vydane_faktury_polozky pol JOIN vydane_faktury f ON f.id = pol.faktura_id
+  WHERE f.storno_at IS NULL AND f.platba_id IS NOT NULL AND pol.balicek_id IS NOT NULL`;
+export const viazaneZRiadkov = (rows: unknown[]): { balicekId: string; platbaId: string }[] =>
+  (rows as { balicek_id?: unknown; platba_id?: unknown }[])
+    .map((r) => ({ balicekId: String(r.balicek_id || ""), platbaId: String(r.platba_id || "") }))
+    .filter((x) => x.balicekId && x.platbaId);
+
 export type DlhPolozka = {
   klient: string;
   /** Deň predaja — pri balíčku deň začiatku, pri poplatku deň poplatku. */
@@ -80,6 +94,11 @@ export type VstupDlhov = {
   ptPlatby: { klient: string; datum: string; suma: number }[];
   /** Začiatky členstiev z histórie PTmindera — len pre poistku (krok 3). */
   ptHistoria: { klient: string; od: string }[];
+  /**
+   * Uhradené faktúry: balíček na faktúre a platba, ktorú k nej niekto priradil
+   * (`vydane_faktury` + `vydane_faktury_polozky`). Tá platba patrí najprv jemu.
+   */
+  viazane?: { balicekId: string; platbaId: string }[];
 };
 
 const den = (s: string) => String(s || "").slice(0, 10);
@@ -195,7 +214,7 @@ export function dlhyKlientov(v: VstupDlhov): {
   for (const p of v.platby) {
     const k = normName(p.klient);
     const xs = pl.get(k) || [];
-    xs.push({ suma: p.suma, datum: den(p.datum), zruseneAt: p.zruseneAt ?? null, vopred: p.vopred, sposob: p.sposob });
+    xs.push({ id: p.id, suma: p.suma, datum: den(p.datum), zruseneAt: p.zruseneAt ?? null, vopred: p.vopred, sposob: p.sposob });
     pl.set(k, xs);
   }
   // 3. Poistka: čo PTminder pozná ako zaplatené, dlhom nie je.
@@ -206,6 +225,7 @@ export function dlhyKlientov(v: VstupDlhov): {
   //    svojho obdobia a zvyšok ide novším (Gažo 15. 10. 2026, viď
   //    `nezaplateneZKokpitu`). Novším sa tak peňazí len pridá, nikdy neuberie.
   const naDalsiZaplatene: string[] = [];
+  const viazane = new Map((v.viazane || []).filter((x) => x.balicekId && x.platbaId).map((x) => [x.balicekId, x.platbaId] as const));
   const kokpit = [...bal.entries()].flatMap(([k, bsPovodne]) => {
     const klient = meno.get(k) || k;
     // Poradové číslo, nie obsah: dva rovnaké balíčky (deň, cena, názov) sú
@@ -217,7 +237,7 @@ export function dlhyKlientov(v: VstupDlhov): {
       const cena = cenaPoslednehoBalicka(bs);
       if (cena > 0 && zvysok.kc + 1 >= cena) naDalsiZaplatene.push(klient);
     };
-    const prve = nezaplateneZKokpitu(bs, pl.get(k) || [], undefined, zvysok).map((b) => ({ ...b, klient }));
+    const prve = nezaplateneZKokpitu(bs, pl.get(k) || [], undefined, zvysok, viazane).map((b) => ({ ...b, klient }));
     // KOKPIT JE PRAVDA OD 1. 10. 2026 (Jerry, 21. 10. 2026: „nemal by byť už
     // Kokpit zdroj pravdy?"). Poistka z PTmindera odpúšťa len balíčky spred
     // prechodu; novší balíček zaplatí len platba v Kokpite (banka, zošit,
@@ -284,7 +304,7 @@ export function dlhyKlientov(v: VstupDlhov): {
       : [];
     const odpustene = new Set([...odpusteneP.map((b) => b.poradie), ...navyse]);
     if (!odpustene.size) { zapisZvysok(); return prve; }
-    const druhe = nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie), zvysok)
+    const druhe = nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie), zvysok, viazane)
       .map((b) => ({ ...b, klient }));
     zapisZvysok();
     return druhe;

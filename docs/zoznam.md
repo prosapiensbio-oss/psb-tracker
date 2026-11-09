@@ -32,7 +32,7 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 
 **Otvorené**
 - [x] *(Vyriešené 8. 11. 2026: report PTmindera z 1. 11. to potvrdil, platba 3. 8. označená ako vopred, Monika nič nedlhuje, 3 h. Pravidlo samé sa nemenilo — rovnaký prípad sa môže zopakovať u iných.)* **Monika Čechova — falošný dlh 7 790 Kč (8. 11. 2026):** platba 3. 8. zaplatila balíček od 2. 9. (30 dní vopred, medzi tým iný balíček nebol), pravidlo „zaplatený“ ju pre okno −14/−21 dní nevezme. Platba 6. 11. tak pokryje septembrový balíček a októbrový ostane dlhom (+ „3 h nad rámec“, SMS, QR na /v/). Možnosti: označiť platbu 3. 8. ako „vopred“ (zásah do dát), alebo rozšíriť pravidlo — to pred zmenou overiť snímkou pred/po nad všetkými klientmi.
-- [ ] **Platba s číslom našej faktúry sa nepriraďuje sama (8. 11. 2026, Crescere fortis / Monika Čechova 20261012):** prevod 6. 11. stiahnutý v noci 7. 11., priradený až ručne 8. 11. — dovtedy faktúra nezaplatená. Návrh: nočný sťah priradí sám, keď text nesie číslo JEDNEJ faktúry z Kokpitu, suma sedí do 2 % a faktúra nemá ďalšie položky. Čaká na Jerryho áno (pravidlo „Kokpit sa má pýtať“).
+- [x] *(Jerry 9. 11.: NIE — platby priraďuje on. Namiesto toho: platba priradená k faktúre patrí balíčku na faktúre a dlh zmizne, `viazane` v dlhKlienta.ts, nasadené 9. 11.)* **Platba s číslom našej faktúry sa nepriraďuje sama (8. 11. 2026, Crescere fortis / Monika Čechova 20261012):** prevod 6. 11. stiahnutý v noci 7. 11., priradený až ručne 8. 11. — dovtedy faktúra nezaplatená. Návrh: nočný sťah priradí sám, keď text nesie číslo JEDNEJ faktúry z Kokpitu, suma sedí do 2 % a faktúra nemá ďalšie položky. Čaká na Jerryho áno (pravidlo „Kokpit sa má pýtať“).
 - [ ] **Faktúra na ďalší balíček — prvý ostrý beh, po tréningu Po 9. 11. 15:00 (Jan Kral):** faktúra 20261018 (6 990 Kč, FSH Devices) je vystavená a odoslaná 4. 11. Over, že vznikol 6h Předplatné od 9. 11., faktúra má priradený balíček a zo zoznamu zmizlo „čaká na prvý tréning“. Ak firma zaplatí skôr, faktúra sa má uhradiť hneď po priradení platby. Na telefóne tlačidlo ešte nikto nepozeral.
 - [ ] **20. 11. 2026 — Azure Speech (jazyková appka):** účet jerrystranavsky@gmail.com, portál → Upgrade, plán „Basic – Zahrnuto“ (nie Vývojář $29). Stránku som Jerrymu otvoril, potvrdzuje a platí on.
 - [ ] **Pluginy na webe (2. 11.):** Jerry zmazal Card Press (backdoor), Kirki, Klaviyo, Exclude Pages; všetkých 78 stránok po tom overených (200, bez odkazu na vypnuté pluginy, bez holých shortcodov). Zmazaných ďalších 8 neaktívnych; 85 adries webu znova overených 2. 11. popoludní (200, bez chýb PHP, formuláre aj meranie na mieste). Ostáva zmazať Pinterest a až potom WooCommerce (WordPress drží WooCommerce, kým je Pinterest na serveri). Potom 20 aktívnych aktualizovať po jednom. Nezmazať: Jetpack (obrázky cez i0.wp.com), Forminator, CF7, Easy Accordion (5 stránok), Real Testimonials, Simple Download Monitor, Code Snippets, Asset CleanUp.
@@ -40,11 +40,11 @@ Jerry 2. 11.: „na čo sme ešte zabudli?“ a potom odpovedal ku každej polo�
 - [x] Gmail filter mazal výstrahy Wordfence: zrušený 2. 11. Filter na Google prihlásenia a Adobe Stock ostáva.
 - [ ] **Výmena prístupov** (rozbor 1. 11.): vysvetlené Jerrymu 2. 11. Zmení heslá a kľúče, ktoré chodili cez prehliadač: `info@`, SMS, Meta, servisný účet Google, Metricool. MailerLite zrušený, Google Ads ruší účet.
 - [ ] **Stráž migrácií pri automatickom nasadení po pushi** (rozbor: „čiastočne, ostáva“).
-- [ ] **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo. Jerry: „čakaj“, zatiaľ neodpovedať. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali.
+- [x] *(Jerry 9. 11.: vyriešené)* **Poistka ČPP (Suchý):** 2. 11. poslal vyjadrenie ČPP a čaká na Jerryho slovo. Jerry: „čakaj“, zatiaľ neodpovedať. ČPP: výluka na priestor nie je, do zmluvy to netreba, pri škode „individuálne“; na škodu na prenajatej nehnuteľnosti priamo neodpovedali.
 - [ ] **Kasička:** korunový účet na vankúš rieši Jerry; Fintable má byť podľa Jerryho 10 €, nie 72 €.
 - [ ] **Regina Obrovská: rozhovor v stredu 4. 11. o 9:30.** Otázky sú z 15. 10.; súhlas písomne.
 - [ ] **Reel Natália „lopatka“:** Natália súhlasí (Jerry 2. 11.), reel je `~/Downloads/Test strih videa/Natalia_reel_lopatka.mp4`, ešte nenaplánovaný.
-- [ ] **José/Guillermo:** 2 tréningy v mínuse, čaká sa na jeho odpoveď.
+- [ ] **José/Guillermo:** 2 tréningy v mínuse, čaká sa na jeho odpoveď (Jerry 9. 11.: stále čaká).
 - [ ] **Nový marketingový plán:** starý z 3. 10. sa nenašiel, Jerry: „ideme ďalej a vytvoríme nový“.
 - [ ] **Dátumy narodenia:** odkaz hotový (Workspace → Anamnézy), posiela Jerry. Bez čísla: Klára Malíčková, Petr Baťa, Romana Prochádzková.
 - [x] Radek Baláž: vrátenie opravené na −15 500 (2. 11., Jerry: „urob to ty“).
@@ -143,7 +143,7 @@ Pravidlo „najprv kruh s Terezkou“ zrušené 5. 11. 2026.
 - **10s** [x] Roly Kokpit a Strižňa (3. 11. 2026, CLAUDE.md a SPEC): titulka a rozpis záberov preč z Kokpitu, rozpis záberov na karte v Strižni, texty karty v Kokpite len na čítanie, konkurenti zo Strižne do Kokpitu.
 - **10t** [x] Čo publikovať do Strižne (3. 11. 2026, Jerry: „presuň všetko“). Mapa nápadov, plán marketingu každého profilu a zadanie pre Project sú v Strižni; Kokpit ukazuje plán na čítanie s tlačidlom Otvoriť v Strižni, drží marketingový plán ProSapiens a návrhy z dát posiela tlačidlom Poslať do Strižne.
 - **10u** [ ] Konkurenti v Metricoole (3. 11. 2026): je tam len holystic.training. Jerry pridá miestnych silových a fyzio trénerov a zahraničných FP trénerov, potom ich Kokpit rozdelí na dve skupiny: kto nám berie klientov a od koho sa učíme.
-- **10w** [ ] Strižňa: dvere z Kokpitu (`strizna://karta`, `plan`, `mapa`) sú napísané a appka ich od 4. 11. 11:02 pozná, kliknutie z Kokpitu ešte neoverené. Karta Ahsoky ležiaca v hlavnej mape a karty osobných účtov založené cez „+ Nový príspevok“ sa neukážu v mape žiadneho účtu; nepresúval som ich, je to zápis do dát.
+- **10w** [ ] *(Jerry 9. 11.: „Otvoriť v Strižni“ funguje — dvere overené.)* Strižňa: dvere z Kokpitu (`strizna://karta`, `plan`, `mapa`) sú napísané a appka ich od 4. 11. 11:02 pozná, kliknutie z Kokpitu ešte neoverené. Karta Ahsoky ležiaca v hlavnej mape a karty osobných účtov založené cez „+ Nový príspevok“ sa neukážu v mape žiadneho účtu; nepresúval som ich, je to zápis do dát.
 - **10v** [ ] Správy z Instagramu ako zdroj dopytov (3. 11. 2026): API správy číta (25 rozhovorov), Kokpit ich zatiaľ len spočítal, nič nečítal ani neukladá. Čaká na Jerryho rozhodnutie, či smie text čítať bez uloženia, kvôli súkromiu ľudí, ktorí píšu.
 
 **D · Obsah — nové nástroje, až po Strižni 1.0**
@@ -153,7 +153,7 @@ Pravidlo „najprv kruh s Terezkou“ zrušené 5. 11. 2026.
 **E · Keď bude čas / keď sa niečo ukáže**
 15. [ ] Pocitovka – overené 9. 11.: 1 odpoveď (7. 11.), predtým 0.
 16. [x] Prezentácia reportu – hotové 20. 10. 2026: telefón na výšku má vlastné rozloženie (720×1280, jeden stĺpec), „🖨 Tlačiť / PDF“ dá každý slajd na vlastnú stranu 16:9. Overené mimo appky na ukážkovom reporte; na skutočnom Jerryho telefóne ešte nie.
-17. [ ] Anonymný dotazník aj bývalým klientom.
+17. [ ] Anonymný dotazník aj bývalým klientom. Jerry 9. 11.: najprv doladiť v Kokpite, potom dať pár ľuďom vyskúšať, rozoslať začiatkom roka 2027. Dnes 0 rozoslaných odkazov.
 18. [x] Objem hľadania z Google Ads – hotové 20. 10. 2026: Marketing → Vyhľadávanie → „Čo ľudia hľadajú na Googli“ (Česko / Brno, 12 mesiacov, záujem rok proti roku, podobné výrazy, „+ Nápad“). Google počíta hľadanie pod jedným tvarom slova („bolest zad“ 0, „bolesti zad“ 2 400) – nula sa ukazuje ako „skús iný tvar“.
 19. [x] Zrušené tréningy z Google Calendar – hotové už od augusta 2026 (snímky kalendára → karta „Zrušené a presunuté“, „Bol tam, alebo nie?“, presuny podľa prvy_raz); položka bola len nevyškrtnutá (overené 20. 10.).
 20. [ ] NDA pri fotkách pred/po — blokované kontrolou súhlasov.

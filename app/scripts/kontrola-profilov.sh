@@ -60,6 +60,8 @@ stiahni kal        "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at
 stiahni balicky    "SELECT id,klient,nazov,hodiny,hodiny_spolu,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj,poznamka FROM balicky"
 # Tie isté vstupy osi ako v loadData — bez nich kontrolór počíta inak než appka.
 stiahni historia   "SELECT klient,nazov,druh,stav,hodiny,zostatok,od,do,pridane,platba FROM ptminder_historia"
+# Väzby platba → balíček z uhradených faktúr (DOPYT_VIAZANYCH_PLATIEB v zaplatene.ts).
+stiahni viazane    "SELECT balicek_id,platba_id FROM vydane_faktury WHERE storno_at IS NULL AND platba_id IS NOT NULL AND balicek_id IS NOT NULL UNION ALL SELECT pol.balicek_id,f.platba_id FROM vydane_faktury_polozky pol JOIN vydane_faktury f ON f.id=pol.faktura_id WHERE f.storno_at IS NULL AND f.platba_id IS NOT NULL AND pol.balicek_id IS NOT NULL"
 stiahni doplnenia  "SELECT klient,den,hodiny FROM doplnenia_hodiny"
 # Ručne určený druh tréningu (úvodný ↔ bežný) — bez neho kontrolór počíta
 # inú os než appka: úvodný si nesie vlastnú hodinu.

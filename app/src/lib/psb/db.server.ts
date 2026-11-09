@@ -10,7 +10,7 @@ import { buduceHodiny, doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDocha
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
 import { zapisPlatiZa } from "./platiZa";
-import { dlhyKlientov, bezHodinZDlhov } from "./zaplatene";
+import { dlhyKlientov, bezHodinZDlhov, DOPYT_VIAZANYCH_PLATIEB, viazaneZRiadkov } from "./zaplatene";
 import { jeUkonceny } from "./ukoncenieBalicka";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
@@ -64,7 +64,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     chybySekcii.push(sekcia);
     return { results: [] as unknown[] };
   };
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly, viazanePl] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -131,6 +131,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
            ON p.kluc = w.kluc AND p.beh = w.beh
         ORDER BY w.kluc`,
     ).all().catch(volitelna("kontroly webu")),
+    // Platba priradená k faktúre patrí balíčku na faktúre (`viazane`).
+    DB.prepare(DOPYT_VIAZANYCH_PLATIEB).all().catch(volitelna("väzby faktúr na platby")),
   ]);
 
   const sessionsPtminder: SessionRow[] = (sessions.results as any[]).map((r) => ({
@@ -410,6 +412,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         })),
         ptPlatby: (payments.results as any[]).map((r) => ({ klient: String(r.client_name || ""), datum: String(r.date || "").slice(0, 10), suma: Number(r.amount_czk) || 0 })),
         ptHistoria: (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),
+        viazane: viazaneZRiadkov(viazanePl.results || []),
       });
       data.poplatky = otvorenePoplatky as PSBData["poplatky"];
       // Platby zapísané v Kokpite (banka, zošit) — na os času klienta a do

@@ -24,7 +24,7 @@ import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
 import { historiaPreMail } from "../src/lib/psb/historiaMail";
 import { dlhJednehoKlienta, dlznici } from "../src/lib/psb/dlznici";
-import { bezHodinZDlhov, dlhyKlientov } from "../src/lib/psb/zaplatene";
+import { bezHodinZDlhov, dlhyKlientov, viazaneZRiadkov } from "../src/lib/psb/zaplatene";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.KONTROLA_DATA;
@@ -89,6 +89,7 @@ const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
     poznamka: b.poznamka || null })),
   ptPlatby: payments.map((p: any) => ({ klient: String(p.client || ""), datum: den(p.date), suma: Number(p.amount) || 0 })),
   ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
+  viazane: (() => { try { return viazaneZRiadkov(nacitaj("viazane")); } catch { return []; } })(),
 });
 const bezHodin = bezHodinZDlhov(dlhy, dvojcata);
 /** Odpovede z registra — appka ich číta ako `anomalyAck` (`db.server.ts`). */

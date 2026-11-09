@@ -20,7 +20,7 @@
 
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 
-export type BalicekDlh = { cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; nazov?: string; poznamka?: string | null };
+export type BalicekDlh = { id?: string; cena: number | null; platnostOd: string; zdroj: string; zruseneAt?: string | null; nazov?: string; poznamka?: string | null };
 
 /**
  * OTVÁRACÍ ZOSTATOK NIE JE PREDAJ.
@@ -34,6 +34,8 @@ export type BalicekDlh = { cena: number | null; platnostOd: string; zdroj: strin
 export const jeOtvaraciZostatok = (b: { poznamka?: string | null }): boolean =>
   /^\s*zostatok prevzatý/i.test(String(b.poznamka || ""));
 export type PlatbaDlh = {
+  /** Id riadku v `platby` — podľa neho sa nájde platba priradená k faktúre. */
+  id?: string;
   suma: number; datum: string; zruseneAt?: string | null;
   /**
    * Zaplatené vopred — na balíček, ktorý ešte nevznikol (migrácia 0097).
@@ -94,11 +96,12 @@ const balickyKokpitu = (balicky: BalicekDlh[]): BalicekDlh[] => balicky
  * dve sa posunuli o balíček dozadu a októbrový ostal ako dlh 4 290 Kč, hoci
  * preplatila. Na ostrých dátach mení −21 dní len ju.
  */
-const zapocitanePlatby = (platby: PlatbaDlh[], od: string): PlatbaDlh[] => {
+const zapocitanePlatby = (platby: PlatbaDlh[], od: string, viazane: Set<string> = new Set()): PlatbaDlh[] => {
   const ms = Date.parse(`${od.slice(0, 10)}T00:00:00Z`);
   // Krivý dátum nesmie zhodiť loadData všetkým — vtedy platí pôvodná hranica.
   const hranica = Number.isFinite(ms) ? new Date(ms - 21 * 86400000).toISOString().slice(0, 10) : od;
-  return platby.filter((p) => !p.zruseneAt && (p.datum >= hranica || !!p.vopred));
+  // Platba priradená k faktúre na balíček sa počíta vždy, aj mimo okna.
+  return platby.filter((p) => !p.zruseneAt && (p.datum >= hranica || !!p.vopred || (!!p.id && viazane.has(p.id))));
 };
 
 /**
@@ -135,12 +138,22 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
    * vopred na balíček, ktorý ešte nevznikol (Jan Kral, 9. 11. 2026).
    */
   zvysok?: { kc: number },
+  /**
+   * PLATBA PRIRADENÁ K FAKTÚRE PATRÍ BALÍČKU NA TEJ FAKTÚRE (id balíčka → id
+   * platby, z `vydane_faktury`). Jerry, 9. 11. 2026: „keď už platbu priradím,
+   * mala by byť priradená a už by nemalo vyskakovať, že je dlžník." Bez väzby
+   * sa platby kládli od najstaršieho balíčka, takže platba za faktúru vedela
+   * zaplatiť starší balíček a ten z faktúry ostal ako dlh (Monika Čechová,
+   * 8. 11. 2026). Väzba platbu najprv zarezervuje pre svoj balíček; čo z nej
+   * ostane, ide ďalej ako doteraz.
+   */
+  viazane?: Map<string, string>,
 ): (B & { doplatit: number })[] {
   const nase = balickyKokpitu(balicky) as B[];
   if (zvysok) zvysok.kc = 0;
   if (!nase.length) return [];
-  const zasoba = zapocitanePlatby(platby, nase[0].platnostOd)
-    .map((p) => ({ datum: p.datum, zostava: p.suma, bitcoin: p.sposob === "bitcoin", cela: true }))
+  const zasoba = zapocitanePlatby(platby, nase[0].platnostOd, new Set(viazane?.values() || []))
+    .map((p) => ({ id: p.id, datum: p.datum, zostava: p.suma, bitcoin: p.sposob === "bitcoin", cela: true }))
     .sort((a, b) => a.datum.localeCompare(b.datum));
   // Vrátenie (záporná platba, `ukoncenieBalicka`) zmenší platby od
   // najnovšej — peniaze, ktoré odišli späť, nič nezaplatia (súčet ako predtým).
@@ -153,6 +166,19 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
       const k = Math.min(dlh, p.zostava);
       p.zostava -= k;
       dlh -= k;
+    }
+  }
+  // Väzba z faktúry: balíček si najprv vezme zo SVOJEJ platby.
+  const zFaktury = new Map<number, number>();
+  if (viazane?.size) {
+    for (const [i, b] of nase.entries()) {
+      const pid = b.id ? viazane.get(b.id) : undefined;
+      const p = pid ? zasoba.find((x) => x.id === pid && x.zostava > 0) : undefined;
+      if (!p) continue;
+      const k = Math.min(b.cena || 0, p.zostava);
+      p.zostava -= k;
+      p.cela = false;
+      zFaktury.set(i, k);
     }
   }
   const zober = (kolko: number, smie: (datum: string) => boolean) => {
@@ -182,7 +208,7 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
   for (const p of zasoba.filter((x) => x.bitcoin && x.zostava > 0)) {
     const kand = nase
       .map((b, i) => ({ b, i }))
-      .filter(({ b, i }) => !btcPre.has(i) && !zaplatenyInde?.(b)
+      .filter(({ b, i }) => !btcPre.has(i) && !zFaktury.has(i) && !zaplatenyInde?.(b)
         && posun(b.platnostOd, -14) <= p.datum && p.datum <= posun(b.platnostOd, 45)
         && Math.abs(p.zostava - (b.cena || 0)) <= (b.cena || 0) * KURZ_BTC)
       .sort((x, y) => y.b.platnostOd.localeCompare(x.b.platnostOd));
@@ -192,6 +218,13 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
   for (const [i, b] of nase.entries()) {
     if (btcPre.has(i)) continue;
     const cena = b.cena || 0;
+    const viazana = zFaktury.get(i);
+    if (viazana !== undefined) {
+      const vzate = viazana + (viazana + 1 >= cena ? 0 : zober(cena - viazana, () => true));
+      if (vzate + 1 >= cena) continue;
+      out.push({ ...b, doplatit: Math.round(cena - vzate) });
+      continue;
+    }
     if (zaplatenyInde?.(b)) {
       /**
        * A NIČ Z OBDOBIA NOVŠIEHO BALÍČKA (Jan Kalmus, 20. 10. 2026: BTC platba

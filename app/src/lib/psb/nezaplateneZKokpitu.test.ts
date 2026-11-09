@@ -112,3 +112,33 @@ describe("splátky — balíček zaplatený na dvakrát", () => {
     ], [], [], meno)).toHaveLength(1);
   });
 });
+
+// Jerry, 9. 11. 2026: „keď už platbu priradím, mala by byť priradená a už by
+// nemalo vyskakovať, že je dlžník." Monika Čechová: platba 6. 11. priradená
+// k faktúre na októbrový balíček si išla zaplatiť septembrový a októbrový
+// ostal dlhom.
+describe("platba priradená k faktúre", () => {
+  const bi = (id: string, od: string, cena: number): BalicekDlh => ({ ...b(od, cena), id });
+  const pi = (id: string, datum: string, suma: number): PlatbaDlh => ({ id, datum, suma });
+  it("zaplatí balíček na faktúre, nie najstarší", () => {
+    const bal = [bi("sep", "2026-09-02", 7790), bi("okt", "2026-10-20", 7790)];
+    const pl = [pi("p1", "2026-08-03", 7790), pi("p2", "2026-11-06", 7790)];
+    // Bez väzby: platba z 3. 8. je mimo okna, 6. 11. zaplatí september, október je dlh.
+    expect(nezaplateneZKokpitu(bal, pl).map((x) => x.id)).toEqual(["okt"]);
+    // S väzbou: október má svoju platbu, september ostane nezaplatený.
+    expect(nezaplateneZKokpitu(bal, pl, undefined, undefined, new Map([["okt", "p2"]])).map((x) => x.id)).toEqual(["sep"]);
+  });
+  it("viazaná platba sa počíta aj mimo okna pred prvým balíčkom", () => {
+    const bal = [bi("a", "2026-11-05", 7790)];
+    expect(nezaplateneZKokpitu(bal, [pi("p", "2026-09-01", 7790)], undefined, undefined, new Map([["a", "p"]]))).toEqual([]);
+  });
+  it("čo z viazanej platby ostane, ide ďalším balíčkom", () => {
+    const bal = [bi("a", "2026-10-01", 6990), bi("b", "2026-10-02", 1100)];
+    expect(nezaplateneZKokpitu(bal, [pi("p", "2026-10-03", 8090)], undefined, undefined, new Map([["b", "p"]]))).toEqual([]);
+  });
+  it("menšia viazaná platba nechá zvyšok ako doplatok", () => {
+    const bal = [bi("a", "2026-10-01", 7790)];
+    const n = nezaplateneZKokpitu(bal, [pi("p", "2026-10-03", 5000)], undefined, undefined, new Map([["a", "p"]]));
+    expect(n.map((x) => x.doplatit)).toEqual([2790]);
+  });
+});
