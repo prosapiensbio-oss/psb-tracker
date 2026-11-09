@@ -151,7 +151,7 @@ Pravidlo „najprv kruh s Terezkou“ zrušené 5. 11. 2026.
 14. [x] Osobné profily — nahradené 19.–20. 10.: profily sú v Strižni (prepínač účtov, značky Metricoolu, farby) – Jerry to tak chcel (Jerry 13. 10.; otvorené otázky v sekcii 2).
 
 **E · Keď bude čas / keď sa niečo ukáže**
-15. [ ] Pocitovka – overené 2. 11.: 0 odpovedí.
+15. [ ] Pocitovka – overené 9. 11.: 1 odpoveď (7. 11.), predtým 0.
 16. [x] Prezentácia reportu – hotové 20. 10. 2026: telefón na výšku má vlastné rozloženie (720×1280, jeden stĺpec), „🖨 Tlačiť / PDF“ dá každý slajd na vlastnú stranu 16:9. Overené mimo appky na ukážkovom reporte; na skutočnom Jerryho telefóne ešte nie.
 17. [ ] Anonymný dotazník aj bývalým klientom.
 18. [x] Objem hľadania z Google Ads – hotové 20. 10. 2026: Marketing → Vyhľadávanie → „Čo ľudia hľadajú na Googli“ (Česko / Brno, 12 mesiacov, záujem rok proti roku, podobné výrazy, „+ Nápad“). Google počíta hľadanie pod jedným tvarom slova („bolest zad“ 0, „bolesti zad“ 2 400) – nula sa ukazuje ako „skús iný tvar“.
@@ -274,7 +274,7 @@ je kde pozrieť).
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
-**Nasadené 5. 11. 2026:** migrácia 0135 aplikovaná, kód v ostrom aj v bete, obrazovka Marketing → Mailer naostro od 7. 11. 2026 (`MailerKroky.tsx`, `mailer.server.ts`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Overené 6. 11. 2026 skúšobnými mailmi:** doména, webhook, meranie (`links.news`), vzhľad A cez celú šírku, odosielateľ ProSapiens Biomechanic, klik, odhlásenie, odpoveď (aj z Gmail adresy bez bodky) a jej čítanie v ostrom Kokpite. **Čaká:** 1. výber darčeka, potvrdzovací mail a znenie políčka; 3. skúšobný mail a overenie obrazovky na ostrých dátach; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`.
+**Nasadené 5. 11. 2026:** migrácia 0135 aplikovaná, kód v ostrom aj v bete, obrazovka Marketing → Mailer naostro od 7. 11. 2026 (`MailerKroky.tsx`, `mailer.server.ts`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Overené 6. 11. 2026 skúšobnými mailmi:** doména, webhook, meranie (`links.news`), vzhľad A cez celú šírku, odosielateľ ProSapiens Biomechanic, klik, odhlásenie, odpoveď (aj z Gmail adresy bez bodky) a jej čítanie v ostrom Kokpite. **Čaká:** 1. výber darčeka, potvrdzovací mail a znenie políčka; 3. skúšobný mail a overenie obrazovky na ostrých dátach; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`. **Overené 9. 11. 2026: na webe ešte nie je** (živý `formulare.js` endpoint nevolá, `mail_darcek` je prázdny, v `mail_odberatelia` 0 prihlásení z webu). Poradie: Jerry vyberie darček → znenie políčka → políčko na web (súhlas Jerryho, živý WordPress).
 
 **Opravené 7. 11. 2026 v `Mail.tsx`:** karta „Pribúdajú odberatelia?" hlási „pribúdajú", hoci posledné prihlásenie je z 3. 9. 2025 (rad končí posledným prihlásením, nie dneškom); „Stav zoznamu" tvrdí, že Kokpit odosielanie nemá postavené.
 
@@ -492,7 +492,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   a /terezia/ existujú (predtým som ich hľadal pod zlou adresou).
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
 - [ ] **Pocitovka beží od 30. 9. 2026** — o mesiac sa pozrieť, koľkí klienti
-  odpovedali. (8. 10.: zatiaľ 0 odpovedí v `klient_merania`.) Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
+  odpovedali. (8. 10.: zatiaľ 0 odpovedí v `klient_merania`; 9. 11.: 1 odpoveď zo 7. 11.) Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
   že sa nepýtame dosť nahlas; vtedy zvážiť pripomenutie v SMS po treťom
   tréningu.
 
