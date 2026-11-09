@@ -5,7 +5,7 @@ import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { klucNezaplateneho, treningyBezBalicka, ukoncenyBalicekKlienta, zostatokBezPtmindera, zostatokKokpitu } from "./zostatokKokpitu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { CENNIK } from "./cennik";
-import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { daysBetween, fmtCZK, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
 import { menoZNazvuUvodneho } from "./kalendar";
@@ -3351,7 +3351,7 @@ export function deriveRegister(
   // „Vybavené" tu odškrtne aj tam.
   for (const s of platbyNaZaplatenie(data.platbyPohyby || [], ack)) {
     const minuly = s.mesiac < dnesPraha().slice(0, 7);
-    const ciastocne = s.pohyby.length ? ` Vo výpise je zatiaľ ${s.pohyby.length} z ${s.platba.pocet} platieb.` : "";
+    const ciastocne = s.pohyby.length ? ` Vo výpise zatiaľ odišlo ${fmtCZK(s.odislo)}${s.platba.sumaAspon ? ` z ${fmtCZK(s.platba.sumaAspon)}` : ""}.` : "";
     add(
       klucPlatbyMesiaca(s.platba.id, s.mesiac),
       "Zápis",

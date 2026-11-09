@@ -60,3 +60,21 @@ describe("platby mesiaca", () => {
     expect(platbyNaZaplatenie([], ack, "2026-11-16").some((x) => x.platba.id === "stat-jerry")).toBe(true);
   });
 });
+
+// Jerry, 9. 11. 2026: doplatky zdravotného 7. 11. (2 722 a 1 128 Kč) odškrtli
+// štát, hoci „štát je zaplatený, len keď odíde 9 761 Kč".
+describe("doplatok nie je mesačná platba štátu", () => {
+  const doplatky = [
+    p("2026-11-07", -1128, "fixne.prevadzka.statJerry", "1113004651/0710 VS 9306664994"),
+    p("2026-11-07", -2722, "fixne.prevadzka.statJerry", "1112001651/0710 VS 9306664994"),
+  ];
+  test("doplatky samy štát nezaplatia, povie sa koľko odišlo", () => {
+    const s = stav(stavPlatieb("2026-11", doplatky, {}, "2026-11-16"), "stat-jerry");
+    expect(s.zaplatene).toBeNull();
+    expect(s.odislo).toBe(3850);
+  });
+  test("s 9 761 Kč je zaplatený, aj keď k tomu odišli doplatky", () => {
+    const s = stavPlatieb("2026-11", [...doplatky, p("2026-11-20", -9761, "fixne.prevadzka.statJerry", "2323438014/3030")], {}, "2026-11-20");
+    expect(stav(s, "stat-jerry").zaplatene).toBe("banka");
+  });
+});

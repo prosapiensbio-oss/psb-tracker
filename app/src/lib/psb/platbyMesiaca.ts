@@ -29,8 +29,13 @@ export type PravidelnaPlatba = {
   den: number;
   /** Doplnok k termínu, keď ho Jerry povedal inak než „pripomenúť X." */
   termin?: string;
-  /** Koľko pohybov za mesiac znamená „zaplatené" (štát Terezky = zdravotné + sociálne). */
-  pocet?: number;
+  /**
+   * Koľko musí v mesiaci odísť, aby to bolo zaplatené (Kč). Bez neho stačí
+   * jeden pohyb. Jerry, 9. 11. 2026: doplatky zdravotného 2 722 a 1 128 Kč
+   * odškrtli štát, hoci „štát je zaplatený, len keď odíde 9 761 Kč". Rozhoduje
+   * súčet, nie počet: doplatok je pohyb v tej istej kategórii.
+   */
+  sumaAspon?: number;
   je: (p: PohybPlatby) => boolean;
 };
 
@@ -38,11 +43,11 @@ const t = (p: PohybPlatby) => p.text.normalize("NFD").replace(/[̀-ͯ]/g, "").to
 
 export const PRAVIDELNE_PLATBY: PravidelnaPlatba[] = [
   {
-    id: "stat-jerry", nazov: "Štát Jerry", suma: "9\u00A0761\u00A0Kč", den: 15,
+    id: "stat-jerry", nazov: "Štát Jerry", suma: "9\u00A0761\u00A0Kč", den: 15, sumaAspon: 9761,
     je: (p) => p.kategoria === "fixne.prevadzka.statJerry",
   },
   {
-    id: "stat-terezka", nazov: "Štát Terezka", suma: "3\u00A0024 + 1\u00A0595\u00A0Kč", den: 18, pocet: 2,
+    id: "stat-terezka", nazov: "Štát Terezka", suma: "3\u00A0024 + 1\u00A0595\u00A0Kč", den: 18, sumaAspon: 3024 + 1595,
     je: (p) => p.kategoria === "fixne.prevadzka.statTerezka",
   },
   {
@@ -72,6 +77,8 @@ export type StavPlatby = {
   mesiac: string;
   /** Pohyby z banky, ktoré ju v tom mesiaci kryjú. */
   pohyby: PohybPlatby[];
+  /** Koľko z nich spolu odišlo (Kč, kladné). */
+  odislo: number;
   /** „banka" = vo výpise, „rucne" = odkliknuté, null = nezaplatené. */
   zaplatene: "banka" | "rucne" | null;
   /** Deň pripomenutia v tom mesiaci už prišiel. */
@@ -103,10 +110,12 @@ export function stavPlatieb(
   const vMesiaci = pohyby.filter((p) => p.datum.slice(0, 7) === mesiac && p.suma < 0);
   return PRAVIDELNE_PLATBY.map((platba) => {
     const kryje = vMesiaci.filter(platba.je);
-    const zaplatene = kryje.length >= (platba.pocet || 1) ? "banka" as const
+    const odislo = Math.round(kryje.reduce((x, p) => x - p.suma, 0));
+    const stacilo = platba.sumaAspon ? odislo + 1 >= platba.sumaAspon : kryje.length > 0;
+    const zaplatene = stacilo ? "banka" as const
       : jeOdklik(ack[klucPlatbyMesiaca(platba.id, mesiac)]) ? "rucne" as const : null;
     const denPripomenutia = `${mesiac}-${String(platba.den).padStart(2, "0")}`;
-    return { platba, mesiac, pohyby: kryje, zaplatene, pripomenut: dnes.slice(0, 10) >= denPripomenutia };
+    return { platba, mesiac, pohyby: kryje, odislo, zaplatene, pripomenut: dnes.slice(0, 10) >= denPripomenutia };
   });
 }
 

@@ -11,7 +11,7 @@
 import { useMemo } from "react";
 
 import { dnesPraha } from "../../lib/psb/cas";
-import { fmtDMY, mesiacCely } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, mesiacCely } from "../../lib/psb/format";
 import { klucPlatbyMesiaca, PLATBY_MESIACA_OD, stavPlatieb, type PohybPlatby, type StavPlatby } from "../../lib/psb/platbyMesiaca";
 import { C } from "../../lib/psb/theme";
 import { NadpisSekcie } from "./WorkspaceKroky";
@@ -68,7 +68,7 @@ function Riadok({ s, onAck, minuly }: { s: StavPlatby; onAck: (key: string, note
         <div style={{ fontSize: 12, color: farba }}>
           {stavText}
           {!s.zaplatene && s.platba.termin ? ` · zaplatiť ${s.platba.termin}` : ""}
-          {!s.zaplatene && s.pohyby.length > 0 ? ` · vo výpise ${s.pohyby.length} z ${s.platba.pocet || 1}` : ""}
+          {!s.zaplatene && s.pohyby.length > 0 ? ` · zatiaľ odišlo ${fmtCZK(s.odislo)}${s.platba.sumaAspon ? ` z ${fmtCZK(s.platba.sumaAspon)}` : ""}` : ""}
         </div>
       </div>
       {s.zaplatene !== "banka" && (
