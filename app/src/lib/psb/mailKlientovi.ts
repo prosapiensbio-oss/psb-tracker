@@ -107,6 +107,8 @@ function rozpisTextom(v: VypisKlienta): string {
 
 export type VypisKlienta = {
   klient: string;
+  /** Ďalší balíček je zaplatený vopred a vznikne prvým tréningom (9. 11. 2026). */
+  dalsiZaplateny?: boolean;
   /** Oslovenie — krstné meno. */
   oslovenie: string;
   trener: string;

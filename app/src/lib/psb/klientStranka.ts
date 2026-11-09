@@ -67,6 +67,9 @@ const hod = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1).replace("."
 function hlavnyStav(v: VypisKlienta, preIneho = false): { velke: string; pod: string; cervene?: boolean } {
   if (v.zostatok == null) return { velke: preIneho ? "Tréninky" : "Tvoje tréninky", pod: "Přehled posledního balíčku." };
   if (v.zostatok > 0) return { velke: preIneho ? `Zbývá ${hod(v.zostatok)}` : `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
+  // Zaplatený ďalší balíček ešte nevznikol: nie je to dlh ani „nezaplaceno"
+  // (Jan Kral, 9. 11. 2026). Hodiny sa pripíšu prvým tréningom.
+  if (v.dalsiZaplateny) return { velke: preIneho ? "Další balíček je zaplacený" : "Další balíček máš zaplacený", pod: "hodiny se připíšou s prvním tréninkem" };
   // Ukončil a dostal peniaze späť: „Poslední hodina, balíček máš dochozený“ by
   // bola nepravda (Radek Baláž, 1. 11. 2026). Mínus po ukončení je ďalej mínus.
   if (v.zostatok === 0 && v.ukonceny) return { velke: "Balíček ukončen", pod: "je uzavřený, žádné hodiny na něm nezbývají" };

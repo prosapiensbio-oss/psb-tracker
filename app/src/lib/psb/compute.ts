@@ -3141,6 +3141,20 @@ export function odstranDuplicity(polozky: RegisterItem[]): RegisterItem[] {
 
 const toneRank: Record<string, number> = { red: 0, orange: 1, blue: 2 };
 
+
+/**
+ * KTO MÁ ZAPLATENÝ ĎALŠÍ BALÍČEK, KTORÝ EŠTE NEVZNIKOL.
+ *
+ * Jerry, 9. 11. 2026: „Včera som potvrdil Jan Kral platbu, ale dnes mám
+ * notifikáciu Jan Kral dnes 1 nad rámec." Balíček 9. 10. – 8. 11. mal 6 h
+ * minutých, ďalší zaplatil 4. 11. a ten vzniká až prvým tréningom. Ráno pred
+ * ním ho Kokpit hlásil ako hodinu nad rámec. Kto to je, rozhoduje rozdelenie
+ * platieb na balíčky (`dlhyKlientov`): po všetkých balíčkoch mu ostali peniaze
+ * aspoň na cenu posledného. Príznak „vopred" pri platbe na to nestačí, nesú ho
+ * aj platby balíčka, ktorý už beží.
+ */
+export const zaplateneVopredNaDalsi = (data: Pick<PSBData, "naDalsiZaplatene">): string[] => data.naDalsiZaplatene || [];
+
 /**
  * Dnešné tréningy, pri ktorých treba niečo vybaviť.
  *
@@ -3160,9 +3174,12 @@ export function dnesneTreningy(
   dnes: Date = new Date(),
   /** Klienti, ktorých faktúra už čaká na ďalší balíček (`data.fakturyNaDalsi`). */
   fakturyNaDalsi: string[] = [],
+  /** Klienti so zaplateným ďalším balíčkom, ktorý ešte nevznikol (`zaplateneVopredNaDalsi`). */
+  zaplateneNaDalsi: string[] = [],
 ): RegisterItem[] {
   const out: RegisterItem[] = [];
   const stavPolozky = (key: string, rodina?: string) => stavPolozkyRegistra(key, ack, rodina, dnes);
+  const zaplatene = new Set(zaplateneNaDalsi.map(normName));
   const kalUdalosti = kal?.udalosti || [];
   const kalZmeny = kal?.zmeny;
     const dnesIso = dnesPraha(dnes);
@@ -3194,7 +3211,9 @@ export function dnesneTreningy(
        * z 2. 10. čakalo na platbu) a Jerry to čítal ako „má poslednú hodinu".
        */
       let sms: RegisterItem["sms"];
-      if (c.packageRemaining != null && c.packageTotal != null) {
+      // Zaplatený ďalší balíček vznikne dnešným tréningom: nie je to posledná
+      // hodina ani hodina nad rámec (Jan Kral, 9. 11. 2026).
+      if (c.packageRemaining != null && c.packageTotal != null && !zaplatene.has(normName(c.name))) {
         const zacal = u.zaciatok.slice(0, 16) <= terazPraha(dnes);
         const pred = c.packageRemaining + (zacal ? 1 : 0);
         // Keď zostatok appka dopočítala (export ho pri offline členstvách

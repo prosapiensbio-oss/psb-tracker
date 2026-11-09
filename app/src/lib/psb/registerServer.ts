@@ -14,7 +14,7 @@
 // (piatok, prvý víkend v mesiaci). Push je o práci s klientmi.
 
 import {
-  capacityByTrainer, deriveClients, deriveRegister, deriveSixM, dnesneTreningy, nezapisaneDoRegistra,
+  capacityByTrainer, deriveClients, deriveRegister, deriveSixM, dnesneTreningy, zaplateneVopredNaDalsi, nezapisaneDoRegistra,
   odstranDuplicity, patriTrenerovi, pripomienkaDovodu, pripomienkySlubov,
   stavPolozkyRegistra, type RegisterItem, type ZmenaVKalendari,
 } from "./compute";
@@ -83,12 +83,12 @@ export function registerZoServera(
     ...(zapisy ? ritualyDoRegistra(zapisy.weeks, zapisy.mesiace, data.anomalyAck, dnes, zapisy.stavDatum) : []),
     // Dnešné tréningy sú v rannej správe to najdôležitejšie — veta, ktorú si
     // človek prečíta o siedmej a večer je buď vybavená, alebo prepadla.
-    ...dnesneTreningy(clients, sixM, { udalosti: ud, zmeny: zm }, data.anomalyAck || {}, dnes, data.fakturyNaDalsi),
+    ...dnesneTreningy(clients, sixM, { udalosti: ud, zmeny: zm }, data.anomalyAck || {}, dnes, data.fakturyNaDalsi, zaplateneVopredNaDalsi(data)),
     ...deriveRegister(data, clients, sixM, capacityByTrainer(clients, data.sessions), { udalosti: ud, zmeny: zm }),
     ...pripomienkySlubov(ud as never, (data.leads || []) as never, data.anomalyAck, dnes, zm as never),
     ...pripomienkaDovodu(clients, [...(data.packages || []), ...(data.balickyKokpit || [])], ud as never, data.anomalyAck, dnes),
     // Posledná hodina / mínus — tá istá funkcia ako v appke (9. 10. 2026).
-    ...(smsOdoslane ? polozkyHodin(clients, ud, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, dnes, data.fakturyNaDalsi) : []),
+    ...(smsOdoslane ? polozkyHodin(clients, ud, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, dnes, data.fakturyNaDalsi, zaplateneVopredNaDalsi(data)) : []),
     // `nezapisaneDoRegistra` vracia položky BEZ stavu odpovede — doplní sa tu,
     // rovnako ako v App.tsx. Bez toho by odklepnutá vec prišla ako push.
     ...nezapisaneDoRegistra({

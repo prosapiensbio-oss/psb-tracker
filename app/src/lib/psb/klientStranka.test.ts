@@ -536,3 +536,17 @@ describe("skloňovanie riadkov", () => {
     expect(aDalsichRadku(5)).toBe("a dalších 5 řádků");
   });
 });
+
+// Jan Kral, 9. 11. 2026: ďalší balíček zaplatil vopred, stránka ho pýtala znova.
+describe("zaplatený ďalší balíček", () => {
+  it("nadpis povie, že je zaplatený, a nie „Nezaplaceno“", () => {
+    const html = klientStranka({ ...zaklad, zostatok: 0, dalsiZaplateny: true });
+    expect(html).toContain("Další balíček máš zaplacený");
+    expect(html).not.toContain("Nezaplaceno");
+  });
+  it("príjemca za niekoho iného dostane tretiu osobu", () => {
+    const html = klientStranka({ ...zaklad, zostatok: 0, dalsiZaplateny: true, preKoho: { prijemca: "Katarína", klient: "Richard Matl" } });
+    expect(html).toContain("Další balíček je zaplacený");
+    expect(html).toContain("Ahoj Kataríno, posílám ti přehled hodin za Richarda.");
+  });
+});

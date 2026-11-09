@@ -153,6 +153,14 @@ describe("celý beh Jana Krala cez jedno pravidlo „zaplatený\"", () => {
   const vopred = { klient: "Jan Kral", datum: "2026-11-06", suma: 6990, vopred: 1 };
   const dlhy = (balicky: object[], platby: object[]) => dlhyKlientov({ poplatky: [], balicky, platby, ptPlatby: [], ptHistoria: [] } as never).polozky;
 
+  const naDalsi = (balicky: object[], platby: object[]) => dlhyKlientov({ poplatky: [], balicky, platby, ptPlatby: [], ptHistoria: [] } as never).naDalsiZaplatene;
+  // 9. 11. 2026 ráno: notifikácia „1 h nad rámec", hoci ďalší balíček bol zaplatený.
+  it("zaplatený ďalší balíček, ktorý ešte nevznikol, je vidno", () => {
+    expect(naDalsi([stary], [zaStary, vopred])).toEqual(["Jan Kral"]);
+    expect(naDalsi([stary], [zaStary])).toEqual([]);
+    expect(naDalsi([stary, novy], [zaStary, vopred])).toEqual([]);
+    expect(naDalsi([stary], [zaStary, { ...vopred, suma: 3000 }])).toEqual([]);
+  });
   it("pred pondelkom bez balíčka: nikto nič nedlží", () => {
     expect(dlhy([stary], [zaStary])).toEqual([]);
     expect(dlhy([stary], [zaStary, vopred])).toEqual([]);

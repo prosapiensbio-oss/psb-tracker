@@ -130,8 +130,14 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
    * peniaze už boli „minuté" a októbrový balíček ostal ako dlh v plnej výške.
    */
   zaplatenyInde?: (b: B) => boolean,
+  /**
+   * Sem sa zapíše, koľko z platieb ostalo po všetkých balíčkoch — peniaze
+   * vopred na balíček, ktorý ešte nevznikol (Jan Kral, 9. 11. 2026).
+   */
+  zvysok?: { kc: number },
 ): (B & { doplatit: number })[] {
   const nase = balickyKokpitu(balicky) as B[];
+  if (zvysok) zvysok.kc = 0;
   if (!nase.length) return [];
   const zasoba = zapocitanePlatby(platby, nase[0].platnostOd)
     .map((p) => ({ datum: p.datum, zostava: p.suma, bitcoin: p.sposob === "bitcoin", cela: true }))
@@ -205,8 +211,15 @@ export function nezaplateneZKokpitu<B extends BalicekDlh>(
     // Koľko na balíček ešte chýba — pri čiastočnej platbe menej než cena.
     out.push({ ...b, doplatit: Math.round(cena - vzate) });
   }
+  if (zvysok) zvysok.kc = Math.round(zasoba.reduce((a, p) => a + Math.max(0, p.zostava), 0));
   return out;
 }
+
+/** Cena posledného balíčka, z ktorého sa ráta dlh — odhad ceny ďalšieho. */
+export const cenaPoslednehoBalicka = (balicky: BalicekDlh[]): number => {
+  const nase = balickyKokpitu(balicky);
+  return Math.round(nase[nase.length - 1]?.cena || 0);
+};
 
 
 /**

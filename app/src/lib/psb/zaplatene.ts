@@ -49,7 +49,7 @@
  */
 
 import { BARTER_KLIENTI } from "./barter";
-import { jeOtvaraciZostatok, KURZ_BTC, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
+import { jeOtvaraciZostatok, KURZ_BTC, cenaPoslednehoBalicka, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { poplatkyPoOdrataniPlatieb, type Platba } from "./platbyEvidencia";
@@ -163,6 +163,13 @@ export function dlhyKlientov(v: VstupDlhov): {
    * niekto má povedať, ktorá verzia platí (notifikácia `ptrozpor|`).
    */
   rozporyPtminder: RozporPtminder[];
+  /**
+   * Klienti, ktorým po zaplatení všetkých balíčkov ostali peniaze aspoň na
+   * cenu posledného — ďalší balíček majú zaplatený vopred, hoci ešte nevznikol
+   * (Jan Kral, 9. 11. 2026). Dlh nemenia; čítajú ich pripomienky hodín
+   * a stránka za odkazom, nech nepýtajú platbu druhýkrát.
+   */
+  naDalsiZaplatene: string[];
 } {
   const barter = new Set(BARTER_KLIENTI.map(normName));
   // 1. Poplatky mínus platby z Kokpitu.
@@ -198,12 +205,19 @@ export function dlhyKlientov(v: VstupDlhov): {
   //    zopakuje: odpustený balíček si z platieb Kokpitu nechá len tie zo
   //    svojho obdobia a zvyšok ide novším (Gažo 15. 10. 2026, viď
   //    `nezaplateneZKokpitu`). Novším sa tak peňazí len pridá, nikdy neuberie.
+  const naDalsiZaplatene: string[] = [];
   const kokpit = [...bal.entries()].flatMap(([k, bsPovodne]) => {
     const klient = meno.get(k) || k;
     // Poradové číslo, nie obsah: dva rovnaké balíčky (deň, cena, názov) sú
     // dva predaje a odpustenie jedného nesmie zasiahnuť druhý.
     const bs = bsPovodne.map((b, i) => ({ ...b, poradie: i }));
-    const prve = nezaplateneZKokpitu(bs, pl.get(k) || []).map((b) => ({ ...b, klient }));
+    const zvysok = { kc: 0 };
+    // Zvyšok sa berie z TOHO výpočtu, ktorý naozaj platí (s odpustením alebo bez).
+    const zapisZvysok = () => {
+      const cena = cenaPoslednehoBalicka(bs);
+      if (cena > 0 && zvysok.kc + 1 >= cena) naDalsiZaplatene.push(klient);
+    };
+    const prve = nezaplateneZKokpitu(bs, pl.get(k) || [], undefined, zvysok).map((b) => ({ ...b, klient }));
     // KOKPIT JE PRAVDA OD 1. 10. 2026 (Jerry, 21. 10. 2026: „nemal by byť už
     // Kokpit zdroj pravdy?"). Poistka z PTmindera odpúšťa len balíčky spred
     // prechodu; novší balíček zaplatí len platba v Kokpite (banka, zošit,
@@ -269,9 +283,11 @@ export function dlhyKlientov(v: VstupDlhov): {
         && !pytat.some((x) => x.poradie === b.poradie) && lenVPtminderi(b)).map((b) => b.poradie)
       : [];
     const odpustene = new Set([...odpusteneP.map((b) => b.poradie), ...navyse]);
-    if (!odpustene.size) return prve;
-    return nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie))
+    if (!odpustene.size) { zapisZvysok(); return prve; }
+    const druhe = nezaplateneZKokpitu(bs, pl.get(k) || [], (b) => odpustene.has(b.poradie), zvysok)
       .map((b) => ({ ...b, klient }));
+    zapisZvysok();
+    return druhe;
   });
 
   // 4. Ten istý predaj v oboch systémoch je jeden — poplatok ustúpi balíčku.
@@ -311,7 +327,7 @@ export function dlhyKlientov(v: VstupDlhov): {
     .filter((x) => !barter.has(normName(x.klient)))
     .sort((a, b) => a.den.localeCompare(b.den) || a.klient.localeCompare(b.klient));
 
-  return { polozky, otvorenePoplatky: otvorene, dvojcata, rozporyPtminder };
+  return { polozky, otvorenePoplatky: otvorene, dvojcata, rozporyPtminder, naDalsiZaplatene };
 }
 
 /**

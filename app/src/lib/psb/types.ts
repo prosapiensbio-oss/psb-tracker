@@ -234,6 +234,8 @@ export type PSBData = {
   fakturyOdKlientov?: import("./fakturaKlienta").FakturaOdKlienta[];
   /** Klienti s faktúrou, ktorá čaká na ďalší balíček (`fakturaNaDalsi.server.ts`). */
   fakturyNaDalsi?: string[];
+  /** Ďalší balíček zaplatený vopred, ešte nevznikol (`dlhyKlientov`, 9. 11. 2026). */
+  naDalsiZaplatene?: string[];
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;

@@ -176,7 +176,11 @@ export async function obsahOdkazu(
   // Ukončený dostal peniaze späť: nový balíček sa mu ponúka, len keď má termín
   // alebo po ukončení trénoval — inak QR na 21 150 Kč nemá s čím súvisieť.
   const ponukatUkoncenemu = !c.ukonceny || !!dalsi || (vypis.zostatok ?? 0) < 0;
-  const ponuka = sPlatbou && !zaNehoPlati && dlh.dlzi <= 0 && nadramec && ponukatUkoncenemu ? ponukaVOdkaze(c.name, os, balicky, data, dnes) : null;
+  // Ďalší balíček už zaplatil (Jan Kral, 9. 11. 2026): QR na ten istý balíček
+  // by bol návod zaplatiť ho druhýkrát.
+  const dalsiZaplateny = (data.naDalsiZaplatene || []).some((m) => normName(m) === normName(c.name));
+  if (dalsiZaplateny && nadramec && dlh.dlzi <= 0) vypis.dalsiZaplateny = true;
+  const ponuka = sPlatbou && !zaNehoPlati && !dalsiZaplateny && dlh.dlzi <= 0 && nadramec && ponukatUkoncenemu ? ponukaVOdkaze(c.name, os, balicky, data, dnes) : null;
   const vlastna = !sPlatbou || zaNehoPlati ? 0 : dlh.dlzi > 0 ? dlh.dlzi : Math.round(ponuka?.cena || 0);
   const vlastnyNazov = dlh.dlzi > 0
     ? ((data.dlhy || []).filter((x) => normName(x.klient) === normName(c.name))[0]?.nazov || dlh.popis)

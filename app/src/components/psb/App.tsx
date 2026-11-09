@@ -45,7 +45,7 @@ import { stavPolozkyRegistra,
   nastavObjednaneZKalendara,
   deriveClients,
   deriveRegister,
-  dnesneTreningy,
+  dnesneTreningy, zaplateneVopredNaDalsi,
   deriveSixM,
   nezapisaneDoRegistra,
   pripomienkySlubov,
@@ -2197,7 +2197,7 @@ function skupinaFaktur(
     // buď vybavená, alebo prepadla.
     // Dnešné tréningy — výpočet je v lib/psb/compute.ts, aby ho okrem
     // obrazovky videla aj ranná dávka notifikácií na telefón.
-    out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}, undefined, data.fakturyNaDalsi));
+    out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}, undefined, data.fakturyNaDalsi, zaplateneVopredNaDalsi(data)));
 
     return out;
   }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal, pravidloNesedi, zamknuteMesiace]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2367,7 +2367,7 @@ function skupinaFaktur(
   // Posledná hodina / mínus s tlačidlom na SMS (Jerry, 9. 10. 2026) — tá
   // istá funkcia ako v rannej správe na telefón (registerServer).
   const hodinyPolozky = useMemo(
-    () => (smsOdoslane ? polozkyHodin(clients, kalUdalosti, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, undefined, data.fakturyNaDalsi) : []),
+    () => (smsOdoslane ? polozkyHodin(clients, kalUdalosti, data.platbyKokpit || [], data.balickyKokpit || [], smsOdoslane, data.anomalyAck || {}, undefined, data.fakturyNaDalsi, zaplateneVopredNaDalsi(data)) : []),
     [clients, kalUdalosti, data.platbyKokpit, data.balickyKokpit, smsOdoslane, data.anomalyAck, data.fakturyNaDalsi],
   );
 

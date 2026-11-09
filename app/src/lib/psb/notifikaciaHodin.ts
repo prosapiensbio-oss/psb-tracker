@@ -10,6 +10,7 @@
  * platba alebo balíček: „Vybavené" platí na stupeň v tejto epizóde, ďalší
  * nákup hodín ju ukončí. Pravidlá sú v `upozorneniaHodin`.
  */
+import { normName } from "./format";
 import { stavPolozkyRegistra, type ClientAgg, type RegisterItem } from "./compute";
 import { terazPraha } from "./cas";
 import { poslednaZmenaStavu, upozorneniaHodin, vetaHodin } from "./workspaceKroky";
@@ -41,6 +42,8 @@ export function polozkyHodin(
   dnes: Date = new Date(),
   /** Klienti, ktorých faktúra už čaká na ďalší balíček (`data.fakturyNaDalsi`). */
   fakturyNaDalsi: string[] = [],
+  /** Zaplatený ďalší balíček, ktorý ešte nevznikol — nie je čo hlásiť (9. 11. 2026). */
+  zaplateneNaDalsi: string[] = [],
 ): RegisterItem[] {
   const terazP = terazPraha(dnes);
   const mena = Object.keys(clients);
@@ -51,7 +54,8 @@ export function polozkyHodin(
     const t = Date.parse(v);
     if (Number.isFinite(t)) odoslane[k] = terazPraha(new Date(t));
   }
-  return upozorneniaHodin(Object.values(clients), odoslane, reset, dnesTrenuje).map((u) => {
+  const zaplatene = new Set(zaplateneNaDalsi.map(normName));
+  return upozorneniaHodin(Object.values(clients).filter((c) => !zaplatene.has(normName(c.name))), odoslane, reset, dnesTrenuje).map((u) => {
     // Stupeň v kľúči: „Vybavené" pri poslednej hodine neumlčí prechod do mínusu.
     const key = `hodiny|${u.meno}|${u.stav === "posledna" ? "posledna" : "minus"}`;
     const v = vetaHodin(u);

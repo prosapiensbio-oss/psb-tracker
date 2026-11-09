@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { dnesneTreningy, type ClientAgg } from "./compute";
+import { dnesneTreningy, zaplateneVopredNaDalsi, type ClientAgg } from "./compute";
 
 // Lukáš Hanus, 6. 10. 2026: −1 pred tréningom o 9:30 a pripomienka písala
 // „dnes je posledná hodina, ktorú mu appka pozná". Jerry to čítal ako
@@ -22,5 +22,16 @@ describe("pripomienka pri dnešnom tréningu hovorí stav PRED ním", () => {
   });
   it("s hodinami navyše nehlási nič", () => {
     expect(dnesneTreningy(klient(4), [], kal, {}, rano)).toEqual([]);
+  });
+});
+
+// Jan Kral, 9. 11. 2026: balíček 9. 10. – 8. 11. minutý, ďalší zaplatený vopred
+// 4. 11. a vznikne až dnešným tréningom. Ráno prišlo „1 h nad rámec".
+describe("zaplatený ďalší balíček nie je hodina nad rámec", () => {
+  it("kto má ďalší zaplatený, nedostane vetu o minutých hodinách", () => {
+    expect(dnesneTreningy(klient(0), [], kal, {}, rano, [], zaplateneVopredNaDalsi({ naDalsiZaplatene: ["Lukas Hanus"] }))).toEqual([]);
+  });
+  it("ostatní ju dostanú ďalej", () => {
+    expect(dnesneTreningy(klient(0), [], kal, {}, rano, [], zaplateneVopredNaDalsi({}))[0].title).toContain("1 h nad rámec");
   });
 });
