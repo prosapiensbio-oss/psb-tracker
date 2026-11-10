@@ -5,6 +5,8 @@ import { bindings } from "../lib/bindings.server";
 import { dnesPraha } from "../lib/psb/cas";
 import { setOverride } from "../lib/psb/db.server";
 import { jeNahladTrenera } from "../lib/psb/verejnyOdkaz";
+import { UKAZKA } from "../lib/psb/ukazka";
+import { AKTUALNA_VERZIA } from "../lib/psb/zmluva6m";
 import { znenie } from "../lib/psb/zmluva6m";
 import { kratkaZmluva, zmluvaNaPodpisHtml, zmluvaPodpisanaHtml } from "../lib/psb/zmluvaStranka";
 import { oznacOtvorenie, pdfZmluvy, podlaTokenu, podpisKlienta, type ZmluvaRiadok } from "../lib/psb/zmluvy.server";
@@ -42,12 +44,25 @@ function naPodpis(z: ZmluvaRiadok, nahlad: boolean, chyba?: string): Response {
   }), chyba ? 400 : 200);
 }
 
+/**
+ * UKÁŽKA (10. 11. 2026, Jerry: „chcem vidieť, ako by to vyzeralo, keby to
+ * posielame cez SMS"). Vymyslený klient, podpis poskytovateľa nakreslený
+ * ako SVG; odoslanie ukáže podpísanú podobu s tým, čo človek nakreslil,
+ * a NIČ neuloží.
+ */
+const UKAZKA_KLIENT = "Jana Ukázková";
+const UKAZKA_PODPIS = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="110" viewBox="0 0 320 110"><path d="M18 78 C40 20 60 20 58 70 S90 95 110 50 S150 20 160 65 S200 90 215 45 S260 30 300 60" fill="none" stroke="#14241B" stroke-width="3" stroke-linecap="round"/></svg>')}`;
+
 export const Route = createFileRoute("/z/$token")({
   server: {
     handlers: {
       GET: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
         const { DB } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database };
+        if (token === UKAZKA.zmluva) {
+          const zn = znenie(AKTUALNA_VERZIA)!;
+          return html(zmluvaNaPodpisHtml({ znenie: zn, klient: UKAZKA_KLIENT, poskytovatelPodpis: UKAZKA_PODPIS, poskytovatelAt: new Date().toISOString(), autor: "Jerry", dnes: dnesPraha(), ukazka: true }));
+        }
         if (!DB || !/^[A-Za-z0-9]{10,30}$/.test(token)) return html(kratkaZmluva("Tento odkaz neplatí."), 404);
         const z = await podlaTokenu(DB, token).catch(() => null);
         if (!z) return html(kratkaZmluva("Tento odkaz neplatí."), 404);
@@ -67,6 +82,18 @@ export const Route = createFileRoute("/z/$token")({
       POST: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
         const { DB } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database };
+        if (token === UKAZKA.zmluva) {
+          const zn = znenie(AKTUALNA_VERZIA)!;
+          const fd = await request.formData().catch(() => null);
+          const podpis = String(fd?.get("podpis") || "");
+          const teraz = new Date().toISOString();
+          return html(zmluvaPodpisanaHtml({
+            znenie: zn, klient: UKAZKA_KLIENT, klientMeno: String(fd?.get("meno") || UKAZKA_KLIENT).slice(0, 120),
+            klientPodpis: /^data:image\/png;base64,/.test(podpis) ? podpis : UKAZKA_PODPIS, klientAt: teraz,
+            suhlasy: zn.pravidla, poskytovatelPodpis: UKAZKA_PODPIS, poskytovatelAt: teraz, autor: "Jerry",
+            odtlacok: "ukazka-nic-sa-neulozilo", cerstvo: true, ukazka: true,
+          }));
+        }
         if (!DB || !/^[A-Za-z0-9]{10,30}$/.test(token)) return html(kratkaZmluva("Tento odkaz neplatí."), 404);
         const z = await podlaTokenu(DB, token).catch(() => null);
         if (!z) return html(kratkaZmluva("Tento odkaz neplatí."), 404);

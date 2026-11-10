@@ -19,6 +19,8 @@ export const UKAZKA = {
   predUvodnym: "UKAZKAPREDUVOD",
   poUvodnom: "UKAZKAPOUVOD",
   anamneza: "UKAZKAANAMNEZA",
+  /** Zmluva 6M — dá sa prejsť aj „podpísať“, nič sa neuloží (10. 11. 2026). */
+  zmluva: "UKAZKAZMLUVA",
 } as const;
 
 export const jeUkazka = (token: string): boolean =>

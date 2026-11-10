@@ -117,8 +117,12 @@ export type StavZmluvyStranky = {
   dnes: string;
   /** Náhľad trénera z Kokpitu — formulár sa neodošle. */
   nahlad?: boolean;
+  /** Ukážka s vymysleným klientom — podpísať sa dá, nič sa neuloží. */
+  ukazka?: boolean;
   chyba?: string;
 };
+
+const UKAZKA_PAS = `<div class="nahlad bezTlace">Ukážka — takto stránku uvidí klient. Dá se projít i podepsat, nic se neuloží.</div>`;
 
 /** PODOBA NA PODPIS. */
 export function zmluvaNaPodpisHtml(s: StavZmluvyStranky): string {
@@ -126,7 +130,7 @@ export function zmluvaNaPodpisHtml(s: StavZmluvyStranky): string {
   const pravidla = z.pravidla.map((p) => `<label class="pr"><input type="checkbox" name="pravidlo_${esc(p.id)}" value="1" required><div><b>${esc(p.nazov)}</b><span>${esc(p.text)}</span></div></label>`).join("");
   return `${hlava(z.nazov)}
 <div class="list">
-${s.nahlad ? `<div class="nahlad">Náhled z Kokpitu — takto stránku uvidí klient. Odsud se podepsat nedá.</div>` : ""}
+${s.nahlad ? `<div class="nahlad">Náhled z Kokpitu — takto stránku uvidí klient. Odsud se podepsat nedá.</div>` : ""}${s.ukazka ? UKAZKA_PAS : ""}
 <h1>${esc(z.nazov)}</h1>
 <div class="pod">Obchodní podmínky ProSapiens Biomechanic, platné od ${esc(z.platneOd)}. Klient: <b>${esc(s.klient)}</b></div>
 
@@ -203,6 +207,7 @@ export type PodpisanaZmluva = {
   odtlacok: string;
   /** Práve podpísaná — ukáže poďakovanie. */
   cerstvo?: boolean;
+  ukazka?: boolean;
 };
 
 /** PODOBA PODPÍSANÁ — na čítanie, tlač a uloženie ako PDF. */
@@ -210,6 +215,7 @@ export function zmluvaPodpisanaHtml(s: PodpisanaZmluva): string {
   const z = s.znenie;
   return `${hlava(z.nazov)}
 <div class="list">
+${s.ukazka ? UKAZKA_PAS : ""}
 ${s.cerstvo ? `<div class="ok bezTlace"><b>Hotovo, smlouva je podepsaná.</b> Děkujeme. Na tomto odkazu ji najdeš kdykoli, tlačítkem níže si ji uložíš jako PDF.</div>` : ""}
 <h1>${esc(z.nazov)}</h1>
 <div class="pod">Obchodní podmínky ProSapiens Biomechanic, platné od ${esc(z.platneOd)}. Klient: <b>${esc(s.klient)}</b></div>
