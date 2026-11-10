@@ -8,7 +8,8 @@ import { adresyMailu } from "../../lib/psb/mime";
 import { vokativ } from "../../lib/psb/oslovenie";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
-import { znenie } from "../../lib/psb/zmluva6m";
+import { AKTUALNA_VERZIA, znenie } from "../../lib/psb/zmluva6m";
+import { UKAZKA } from "../../lib/psb/ukazka";
 import { zmluvaMail } from "../../lib/psb/zmluvaStranka";
 import { poslednyPodpis, vytvorZmluvu, zmluvaPodlaId, zoznamZmluv, zrusZmluvu } from "../../lib/psb/zmluvy.server";
 
@@ -94,6 +95,30 @@ export const Route = createFileRoute("/api/zmluvy")({
               return Response.json({ ok: false, error: `Mail neodišiel — ${v.chyba}` }, { status: 502 });
             }
             await audit(DB, { action: "zmluva-mail", predmet: `${z.klient} · ${adresy.join(", ")}`, actor: kto });
+            return Response.json({ ok: true, komu: adresy }, { headers: ns });
+          }
+          /**
+           * SKÚŠOBNÝ MAIL (Jerry, 10. 11. 2026: „pošli mi skúšobný mail so
+           * zmluvou na môj mail"). Ten istý mail, aký dostane klient, ale
+           * s odkazom na ukážku (nič sa neuloží) a na skúšobnú adresu
+           * z nastavenia mailera — nikdy na klienta.
+           */
+          if (b.akcia === "skuska") {
+            const zn = znenie(AKTUALNA_VERZIA)!;
+            const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'mail_skuska_adresa'").first<{ value: string }>();
+            let komu = "";
+            try { komu = String(JSON.parse(r?.value || '""')); } catch { komu = r?.value || ""; }
+            const { adresy } = adresyMailu(komu);
+            if (!adresy.length) return Response.json({ ok: false, error: "Skúšobná adresa nie je nastavená (Marketing → Mailer)." }, { status: 400 });
+            const n = await nastaveniaMailu(DB);
+            if (!n.host || !n.user || !n.heslo) return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
+            const m = zmluvaMail(zn, { oslovenie: "Jano", odkaz: verejnyOdkaz(`/z/${UKAZKA.zmluva}`, origin) });
+            const v = await posliMail(
+              { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
+              { od: n.user, odMeno: "ProSapiens Biomechanic", komu: adresy, predmet: `[SKÚŠKA] ${m.predmet}`, telo: m.text, html: m.html },
+            );
+            if (!v.ok) return Response.json({ ok: false, error: `Mail neodišiel — ${v.chyba}` }, { status: 502 });
+            await audit(DB, { action: "zmluva-mail-skuska", predmet: adresy.join(", "), actor: kto });
             return Response.json({ ok: true, komu: adresy }, { headers: ns });
           }
           if (b.akcia === "zrus") {

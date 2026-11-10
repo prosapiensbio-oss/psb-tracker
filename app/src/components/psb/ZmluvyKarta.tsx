@@ -239,7 +239,20 @@ export function ZmluvyKarta({ data, clients, mena }: { data: PSBData; clients: R
             <button onClick={() => { setNova(false); setHladanie(""); }} style={{ ...tl, marginTop: 6 }}>Zavrieť</button>
           </div>
         ) : (
-          <button onClick={() => setNova(true)} style={{ ...tl, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>+ Nová zmluva</button>
+<div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                    <button onClick={() => setNova(true)} style={{ ...tl, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>+ Nová zmluva</button>
+          <a href="/z/UKAZKAZMLUVA" target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }} title="Ako stránku vidí klient — dá sa prejsť aj podpísať, nič sa neuloží">Ukážka pre klienta</a>
+          <button
+            onClick={() => void (async () => {
+              setChyba("");
+              const r = await fetch("/api/zmluvy", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ akcia: "skuska" }) })
+                .then((x) => x.json()).catch(() => null) as { ok?: boolean; komu?: string[]; error?: string } | null;
+              if (!r?.ok) { setChyba(r?.error || "Skúšobný mail neodišiel."); return; }
+              setHlaska(`Skúšobný mail odišiel na ${(r.komu || []).join(", ")}.`);
+            })()}
+            style={tl} title="Mail, aký dostane klient, s odkazom na ukážku — na tvoju skúšobnú adresu"
+          >Skúšobný mail mne</button>
+          </div>
         )}
       </div>
 
