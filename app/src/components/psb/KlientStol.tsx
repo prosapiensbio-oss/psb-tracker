@@ -1463,6 +1463,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               </div>
             )}
             {c.zdrojKto && <div><span style={{ color: C.textDim }}>{podlaRodu(c.zdrojKto, { m: "priviedol", z: "priviedla", neutralne: "odporúčanie od" })}</span> {c.zdrojKto}</div>}
+            {/* ZMLUVA 6M (Jerry, 10. 11. 2026: „stačilo by pridať len do
+                profilu") — deň podpisu a odkaz; v 6M bez zmluvy to povie. */}
+            {zmluvaKlienta ? (
+              <div>
+                <span style={{ color: C.textDim }}>zmluva 6M</span>{" "}
+                <span style={{ color: C.green }}>podpísaná {fmtDMY(zmluvaKlienta.at.slice(0, 10))}</span>
+                <span style={{ color: C.textDim }}> · </span>
+                <a href={`/z/${zmluvaKlienta.token}`} target="_blank" rel="noreferrer" style={{ color: C.accentLight }}>{zmluvaKlienta.zdroj === "docuseal" ? "PDF" : "otvoriť"}</a>
+              </div>
+            ) : c.is6m ? (
+              <div><span style={{ color: C.textDim }}>zmluva 6M</span> <span style={{ color: c.contractSigned ? C.green : C.orange }}>{c.contractSigned ? "podpísaná (mimo Kokpitu)" : "nepodpísaná — Workspace → Zmluvy"}</span></div>
+            ) : null}
             <UpravitProfil
               meno={meno}
               c={c}
