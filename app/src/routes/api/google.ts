@@ -160,6 +160,51 @@ export const Route = createFileRoute("/api/google")({
             return Response.json({ ok: true, sprava: `Servisný účet ${sa.client_email}. ${casti.join(" ")}` });
           }
 
+          /**
+           * HĹBKA LISTOVANIA — ako ďaleko sa ľudia dostanú na stránke.
+           *
+           * Web je vodorovné listovanie, takže „čas na stránke" ani „scroll"
+           * nehovoria nič; `formulare.js` preto posiela pri každom posune
+           * hlbšie udalosť `obrazovka` s parametrami `cislo` (koľká obrazovka),
+           * `celkom` (koľko ich stránka má) a `nazov`. Vlastné rozmery k nim
+           * boli zaregistrované 27. 10. 2026 a GA4 NEDOPOČÍTAVA SPÄTNE —
+           * staršie dni ostanú bez rozpadu, čo nie je chyba dopytu.
+           *
+           * Len číta, nič nezapisuje: je to odpoveď na otázku „je na webe
+           * veľa textu", nie ďalší import.
+           */
+          if (b.akcia === "hlbka") {
+            const property = await nastavenie(DB, "google_ga4_property");
+            if (!property) return Response.json({ ok: false, error: "Nie je zadané GA4 property ID." }, { status: 400 });
+            const od = String(b.od || "").slice(0, 10) || odKedy(new Date(), 1);
+            const do_ = String(b.do || "").slice(0, 10) || dnesPraha();
+            const filter = {
+              filter: { fieldName: "eventName", stringFilter: { matchType: "EXACT", value: "obrazovka" } },
+            };
+            const r = await post(GA4(property), t.token, {
+              dateRanges: [{ startDate: od, endDate: do_ }],
+              dimensions: [{ name: "pagePath" }, { name: "customEvent:cislo" }, { name: "customEvent:nazov" }],
+              metrics: [{ name: "eventCount" }, { name: "totalUsers" }],
+              dimensionFilter: filter,
+              limit: 2000,
+            });
+            if (!r.ok) return Response.json({ ok: false, error: r.chyba }, { status: 502 });
+            // Koľko ľudí na tú stránku vôbec prišlo — bez menovateľa je
+            // „30 ľudí dolistovalo na piatu" číslo bez významu.
+            const navstevy = await post(GA4(property), t.token, {
+              dateRanges: [{ startDate: od, endDate: do_ }],
+              dimensions: [{ name: "pagePath" }],
+              metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+              limit: 300,
+            });
+            return Response.json({
+              ok: true, od, do: do_,
+              hlbka: r.data?.rows ?? [],
+              navstevy: navstevy.ok ? (navstevy.data?.rows ?? []) : [],
+              varovanie: navstevy.ok ? "" : `návštevy sa nestiahli: ${navstevy.chyba}`,
+            });
+          }
+
           // ── sťahovanie ───────────────────────────────────────────────────
           if (b.akcia === "stiahni") {
             const mesiacov = Math.min(Math.max(Number(b.mesiacov) || 18, 1), 36);
