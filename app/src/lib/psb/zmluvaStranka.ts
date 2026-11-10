@@ -176,7 +176,7 @@ ${s.chyba ? `<div class="chyba">${esc(s.chyba)}</div>` : ""}
   function bod(e){var r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,p:e.pressure&&e.pointerType==='pen'?e.pressure:0.5};}
   cv.addEventListener('pointerdown',function(e){e.preventDefault();kreslim=true;posl=bod(e);try{cv.setPointerCapture(e.pointerId)}catch(x){}
     ctx.beginPath();ctx.arc(posl.x,posl.y,1.2,0,6.3);ctx.fillStyle='#14241B';ctx.fill();});
-  cv.addEventListener('pointermove',function(e){if(!kreslim)return;e.preventDefault();var evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+  cv.addEventListener('pointermove',function(e){if(!kreslim)return;e.preventDefault();var evs=e.getCoalescedEvents?e.getCoalescedEvents():[];if(!evs||!evs.length)evs=[e];
     for(var i=0;i<evs.length;i++){var b=bod(evs[i]);ctx.lineWidth=1.4+b.p*2.6;ctx.beginPath();ctx.moveTo(posl.x,posl.y);ctx.lineTo(b.x,b.y);ctx.stroke();posl=b;}});
   function koniec(){if(!kreslim)return;kreslim=false;tahy++;document.getElementById('nap').style.display='none';skontroluj();}
   cv.addEventListener('pointerup',koniec);cv.addEventListener('pointercancel',koniec);cv.addEventListener('pointerleave',koniec);

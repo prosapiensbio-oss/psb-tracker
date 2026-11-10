@@ -16,6 +16,8 @@ describe("zmluva 6M", () => {
     expect(h).toContain("V Brně dne <b>10. 11. 2026</b>");
     expect(h).toContain("Mgr. Filip Stráňavský");
     expect(h).toContain("11.7 Přílohou obchodních podmínek");
+    // Prázdne getCoalescedEvents (niektoré prehliadače) nesmie zahodiť ťah.
+    expect(h).toContain("if(!evs||!evs.length)evs=[e];");
   });
   it("náhľad sa podpísať nedá", () => {
     const h = zmluvaNaPodpisHtml({ znenie: zn, klient: "A B", poskytovatelPodpis: PNG, poskytovatelAt: "2026-11-10T10:00:00Z", autor: "Jerry", dnes: "2026-11-10", nahlad: true });
