@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hĺbka listovania — návrhy A · B · C</title>
+<style>
+  :root {
+    --c-bg: #1a1e16; --c-surface: #252b1f; --c-accent: #6b8c42;
+    --c-text: #e0dcc8; --c-textDim: #90927b;
+    --c-red: #c25b44; --c-orange: #d4a04a; --c-green: #8fbe52;
+    --c-line: #3a4231; --c-track: #2e3527;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--c-bg); color: var(--c-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--c-surface);
+    border-bottom: 1px solid var(--c-line); padding: 14px 20px;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  header .sub { color: var(--c-textDim); font-size: 13px; }
+  .prep { display: flex; gap: 6px; margin-left: auto; }
+  .prep button {
+    background: var(--c-track); color: var(--c-text); border: 1px solid var(--c-line);
+    border-radius: 10px; padding: 7px 14px; font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  .prep button.on { background: var(--c-accent); border-color: var(--c-accent); color: #10140d; }
+  main { padding: 26px 20px 80px; }
+  .scena { display: none; }
+  .scena.on { display: block; }
+  .ramy { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .ram { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 16px; padding: 16px; }
+  .ram.pc { width: 980px; max-width: 100%; }
+  .ram.tel { width: 375px; }
+  .ramStitok { color: var(--c-textDim); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px; }
+  .pozn {
+    margin: 22px 0 0; max-width: 820px; color: var(--c-textDim); font-size: 14px;
+    border-left: 3px solid var(--c-accent); padding-left: 14px;
+  }
+  .pozn b { color: var(--c-text); }
+
+  /* ——— spoločné ——— */
+  .karta { background: transparent; }
+  .kartaHlava { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .kartaHlava h2 { font-size: 15px; margin: 0; font-weight: 600; }
+  .kartaHlava .male { color: var(--c-textDim); font-size: 13px; }
+  .obdobie { color: var(--c-textDim); font-size: 12.5px; margin: 0 0 16px; }
+
+  /* ——— A: schody ——— */
+  .a-strana { padding: 12px 0; border-top: 1px solid var(--c-line); }
+  .a-strana:first-of-type { border-top: 0; }
+  .a-hlava { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .a-hlava .cesta { font-weight: 600; }
+  .a-hlava .kto { color: var(--c-textDim); font-size: 13px; margin-left: auto; }
+  .a-rad { display: flex; align-items: flex-end; gap: 3px; height: 74px; }
+  .a-stlp { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
+  .a-stlp .st { width: 100%; background: var(--c-accent); border-radius: 4px 4px 0 0; min-height: 3px; }
+  .a-stlp.pad .st { background: var(--c-red); }
+  .a-stlp .n { font-size: 11px; color: var(--c-textDim); }
+  .a-pod { display: flex; gap: 3px; margin-top: 6px; }
+  .a-pod span { flex: 1; font-size: 10.5px; color: var(--c-textDim); text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .a-veta { margin-top: 8px; font-size: 13px; }
+  .a-veta b { color: var(--c-red); }
+
+  /* ——— B: zoznam s mikrokrivkou ——— */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--c-textDim); font-weight: 600; padding: 0 8px 8px 0; }
+  td { padding: 9px 8px 9px 0; border-top: 1px solid var(--c-line); vertical-align: middle; font-size: 14px; }
+  td.cesta { font-weight: 600; }
+  td.dim { color: var(--c-textDim); }
+  .spark { display: flex; align-items: flex-end; gap: 2px; height: 26px; width: 120px; }
+  .spark i { flex: 1; background: var(--c-accent); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .spark i.pad { background: var(--c-red); }
+  .znacka { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .znacka.zle { background: rgba(194,91,68,.18); color: var(--c-red); }
+  .znacka.dobre { background: rgba(143,190,82,.16); color: var(--c-green); }
+
+  /* ——— C: lievik jednej stránky ——— */
+  .c-vyber { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .c-vyber button { background: var(--c-track); color: var(--c-text); border: 1px solid var(--c-line);
+    border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+  .c-vyber button.on { background: var(--c-accent); border-color: var(--c-accent); color: #10140d; font-weight: 600; }
+  .c-rad { display: grid; grid-template-columns: 26px 1fr 54px; gap: 10px; align-items: center; padding: 3px 0; }
+  .c-rad .cis { color: var(--c-textDim); font-size: 12px; text-align: right; }
+  .c-rad .pas { height: 22px; background: var(--c-track); border-radius: 6px; overflow: hidden; position: relative; }
+  .c-rad .pas i { display: block; height: 100%; background: var(--c-accent); border-radius: 6px; }
+  .c-rad .pas span { position: absolute; left: 9px; top: 0; line-height: 22px; font-size: 12.5px; color: var(--c-text); }
+  .c-rad .kolko { font-size: 13px; text-align: right; }
+  .c-medzera { display: grid; grid-template-columns: 26px 1fr 54px; gap: 10px; }
+  .c-medzera div:nth-child(2) { font-size: 11.5px; color: var(--c-red); padding-left: 9px; }
+  .c-medzera.tichy div:nth-child(2) { color: var(--c-textDim); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Hĺbka listovania — ako ďaleko ľudia dolistujú</h1>
+    <div class="sub">tri návrhy obrazovky do Kokpitu · skutočné čísla 27. 10. – 9. 11. 2026</div>
+  </div>
+  <div class="prep" id="prepScena">
+    <button data-s="A" class="on">A</button>
+    <button data-s="B">B</button>
+    <button data-s="C">C</button>
+  </div>
+  <div class="prep" id="prepZar">
+    <button data-z="pc" class="on">PC</button>
+    <button data-z="tel">Telefón</button>
+  </div>
+</header>
+
+<main>
+  <section class="scena on" id="sc-A"></section>
+  <section class="scena" id="sc-B"></section>
+  <section class="scena" id="sc-C"></section>
+</main>
+
+<script>
+/* Skutočné čísla z GA4 (udalosť „obrazovka", vlastné rozmery od 27. 10. 2026).
+   ludia = koľko ľudí stránku otvorilo, krivka = koľko ich videlo N-tú obrazovku. */
+var DATA = [
+  { cesta: "/", ludia: 51, krivka: [41,7,6,6,3,3,2,2,3,1],
+    nazvy: ["Úvod","Vzorec","Pro koho","Jak to funguje","Výsledky","Ceny","O nás","O nás","O nás","Kontakt"] },
+  { cesta: "/sluzby/", ludia: 18, krivka: [2,5,11,5,3],
+    nazvy: ["Služby","Ceník","Balíčky","Ceník","Balíčky"] },
+  { cesta: "/uvodni-trenink/", ludia: 17, krivka: [10,6,6,2,2,4,4,1,1],
+    nazvy: ["Úvodní trénink","Poznáváte se","Průběh","Cena","Dva příběhy","Dva příběhy","Rezervace","Otázky","Rezervace"] },
+  { cesta: "/vysledky/", ludia: 10, krivka: [8,5,3,3,3,4,4,1,1,1,1,1],
+    nazvy: ["Výsledky","Akis","Jarek","Michal","Regina","Dana","Pavel","Jana","Petr","Lucie","Tomáš","Konec"] },
+  { cesta: "/kariera/", ludia: 8, krivka: [7,4,3,1,2,2,2],
+    nazvy: ["Kariéra","Koho hledáme","Co nabízíme","Proces","Tým","Studio","Kontakt"] },
+  { cesta: "/kontakt/", ludia: 8, krivka: [5,2,2], nazvy: ["Kontakt","Kde jsme","Formulář"] },
+  { cesta: "/blog/", ludia: 7, krivka: [5,3,2,1], nazvy: ["Blog","Články","Články","Články"] },
+  { cesta: "/rib-flare/", ludia: 6, krivka: [1,5,5,6,4,3,3,3,3,3,1,1,1,1],
+    nazvy: ["Úvod","Co to je","Proč vzniká","Dech","Žebra","Bránice","Cvik","Cvik","Chyby","Shrnutí","Zdroje","Zdroje","Další","Konec"] },
+  { cesta: "/test-postury/", ludia: 5, krivka: [5,2,2], nazvy: ["Test postury","Otázky","Formulář"] }
+];
+
+/* Najväčší pád v krivke: index, odkiaľ sa padá, a o koľko percent. */
+function pad(k) {
+  var naj = { od: 0, pct: 0 };
+  for (var i = 1; i < k.length; i++) {
+    if (!k[i - 1]) continue;
+    var p = (k[i - 1] - k[i]) / k[i - 1];
+    if (p > naj.pct) naj = { od: i - 1, pct: p };
+  }
+  return naj;
+}
+function pct(x) { return Math.round(x * 100) + " %"; }
+
+/* ——— A: schody ——— */
+function kresliA(tel) {
+  var dni = '<p class="obdobie">27. 10. – 9. 11. 2026 · koľko ľudí videlo ktorú obrazovku</p>';
+  var zoz = tel ? DATA.slice(0, 3) : DATA.slice(0, 6);
+  var h = zoz.map(function (s) {
+    var max = Math.max.apply(null, s.krivka), p = pad(s.krivka);
+    var stlpce = s.krivka.map(function (v, i) {
+      return '<div class="a-stlp' + (i === p.od + 1 && p.pct >= .5 ? ' pad' : '') + '">' +
+        '<span class="n">' + v + '</span>' +
+        '<span class="st" style="height:' + Math.max(3, Math.round(v / max * 52)) + 'px"></span>' +
+      '</div>';
+    }).join("");
+    var mena = tel ? "" : '<div class="a-pod">' + s.nazvy.map(function (n) { return "<span>" + n + "</span>"; }).join("") + '</div>';
+    return '<div class="a-strana">' +
+      '<div class="a-hlava"><span class="cesta">' + s.cesta + '</span>' +
+        '<span class="kto">' + s.ludia + ' ľudí · ' + s.krivka.length + ' obrazoviek</span></div>' +
+      '<div class="a-rad">' + stlpce + '</div>' + mena +
+      '<div class="a-veta">Najväčší pád: <b>' + (p.od + 1) + '. → ' + (p.od + 2) + '. (' + pct(p.pct) + ')</b> — ' +
+        (s.krivka[0] < max
+          ? 'na túto stránku sa chodí odkazom rovno doprostred, tak sa krivka číta od ' + (s.krivka.indexOf(max) + 1) + '. obrazovky.'
+          : (s.nazvy[p.od] || "") + ' nepresvedčila listovať ďalej.') + '</div>' +
+    '</div>';
+  }).join("");
+  return '<div class="karta"><div class="kartaHlava"><h2>Hĺbka listovania</h2>' +
+    '<span class="male">kde ľudia prestanú listovať</span></div>' + dni + h + '</div>';
+}
+
+/* ——— B: zoznam s mikrokrivkou ——— */
+function kresliB(tel) {
+  var riadky = DATA.map(function (s) {
+    var max = Math.max.apply(null, s.krivka), p = pad(s.krivka);
+    var spark = '<div class="spark">' + s.krivka.map(function (v, i) {
+      return '<i class="' + (i === p.od + 1 && p.pct >= .5 ? "pad" : "") + '" style="height:' + Math.max(2, Math.round(v / max * 24)) + 'px"></i>';
+    }).join("") + '</div>';
+    var dokial = 1;
+    for (var i = 0; i < s.krivka.length; i++) if (s.krivka[i] >= max / 2) dokial = i + 1;
+    var zdravo = p.pct < .5;
+    if (tel) {
+      return '<tr><td class="cesta">' + s.cesta + '<div class="dim" style="font-size:12.5px">' +
+        s.ludia + ' ľudí · polovica do ' + dokial + '. obrazovky</div></td>' +
+        '<td style="width:126px">' + spark + '</td></tr>';
+    }
+    return '<tr><td class="cesta">' + s.cesta + '</td>' +
+      '<td class="dim">' + s.ludia + '</td>' +
+      '<td>' + spark + '</td>' +
+      '<td class="dim">' + dokial + '. z ' + s.krivka.length + '</td>' +
+      '<td><span class="znacka ' + (zdravo ? "dobre" : "zle") + '">' +
+        (p.od + 1) + '. → ' + (p.od + 2) + '. &nbsp;−' + pct(p.pct) + '</span></td>' +
+      '<td class="dim">' + (s.nazvy[p.od] || "") + '</td></tr>';
+  }).join("");
+  var hlava = tel
+    ? "<tr><th>Stránka</th><th>Krivka</th></tr>"
+    : "<tr><th>Stránka</th><th>Ľudí</th><th>Krivka</th><th>Polovica vydrží</th><th>Najväčší pád</th><th>Na ktorej obrazovke</th></tr>";
+  return '<div class="karta"><div class="kartaHlava"><h2>Hĺbka listovania</h2>' +
+    '<span class="male">všetky stránky naraz</span></div>' +
+    '<p class="obdobie">27. 10. – 9. 11. 2026</p>' +
+    '<table>' + hlava + riadky + '</table></div>';
+}
+
+/* ——— C: lievik jednej stránky ——— */
+var cVybrana = 0;
+function kresliC(tel) {
+  var s = DATA[cVybrana], max = s.krivka[0] || 1;
+  var vyber = '<div class="c-vyber">' + DATA.slice(0, tel ? 4 : 7).map(function (x, i) {
+    return '<button data-c="' + i + '"' + (i === cVybrana ? ' class="on"' : "") + '>' + x.cesta + "</button>";
+  }).join("") + '</div>';
+  var rady = s.krivka.map(function (v, i) {
+    var r = '<div class="c-rad"><div class="cis">' + (i + 1) + '.</div>' +
+      '<div class="pas"><i style="width:' + Math.max(4, Math.round(v / max * 100)) + '%"></i>' +
+      '<span>' + (s.nazvy[i] || "") + '</span></div>' +
+      '<div class="kolko">' + v + '</div></div>';
+    if (i < s.krivka.length - 1) {
+      var ubudlo = v - s.krivka[i + 1];
+      var velky = v && ubudlo / v >= .5;
+      r += '<div class="c-medzera' + (velky ? "" : " tichy") + '"><div></div><div>' +
+        (ubudlo > 0 ? "↓ odišlo " + ubudlo + (velky ? " (" + pct(ubudlo / v) + ")" : "")
+          : ubudlo === 0 ? "→ neodišiel nikto"
+          : "↑ pribudlo " + (-ubudlo) + " — prišli odkazom rovno sem") +
+        '</div><div></div></div>';
+    }
+    return r;
+  }).join("");
+  return '<div class="karta"><div class="kartaHlava"><h2>Hĺbka listovania</h2>' +
+    '<span class="male">' + s.cesta + " · " + s.ludia + ' ľudí</span></div>' +
+    '<p class="obdobie">27. 10. – 9. 11. 2026 · koľko ľudí sa dostalo na ktorú obrazovku</p>' +
+    vyber + rady + '</div>';
+}
+
+var zariadenie = "pc";
+function vykresli() {
+  [["A", kresliA], ["B", kresliB], ["C", kresliC]].forEach(function (par) {
+    var el = document.getElementById("sc-" + par[0]);
+    var ramy = zariadenie === "pc"
+      ? '<div class="ram pc"><p class="ramStitok">Workspace / Marketing — monitor</p>' + par[1](false) + "</div>"
+      : '<div class="ram tel"><p class="ramStitok">Telefón 375 px</p>' + par[1](true) + "</div>";
+    el.innerHTML = '<div class="ramy">' + ramy + "</div>" + POZN[par[0]];
+  });
+}
+var POZN = {
+  A: '<p class="pozn"><b>A — Schody.</b> Jedna stránka = jeden rad stĺpcov, pod ním názvy obrazoviek. ' +
+     'Tvar krivky je vidieť na prvý pohľad a červený stĺpec ukazuje, kde ľudia odpadli. ' +
+     'Na telefóne sa názvy nezmestia, tak sú preč a vidno tri stránky.</p>',
+  B: '<p class="pozn"><b>B — Zoznam s mikrokrivkou.</b> Všetky stránky naraz, jeden riadok na stránku: ' +
+     'koľko ľudí, krivka v malom, dokiaľ vydrží polovica a pomenovaný najväčší pád. ' +
+     'Najviac informácií na najmenšej ploche; tvar krivky je ale malý.</p>',
+  C: '<p class="pozn"><b>C — Lievik jednej stránky.</b> Vyberieš stránku a vidíš každú obrazovku s menom ' +
+     'a koľko ľudí ju videlo; medzi riadkami stojí, koľko ich odišlo. Najzrozumiteľnejšie, ' +
+     'ale naraz len jedna stránka.</p>'
+};
+
+document.getElementById("prepScena").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return;
+  [].forEach.call(this.querySelectorAll("button"), function (x) { x.classList.toggle("on", x === b); });
+  [].forEach.call(document.querySelectorAll(".scena"), function (s) { s.classList.toggle("on", s.id === "sc-" + b.dataset.s); });
+});
+document.getElementById("prepZar").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return;
+  [].forEach.call(this.querySelectorAll("button"), function (x) { x.classList.toggle("on", x === b); });
+  zariadenie = b.dataset.z; vykresli();
+});
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-c]"); if (!b) return;
+  cVybrana = Number(b.dataset.c); vykresli();
+  document.querySelector('#prepScena button[data-s="C"]').click();
+});
+vykresli();
+</script>
+</body>
+</html>
