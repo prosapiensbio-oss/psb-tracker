@@ -24,6 +24,8 @@ import { SmsKlientovi } from "./SmsKlientovi";
 type Zmluva = {
   id: string; klient: string; token: string; stav: "caka" | "podpisana" | "zrusena"; verzia: string;
   autor: string | null; vytvorene: string; otvorene: string | null; podpisane: string | null; zrusene: string | null; odkaz: string;
+  /** Priamo na Kokpit — náhľad a podpis tu (presmerovanie na webe zahodí ?nahlad=1). */
+  priamy?: string;
   zdroj?: string; email?: string | null;
 };
 
@@ -163,12 +165,12 @@ export function ZmluvyKarta({ data, clients, mena }: { data: PSBData; clients: R
               <button onClick={() => setSms(otvorena ? null : { klient: z.klient, url: z.odkaz })} style={{ ...tl, borderColor: mix(C.accent, 45), color: C.accentLight }}>{otvorena ? "Zavrieť SMS" : "Poslať SMS"}</button>
               <button onClick={() => setMail(mail?.id === z.id ? null : { id: z.id, komu: z.email || "" })} style={{ ...tl, borderColor: mix(C.accent, 45), color: C.accentLight }} title="Celé znenie v maili, aby si ho klient prečítal ešte pred podpisom">{mail?.id === z.id ? "Zavrieť mail" : "Poslať mailom"}</button>
               <button onClick={() => void kopiruj(z.odkaz, z.klient)} style={{ ...tl, borderColor: mix(C.green, 45), color: C.green }}>Kopírovať odkaz</button>
-              <a href={z.odkaz} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }} title="Otvorí zmluvu na podpis — klient ju podpíše rovno na tomto zariadení">Podpísať tu (iPad)</a>
-              <a href={`${z.odkaz}?nahlad=1`} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }}>Náhľad</a>
+              <a href={z.priamy || z.odkaz} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }} title="Otvorí zmluvu na podpis — klient ju podpíše rovno na tomto zariadení">Podpísať tu (iPad)</a>
+              <a href={`${z.priamy || z.odkaz}?nahlad=1`} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }}>Náhľad</a>
               <button onClick={() => void zrus(z)} style={tl}>Zrušiť</button>
             </>
           ) : (
-            <a href={z.odkaz} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }}>{z.zdroj === "docuseal" ? "Otvoriť PDF (DocuSeal)" : "Otvoriť podpísanú"}</a>
+            <a href={z.priamy || z.odkaz} target="_blank" rel="noreferrer" style={{ ...tl, textDecoration: "none" }}>{z.zdroj === "docuseal" ? "Otvoriť PDF (DocuSeal)" : "Otvoriť podpísanú"}</a>
           )}
         </div>
         {mail?.id === z.id && z.stav === "caka" && (

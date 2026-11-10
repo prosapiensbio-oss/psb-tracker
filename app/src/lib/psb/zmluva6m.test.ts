@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { AKTUALNA_VERZIA, jePodpis, menoPodpisujuceho, odtlacokZnenia, znenie } from "./zmluva6m";
 import { zmluvaMail, zmluvaNaPodpisHtml, zmluvaPodpisanaHtml } from "./zmluvaStranka";
 import { notifikacieZmluv } from "./zmluvyNotifikacie";
+import { textSmsZmluvy } from "./smsSablony";
+import { verejnyOdkaz } from "./verejnyOdkaz";
 
 const zn = znenie(AKTUALNA_VERZIA)!;
 const PNG = `data:image/png;base64,${"A".repeat(2000)}`;
@@ -56,5 +58,10 @@ describe("zmluva 6M", () => {
     const n = notifikacieZmluv([{ id: "z1", klient: "Jan Kral", at: "2026-11-10T17:33:00Z" }]);
     expect(n[0].key).toBe("zmluva-podpisana|z1");
     expect(n[0].title).toContain("zmluvu 6M");
+  });
+  it("SMS so zmluvou cez prosapiens.cz/z/ je jedna správa", () => {
+    const url = verejnyOdkaz("/z/ABCDEFGHJKLMNP", "https://kokpit.prosapiensbio.workers.dev");
+    expect(url).toBe("https://prosapiens.cz/z/ABCDEFGHJKLMNP");
+    expect(textSmsZmluvy("Kateřina Matlová", url).length).toBeLessThanOrEqual(160);
   });
 });

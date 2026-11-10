@@ -2,12 +2,11 @@ import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { chybaUkoncenia, navrhUkoncenia } from "../../lib/psb/ukoncenieBalicka";
 import { potvrdDruhyBalicek } from "../../lib/psb/duplicitaBalicka";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { dlhyKlienta } from "../../lib/psb/zaplatene";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
-import { ZmluvaKlienta } from "./ZmluvaKlienta";
 import { cas24, hod, prepadnuteRad, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { vetaPrevzatych } from "../../lib/psb/mailKlientovi";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
@@ -147,7 +146,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [menoVnutri, setMenoVnutri] = useState("");
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
-  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "zmluva" | "fotky" | "poznamky">("zdravie");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "fotky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
@@ -258,6 +257,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   useEffect(() => { void nacitajBalicky(); void nacitajPlatby(); void nacitajCakajuce(); }, [nacitajBalicky, nacitajPlatby, nacitajCakajuce]);
 
   const c = meno ? clients[meno] : undefined;
+  /** Podpísaná zmluva 6M (Kokpit alebo DocuSeal) — hlavička aj os „všetko“. */
+  const zmluvaKlienta = useMemo(
+    () => (data.zmluvyKlientov || []).find((z) => normName(z.klient) === normName(meno)) || null,
+    [data.zmluvyKlientov, meno],
+  );
   const os = useMemo(
     () => (meno ? osCasuKlienta(meno, {
       sessions: data.sessions as never,
@@ -679,7 +683,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
-    () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu).length : 0),
+    () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu, zmluvaKlienta).length : 0),
     [c, dopyt, priviedol, poplatkyKlienta, btcSats, meno, spolu],
   );
 
@@ -1493,7 +1497,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         </button>
         {detaily && c && (
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu).map((x) => (
+            {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno], spolu, zmluvaKlienta).map((x) => (
               <span key={x.k} title={x.info} style={{
                 fontSize: 10.5, padding: "3px 7px", borderRadius: 6,
                 background: mix(x.farba || C.border, 20), color: x.farba || C.textMuted,
@@ -1566,7 +1570,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["zmluva", "zmluva"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} data-aktivna={filter === id ? "1" : undefined} onClick={() => setFilter(id)} style={{ ...prepinac(filter === id), flex: "none" }}>{l}</button>
             ))}
           </PrepinacFiltra>
@@ -2078,7 +2082,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           )}
 
           {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? os : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
-            .map((x, i) => (
+            .map((x, i, vsetky) => (
+              <Fragment key={i}>
+              {/* Podpis zmluvy 6M stojí na osi na svojom dni (Jerry, 10. 11. 2026). */}
+              {filter === "vsetko" && zmluvaKlienta && naOsiPred(vsetky, i, zmluvaKlienta.at.slice(0, 10)) && <RiadokZmluvy z={zmluvaKlienta} />}
               <RiadokOsi
                 key={i}
                 u={x}
@@ -2094,6 +2101,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 onZrusZapis={() => { setZdarmaDen(""); setZdarmaDovod(""); }}
                 onDruh={x.druh === "trening" ? (uvodny) => void zmenDruh(x.den, uvodny) : undefined}
               />
+              {filter === "vsetko" && zmluvaKlienta && i === vsetky.length - 1 && naOsiPred(vsetky, vsetky.length, zmluvaKlienta.at.slice(0, 10)) && <RiadokZmluvy z={zmluvaKlienta} />}
+              </Fragment>
             ))}
 
           {/* Výpis na poslanie klientovi — pod zoznamom, nie nad ním: najprv
@@ -2116,7 +2125,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           )}
 
           {filter === "anamneza" && <AnamnezaZhrnutie meno={meno} onOtvor={(m) => onOtvorAnamnezu?.(m)} />}
-          {filter === "zmluva" && <ZmluvaKlienta meno={meno} />}
 
           {/* Fotky držania tela aj v profile (Jerry, 6. 10. 2026) — ďalšie
               fotenie sa nahrá tu, nemusí sa kvôli nemu otvárať anamnéza. */}
@@ -2353,6 +2361,26 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
         <span style={{ marginLeft: 8, color: C.textDim }} title="hodina z ďalšieho balíčka, keď ho zaplatí">{hod(stav.buduca)} h</span>
       ) : null}
     </span>
+  );
+}
+
+/**
+ * Kam na os patrí podpis zmluvy: pred prvý riadok staršieho dňa. Os je od
+ * najnovšieho; `i === dlzka` znamená „za posledný riadok“ (starší než všetko).
+ * Riadok sa vloží práve raz — pri prvom i, kde to platí.
+ */
+function naOsiPred(os: { den: string }[], i: number, den: string): boolean {
+  const prvy = os.findIndex((x) => x.den < den);
+  return (prvy === -1 ? os.length : prvy) === i;
+}
+
+function RiadokZmluvy({ z }: { z: { at: string; token: string; zdroj: string } }) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12.5 }}>
+      <span style={{ minWidth: 92, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{denVTyzdni(z.at.slice(0, 10))} {fmtDMY(z.at.slice(0, 10))}</span>
+      <span style={{ flex: 1, color: C.green }}><b>Zmluva 6M podpísaná</b>{z.zdroj === "docuseal" ? <span style={{ color: C.textMuted }}> · DocuSeal</span> : null}</span>
+      <a href={`/z/${z.token}`} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: C.accentLight, whiteSpace: "nowrap" }}>{z.zdroj === "docuseal" ? "otvoriť PDF" : "otvoriť"}</a>
+    </div>
   );
 }
 
@@ -2908,6 +2936,7 @@ function stitky(
   poplatky: unknown[],
   satoshi?: number,
   spolu?: { od: string; zdroj: string; text: string; skoncila: boolean; lekcie?: number } | null,
+  zmluva?: { at: string; zdroj: string } | null,
 ): { k: string; v: string; farba?: string; info?: string }[] {
   const out: { k: string; v: string; farba?: string; info?: string }[] = [];
   const pridaj = (k: string, v: string | number | undefined | null | false, farba?: string, info?: string) => {
@@ -2937,7 +2966,8 @@ function stitky(
   pridaj("odporúčanie od", c.zdrojKto);
   if (priviedol.length) pridaj(podlaRodu(c.name, { m: "priviedol", z: "priviedla", neutralne: "počet odporúčaní" }), `${priviedol.length}`, C.green);
   pridaj("6M", c.is6m ? "áno" : "", C.accentLight);
-  pridaj("zmluva", c.contractSigned ? "podpísaná" : "", C.green);
+  pridaj("zmluva", c.contractSigned || zmluva ? `podpísaná${zmluva ? ` ${fmtDMY(zmluva.at.slice(0, 10))}` : ""}` : "", C.green,
+    zmluva ? (zmluva.zdroj === "docuseal" ? "podpísaná v DocuSeal — PDF je v osi „všetko“" : "podpísaná cez odkaz z Kokpitu — otvoríš ju v osi „všetko“") : undefined);
   pridaj("sadzba", c.specialRate ? "špeciálna" : "", C.orange, c.specialRateNote);
   pridaj("bitcoin", c.bitcoin ? (satoshi ? `${satoshi.toLocaleString("sk-SK")} sat` : "áno") : "", C.accentLight);
   pridaj("modalita", c.modality);

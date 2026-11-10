@@ -138,3 +138,16 @@ export async function pdfZmluvy(DB: D1Database, id: string): Promise<Uint8Array 
 export async function zmluvaPodlaId(DB: D1Database, id: string): Promise<ZmluvaRiadok | null> {
   return (await DB.prepare("SELECT * FROM zmluvy WHERE id = ?1").bind(id).first<ZmluvaRiadok>()) || null;
 }
+
+/**
+ * Posledná podpísaná zmluva každého klienta — do profilu (hlavička aj os
+ * „všetko“). Bez podpisov, len deň a odkaz.
+ */
+export async function podpisaneKlientov(DB: D1Database): Promise<{ klient: string; at: string; token: string; zdroj: string }[]> {
+  const r = await DB.prepare(
+    `SELECT klient, klient_at, token, zdroj FROM zmluvy z
+      WHERE stav = 'podpisana' AND klient_at = (SELECT MAX(klient_at) FROM zmluvy y WHERE y.klient = z.klient AND y.stav = 'podpisana')`,
+  ).all();
+  return ((r.results || []) as { klient: string; klient_at: string; token: string; zdroj: string }[])
+    .map((x) => ({ klient: x.klient, at: x.klient_at, token: x.token, zdroj: x.zdroj || "kokpit" }));
+}

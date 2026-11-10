@@ -7,6 +7,7 @@ import { kanonickyTvarKlienta } from "../../lib/psb/nahodTrening.server";
 import { adresyMailu } from "../../lib/psb/mime";
 import { vokativ } from "../../lib/psb/oslovenie";
 import { posliMail } from "../../lib/psb/smtp.server";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { znenie } from "../../lib/psb/zmluva6m";
 import { zmluvaMail } from "../../lib/psb/zmluvaStranka";
 import { poslednyPodpis, vytvorZmluvu, zmluvaPodlaId, zoznamZmluv, zrusZmluvu } from "../../lib/psb/zmluvy.server";
@@ -30,8 +31,9 @@ async function nastaveniaMailu(DB: import("@cloudflare/workers-types").D1Databas
  *   POST { akcia: "zrus", id }  → zruší nepodpísanú
  *   POST { akcia: "mail", id, komu } → pošle zmluvu na prečítanie aj s odkazom na podpis
  *
- * Odkaz ide priamo na workera: `/z/` krátke presmerovanie na webe zatiaľ
- * nepozná (snippet 26 vie /u/ /v/ /t/ /k/ /d/ /f/).
+ * Odkaz pre klienta ide cez prosapiens.cz/z/ (snippet 26 od 10. 11. 2026),
+ * `priamy` na workera — náhľad a podpis na iPade, lebo presmerovanie zahodí
+ * `?nahlad=1` a náhľad by sa rátal ako otvorenie klientom.
  */
 const ns = { "cache-control": "no-store" };
 
@@ -49,7 +51,7 @@ export const Route = createFileRoute("/api/zmluvy")({
         }
         const zmluvy = await zoznamZmluv(DB).catch(() => null);
         if (!zmluvy) return Response.json({ ok: false, error: "Tabuľka zmlúv chýba (migrácia 0138)." }, { status: 503 });
-        return Response.json({ ok: true, zmluvy: zmluvy.map((z) => ({ ...z, odkaz: `${url.origin}/z/${z.token}` })) }, { headers: ns });
+        return Response.json({ ok: true, zmluvy: zmluvy.map((z) => ({ ...z, odkaz: verejnyOdkaz(`/z/${z.token}`, url.origin), priamy: `${url.origin}/z/${z.token}` })) }, { headers: ns });
       },
       POST: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
@@ -64,7 +66,7 @@ export const Route = createFileRoute("/api/zmluvy")({
             const r = await vytvorZmluvu(DB, { klient, podpis: String(b.podpis || ""), autor: kto });
             if (!r.ok) return Response.json(r, { status: 400 });
             await audit(DB, { action: "zmluva-vytvorena", predmet: klient, neu: { id: r.id }, actor: kto });
-            return Response.json({ ok: true, id: r.id, odkaz: `${origin}/z/${r.token}` }, { headers: ns });
+            return Response.json({ ok: true, id: r.id, odkaz: verejnyOdkaz(`/z/${r.token}`, origin) }, { headers: ns });
           }
           /**
            * MAIL SO ZMLUVOU NA PREČÍTANIE (10. 11. 2026). Ide len na klik
@@ -82,7 +84,7 @@ export const Route = createFileRoute("/api/zmluvy")({
             const n = await nastaveniaMailu(DB);
             if (!n.host || !n.user || !n.heslo) return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
             const krstne = z.klient.trim().split(/\s+/)[0] || "";
-            const m = zmluvaMail(zn, { oslovenie: vokativ(krstne), odkaz: `${origin}/z/${z.token}`, uvod: String(b.uvod || "").slice(0, 600) });
+            const m = zmluvaMail(zn, { oslovenie: vokativ(krstne), odkaz: verejnyOdkaz(`/z/${z.token}`, origin), uvod: String(b.uvod || "").slice(0, 600) });
             const v = await posliMail(
               { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
               { od: n.user, odMeno: "ProSapiens Biomechanic", komu: adresy, predmet: m.predmet, telo: m.text, html: m.html },

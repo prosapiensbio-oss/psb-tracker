@@ -28,7 +28,7 @@
 export const VEREJNA_DOMENA = "https://prosapiens.cz";
 
 /**
- * Verejný odkaz pre klienta. `cesta` je `/u/`, `/v/`, `/t/`, `/k/`, `/d/` alebo `/f/` + token.
+ * Verejný odkaz pre klienta. `cesta` je `/u/`, `/v/`, `/t/`, `/k/`, `/d/`, `/f/` alebo `/z/` (zmluva, od 10. 11. 2026) + token.
  *
  * `zaloha` je adresa workera — keď sa presmerovanie na webe raz rozbije,
  * zmení sa JEDNA konštanta tu a odkazy začnú znova chodiť priamo. Bez tohto
@@ -36,7 +36,7 @@ export const VEREJNA_DOMENA = "https://prosapiens.cz";
  */
 export function verejnyOdkaz(cesta: string, zaloha?: string): string {
   const c = cesta.startsWith("/") ? cesta : `/${cesta}`;
-  if (!/^\/(u|v|t|k|d|f)\/[A-Za-z0-9]{8,24}$/.test(c)) {
+  if (!/^\/(u|v|t|k|d|f|z)\/[A-Za-z0-9]{8,24}$/.test(c)) {
     // Čo presmerovanie na webe nepozná, musí ísť priamo na workera —
     // inak by klient dostal odkaz, ktorý končí na 404.
     return `${(zaloha || "").replace(/\/+$/, "")}${c}`;
