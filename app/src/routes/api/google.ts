@@ -197,8 +197,21 @@ export const Route = createFileRoute("/api/google")({
               metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
               limit: 300,
             });
+            // Lievik vedľa hĺbky: bez počtu odoslaní sa nedá povedať, či
+            // hĺbka za niečo stojí — a práve tam bola 10. 11. 2026 diera
+            // (dopyty v Kokpite pribúdali, GA4 hlásila nulu odoslaní).
+            const udalosti = await post(GA4(property), t.token, {
+              dateRanges: [{ startDate: od, endDate: do_ }],
+              dimensions: [{ name: "eventName" }, { name: "pagePath" }],
+              metrics: [{ name: "eventCount" }, { name: "totalUsers" }],
+              dimensionFilter: {
+                filter: { fieldName: "eventName", inListFilter: { values: ["cta_formular", "formular_start", "formular_odoslany", "formular_zlyhal", "formular_oprava", "obrazovka"] } },
+              },
+              limit: 500,
+            });
             return Response.json({
               ok: true, od, do: do_,
+              udalosti: udalosti.ok ? (udalosti.data?.rows ?? []) : [],
               hlbka: r.data?.rows ?? [],
               navstevy: navstevy.ok ? (navstevy.data?.rows ?? []) : [],
               varovanie: navstevy.ok ? "" : `návštevy sa nestiahli: ${navstevy.chyba}`,
