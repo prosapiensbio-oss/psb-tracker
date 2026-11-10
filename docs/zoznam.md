@@ -21,8 +21,8 @@ nezapadlo medzi úlohami bez termínu):
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
 - **Prvá platba cez odkaz** — bitcoinová faktúra z `/v/` sa zapisuje do `ln_faktury` až pri skutočnom otvorení klientom a Blink ju hlási ako zaplatenú (3. 11. 2026). Túto časť sme ešte nevideli na ostrej platbe: pri ďalšej BTC platbe cez odkaz over, že sa v kroku Platby ukáže s „Blink hlási zaplatenú faktúru“ a sumou z odkazu.
-- **10. 11. 2026** — hĺbka listovania na webe v GA4 (podrobne v „Kontrola
-  merania webu — 27. 10. 2026" nižšie).
+- [x] **10. 11. 2026** — hĺbka listovania na webe prečítaná; čísla a záver
+  v „Zavreté" dole („Hĺbka listovania — odpoveď z dát").
 
 ---
 
@@ -590,12 +590,8 @@ dolistovali" — čiže práve to, kvôli čomu vzniklo. Doplnené 27. 10.
 (Hlbka obrazovky / Nazov obrazovky / Obrazoviek celkom). **GA4 nedopočítava
 spätne**, takže odpoveď bude až z dát od 27. 10.
 
-- [ ] **10. 11. 2026 — pozrieť sa na hĺbku listovania** (zapísané 27. 10. 2026
-  na Jerryho pokyn „nech na to nezabudneme"). GA4, vlastnosť 355422977:
-  Interakcia → Udalosti → `obrazovka`, rozpad podľa **Hlbka obrazovky**
-  a **Nazov obrazovky**. Rozmery pribudli 27. 10. a GA4 nedopočítava spätne,
-  takže dva týždne dát sú najskorší možný termín. To je odpoveď na debatu
-  „je na webe veľa textu" — dovtedy ju nerozhodovať dojmom.
+- [x] **10. 11. 2026 — hĺbka listovania prečítaná.** Čísla a záver sú
+  v sekcii „Zavreté" dole („Hĺbka listovania — odpoveď z dát").
 
 ---
 
@@ -638,6 +634,35 @@ Otvorené:
 6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
 
 ## Zavreté (aby sa neotvárali odznova)
+
+### Hĺbka listovania — odpoveď z dát (10. 11. 2026)
+
+Dva týždne od registrácie rozmerov (27. 10. – 9. 11. 2026), čítané novou
+akciou `hlbka` v `/api/google` — len číta: rozpad podľa stránky a čísla
+obrazovky plus návštevnosť tej stránky ako menovateľ.
+
+**Úvodná stránka: zo 41 ľudí, čo videli prvú obrazovku, listovalo ďalej 7.**
+Krivka 41 · 7 · 6 · 6 · 3 · 3 · 2 · 2 · 3 · 1 — po prvom švihnutí ubudne 83 %,
+ale kto švihne raz, dolistuje ďaleko: šiesti na „Jak to funguje", traja na
+„Ceny", jeden na koniec.
+
+**Články sa čítajú celé.** /rib-flare/ má 14 obrazoviek a krivku
+1 · 5 · 5 · 6 · 4 · 3 · 3 · 3 · 3 · 3 · 1 · 1 · 1 · 1; /anterior-pelvic-tilt/
+13 obrazoviek a polovica ľudí je ešte na desiatej.
+
+**/uvodni-trenink/: zo 17 ľudí sa 4 dostali na obrazovku s rezerváciou**
+(10 · 6 · 6 · 2 · 2 · 4 · 4 · 1 · 1).
+
+**/sluzby/ má krivku 2 · 5 · 11 · 5 · 3** — na tretej obrazovke je viac ľudí
+než na prvej, lebo sa tam chodí odkazom na `#cenik`. Nie je to chyba merania,
+je to dôkaz, že kotva funguje.
+
+**Záver k debate „je na webe veľa textu":** dĺžka problém nie je. Úzke hrdlo
+je PRVÁ OBRAZOVKA úvodnej stránky — štyria z piatich po nej neprejdú ďalej.
+
+**Čo čísla nehovoria:** GA4 nemeria každého (súhlas s cookies, blokovače).
+V tom istom okne zapísal Kokpit viac dopytov než GA4 odoslaných formulárov —
+na POČTY platí Kokpit, GA4 je na TVAR cesty.
 
 - **PTminder vrátil €90,97** (overené 3. 11. 2026 v Gmaile: refund #3050-9287 a dobropis k faktúre 295B0AC8-0059, celkom 0 €). Účet sa deaktivuje 1. 12., dáta vymažú 3 mesiace po zrušení; archív je v `~/Downloads/PTminder archív 2026-11-01/`.
 - **Mail s návrhmi tričiek odoslaný** (overené 3. 11. 2026 v odoslanej pošte: 2. 11. na podpora@proukrajinu.org, „Návrhy na trička — zadarmo, ak sa vám hodia", 12 príloh z PRE-FOND).
