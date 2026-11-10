@@ -17,6 +17,15 @@ Stav k **27. 10. 2026** (overené v D1: ponuku termínov si klienti vybrali už 
 **Veci s dátumom** (sem patrí všetko, čo sa nedá urobiť skôr, aby to
 nezapadlo medzi úlohami bez termínu):
 
+- **Jedno kliknutie od Jerryho (hneď)** — WP Fastest Cache → „Vymazat všechny
+  cache paměti". Nové listovanie na webe (šípka, vykúkajúca ďalšia obrazovka)
+  je nahraté a v zdrojovom CSS je, ale návštevníkom ide stará zlúčená kópia
+  CSS. Z účtu „ProSapiens" sa nastavenia WPFC nedajú otvoriť („nemáte
+  oprávnění"), z Jerryho účtu áno.
+- **24. 11. 2026** — vyhodnotiť prvú obrazovku úvodnej stránky: koľko ľudí
+  z POČÍTAČA prešlo z 1. na 2. obrazovku (pred zmenou 1 z 36) a koľko klikov
+  má `cta_odkaz` na „Rezervovat úvodní trénink".
+
 - [x] **2. 11. 2026** — overené v `automaty`: ranná dávka odišla o 05:30Z (4 odbery), automatické balíčky z plánovača o 04:15Z (0 nových), všetkých 17 automatov bez chyby.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
 - **Keď sa to zopakuje** — karta „Informace po úvodní lekci" na stránke po úvodnom (/u/): nová klientka Terezke povedala, že ťuknutie nič neurobilo, 1× (hlásené 2. 11. 2026), telefón neznámy, na ostatné odkazy sa nesťažovala. V testovacom prehliadači sa chyba nezopakovala (na šírke telefónu aj v rámiku; nová karta tam bola blokovaná, videný len pokus o otvorenie), iPhone/Safari ani vstavaný prehliadač overené neboli. Podozrenie, nedokázané: `target="_blank"` vo vstavanom prehliadači telefónu. Jerry: nechať tak, pri ďalšom hlásení zistiť telefón a appku, z ktorej otvárala SMS.
@@ -632,6 +641,34 @@ Otvorené:
 4. [x] Kokpit: nárok s hodinami navyše od októbra 2026 (strop 40 h, spolu 25 000), strážca stráži zálohy od 11/2026, veta pri kladnom dlhu opravená — nasadené 27. 10. 2026 (commit 7429164).
 5. [x] Rezervný účet PSB = Fio 2503222384/2010 (Jerry 27. 10.); prevody naň Kokpit spozná sám, zatvoria pripomienku 5 % a počítajú sa do rezervy firmy.
 6. [ ] **December 2026 pri uzávierke roka: rozhovor o odpustení časti dlhu** (Jerry −162 985, Terezka +7 809 k 30. 9.; zapísané hodiny navyše 27. 7.–30. 9. = 116 h × 450 = 52 290 Kč ako podklad).
+
+## Prvá obrazovka úvodnej stránky — nasadené 10. 11. 2026
+
+Rozpad hĺbky listovania podľa zariadenia ukázal, že to nie je obsahom:
+na telefóne listuje väčšina (5 · 6 · 4 · 5 …), na POČÍTAČI z 36 ľudí
+pokračoval jeden. Počítač mal jediné vodítko — nápis „Posouvejte" veľký
+152 × 19 px v pravom dolnom rohu nad fotkou — a koliesko myši posunie len
+asi tretinu obrazovky (prichytí sa, až keď je bližšie než 22 %).
+
+Nasadené naživo (téma `psb-spready`, zmenené v repe aj cez Editor šablón):
+
+1. **Klik na „Rezervovat úvodní trénink" sa meria** — udalosť `cta_odkaz`
+   (`formulare.js`). Dovtedy sa nemeral nikde: `cta_formular` chytá len kotvu
+   na formulár na tej istej stránke, `odchod` len cudzie weby. Bez toho sa
+   nedalo povedať, či ľudia odišli, alebo klikli ďalej.
+2. **Šípka vpravo v strede výšky s názvom ďalšej obrazovky** („Vzorec →"),
+   klikateľná, len na počítači (telefón má svoju veľkú šípku dole).
+3. **Vykúkajúca ďalšia obrazovka** — prvá obrazovka je na počítači o 72 px
+   užšia, takže vpravo vidno, že niečo pokračuje.
+4. **Najsilnejšia veta je na prvej obrazovke** („Bolest je místo. Příčina je
+   vzorec.") a vedľa hlavného tlačidla stojí druhé, tichšie: „Jak to funguje →",
+   ktoré posunie ďalej namiesto odchodu. Z druhej obrazovky sa veta vypustila,
+   aby sa dve obrazovky za sebou neopakovali.
+
+Čo ešte nie je hotové: WPFC drží starú zlúčenú kópiu CSS (viď „Veci s dátumom"
+hore) a výsledok sa dá merať až o dva týždne.
+
+---
 
 ## Zavreté (aby sa neotvárali odznova)
 
