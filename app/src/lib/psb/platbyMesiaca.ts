@@ -93,7 +93,7 @@ type Ack = Record<string, { note?: string } | undefined>;
  * by po odložení zmizla navždy namiesto toho, aby sa v ten deň vrátila
  * (našla to kontrola nad ostrými dátami 30. 10. 2026).
  */
-const jeOdklik = (a: { note?: string } | undefined) => !!a && !String(a.note || "").startsWith("odlozene|");
+export const jeOdklik = (a: { note?: string } | undefined) => !!a && !String(a.note || "").startsWith("odlozene|");
 
 const predoslyMesiac = (m: string) => {
   const [r, mm] = m.split("-").map(Number);

@@ -5,6 +5,7 @@
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
 import { platbyNaZaplatenie, stavPlatieb, type StavPlatby } from "./platbyMesiaca";
+import { ROCNE_PLATBY, rocneNaZaplatenie } from "./rocnePlatby";
 import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
@@ -1182,6 +1183,11 @@ export function buildAiContext(
         nezaplateneZaMinulyMesiac: platbyNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).filter((x) => x.mesiac < teraz).map(riadok),
       };
     })(),
+    rocnePlatby: {
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Platby a termíny, ktoré sa opakujú raz za rok (Jerry, 10. 11. 2026): poistka zodpovednosti za priestor (ČPP, zmluva 0029969549, 10 mil. Kč, 7 315 Kč, 11. 11. 2026 – 10. 11. 2027, automatická obnova). Pripomienka sa v registri objaví 25. 10. 2027 (platba do 11. 11.) a 15. 9. 2027 (výpoveď alebo porovnanie najneskôr 29. 9. 2027); kľúč rocna-platba|<id>|<rok>.",
+      zoznam: ROCNE_PLATBY.map((p) => ({ id: p.id, nazov: p.nazov, suma: p.suma, pripomenutOd: p.od, termin: p.termin })),
+      cakaNaVybavenie: rocneNaZaplatenie(data.platbyPohyby || [], data.anomalyAck || {}).map((s) => ({ id: s.platba.id, nazov: s.platba.nazov, termin: s.platba.termin })),
+    },
     dlhyVyplaty: (() => {
       // Dlh trénera voči firme (alebo firmy voči trénerovi) — to isté číslo,
       // aké ukazuje karta „Kam smeruje dlh" v Peniaze → J&T Výplaty. Ráta ho

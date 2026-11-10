@@ -21,6 +21,7 @@ import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
 import { notifikacieZmluv } from "./zmluvyNotifikacie";
 import { klucPlatbyMesiaca, platbyNaZaplatenie } from "./platbyMesiaca";
+import { klucRocnejPlatby, rocneNaZaplatenie } from "./rocnePlatby";
 import { otazkaUkonceneho } from "./ukoncenieBalicka";
 import { odlozenieTeraz, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL } from "./rezervaOdlozenie";
 import type {
@@ -3366,6 +3367,25 @@ export function deriveRegister(
       "workspace|kontroly",
       // Rodina po platbe: „Nehlásiť" pri Jarkovi nesmie umlčať nájom.
       `platba-mesiaca|${s.platba.id}`,
+      { trener: "Jerry" },
+    );
+  }
+
+  // ROČNÉ PLATBY (Jerry, 10. 11. 2026): poistka zodpovednosti za priestor sa
+  // obnovuje raz za rok a nikto nechodí do kalendára. Pripomína sa od
+  // `od` do `do`; kľúč nesie rok, takže odklik platí len na jednu obnovu.
+  for (const s of rocneNaZaplatenie(data.platbyPohyby || [], ack)) {
+    const po = dnesPraha().slice(0, 10) > s.platba.termin;
+    add(
+      klucRocnejPlatby(s.platba.id, s.platba.rok),
+      "Zápis",
+      po ? "red" : "orange",
+      `${s.platba.suma === "bez platby" ? "Vybaviť" : "Zaplatiť"}: ${s.platba.nazov}${s.platba.suma === "bez platby" ? "" : ` ${s.platba.suma}`}`,
+      `${s.platba.popis} ${po ? "Termín" : "Do"} ${fmtDMY(s.platba.termin)}${po ? " už prešiel." : "."}`
+        + " Keď prevod Kokpit v noci uvidí vo výpise z Fio, zmizne sám; inak klikni Vybavené.",
+      po ? 1 : 3,
+      "workspace|kontroly",
+      `rocna-platba|${s.platba.id}`,
       { trener: "Jerry" },
     );
   }
