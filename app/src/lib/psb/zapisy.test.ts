@@ -26,6 +26,13 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  // Zmluvu zakladá tréner; klientova polovica sa zapíše až podpisom (podpisKlienta).
+  zmluvy: {
+    klient_meno: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_podpis: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_suhlasy_json: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_at: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá",
+    klient_ip: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_ua: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", odtlacok: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá",
+    otvorene_at: "prvé otvorenie odkazu klientom, nie založenie",
+    zrusene_at: "zrušenie nepodpísanej zmluvy, nie založenie",
+  },
   // Mailer: rozpísaný mail ešte nemá skúšku ani odoslanie; nový kontakt ešte
   // nedostal žiadny mail. Prázdna hodnota a nula z migrácie sú správny začiatok.
   mail_vydania: {

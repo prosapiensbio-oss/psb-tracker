@@ -140,3 +140,4 @@
 0135_mailer_vydania.sql
 0136_odkaz_pre_prijemcu.sql
 0137_fio_moja_poznamka.sql
+0138_zmluvy.sql

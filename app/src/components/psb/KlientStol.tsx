@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { dlhyKlienta } from "../../lib/psb/zaplatene";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
+import { ZmluvaKlienta } from "./ZmluvaKlienta";
 import { cas24, hod, prepadnuteRad, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { vetaPrevzatych } from "../../lib/psb/mailKlientovi";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
@@ -146,7 +147,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [menoVnutri, setMenoVnutri] = useState("");
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
-  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "fotky" | "poznamky">("zdravie");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "zmluva" | "fotky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
@@ -1565,7 +1566,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "platby"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["zmluva", "zmluva"], ["fotky", "fotky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} data-aktivna={filter === id ? "1" : undefined} onClick={() => setFilter(id)} style={{ ...prepinac(filter === id), flex: "none" }}>{l}</button>
             ))}
           </PrepinacFiltra>
@@ -2115,6 +2116,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           )}
 
           {filter === "anamneza" && <AnamnezaZhrnutie meno={meno} onOtvor={(m) => onOtvorAnamnezu?.(m)} />}
+          {filter === "zmluva" && <ZmluvaKlienta meno={meno} />}
 
           {/* Fotky držania tela aj v profile (Jerry, 6. 10. 2026) — ďalšie
               fotenie sa nahrá tu, nemusí sa kvôli nemu otvárať anamnéza. */}

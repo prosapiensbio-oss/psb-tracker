@@ -34,6 +34,7 @@ import { PENIAZE_KLUC, spojPlatby } from "./peniazeZKokpitu";
 
 import { nacitajDozor } from "./reklamaDozor.server";
 import { nacitajFotkyKlientov } from "./fotkyOdkazy.server";
+import { nedavnoPodpisane } from "./zmluvy.server";
 import { znamiKlienti } from "./nahodTrening.server";
 import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
 import { klientiSCakajucouFakturou } from "./fakturaNaDalsi.server";
@@ -499,6 +500,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
   data.reklamaDozor = await nacitajDozor(DB);
   // Odpovede klientov na odkaz s fotkami → notifikácia trénerovi (fotkyOdkazy.ts).
   data.fotkyKlientov = await nacitajFotkyKlientov(DB);
+  // Zmluvy 6M podpísané klientom → notifikácia (zmluvyNotifikacie.ts). Bez tabuľky ticho prázdne.
+  data.zmluvyPodpisane = await nedavnoPodpisane(DB).catch(() => { chybySekcii.push("zmluvy"); return []; });
   // Fakturačné údaje vyplnené klientom na odkaze po úvodnom → notifikácia (fakturaKlienta.ts).
   const odHranice = new Date(Date.now() - FAKTURA_OKNO_DNI * 86400_000).toISOString();
   data.fakturyOdKlientov = ((await DB.prepare(

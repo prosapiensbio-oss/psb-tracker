@@ -19,6 +19,7 @@ import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
 import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
+import { notifikacieZmluv } from "./zmluvyNotifikacie";
 import { klucPlatbyMesiaca, platbyNaZaplatenie } from "./platbyMesiaca";
 import { otazkaUkonceneho } from "./ukoncenieBalicka";
 import { odlozenieTeraz, REZERVA_CISLO, REZERVA_KOD, REZERVA_PODIEL } from "./rezervaOdlozenie";
@@ -3684,6 +3685,16 @@ export function deriveRegister(
   for (const n of notifikacieFaktur(data.fakturyOdKlientov || [], dnesPraha())) {
     add(n.key, "Zápis", "blue", n.title, n.detail, 8, n.klient, "faktura-od-klienta",
       { trener: "Jerry", oKom: n.klient });
+  }
+
+  /**
+   * Klient podpísal zmluvu 6M cez odkaz (10. 11. 2026). Patrí trénerovi
+   * klienta; zmluvy posiela Jerry, preto bez známeho trénera jemu.
+   */
+  for (const n of notifikacieZmluv(data.zmluvyPodpisane || [])) {
+    const c = clients[n.klient] || Object.values(clients).find((x) => normName(x.name) === normName(n.klient));
+    add(n.key, "Zápis", "blue", n.title, n.detail, 8, n.klient, "zmluva-podpisana",
+      { trener: c?.primaryTrainer || "Jerry", oKom: n.klient });
   }
 
   return items.sort((a, b) => {

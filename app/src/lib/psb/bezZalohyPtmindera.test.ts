@@ -38,7 +38,9 @@ describe("deriveClients — zostatok bez zálohy z PTmindera", () => {
   const data = {
     ...EMPTY_DATA,
     sessions: [
-      { date: `${posun(-40)}T00:00:00.000Z`, time: "10:00", client: "Kat Stokl", sessionTrainer: "Terezka", sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 0 },
+      // Pevný deň PRED 1. 10. (pred prechodom sa nesúdi). Kým tu bolo `posun(-40)`,
+      // test 10. 11. 2026 trafil práve 1. 10. a začal hlásiť tréning, ktorý mal mlčať.
+      { date: "2026-09-15T00:00:00.000Z", time: "10:00", client: "Kat Stokl", sessionTrainer: "Terezka", sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 0 },
       { date: `${posun(-2)}T00:00:00.000Z`, time: "10:00", client: "Kat Stokl", sessionTrainer: "Terezka", sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 0 },
       { date: `${posun(-3)}T00:00:00.000Z`, time: "10:00", client: "Ma Balicek", sessionTrainer: "Jerry", sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 0 },
     ],

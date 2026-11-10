@@ -9,6 +9,7 @@ import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EditorKarta } from "./EditorKarta";
+import { ZmluvyKarta } from "./ZmluvyKarta";
 import { ReklamaPracovisko } from "./ReklamaDozor";
 import { RadKariet } from "./RadKariet";
 
@@ -1032,6 +1033,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
     <>
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
               {k.druh === "editor" && <EditorKarta mena={mena} />}
+              {k.druh === "zmluvy" && <ZmluvyKarta data={data} clients={clients} mena={mena} />}
               {/* DOZOR REKLÁM — tá istá obrazovka ako bola v Marketingu (19. 10. 2026). */}
               {k.druh === "reklamy" && (
                 <NaCeluObrazovku nazov="Dozor reklám">

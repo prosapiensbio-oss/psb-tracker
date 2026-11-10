@@ -24,7 +24,7 @@ describe("karta je kategória, nie položka", () => {
     // karty. Jerry 23. 9. 2026: „predstavoval som si celé kategórie."
     // Karta „klient" je navyše — nie je to fronta, je to pracovný stôl.
     const k = postavKarty({ ...zdroje, ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy", "zmeny", "mena", "platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "zmeny", "mena", "platby"]);
     expect(k.find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
   });
 
@@ -36,16 +36,18 @@ describe("karta je kategória, nie položka", () => {
     expect(k[1].druh).toBe("faktury");
     // Anamnézy sú tretie — kartotéka bez fronty, stavia sa vždy.
     expect(k[2].druh).toBe("anamnezy");
-    // Editor hneď za nimi (6. 10. 2026) — tiež nástroj, nie fronta.
-    expect(k[3].druh).toBe("editor");
+    // Zmluvy 6M hneď za anamnézami (10. 11. 2026) — tá istá kartotéka.
+    expect(k[3].druh).toBe("zmluvy");
+    // Editor za nimi (6. 10. 2026) — tiež nástroj, nie fronta.
+    expect(k[4].druh).toBe("editor");
     // Dozor reklám za editorom (19. 10. 2026) — nástroj, nie fronta.
-    expect(k[4].druh).toBe("reklamy");
-    expect(k[7].druh).toBe("platby");
+    expect(k[5].druh).toBe("reklamy");
+    expect(k[8].druh).toBe("platby");
   });
 
   it("prázdna kategória kartu nevyrobí", () => {
     const k = postavKarty({ ...zdroje, zmeny: [], nezname: [], ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy", "platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "platby"]);
   });
 });
 
@@ -62,7 +64,7 @@ describe("karta patrí prihlásenému", () => {
     // ale jej robota — a bez karty tlačidlo „Vystaviť faktúru" na karte
     // klienta ticho nerobilo nič (28. 9. 2026, Janka šnirychova).
     const k = postavKarty({ ...zdroje, ktoSom: "terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy", "zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "zmeny", "mena"]);
     expect(k.find((x) => x.druh === "zmeny")!.polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
   });
 
@@ -139,7 +141,7 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 
   it("aj „Terezka“ s veľkým T", () => {
     const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy", "zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "zmeny", "mena"]);
   });
 
   it("„app“ (spoločné prihlásenie) nefiltruje", () => {
@@ -152,9 +154,9 @@ describe("karta klienta je stôl, nie fronta", () => {
     // Ostatné karty sú zoznamy toho, čo čaká, a keď sa vyprázdnia, zmiznú.
     // Tieto nie — sú to miesta, kam sa chodí robiť (od 6. 10. aj Editor).
     const k = postavKarty({ zmeny: [], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy"]);
     // „krok" je karta bety (4. 10. 2026) — prázdna povie „Všetko vybavené".
-    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy", "editor", "reklamy", "krok"]);
+    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "krok"]);
   });
 
   it("nemá položky, takže sa nedá „vybaviť“", () => {
@@ -234,7 +236,7 @@ describe("beta: tri kroky", () => {
   it("staré karty sa zložia do krokov v poradí týždňa a kroky nemiznú", () => {
     const k = postavKarty({ zmeny: [zmena({ id: "z1", trener: "Jerry" })], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
     const b = krokyBety(k);
-    expect(b.map((x) => (x.druh === "krok" ? x.krok : x.druh))).toEqual(["kalendar", "sms", "platby", "faktury", "anamnezy", "editor", "reklamy", "klient"]);
+    expect(b.map((x) => (x.druh === "krok" ? x.krok : x.druh))).toEqual(["kalendar", "sms", "platby", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "klient"]);
     const kal = b.find((x) => x.druh === "krok" && x.krok === "kalendar");
     expect(kal && kal.druh === "krok" ? kal.sekcie.map((s) => s.druh) : []).toEqual(["zmeny"]);
   });

@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ZTokenRouteImport } from './routes/z.$token'
 import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as TTokenRouteImport } from './routes/t.$token'
@@ -22,6 +23,7 @@ import { Route as FTokenRouteImport } from './routes/f.$token'
 import { Route as DTokenRouteImport } from './routes/d.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
+import { Route as ApiZmluvyRouteImport } from './routes/api/zmluvy'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
 import { Route as ApiWebObsahRouteImport } from './routes/api/web-obsah'
 import { Route as ApiWebKontrolaRouteImport } from './routes/api/web-kontrola'
@@ -126,6 +128,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ZTokenRoute = ZTokenRouteImport.update({
+  id: '/z/$token',
+  path: '/z/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VTokenRoute = VTokenRouteImport.update({
   id: '/v/$token',
   path: '/v/$token',
@@ -169,6 +176,11 @@ const AssetsSplatRoute = AssetsSplatRouteImport.update({
 const ApiZositRoute = ApiZositRouteImport.update({
   id: '/api/zosit',
   path: '/api/zosit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiZmluvyRoute = ApiZmluvyRouteImport.update({
+  id: '/api/zmluvy',
+  path: '/api/zmluvy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWishlistRoute = ApiWishlistRouteImport.update({
@@ -671,6 +683,7 @@ export interface FileRoutesByFullPath {
   '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
+  '/api/zmluvy': typeof ApiZmluvyRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
@@ -680,6 +693,7 @@ export interface FileRoutesByFullPath {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/z/$token': typeof ZTokenRoute
   '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
@@ -769,6 +783,7 @@ export interface FileRoutesByTo {
   '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
+  '/api/zmluvy': typeof ApiZmluvyRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
@@ -778,6 +793,7 @@ export interface FileRoutesByTo {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/z/$token': typeof ZTokenRoute
   '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
@@ -868,6 +884,7 @@ export interface FileRoutesById {
   '/api/web-kontrola': typeof ApiWebKontrolaRoute
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
+  '/api/zmluvy': typeof ApiZmluvyRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
   '/d/$token': typeof DTokenRoute
@@ -877,6 +894,7 @@ export interface FileRoutesById {
   '/t/$token': typeof TTokenRoute
   '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
+  '/z/$token': typeof ZTokenRoute
   '/api/strizna/statistiky': typeof ApiStriznaStatistikyRoute
   '/k/$token/kalendar.ics': typeof KTokenKalendarDoticsRoute
   '/api/strizna/kniznica/$': typeof ApiStriznaKniznicaSplatRoute
@@ -968,6 +986,7 @@ export interface FileRouteTypes {
     | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
+    | '/api/zmluvy'
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
@@ -977,6 +996,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/z/$token'
     | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
@@ -1066,6 +1086,7 @@ export interface FileRouteTypes {
     | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
+    | '/api/zmluvy'
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
@@ -1075,6 +1096,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/z/$token'
     | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
@@ -1164,6 +1186,7 @@ export interface FileRouteTypes {
     | '/api/web-kontrola'
     | '/api/web-obsah'
     | '/api/wishlist'
+    | '/api/zmluvy'
     | '/api/zosit'
     | '/assets/$'
     | '/d/$token'
@@ -1173,6 +1196,7 @@ export interface FileRouteTypes {
     | '/t/$token'
     | '/u/$token'
     | '/v/$token'
+    | '/z/$token'
     | '/api/strizna/statistiky'
     | '/k/$token/kalendar.ics'
     | '/api/strizna/kniznica/$'
@@ -1263,6 +1287,7 @@ export interface RootRouteChildren {
   ApiWebKontrolaRoute: typeof ApiWebKontrolaRoute
   ApiWebObsahRoute: typeof ApiWebObsahRoute
   ApiWishlistRoute: typeof ApiWishlistRoute
+  ApiZmluvyRoute: typeof ApiZmluvyRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
   DTokenRoute: typeof DTokenRoute
@@ -1272,6 +1297,7 @@ export interface RootRouteChildren {
   TTokenRoute: typeof TTokenRoute
   UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
+  ZTokenRoute: typeof ZTokenRoute
   ApiStriznaStatistikyRoute: typeof ApiStriznaStatistikyRoute
   ApiStriznaKniznicaSplatRoute: typeof ApiStriznaKniznicaSplatRoute
   ApiStriznaNahrateSplatRoute: typeof ApiStriznaNahrateSplatRoute
@@ -1305,6 +1331,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/z/$token': {
+      id: '/z/$token'
+      path: '/z/$token'
+      fullPath: '/z/$token'
+      preLoaderRoute: typeof ZTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v/$token': {
@@ -1368,6 +1401,13 @@ declare module '@tanstack/react-router' {
       path: '/api/zosit'
       fullPath: '/api/zosit'
       preLoaderRoute: typeof ApiZositRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/zmluvy': {
+      id: '/api/zmluvy'
+      path: '/api/zmluvy'
+      fullPath: '/api/zmluvy'
+      preLoaderRoute: typeof ApiZmluvyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/wishlist': {
@@ -2049,6 +2089,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebKontrolaRoute: ApiWebKontrolaRoute,
   ApiWebObsahRoute: ApiWebObsahRoute,
   ApiWishlistRoute: ApiWishlistRoute,
+  ApiZmluvyRoute: ApiZmluvyRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
   DTokenRoute: DTokenRoute,
@@ -2058,6 +2099,7 @@ const rootRouteChildren: RootRouteChildren = {
   TTokenRoute: TTokenRoute,
   UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
+  ZTokenRoute: ZTokenRoute,
   ApiStriznaStatistikyRoute: ApiStriznaStatistikyRoute,
   ApiStriznaKniznicaSplatRoute: ApiStriznaKniznicaSplatRoute,
   ApiStriznaNahrateSplatRoute: ApiStriznaNahrateSplatRoute,

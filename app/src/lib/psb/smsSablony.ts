@@ -59,3 +59,7 @@ export function textSmsFotiek(meno: string, url: string, podpis: string): string
 /** Hromadná správa: `{meno}` je krstné meno v 5. páde bez diakritiky. */
 export const zlozHromadnuSms = (text: string, meno: string): string =>
   text.replace(/\{meno\}/gi, oslovenieDoSms(meno));
+
+/** Zmluva 6M na podpis (10. 11. 2026) — odkaz na /z/, zvyšok nesie stránka. */
+export const textSmsZmluvy = (meno: string, url: string): string =>
+  bezDiakritiky(`${ahoj(meno)} posilam ti k podpisu podminky 6M spoluprace. Pravidla si odklikni a podepis se prstem: ${url} Diky, Jerry`);

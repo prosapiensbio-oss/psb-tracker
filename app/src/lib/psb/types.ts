@@ -232,6 +232,8 @@ export type PSBData = {
   fotkyKlientov?: import("./fotkyOdkazy").FotkyKlientov;
   /** Fakturačné údaje, ktoré klient vyplnil sám cez odkaz po úvodnom (posledných 30 dní). */
   fakturyOdKlientov?: import("./fakturaKlienta").FakturaOdKlienta[];
+  /** Zmluvy 6M podpísané klientom za posledné 3 týždne → notifikácia (zmluvyNotifikacie.ts). */
+  zmluvyPodpisane?: import("./zmluvyNotifikacie").PodpisanaZmluvaNot[];
   /** Klienti s faktúrou, ktorá čaká na ďalší balíček (`fakturaNaDalsi.server.ts`). */
   fakturyNaDalsi?: string[];
   /** Ďalší balíček zaplatený vopred, ešte nevznikol (`dlhyKlientov`, 9. 11. 2026). */
