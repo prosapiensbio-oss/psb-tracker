@@ -183,7 +183,7 @@ export const Route = createFileRoute("/api/google")({
             };
             const r = await post(GA4(property), t.token, {
               dateRanges: [{ startDate: od, endDate: do_ }],
-              dimensions: [{ name: "pagePath" }, { name: "customEvent:cislo" }, { name: "customEvent:nazov" }],
+              dimensions: [{ name: "pagePath" }, { name: "customEvent:cislo" }, { name: "customEvent:nazov" }, { name: "deviceCategory" }],
               metrics: [{ name: "eventCount" }, { name: "totalUsers" }],
               dimensionFilter: filter,
               limit: 2000,
@@ -193,7 +193,7 @@ export const Route = createFileRoute("/api/google")({
             // „30 ľudí dolistovalo na piatu" číslo bez významu.
             const navstevy = await post(GA4(property), t.token, {
               dateRanges: [{ startDate: od, endDate: do_ }],
-              dimensions: [{ name: "pagePath" }],
+              dimensions: [{ name: "pagePath" }, { name: "deviceCategory" }],
               metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
               limit: 300,
             });
