@@ -37,6 +37,8 @@ import {
 import { KATEGORIE_HOOKOV } from "../../lib/psb/marketing-obsah";
 import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
+import { HlbkaListovania } from "./HlbkaListovania";
+import { jeBeta } from "../../lib/psb/beta";
 import { ObjemHladania } from "./ObjemHladania";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
@@ -1278,6 +1280,7 @@ export function Marketing({ data, clients, leads, chat, chatReklama, sub, onSub,
       {/* Web = sú moje stránky v poriadku a chodí na ne niekto. */}
       {sub === "web" && (
         <>
+          {jeBeta() && <HlbkaListovania />}
           <StrankyWebu chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} {...skrytie} />
           <CoFungovaloWeb rok={rok} chat={chat} />
