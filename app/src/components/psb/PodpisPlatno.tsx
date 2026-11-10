@@ -135,13 +135,13 @@ export function PodpisPlatno({ onZmena, vyska = 200, predvolba }: {
         ref={obal}
         style={{ position: "relative", height: vyska, borderRadius: 12, border: `1.5px dashed ${mix(C.green, 60)}`, background: "#FFFFFF", touchAction: "none", overflow: "hidden" }}
       >
+        <canvas ref={cv} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", touchAction: "none", cursor: "crosshair" }} />
         <div style={{ position: "absolute", left: 20, right: 20, bottom: 40, borderBottom: "1px solid #C9D4CC", pointerEvents: "none" }} />
         {prazdne && (
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 14, textAlign: "center", fontSize: 12, color: "#8A9A90", pointerEvents: "none" }}>
             podpíš sa prstom alebo perom
           </div>
         )}
-        <canvas ref={cv} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", touchAction: "none", cursor: "crosshair" }} />
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
         <button
