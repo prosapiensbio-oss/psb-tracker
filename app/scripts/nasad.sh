@@ -211,7 +211,20 @@ for i in $(seq 1 $pokusov); do
   $spustac deploy -c wrangler.jsonc > /tmp/nasad-$i.log 2>&1
 
   po=$(verzia)
+  # Stavový kód na assete NESTAČÍ. Chýbajúci `*.js` vracia worker ako 200
+  # a v tele je skript samoliečenia (`not_found_handling: none` +
+  # routes/assets/$.ts) — presne preto, aby sa zaseknutá PWA opravila sama.
+  # Kontrola na 200 teda prejde aj vtedy, keď sa assety vôbec nenahrali:
+  # stalo sa to 11. 11. 2026, skript ohlásil úspech a v prehliadači bežala
+  # predošlá appka. Rozhoduje VEĽKOSŤ a to, že to nie je samoliečenie.
+  curl -s "$adresa/assets/$kontrolny" -o /tmp/nasad-asset-$i.js
   asset=$(curl -s -o /dev/null -w '%{http_code}' "$adresa/assets/$kontrolny")
+  bajtov=$(wc -c < /tmp/nasad-asset-$i.js | tr -d ' ')
+  if grep -q 'kokpit-samoliecenie' /tmp/nasad-asset-$i.js; then
+    asset="chýba (prišlo samoliečenie, nie súbor)"
+  elif [ "${bajtov:-0}" -lt 1000 ]; then
+    asset="podozrivo malý ($bajtov B)"
+  fi
 
   if [ -n "$po" ] && [ -n "$pred" ] && [ "$po" -gt "$pred" ] && [ "$asset" = "200" ]; then
     echo "✓ nasadené — verzia $pred → $po, súbor $kontrolny je živý"
