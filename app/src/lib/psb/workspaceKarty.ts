@@ -28,7 +28,9 @@ import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 import type { PodlaKlienta } from "./sporneKonanie";
 import type { NavrhFaktury } from "./platbyEvidencia";
 
-export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
+export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string;
+  /** Udalosť v kal_udalosti — okno dôvodu sa podľa nej pýta na dochádzku. */
+  uid?: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = {
   fioId: string; datum: string; suma: number; text: string; navrh: string;

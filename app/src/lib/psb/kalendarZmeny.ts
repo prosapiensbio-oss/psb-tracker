@@ -345,3 +345,24 @@ export function zmiznuteStarsie<T extends { uid: string }>(stare: T[], uidy: Set
   if (zmizle.length > 5 && zmizle.length > stare.length / 3) return { zmizle: [], odmietnute: true };
   return { zmizle, odmietnute: false };
 }
+
+/**
+ * UKONČENÝ KLIENT — BUDÚCE TERMÍNY SA NEHLÁSIA (Radek Baláž, 11. 11. 2026:
+ * „prečo mi stále vyskakuje Baláž, keď vieme, že skončil?“).
+ *
+ * Séria jeho termínov bola v Kokpite zapísaná 26. 9. až do konca roka; po
+ * ukončení (13. 10.) ju Jerry v Google skrátil, no riadky v Kokpite ostali.
+ * Každý týždeň jeden vošiel do 14-dňového okna, v Google nebol, a karta
+ * Zmeny sa pýtala „zmizol tréning — prečo?“. Odpoveď appka pozná: klient
+ * je Neaktívny. Mlčí sa LEN o termíne, ktorý v čase zistenia ešte len mal
+ * prísť — zmiznutý minulý tréning sa ohlási ďalej, ten môže hýbať hodinami.
+ */
+export function mlciPriUkoncenom(
+  z: { druh: string; klient: string | null; pred: string | null },
+  /** Kedy sa zmiznutie zistilo — pražský čas `YYYY-MM-DDTHH:MM`. */
+  zistene: string,
+  neaktivni: Set<string>,
+  norm: (s: string) => string,
+): boolean {
+  return z.druh === "zrusene" && !!z.klient && neaktivni.has(norm(z.klient)) && !!z.pred && z.pred.slice(0, 16) > zistene.slice(0, 16);
+}

@@ -9,6 +9,7 @@ import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EditorKarta } from "./EditorKarta";
+import { OknoDovoduZrusenia, type ZrusenaHodina } from "./Kalendar";
 import { ZmluvyKarta } from "./ZmluvyKarta";
 import { ReklamaPracovisko } from "./ReklamaDozor";
 import { RadKariet } from "./RadKariet";
@@ -269,6 +270,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
   // Otvorený klient prežije prepnutie karty, nie odchod zo záložky — viď
   // `menoZvonku` v KlientStol.
   const [klientNaStole, setKlientNaStole] = useState("");
+  /** Okno „Prečo sa hodina ruší?“ nad zmiznutým tréningom (karta Zmeny). */
+  const [oknoDovodu, setOknoDovodu] = useState<{ kluc: string; z: ZrusenaHodina } | null>(null);
   /** Kto čaká na anamnézu. Vlastný fetch — obsah odpovedí sa sem neťahá. */
   const [anamnezy, setAnamnezy] = useState<AnamnezaRiadok[]>([]);
   /** Klient, ktorého anamnézu má karta Klient otvoriť rovno (zo zoznamu). */
@@ -1376,7 +1379,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
                       ).map((d) => (
                         <button
                           key={d}
-                          onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: d })}
+                          /* „Klient zrušil“ pri zmiznutom tréningu otvorí to isté okno ako
+                             zmazanie v Kalendári — choroba, práca, rodina… a pri poslednej
+                             chvíli otázku na dochádzku (Jerry, 11. 11. 2026). */
+                          onClick={() => (d === "klient zrušil" && z.druh === "zrusene" && z.pred && z.uid
+                            ? setOknoDovodu({ kluc, z: { id: z.id, uid: z.uid, kto: z.klient || z.nazov || "", zaciatok: z.pred, trener: z.trener } })
+                            : void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: d }))}
                           disabled={pracujem === kluc}
                           title="Uzavrieť s týmto dôvodom"
                           style={stitok(t === d)}
@@ -2229,6 +2237,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
     // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
     // trik: 100vw a posun o polovicu rozdielu doľava.
     <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: mobil ? "0 10px" : "0 20px", boxSizing: "border-box" }}>
+      {oknoDovodu && (
+        <OknoDovoduZrusenia
+          z={oknoDovodu.z}
+          onZavri={() => setOknoDovodu(null)}
+          onHotovo={async () => {
+            const k = oknoDovodu.kluc;
+            setOknoDovodu(null);
+            setHotove((s) => new Set([...s, k]));
+            setKrokSpat({ kluc: k, id: oknoDovodu.z.id, popis: "dôvod z okna" });
+            oznam("kalendar");
+          }}
+        />
+      )}
       {mobil && (
         <div style={{ position: "sticky", top: 59, zIndex: 30, margin: "-16px -10px 8px", padding: "6px 10px", background: mix(C.bg, 96), backdropFilter: "blur(10px)" }}>
           {radKariet}

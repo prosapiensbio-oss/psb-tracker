@@ -2199,7 +2199,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   );
 }
 
-type ZrusenaHodina = { id: string; uid: string; kto: string; zaciatok: string; trener: string };
+export type ZrusenaHodina = { id: string; uid: string; kto: string; zaciatok: string; trener: string };
 
 /**
  * PREČO SA HODINA RUŠÍ (Jerry, 30. 10. 2026: „po potvrdení vymazania hodiny
@@ -2221,7 +2221,7 @@ type ZrusenaHodina = { id: string; uid: string; kto: string; zaciatok: string; t
  * potom dôvod — keď padne prvé, dôvod sa nezapíše a otázka ostane otvorená.
  * Zmazaná hodina s konal = 1 sa počíta, len čo nastane jej čas.
  */
-function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavri: () => void; onHotovo: () => Promise<void> }) {
+export function OknoDovoduZrusenia({ z, onZavri, onHotovo }: { z: ZrusenaHodina; onZavri: () => void; onHotovo: () => Promise<void> }) {
   const [ine, setIne] = useState(false);
   const [text, setText] = useState("");
   const [dochadzka, setDochadzka] = useState<string | null>(null);

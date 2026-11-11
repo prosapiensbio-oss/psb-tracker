@@ -14,7 +14,7 @@ import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from 
 import { normName } from "../../lib/psb/format";
 import { citajIcal } from "../../lib/psb/ical";
 import { presunyZmien, uzavriZjavnePresuny } from "../../lib/psb/kalendarPresuny.server";
-import { DOZADU_ZMIZNUTIE_DNI, ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, uidyVIcale, zmizlaPoKonci, zmiznuteStarsie } from "../../lib/psb/kalendarZmeny";
+import { DOZADU_ZMIZNUTIE_DNI, mlciPriUkoncenom, ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, uidyVIcale, zmizlaPoKonci, zmiznuteStarsie } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, odmietnutPokles, POKLES_TEXT, stiahniIcal, textPoklesu, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
@@ -65,6 +65,12 @@ function okno() {
   const od = terazPraha(new Date(d - DOZADU_DNI * 86400000));
   const do_ = terazPraha(new Date(d + DOPREDU_DNI * 86400000));
   return { od, do_, odMs: Date.parse(`${od}:00Z`), doMs: Date.parse(`${do_}:00Z`) };
+}
+
+/** Mená klientov so stavom Neaktívny (normName) — pre `mlciPriUkoncenom`. */
+async function nacitajNeaktivnych(DB: D1Database): Promise<Set<string>> {
+  const r = await DB.prepare("SELECT name FROM client_overrides WHERE status = 'Neaktívny'").all().catch(() => ({ results: [] }));
+  return new Set(((r.results || []) as { name: string }[]).map((x) => normName(x.name)));
 }
 
 /**
@@ -241,8 +247,12 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const dnesDen = dnesPraha(new Date(kedy));
 
   let zmien = 0;
+  // Ukončení klienti — ich budúce termíny sa pri zmiznutí nehlásia (mlciPriUkoncenom).
+  const neaktivni = await nacitajNeaktivnych(DB);
+  const zisteneTeraz = terazPraha(new Date(kedy));
   for (const x of sparujZmeny(surove)) {
     if (!ohlasitZmenu(x.druh, x.pred, x.po, dnesDen, x.typ)) continue;
+    if (mlciPriUkoncenom(x, zisteneTeraz, neaktivni, normName)) continue;
     zmien++;
     prikazy.push(DB.prepare(
       "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -320,8 +330,9 @@ export const Route = createFileRoute("/api/kalendar")({
         }
 
         const { od, do_ } = okno();
+        const neaktivni = await nacitajNeaktivnych(DB);
 
-        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti, sporne] = await Promise.all([
+        const [zdroje, zmenyVsetky, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti, sporne] = await Promise.all([
           DB.prepare(`SELECT z.id, z.trener, z.aktivny, z.posledne_ok, z.posledna_chyba,
             (SELECT s.kedy FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_kedy,
             (SELECT s.ok FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_ok,
@@ -481,6 +492,15 @@ export const Route = createFileRoute("/api/kalendar")({
          * NÁVRH PRESUNU K ZMIZNUTEJ HODINE (Jerry, 8. 10. 2026) — ostáva pri
          * zmenách s viacerými kandidátmi; jednoznačné zavrie snímka sama.
          */
+        /**
+         * Nevysvetlené zmeny BEZ budúcich termínov ukončených klientov
+         * (mlciPriUkoncenom) — aj tých, čo vznikli pred touto opravou
+         * (Baláž 24. 11.). `kedy` je UTC, termíny sú pražské.
+         */
+        const zmeny = {
+          results: ((zmenyVsetky.results || []) as unknown as { kedy: string; druh: string; klient: string | null; pred: string | null }[])
+            .filter((z) => !mlciPriUkoncenom(z, terazPraha(new Date(z.kedy)), neaktivni, normName)),
+        };
         const zmenyRiadky = (zmeny.results || []) as unknown as { id: string; kedy: string; klient: string | null; nazov: string | null; druh: string; pred: string | null }[];
         const presuny = await presunyZmien(DB, zmenyRiadky);
 
