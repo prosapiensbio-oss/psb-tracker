@@ -339,3 +339,19 @@ describe("balicekPreOs — jedno mapovanie riadku balíčka", () => {
     expect(zProfilu.some((u) => u.druh === "balicekOd" && u.zostatokZPtmindera)).toBe(true);
   });
 });
+
+// Matej Procházka, 11. 11. 2026: ráno „1 h prepadlo“, potom Jerry: „nie je
+// to prepadnutie, je to doplnenie“. Doplnenie na deň konca platnosti berie
+// hodinu späť — os ju nesmie ukázať ako prepadnutú.
+describe("prepadlo a potom doplnenie na ten istý deň", () => {
+  const acks = { "platnost|Matej Prochadzka|2026-11-10": { note: "1 h prepadlo — platnosť do 2026-11-10" } };
+  const base = { sessions: [], payments: [], packages: [], acks };
+  const prepadnute = (o: ReturnType<typeof osCasuKlienta>) => o.filter((x) => x.druh === "balicekDo" && "prepadlo" in x && x.prepadlo);
+  it("bez doplnenia ostane prepadnutá hodina", () => {
+    expect(prepadnute(osCasuKlienta("Matej Prochadzka", base as never, "2026-11-11T12:00")).length).toBe(1);
+  });
+  it("s doplnením 1 h od toho dňa prepadnutá nie je", () => {
+    const balicky = [{ klient: "Matej Prochadzka", nazov: "Doplnenie členstva", hodiny: 1, platnost_od: "2026-11-10", cena_czk: 0, zdroj: "rucne" }];
+    expect(prepadnute(osCasuKlienta("Matej Prochadzka", { ...base, balicky } as never, "2026-11-11T12:00")).length).toBe(0);
+  });
+});

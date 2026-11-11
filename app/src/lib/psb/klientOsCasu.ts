@@ -534,8 +534,22 @@ export function osCasuKlienta(
   }
 
 
+  /**
+   * ROZHODNUTIE SA DÁ ZMENIŤ: „prepadlo“, a potom doplnenie na ten istý deň
+   * (Matej Procházka, 11. 11. 2026). Ráno sa po oprave tréningu zo 14. 10.
+   * zapísalo „1 h prepadlo“, Jerry potom povedal, že hodina neprepadla, je to
+   * doplnenie. Doplnenie s platnosťou od dňa konca platnosti tie hodiny berie
+   * späť — os ich nesmie ukázať ako prepadnuté a zároveň ako doplnenie.
+   */
+  const doplneneVDen = new Map<string, number>();
+  for (const b of riadky) {
+    if (normName(b.klient) !== k || b.zrusene_at || !jeDoplnenie(b.nazov)) continue;
+    const d = den(b.platnost_od);
+    doplneneVDen.set(d, (doplneneVDen.get(d) || 0) + (Number(b.hodiny) || 0));
+  }
   for (const p of prepadnuteHodiny(meno, zdroj.acks)) {
-    if (p.den <= dnes) out.push({ druh: "balicekDo", den: p.den, nazov: "prepadnuté hodiny", hodin: p.hodin, prepadlo: p.hodin });
+    const hodin = Math.max(0, p.hodin - (doplneneVDen.get(p.den) || 0));
+    if (p.den <= dnes && hodin > 0) out.push({ druh: "balicekDo", den: p.den, nazov: "prepadnuté hodiny", hodin, prepadlo: hodin });
   }
 
   /**
