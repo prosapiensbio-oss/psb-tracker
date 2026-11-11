@@ -304,3 +304,44 @@ export function prenosRucnych<T extends { uid: string; zaciatok: string; zmizla_
   }
   return out;
 }
+
+/**
+ * TRÉNING ZMAZANÝ AŽ PO VYPADNUTÍ Z OKNA (Matej Procházka, 11. 11. 2026).
+ *
+ * Snímka porovnáva len okno 21 dní dozadu. Tréning zo 14. 10. sa nekonal,
+ * Jerry ho z Google zmazal až v novembri — Kokpit sa na ten deň už
+ * nepozeral, udalosť ostala živá a uberala hodinu z balíčka. Appka si preto
+ * myslela, že balíček je minutý, a neohlásila končiacu platnosť so zvyškom.
+ *
+ * Oprava nerozbaľuje opakovania v dlhšom okne (to je drahé — dvakrát už
+ * Kokpit padol na limite CPU), len sa pýta, či UID udalosti v súbore
+ * VÔBEC je. Súbor nesie celú históriu kalendára, takže zmazaná jednorazová
+ * udalosť v ňom chýba úplne. Zmazaný jeden výskyt opakovanej série (EXDATE)
+ * týmto chytiť nejde — séria v súbore ostáva.
+ */
+export const DOZADU_ZMIZNUTIE_DNI = 120;
+
+/** Všetky UID v iCal texte (so spojenými zalomenými riadkami). */
+export function uidyVIcale(text: string): Set<string> {
+  const spojene = text.replace(/\r?\n[ \t]/g, "");
+  const out = new Set<string>();
+  for (const m of spojene.matchAll(/^UID:(.+?)\r?$/gm)) out.add(m[1].trim());
+  return out;
+}
+
+/**
+ * Ktoré staršie živé udalosti v súbore už nie sú. Kľúč udalosti v Kokpite je
+ * `UID|začiatok`; porovnáva sa UID.
+ *
+ * POISTKY — skrátený alebo zlý súbor nesmie pochovať históriu:
+ *  • súbor s menej než 20 UID sa nesúdi vôbec,
+ *  • keď by naraz zmizlo viac než 5 udalostí a zároveň viac než tretina
+ *    sledovaných, nezmizne nič (`odmietnute`) — to nie je zmazanie, to je
+ *    iný súbor.
+ */
+export function zmiznuteStarsie<T extends { uid: string }>(stare: T[], uidy: Set<string>): { zmizle: T[]; odmietnute: boolean } {
+  if (uidy.size < 20 || !stare.length) return { zmizle: [], odmietnute: false };
+  const zmizle = stare.filter((s) => !uidy.has(s.uid.split("|")[0]));
+  if (zmizle.length > 5 && zmizle.length > stare.length / 3) return { zmizle: [], odmietnute: true };
+  return { zmizle, odmietnute: false };
+}

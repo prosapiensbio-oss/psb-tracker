@@ -14,7 +14,7 @@ import { pravidloCelehoMena, typRucnePreNovu, zapisTrening, znamiKlienti } from 
 import { normName } from "../../lib/psb/format";
 import { citajIcal } from "../../lib/psb/ical";
 import { presunyZmien, uzavriZjavnePresuny } from "../../lib/psb/kalendarPresuny.server";
-import { ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, zmizlaPoKonci } from "../../lib/psb/kalendarZmeny";
+import { DOZADU_ZMIZNUTIE_DNI, ohlasitZmenu, prenosRucnych, sparujZmeny, najdiPresun, uidyVIcale, zmizlaPoKonci, zmiznuteStarsie } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, odmietnutPokles, POKLES_TEXT, stiahniIcal, textPoklesu, vyberZdroj, zdrojNaDobeh, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
@@ -87,6 +87,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
     .bind(snimkaId, kedy, z.trener, `${NEDOKONCENE} — beh sa neukončil (limit workera)`).run();
 
   let udalosti;
+  /** Celý súbor — aj na kontrolu starších udalostí (`zmiznuteStarsie`). */
+  let surovyText = "";
   try {
     // 28 s, nie 15: Google generuje iCal rôzne dlho a Jerryho kalendár (~2,5 MB)
     // sa z Workera pri pomalšom behu na 15 s nestihol — `posledná_chyba = timeout`,
@@ -94,7 +96,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
     // „snímka vyjde ~1 z 3"). 28 s dáva rezervu a fetch je I/O, nie CPU, takže
     // to nehrozí prekročením CPU limitu workera. Cloudflare req cap je ~30 s.
     // Na HTTP 429 od Googlu skúša znova (stiahniIcal, 20. 10. 2026).
-    udalosti = citajIcal(await stiahniIcal(z.url), odMs, doMs);
+    surovyText = await stiahniIcal(z.url);
+    udalosti = citajIcal(surovyText, odMs, doMs);
   } catch (e) {
     const chyba = e instanceof Error ? e.message : "nepodarilo sa stiahnuť";
     await DB.prepare("UPDATE kal_zdroje SET posledna_chyba = ? WHERE id = ?").bind(chyba, z.id).run();
@@ -204,6 +207,27 @@ async function snimka(DB: D1Database, z: Zdroj) {
     if (s.prvy_raz && Date.parse(kedy) - Date.parse(s.prvy_raz) < 12 * 3600 * 1000) continue;
     prikazy.push(DB.prepare("UPDATE kal_udalosti SET zmizla_at = ? WHERE uid = ? AND trener = ?").bind(kedy, s.uid, z.trener));
     zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null, s.typ);
+  }
+
+  /**
+   * TRÉNING ZMAZANÝ AŽ PO VYPADNUTÍ Z OKNA (11. 11. 2026, `zmiznuteStarsie`).
+   * Živé tréningy staršie než okno (do 120 dní) sa pozrú len na to, či ich
+   * UID v súbore ešte je. Zmiznutá sa ohlási ako každá iná zrušená udalosť
+   * („bol tam?") a kým nepríde odpoveď, hodinu neuberá. Prvé stiahnutie
+   * zdroja nič nesúdi, rovnako ako hlavné okno.
+   */
+  if (!prveStiahnutie && surovyText) {
+    const odStare = terazPraha(new Date(Date.parse(kedy) - DOZADU_ZMIZNUTIE_DNI * 86400000));
+    const starsie = ((await DB.prepare(
+      `SELECT uid, nazov, klient, zaciatok, typ FROM kal_udalosti
+        WHERE trener = ?1 AND zaciatok >= ?2 AND zaciatok < ?3 AND zmizla_at IS NULL AND typ IN ('trening','uvodny')`,
+    ).bind(z.trener, odStare, od).all()).results || []) as unknown as { uid: string; nazov: string; klient: string | null; zaciatok: string; typ: string | null }[];
+    const { zmizle, odmietnute } = zmiznuteStarsie(starsie, uidyVIcale(surovyText));
+    if (odmietnute) console.error(`snimka ${z.trener}: staršie udalosti — ${starsie.length} sledovaných, v súbore by chýbala viac než tretina; nesúdim`);
+    for (const s0 of zmizle) {
+      prikazy.push(DB.prepare("UPDATE kal_udalosti SET zmizla_at = ? WHERE uid = ? AND trener = ? AND zmizla_at IS NULL").bind(kedy, s0.uid, z.trener));
+      zmena("zrusene", s0.uid, s0.nazov, s0.klient, s0.zaciatok, null, s0.typ);
+    }
   }
 
   // Párovanie zrušenia s pridaním (to je posun, nie dve udalosti) žije
