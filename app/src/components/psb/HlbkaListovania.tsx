@@ -36,6 +36,10 @@ export function HlbkaListovania() {
   const [chyba, setChyba] = useState("");
   const [stranky, setStranky] = useState<StrankaHlbky[]>([]);
   const [otvorena, setOtvorena] = useState("");
+  // Jerry, 11. 11. 2026: „zabalit a nechat otvorené iba 3 riadky." Prvé tri
+  // stránky nesú väčšinu návštevnosti; zvyšok je dlhý chvost, ktorý sa
+  // rozbalí, keď ho niekto naozaj chce.
+  const [vsetky, setVsetky] = useState(false);
   const [obdobie, setObdobie] = useState("");
 
   useEffect(() => {
@@ -118,7 +122,7 @@ export function HlbkaListovania() {
         <>
           <p style={{ color: C.textDim, fontSize: 12.5, margin: "2px 0 10px" }}>{obdobie}</p>
           <div>
-            {stranky.map((s) => (
+            {(vsetky ? stranky : stranky.slice(0, 3)).map((s) => (
               <Riadok
                 key={s.cesta}
                 s={s}
@@ -127,6 +131,18 @@ export function HlbkaListovania() {
               />
             ))}
           </div>
+          {stranky.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setVsetky(!vsetky)}
+              style={{
+                marginTop: 10, background: "none", border: 0, color: C.accentLight,
+                cursor: "pointer", fontSize: 13, padding: 0,
+              }}
+            >
+              {vsetky ? "Zabaliť" : `Ukázať všetkých ${stranky.length} stránok`}
+            </button>
+          )}
         </>
       )}
     </Card>
