@@ -17,9 +17,10 @@ import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
 import * as Sk from "../../lib/psb/sklonovanie";
+import { kampanCelaZBloku, popisKampane, zalozCeluKampan, type KampanCela } from "../../lib/psb/kampanCela";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav" | "prompt-claude";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav" | "prompt-claude" | "kampan-cela";
   label: string;
   done?: boolean;
   key?: string;
@@ -171,6 +172,12 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
         // (od 19. 10. 2026 — boostnutý príspevok je zdroj ako každý iný).
         } else if (o?.type === "reklama-nova" && /^[0-9]{5,}$/.test(String(o.sadaId)) && /^[0-9]{5,}(_[0-9]{5,})?$/.test(String(o.mediaZReklamy)) && String(o.text || "").trim().length >= 20) {
           actions.push({ type: "reklama-nova", label, data: o });
+        // Kampaň celá jedným klikom (12. 11. 2026) — kampaň, sada s mestom,
+        // reklama s textom a médiom, prípadne spustenie. Neúplný návrh
+        // tlačidlo nedostane.
+        } else if (o?.type === "kampan-cela") {
+          const v = kampanCelaZBloku(o as Record<string, unknown>);
+          if (v.ok) actions.push({ type: "kampan-cela", label: popisKampane(v.k), data: v.k as unknown as Record<string, unknown> });
         } else if (o?.type === "reklama-stav" && /^[0-9]{5,}$/.test(String(o.objektId)) && (o.stav === "ACTIVE" || o.stav === "PAUSED")) {
           actions.push({ type: "reklama-stav", label, data: o });
         // Zadanie pre Claude Code — veci, ktoré Kokpit sám nespraví (kód,
@@ -767,6 +774,14 @@ export function useAssistantChat(
         void doSchranky(String(a.data.text)).then((ok) => oznamVysledok(ok
           ? "Zadanie pre Claude Code je v schránke — vlož ho do Clauda."
           : "Schránka odmietla — zadanie je v bloku vyššie, označ ho a skopíruj ručne."));
+      } else if (a.type === "kampan-cela" && a.data) {
+        oznamVysledok("Zakladám kampaň v Mete — kampaň, sada, reklama…");
+        const volaj = (telo: Record<string, unknown>) => fetch("/api/meta", {
+          method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+        }).then(async (r) => { const t = await r.text(); try { return JSON.parse(t) as Record<string, unknown>; } catch { return { ok: false, error: `HTTP ${r.status}: ${t.slice(0, 200)}` }; } });
+        void zalozCeluKampan(a.data as unknown as KampanCela, volaj)
+          .then((v) => { oznamVysledok(v.veta); oznam("reklama"); })
+          .catch(() => oznamVysledok("Založenie kampane zlyhalo — spojenie. Pozri v Dozore reklám, čo v Mete vzniklo."));
       } else if ((a.type === "reklama-rozpocet" || a.type === "reklama-cielenie" || a.type === "reklama-nova" || a.type === "reklama-stav") && a.data) {
         // Reklamný agent: klik = jeden zásah do Mety. Výsledok ide späť do
         // rozhovoru, aby Jarvis vedel, čo sa naozaj stalo.

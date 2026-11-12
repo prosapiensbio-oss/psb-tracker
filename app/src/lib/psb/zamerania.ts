@@ -107,7 +107,7 @@ export const ZAMERANIA: Zameranie[] = [
       "Čítaj najprv: vzas_settings kľúč metricool_plan (čo vyšlo a čo je naplánované: najčerstvejší príspevok s uloženiami a zdieľaniami je prvý kandidát na propagáciu), mkt_kampane (stav_sad hovorí, či niečo beží), mkt_reklamy (výkon jednotlivých reklamných kusov — hook rate, frekvencia, CTR), ig_prispevky (čo sa dá propagovať), lievik, zdrojeKlientov, web, napady, pnl (na to, čo si firma môže dovoliť).",
       "Ako viesť túto debatu:",
       "· Pýtaj sa na to, čo chýba, po jednom: čo má kampaň dosiahnuť, na ktorú stránku vedie, koľko denne, ako dlho, KOMU sa má ukázať.",
-      "· Keď máš dosť, ukonči odpoveď riadkom ⟦kampan|cieľ|adresa|rozpočet|názov⟧ — appka z neho spraví tlačidlo, ktoré vyplní formulár.",
+      "· Keď máš dosť, ukonči odpoveď riadkom ⟦kampan|cieľ|adresa|rozpočet|názov⟧ — appka z neho spraví tlačidlo, ktoré vyplní formulár. Keď poznáš aj text reklamy, médium a mesto, napíš namiesto toho blok kampan-cela (pravidlá v KAMPAŇ CELÁ JEDNÝM KLIKOM) — Jerry potom nemusí nič dopĺňať.",
       "· Kampaň vzniká VŽDY pozastavená a VŽDY na účte 172897726151288 (ProSapiens Biomechanic). Iný účet appka nesleduje, takže výdavok z neho by v cene za klienta nikdy nebol.",
       "· Minimum je 22 Kč/deň. Strop výdavkov je NEPOVINNÝ; keď ho Jerry chce, musí byť aspoň 2 000 Kč — nižší Meta odmieta.",
       "· Cieľ „dopyty“: udalosť Lead od 18. 8. 2026 meria SKUTOČNÉ odoslania formulára (CAPI) — na meranie je pravdivá. Na optimalizáciu jej je málo (Meta chce ~50 udalostí týždenne, PSB má 3–4 dopyty mesačne), preto sa kampaň učí zo zobrazení stránky a cena za skutočný dopyt sa číta z Leadov.",
