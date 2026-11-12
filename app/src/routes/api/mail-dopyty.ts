@@ -329,7 +329,8 @@ export const Route = createFileRoute("/api/mail-dopyty")({
            * `email_spravy` — tie isté, čo prešli dopytmi, aj tie, čo nie.
            * Chyba tu nesmie zhodiť import dopytov (napr. pred migráciou 0139).
            */
-          const emailov = await ulozHlavicky(DB, spravy, novyKurzor.validity, n).catch(() => -1);
+          // Starší než týždeň = už vybavené mimo Kokpitu (aj tu, nielen pri prvom načítaní).
+          const emailov = await ulozHlavicky(DB, spravy, novyKurzor.validity, n, undefined, new Date(Date.now() - 7 * 864e5).toISOString()).catch(() => -1);
 
           const vysledok = {
             kedy: zaciatok.toISOString(),

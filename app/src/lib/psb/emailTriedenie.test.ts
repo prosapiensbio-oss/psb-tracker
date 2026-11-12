@@ -43,6 +43,10 @@ describe("roztried", () => {
     const r = roztried(m({ od: "ProSapiens Biomechanic <prosapiensbio@gmail.com>", predmet: "You are invited to sign a document", text: "trénink" }), VLASTNE, [], znami);
     expect(r).toMatchObject({ kategoria: "prevadzka", dovod: "naša adresa" });
   });
+  it("preposlané vyúčtovanie a energie sú prevádzka, nie nový človek", () => {
+    expect(roztried(m({ od: "Kamil Konvička <kamil@seznam.cz>", predmet: "Re: Fwd: Vyúčtování 2024 - pro story" }), VLASTNE, [], znami).kategoria).toBe("prevadzka");
+    expect(roztried(m({ od: "Kamil Konvička <kamil@seznam.cz>", predmet: "Fwd: RE: Re: Fwd: Váš přepis energií u innogy" }), VLASTNE, [], znami).kategoria).toBe("prevadzka");
+  });
   it("faktúra dodávateľa je prevádzka", () => {
     expect(roztried(m({ od: "uctarna@pronajem.cz", predmet: "Faktura za listopad" }), VLASTNE, [], znami).kategoria).toBe("prevadzka");
   });

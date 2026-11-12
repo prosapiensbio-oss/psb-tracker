@@ -53,7 +53,7 @@ export function normMeno(s: string): string {
   return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-const PREVADZKA_SLOVA = ["faktur", "vyúčtov", "vyuctov", "nájem", "najem", "nájom", "smlouv", "objednávk", "objednavk", "zásilk", "zasilk", "doménu", "domén", "hosting", "platba přijata", "potvrzení platby"];
+const PREVADZKA_SLOVA = ["energi", "elektřin", "elektrin", "přepis", "prepis", "plyn", "pojistn", "poistn", "faktur", "vyúčtov", "vyuctov", "nájem", "najem", "nájom", "smlouv", "objednávk", "objednavk", "zásilk", "zasilk", "doménu", "domén", "hosting", "platba přijata", "potvrzení platby"];
 
 const PREVADZKA_DOVODY = /^(vlastná adresa|vlastná doména|technická adresa|služba|strojový predmet)/;
 
@@ -89,6 +89,12 @@ export function roztried(v: ImapSprava, vlastne: string[], ignoruj: string[], zn
     return { ...zaklad, kategoria: "klient", klient: k, dovod: "žiada celú históriu" };
   }
   const preco = r.preskocene;
+  // Faktúry, vyúčtovanie, energie — prevádzka aj vtedy, keď je to „Re:“ alebo „Fwd:“
+  // (12. 11. 2026: vyúčtovanie od správy domu padlo medzi nových ľudí).
+  const predmetMaly = (v.predmet || "").toLowerCase();
+  if (!znami.dopytoveMaily.has(odMail) && PREVADZKA_SLOVA.some((x) => predmetMaly.includes(x))) {
+    return { ...zaklad, kategoria: "prevadzka", klient: null, dovod: "faktúra / prevádzka" };
+  }
   if (preco === "odpoveď v rozhovore") {
     // Odpoveď na náš mail od človeka, ktorý je v dopytoch, je pokračovanie
     // dopytu. Od neznámeho tiež — Terezka má radšej vidieť o jeden navyše.
