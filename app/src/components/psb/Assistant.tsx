@@ -17,7 +17,7 @@ import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
 import * as Sk from "../../lib/psb/sklonovanie";
-import { kampanCelaZBloku, popisKampane, zalozCeluKampan, type KampanCela } from "../../lib/psb/kampanCela";
+import { kampanCelaZBloku, kontrolaKampane, popisKampane, zalozCeluKampan, type KampanCela } from "../../lib/psb/kampanCela";
 
 type ParsedAction = {
   type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan" | "reklama-rozpocet" | "reklama-cielenie" | "reklama-nova" | "reklama-stav" | "prompt-claude" | "kampan-cela";
@@ -1061,6 +1061,8 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
+  /** Kampaň, ktorej kontrola je otvorená — prvý klik ukáže, druhý zakladá (12. 11. 2026). */
+  const [kontrolaKampanePre, setKontrolaKampanePre] = useState<string | null>(null);
   const [skopirovane, setSkopirovane] = useState<number | null>(null);
   const [navrh, setNavrh] = useState("");
   /**
@@ -1256,7 +1258,34 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
                 </button>
               </div>
             )}
-            {m.actions?.map((a, ai) => (
+            {m.actions?.map((a, ai) => a.type === "kampan-cela" && !a.done && a.data ? (
+              <div key={ai} style={{ marginTop: 6 }}>
+                <button onClick={() => setKontrolaKampanePre((x) => (x === `${mi}-${ai}` ? null : `${mi}-${ai}`))}
+                  style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${C.accent}`, background: mix(C.accent, 14), color: C.accentLight }}>
+                  🔍 Skontrolovať: {a.label}
+                </button>
+                {kontrolaKampanePre === `${mi}-${ai}` && (
+                  <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 9, border: `1px solid ${C.border}`, background: C.surface, fontSize: 12.5, lineHeight: 1.5 }}>
+                    {kontrolaKampane(a.data as unknown as KampanCela).map(([k, v]) => (
+                      <div key={k} style={{ display: "grid", gridTemplateColumns: "96px minmax(0, 1fr)", gap: 8, padding: "2px 0" }}>
+                        <span style={{ color: C.textDim }}>{k}</span>
+                        <span style={{ color: C.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontWeight: k === "Po kliku" || k === "Peniaze" ? 700 : 400 }}>{v}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      <button onClick={() => { setKontrolaKampanePre(null); runAction(mi, ai); }}
+                        style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12.5, fontWeight: 700, border: `1px solid ${C.accent}`, background: C.accent, color: C.onAccent, fontFamily: "inherit" }}>
+                        ⚡ Sedí — {(a.data as unknown as KampanCela).spustit ? "založiť a spustiť" : "založiť pozastavenú"}
+                      </button>
+                      <button onClick={() => setKontrolaKampanePre(null)}
+                        style={{ padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12.5, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}>
+                        Zrušiť
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>
                 {a.done ? `✓ Hotovo — ${a.label}` : `⚡ ${a.label}`}
               </button>

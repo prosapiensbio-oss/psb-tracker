@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kampanCelaZBloku, popisKampane, zalozCeluKampan } from "./kampanCela";
+import { kampanCelaZBloku, kontrolaKampane, popisKampane, zalozCeluKampan } from "./kampanCela";
 
 const BLOK = {
   type: "kampan-cela", nazov: "PSB 2026-11 — Nejde jen o trénink", ciel: "navstevnost",
@@ -57,5 +57,17 @@ describe("zalozCeluKampan", () => {
     const v = await zalozCeluKampan(k, s.volaj);
     expect(v.veta).toContain("NESPUSTENÁ");
     expect(v.veta).toContain("reklama zamietnutá");
+  });
+});
+
+describe("kontrolaKampane", () => {
+  it("pred klikom ukáže peniaze, mesto, médium aj celý text", () => {
+    const r = kampanCelaZBloku(BLOK);
+    if (!r.ok) throw new Error("návrh");
+    const m = Object.fromEntries(kontrolaKampane(r.k));
+    expect(m["Peniaze"]).toBe("67 Kč denne · 30 dní ≈ 2 010 Kč · strop 2 000 Kč");
+    expect(m["Kde"]).toBe("Brno + 20 km");
+    expect(m["Po kliku"]).toContain("SPUSTÍ");
+    expect(m["Text reklamy"]).toBe(BLOK.text);
   });
 });

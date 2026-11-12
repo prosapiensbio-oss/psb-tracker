@@ -75,6 +75,26 @@ export function popisKampane(k: KampanCela): string {
   return `${k.spustit ? "Založiť a SPUSTIŤ" : "Založiť (pozastavenú)"}: ${k.nazov} · ${k.denneKc} Kč/deň${spolu} · ${k.mesto} + ${k.okruhKm} km`;
 }
 
+/**
+ * KONTROLA PRED KLIKOM (Jerry, 12. 11. 2026: „tlačidlo vyskočilo bez
+ * kontroly predtým“). Prvý klik ukáže tieto riadky, až druhý zakladá —
+ * človek vidí text, médium, cielenie aj peniaze skôr, než z nich niečo vznikne.
+ */
+export function kontrolaKampane(k: KampanCela): [string, string][] {
+  const tis = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return [
+    ["Kampaň", k.nazov],
+    ["Po kliku", k.spustit ? "založí sa a hneď SPUSTÍ (cez kontrolór)" : "založí sa POZASTAVENÁ"],
+    ["Peniaze", `${k.denneKc} Kč denne${k.dni ? ` · ${k.dni} dní ≈ ${tis(k.denneKc * k.dni)} Kč` : " · bez konca"}${k.stropKc ? ` · strop ${tis(k.stropKc)} Kč` : ""}`],
+    ["Kde", `${k.mesto} + ${k.okruhKm} km`],
+    ["Cieľ", k.ciel === "dopyty" ? "dopyty (optimalizuje na návštevu stránky)" : "návštevnosť webu"],
+    ["Stránka", k.stranka],
+    ["Médium", k.media.includes("_") ? `príspevok ${k.media}` : `video alebo reklama ${k.media}`],
+    ["Nadpis", k.nadpis || "—"],
+    ["Text reklamy", k.text],
+  ];
+}
+
 type Volaj = (telo: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
 /** Vykoná návrh krok po kroku. `volaj` posiela telo na /api/meta. */
