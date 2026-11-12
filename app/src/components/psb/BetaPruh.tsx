@@ -15,7 +15,7 @@ import { C } from "../../lib/psb/theme";
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  { text: "Prezentácia uzávierky A (Uzávierka → Prezentácia)", tab: "workspace", sub: "uzavierka" },
+  // Prezentácia uzávierky A naostro od 12. 11. 2026 — nič sa neskúša.
   // Karta Email je naostro od 12. 11. 2026 — nič sa neskúša.
 ];
 

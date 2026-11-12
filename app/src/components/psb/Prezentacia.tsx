@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { dalej, plnyKrok, postavPrezentaciu, postavPrezentaciuA, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdPrehlad, type SlajdRezerva, type SlajdSemafor, type SlajdSpolu, type SlajdTitulka, type SlajdVydavky, type SlajdVytazenost, type SlajdZaver } from "../../lib/psb/prezentacia";
-import { jeBeta } from "../../lib/psb/beta";
+import { dalej, plnyKrok, postavPrezentaciuA, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdPrehlad, type SlajdRezerva, type SlajdSemafor, type SlajdSpolu, type SlajdTitulka, type SlajdVydavky, type SlajdVytazenost, type SlajdZaver } from "../../lib/psb/prezentacia";
 import type { Report, Semafor } from "../../lib/psb/mesacnyReport";
 
 /**
@@ -513,8 +512,9 @@ export function Platno({ s, krok, pata, strana, zoSlajdov, onKlik, naVysku = fal
 }
 
 export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () => void }) {
-  // Návrh A sa skúša v bete (12. 11. 2026); ostrý Kokpit ostáva po starom.
-  const slajdy = useMemo(() => (jeBeta() ? postavPrezentaciuA(report) : postavPrezentaciu(report)), [report]);
+  // Návrh A naostro od 12. 11. 2026 (Jerry: „postav to naostro"). Starý
+  // `postavPrezentaciu` ostáva len kvôli testom pôvodného rozloženia.
+  const slajdy = useMemo(() => postavPrezentaciuA(report), [report]);
   // Slajd a krok v JEDNOM stave — posúvajú sa vždy spolu a dva settery by sa
   // pri rýchlom klikaní prečítali navzájom staré.
   const [kde, setKde] = useState(() => ({ i: 0, krok: plnyKrok(slajdy, 0) }));
