@@ -16,7 +16,7 @@ export type EmailRiadok = {
   id: string; uid: number; validity: string;
   odMeno: string; odMail: string; odpovedatMail: string; komu: string;
   predmet: string; datum: string; kategoria: Kategoria; klient: string | null; dovod: string;
-  stav: "nove" | "precitane" | "vybavene"; vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null;
+  stav: "nove" | "precitane" | "vybavene" | "odstranene"; vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null;
   /** Telefón z dopytu (alebo klienta z PTmindera) — Terezka dopytom volá, nepíše (12. 11. 2026). */
   telefon: string | null;
 };
@@ -98,7 +98,7 @@ const TELEFON = `COALESCE(
 export async function zoznamEmailov(DB: D1Database, dni = 45): Promise<EmailRiadok[]> {
   const od = new Date(Date.now() - dni * 864e5).toISOString();
   const r = await DB.prepare(
-    `SELECT s.*, ${TELEFON} FROM email_spravy s WHERE s.stav <> 'vybavene' OR s.datum >= ?1 ORDER BY s.datum DESC LIMIT 400`,
+    `SELECT s.*, ${TELEFON} FROM email_spravy s WHERE s.stav <> 'odstranene' AND (s.stav <> 'vybavene' OR s.datum >= ?1) ORDER BY s.datum DESC LIMIT 400`,
   ).bind(od).all();
   return ((r.results || []) as Record<string, unknown>[]).map(naRiadok);
 }
@@ -117,6 +117,13 @@ export async function nastavStav(DB: D1Database, id: string, stav: EmailRiadok["
       ? "UPDATE email_spravy SET stav = CASE WHEN stav = 'nove' THEN 'precitane' ELSE stav END, precitane_at = COALESCE(precitane_at, ?2) WHERE id = ?1 AND ?3 = ?3"
       : "UPDATE email_spravy SET stav = 'precitane', vybavene_at = NULL, vybavil = NULL WHERE id = ?1 AND ?2 = ?2 AND ?3 = ?3";
   const r = await DB.prepare(sql).bind(id, teraz, kto).run();
+  return (r.meta?.changes || 0) > 0;
+}
+
+/** Odstránený = presunutý do Koša v schránke; z karty zmizne, riadok ostane ako stopa. */
+export async function oznacOdstraneny(DB: D1Database, id: string, kto: string): Promise<boolean> {
+  const r = await DB.prepare("UPDATE email_spravy SET stav = 'odstranene', vybavene_at = ?2, vybavil = ?3 WHERE id = ?1")
+    .bind(id, new Date().toISOString(), kto).run();
   return (r.meta?.changes || 0) > 0;
 }
 
@@ -154,7 +161,7 @@ export async function konverzacia(DB: D1Database, v: { mail: string; klient: str
   const k = v.klient || "\u0000";
   const q = async (sql: string, ...b: unknown[]) => ((await DB.prepare(sql).bind(...b).all().catch(() => ({ results: [] }))).results || []) as Record<string, unknown>[];
   const [prisle, odoslane, faktury, sms, zmluvy] = await Promise.all([
-    q("SELECT id, uid, validity, predmet, datum FROM email_spravy WHERE od_mail = ?1 OR klient = ?2 ORDER BY datum DESC LIMIT 60", mail, k),
+    q("SELECT id, uid, validity, predmet, datum FROM email_spravy WHERE (od_mail = ?1 OR klient = ?2) AND stav <> 'odstranene' ORDER BY datum DESC LIMIT 60", mail, k),
     q("SELECT predmet, text, kto, kedy FROM email_odoslane WHERE komu = ?1 OR klient = ?2 ORDER BY kedy DESC LIMIT 60", mail, k),
     q("SELECT cislo, celkom_czk, odoslane_at, odoslane_komu FROM vydane_faktury WHERE klient = ?1 AND odoslane_at IS NOT NULL ORDER BY odoslane_at DESC LIMIT 30", k),
     q("SELECT action, payment_id, actor, at FROM vzas_audit WHERE action LIKE 'sms-%' AND action NOT IN ('sms-zlyhala','sms-brana-nastavena') AND payment_id LIKE ?1 ORDER BY at DESC LIMIT 40", `${k} · %`),

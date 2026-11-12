@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { uidValidity, vyberUidy } from "./imapParse";
+import { kosZoZoznamu, uidValidity, vyberUidy } from "./imapParse";
 
 const rad = (od: number, po: number) => Array.from({ length: po - od + 1 }, (_, i) => String(od + i));
 
@@ -46,5 +46,19 @@ describe("uidValidity", () => {
   it("nájde číslo v odpovedi SELECT", () => {
     expect(uidValidity("* FLAGS (\\Seen)\r\n* OK [UIDVALIDITY 1712345] UIDs valid\r\nk2 OK [READ-WRITE] done\r\n")).toBe("1712345");
     expect(uidValidity("k2 OK done\r\n")).toBe("");
+  });
+});
+
+describe("kosZoZoznamu", () => {
+  it("prednosť má označenie \\Trash", () => {
+    const r = '* LIST (\\HasNoChildren) "." "INBOX"\r\n* LIST (\\HasNoChildren \\Trash) "." "Kôš"\r\n* LIST (\\HasNoChildren) "." "Trash"\r\nk2 OK List completed.\r\n';
+    expect(kosZoZoznamu(r)).toBe("Kôš");
+  });
+  it("bez označenia podľa mena, aj vnorené pod INBOX", () => {
+    expect(kosZoZoznamu('* LIST (\\HasNoChildren) "." "INBOX"\r\n* LIST (\\HasNoChildren) "." "INBOX.Trash"\r\n')).toBe("INBOX.Trash");
+    expect(kosZoZoznamu('* LIST (\\HasNoChildren) "/" Trash\r\n')).toBe("Trash");
+  });
+  it("bez koša nič — radšej nemazať než mazať navždy", () => {
+    expect(kosZoZoznamu('* LIST (\\HasNoChildren) "." "INBOX"\r\n* LIST (\\HasNoChildren) "." "Sent"\r\n')).toBeNull();
   });
 });

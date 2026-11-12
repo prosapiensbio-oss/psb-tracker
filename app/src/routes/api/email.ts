@@ -4,11 +4,11 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
-import { emailPodlaId, konverzacia, vybavStarsie, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
+import { emailPodlaId, konverzacia, oznacOdstraneny, vybavStarsie, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
 import type { EmailRiadok } from "../../lib/psb/email.server";
 import { PORADIE_KATEGORII, maObsah } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
-import { stiahniSpravy, stiahniTela } from "../../lib/psb/imap";
+import { presunDoKosa, stiahniSpravy, stiahniTela } from "../../lib/psb/imap";
 import { telefonZTextu } from "../../lib/psb/mailDopyt";
 import { adresyMailu } from "../../lib/psb/mime";
 import { posliMail } from "../../lib/psb/smtp.server";
@@ -25,6 +25,7 @@ import { nastavenia } from "./mail-dopyty";
  *   POST { akcia: "prerad", id, kategoria?, klient? }
  *   POST { akcia: "odpovedz", id, komu, predmet, text, citat?, vybav? }
  *   POST { akcia: "dopyt", id }                 → zapíše odosielateľa do dopytov
+ *   POST { akcia: "odstran", id }               → presun do Koša v schránke (navždy sa nemaže nič)
  *   POST { akcia: "nacitaj" }                   → hlavičky za 30 dní (prvé otvorenie); staršie než týždeň ako vybavené
  *
  * Obsah mailov sa do databázy NEUKLADÁ (dohoda s Jerrym) — číta sa vždy
@@ -168,6 +169,17 @@ export const Route = createFileRoute("/api/email")({
             if (e && b.vybav) await nastavStav(DB, e.id, "vybavene", kto);
             await audit(DB, { action: "email-odpoved", predmet: `${e?.klient || adresy.join(", ")} · ${predmet}`.slice(0, 200), actor: kto });
             return Response.json({ ok: true, komu: adresy }, { headers: ns });
+          }
+          if (b.akcia === "odstran") {
+            const e = await emailPodlaId(DB, id);
+            if (!e) return Response.json({ ok: false, error: "Mail sa nenašiel." }, { status: 404 });
+            const n = await nastavenia(DB);
+            if (!n.host || !n.user || !n.heslo) return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
+            const v = await presunDoKosa({ host: n.host, port: n.port, user: n.user, heslo: n.heslo, uid: e.uid, validity: e.validity });
+            if (!v.ok) return Response.json({ ok: false, error: `Neodstránil som: ${v.chyba}` }, { status: 502 });
+            await oznacOdstraneny(DB, e.id, kto);
+            await audit(DB, { action: "email-odstraneny", predmet: `${e.odMeno} · ${e.predmet}`.slice(0, 200), neu: v.nebola ? "v schránke už nebol" : `do ${v.kos}`, actor: kto });
+            return Response.json({ ok: true, kos: v.kos, nebola: !!v.nebola }, { headers: ns });
           }
           if (b.akcia === "dopyt") {
             const e = await emailPodlaId(DB, id);

@@ -24,7 +24,7 @@ import { VyberMena } from "./VyberMena";
 
 type Email = {
   id: string; odMeno: string; odMail: string; odpovedatMail: string; komu: string; predmet: string; datum: string;
-  kategoria: Kategoria; klient: string | null; dovod: string; stav: "nove" | "precitane" | "vybavene";
+  kategoria: Kategoria; klient: string | null; dovod: string; stav: "nove" | "precitane" | "vybavene" | "odstranene";
   vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null; telefon: string | null;
 };
 type Bublina =
@@ -238,6 +238,16 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
     await nacitaj();
   };
 
+  /** Odstrániť = presun do Koša v schránke (Jerry, 12. 11. 2026). Navždy sa nemaže nič. */
+  const odstran = async (e: Email) => {
+    const r = await api<{ kos: string; nebola: boolean }>("/api/email", { akcia: "odstran", id: e.id });
+    if (!r.ok) { setChyba(r.error || "Mail sa nepodarilo odstrániť."); return; }
+    setHlaska(r.nebola ? "Odstránené z karty — v schránke už nebol." : `Presunuté do koša (${r.kos}) — vo webmaili sa dá vrátiť.`);
+    const dalsi = nevybavene.find((x) => x.id !== e.id && x.kategoria !== "ostatne");
+    setVybrany(dalsi?.id || null);
+    await nacitaj();
+  };
+
   const posledne = citane?.ok ? kedyCelo(citane.ok) : "";
   const BODKA: Partial<Record<Kategoria, string>> = { klient: C.green, novy: C.accent };
 
@@ -335,7 +345,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
 
   const detail = otvoreny
     ? <Detail key={`${otvoreny.id}|${ludia ? "l" : "e"}`} e={otvoreny} ludia={ludia} data={data} clients={clients} mena={mena} ktoSom={ktoSom}
-        onProfil={onProfil} onTerminy={onTerminy} onStav={zmenStav} onZmena={nacitaj} setHlaska={setHlaska} setChyba={setChyba}
+        onProfil={onProfil} onTerminy={onTerminy} onStav={zmenStav} onOdstran={odstran} onZmena={nacitaj} setHlaska={setHlaska} setChyba={setChyba}
         onSpat={uzke ? () => setVybrany(null) : undefined} naVysku={!uzke} />
     : <div style={{ color: C.textDim, fontSize: 13, padding: "30px 10px", textAlign: "center" }}>
         {emaily === null ? "Načítavam…" : ludia ? "Vyber človeka vľavo." : naVybavenie ? "Vyber mail vľavo." : "Všetko vybavené."}
@@ -387,9 +397,10 @@ function PasKlienta({ meno, data, clients, onProfil }: { meno: string; data: PSB
   );
 }
 
-function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, onStav, onZmena, setHlaska, setChyba, onSpat, naVysku }: {
+function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, onStav, onOdstran, onZmena, setHlaska, setChyba, onSpat, naVysku }: {
   e: Email; ludia: boolean; data: PSBData; clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null;
   onProfil: (m: string) => void; onTerminy?: () => void; onStav: (e: Email, s: "vybavene" | "vratit") => Promise<void>;
+  onOdstran: (e: Email) => Promise<void>;
   onZmena: () => Promise<unknown>; setHlaska: (s: string) => void; setChyba: (s: string) => void; onSpat?: () => void;
   /** Na počítači vyplní výšku plochy: hlavička hore, mail v strede roluje, odpoveď dole. */
   naVysku?: boolean;
@@ -471,6 +482,8 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       {e.kategoria !== "klient" && <button onClick={dopyt} style={tl}>＋ Zapísať ako dopyt</button>}
       {onTerminy && <button onClick={onTerminy} style={tl}>Ponúknuť termíny</button>}
       <button onClick={() => setPreradit((x) => !x)} style={{ ...tl, border: "none" }}>preradiť…</button>
+      <button onClick={() => void onOdstran(e)} title="Presunie mail do Koša v schránke info@ — vo webmaili sa dá vrátiť"
+        style={{ ...tl, marginLeft: "auto", color: C.red, borderColor: C.red }}>🗑 Odstrániť</button>
     </div>
   );
 

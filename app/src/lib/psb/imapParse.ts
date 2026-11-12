@@ -183,3 +183,22 @@ function dekodujObsah(t: string, kodovanie: string): string {
   }
   return t;
 }
+
+/**
+ * Priečinok koša z odpovede `LIST "" "*"`. Prednosť má označenie `\\Trash`
+ * (RFC 6154), potom meno. Bez koša sa nemaže — radšej nič než navždy.
+ */
+export function kosZoZoznamu(odpoved: string): string | null {
+  const riadky = odpoved.split(/\r?\n/).filter((r) => /^\* LIST /i.test(r));
+  const meno = (r: string) => {
+    const m = /^\* LIST \([^)]*\) (?:"[^"]*"|NIL) (?:"((?:[^"\\]|\\.)*)"|(\S+))\s*$/i.exec(r);
+    return m ? (m[1] ?? m[2] ?? "").replace(/\\(.)/g, "$1") : null;
+  };
+  const oznaceny = riadky.find((r) => /\\Trash\b/i.test(r));
+  if (oznaceny) return meno(oznaceny);
+  for (const r of riadky) {
+    const n = meno(r);
+    if (n && /(^|[./])(trash|deleted items|deleted messages|ko[šs])$/i.test(n)) return n;
+  }
+  return null;
+}

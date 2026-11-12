@@ -19,7 +19,7 @@
 
 import { connect } from "cloudflare:sockets";
 
-import { imapDatum, rozoberOdpoved, uidValidity, vyberUidy } from "./imapParse";
+import { imapDatum, kosZoZoznamu, rozoberOdpoved, uidValidity, vyberUidy } from "./imapParse";
 import type { ImapSprava, KurzorSchranky } from "./imapParse";
 
 export type { ImapSprava, KurzorSchranky } from "./imapParse";
@@ -169,3 +169,37 @@ export async function stiahniTela(opts: {
   }
 }
 
+
+/**
+ * ODSTRÁNIŤ = PRESUN DO KOŠA (Jerry, 12. 11. 2026: „treba tam pridať
+ * odstrániť“). Jediný zásah Kokpitu do schránky; navždy sa nemaže nič —
+ * mail ostane v Koši vo webmaili a dá sa vrátiť. Bez koša sa neurobí nič.
+ * Správa, ktorá v schránke už nie je, sa hlási ako `nebola`, nie chyba.
+ */
+export async function presunDoKosa(opts: {
+  host: string; port?: number; user: string; heslo: string; uid: number; validity: string;
+}): Promise<{ ok: true; kos: string; nebola?: boolean } | { ok: false; chyba: string }> {
+  const s = new Spojenie(opts.host, opts.port || 993);
+  try {
+    await s.privitanie();
+    await s.prikaz(`LOGIN ${uvodzovky(opts.user)} ${uvodzovky(opts.heslo)}`);
+    const kos = kosZoZoznamu(await s.prikaz(`LIST "" "*"`));
+    if (!kos) return { ok: false, chyba: "v schránke som nenašiel Kôš — nič som nezmazal" };
+    const validity = uidValidity(await s.prikaz(`SELECT "INBOX"`));
+    if (opts.validity && validity && validity !== opts.validity) return { ok: false, chyba: "schránka sa medzitým prečíslovala — načítaj ju znova" };
+    if (!/^\* \d+ FETCH/im.test(await s.prikaz(`UID FETCH ${opts.uid} (UID)`))) return { ok: true, kos, nebola: true };
+    try {
+      await s.prikaz(`UID MOVE ${opts.uid} ${uvodzovky(kos)}`);
+    } catch {
+      // Server bez MOVE: skopírovať do koša, až potom v INBOXe zmazať.
+      await s.prikaz(`UID COPY ${opts.uid} ${uvodzovky(kos)}`);
+      await s.prikaz(`UID STORE ${opts.uid} +FLAGS.SILENT (\\Deleted)`);
+      await s.prikaz(`UID EXPUNGE ${opts.uid}`);
+    }
+    return { ok: true, kos };
+  } catch (e) {
+    return { ok: false, chyba: String((e as Error)?.message || e).slice(0, 200) };
+  } finally {
+    await s.zavri();
+  }
+}
