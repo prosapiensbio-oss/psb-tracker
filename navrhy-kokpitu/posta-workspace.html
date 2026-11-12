@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pošta vo Workspace — návrhy</title>
+<style>
+:root {
+  --bg:#14180f; --mesh1:#4a5c2e; --mesh2:#5c6b3a; --mesh3:#2e3a1c; --base2:#1c2216;
+  --card:rgba(255,255,255,.06); --card2:rgba(255,255,255,.09); --border:rgba(255,255,255,.12);
+  --accent:#e2914e; --accent-light:#f0b06e; --green:#8fd38f; --orange:#f0a35e; --red:#e2604a; --blue:#8bb8e8;
+  --text:#f0eee2; --muted:#c0bda8; --dim:#9b957f;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;min-height:100vh;color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;
+  background:radial-gradient(circle at 15% 8%,var(--mesh1) 0%,transparent 45%),radial-gradient(circle at 88% 12%,var(--mesh2) 0%,transparent 50%),radial-gradient(circle at 45% 95%,var(--mesh3) 0%,transparent 55%),linear-gradient(160deg,var(--bg) 0%,var(--base2) 100%);background-attachment:fixed}
+main{max-width:1180px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:21px;margin:0 0 4px}
+.uvod{color:var(--muted);margin:0 0 16px;max-width:76ch}
+.prepinac{position:sticky;top:0;z-index:9;display:flex;gap:8px;padding:10px 0;background:linear-gradient(var(--bg),rgba(20,24,15,.85));backdrop-filter:blur(6px);flex-wrap:wrap}
+.prepinac button{font:inherit;font-weight:700;font-size:15px;padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+.prepinac button.on{background:rgba(226,145,78,.22);border-color:var(--accent);color:var(--accent-light)}
+.navrh{display:none}.navrh.on{display:block}
+.popis{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px;margin:6px 0 16px}
+.popis h2{margin:0 0 4px;font-size:17px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.pismeno{display:inline-flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:8px;background:rgba(226,145,78,.2);color:var(--accent-light);font-size:14px}
+.tip{font-size:12px;font-weight:700;color:#1c1c1a;background:var(--accent-light);border-radius:99px;padding:1px 9px}
+.popis p{margin:3px 0;color:var(--muted)}
+.zariadenia{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.pc{flex:1 1 720px;min-width:0}
+.mobil{flex:0 0 340px;width:340px;border:9px solid #0c0e09;border-radius:38px;overflow:hidden;background:#171c12;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.stitok-zar{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+.karta{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px 18px;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.karta h3{margin:0;font-size:17px}
+.karta .pod{color:var(--dim);font-size:12.5px;margin:2px 0 12px}
+.tl{font:inherit;font-size:12px;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tl.z{border-color:rgba(143,211,143,.45);color:var(--green)}
+.tl.o{border-color:rgba(226,145,78,.5);color:var(--accent-light)}
+.tl.h{background:rgba(143,211,143,.14);border-color:rgba(143,211,143,.5);color:var(--green);font-weight:700}
+.znacka{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;margin-left:6px;vertical-align:1px}
+.zk{background:rgba(143,211,143,.16);color:var(--green)}
+.zd{background:rgba(240,176,110,.18);color:var(--accent-light)}
+.zp{background:rgba(255,255,255,.08);color:var(--muted)}
+.zs{background:rgba(226,96,74,.18);color:#ff9a86}
+.sekcia{margin:14px 0 4px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.sekcia span{font-weight:400}
+.dim{color:var(--dim)}.muted{color:var(--muted)}
+.klient-pas{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 11px;border-radius:10px;background:rgba(143,211,143,.08);border:1px solid rgba(143,211,143,.25);font-size:12.5px}
+.klient-pas b{color:var(--green)}
+.text-mailu{white-space:pre-wrap;font-size:13.5px;line-height:1.6;color:#e7e4d5;padding:10px 2px}
+.odpoved{width:100%;min-height:70px;resize:vertical;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--text);font:inherit;font-size:13px;padding:9px 11px}
+.stav{font-size:11.5px;color:var(--dim);display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+
+/* A — dvojpanel */
+.a-mriezka{display:grid;grid-template-columns:300px 1fr;gap:14px}
+.a-zoznam{border-right:1px solid rgba(255,255,255,.08);padding-right:10px;max-height:560px;overflow:auto}
+.a-riadok{padding:9px 10px;border-radius:10px;cursor:pointer;margin-bottom:3px}
+.a-riadok.on{background:rgba(226,145,78,.14)}
+.a-riadok .kto{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:6px}
+.a-riadok .kto small{font-weight:400;color:var(--dim);font-size:11px}
+.a-riadok .pred{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a-riadok.nove .kto::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px}
+.a-detail h4{margin:0 0 3px;font-size:16px}
+
+/* B — triedená fronta */
+.b-riadok{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.b-hlava{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.b-hlava b{font-size:14px}
+.b-pred{font-size:13px;color:var(--muted);margin-top:2px}
+.b-ukazka{font-size:12.5px;color:var(--dim);margin-top:2px}
+.b-akcie{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.b-otvoreny{margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.07)}
+.zbalene{padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.04);color:var(--muted);font-size:12.5px;margin-top:6px}
+
+/* C — po ľuďoch */
+.c-mriezka{display:grid;grid-template-columns:250px 1fr;gap:14px}
+.c-osoba{display:flex;gap:9px;align-items:center;padding:8px 9px;border-radius:12px;cursor:pointer}
+.c-osoba.on{background:rgba(226,145,78,.14)}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;background:rgba(255,255,255,.1)}
+.avatar.k{background:rgba(143,211,143,.22);color:var(--green)}
+.avatar.n{background:rgba(240,176,110,.22);color:var(--accent-light)}
+.c-osoba small{display:block;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.bublina{max-width:78%;padding:9px 12px;border-radius:16px;margin:6px 0;font-size:13px;line-height:1.5}
+.bublina.on{background:rgba(255,255,255,.08);border-bottom-left-radius:5px}
+.bublina.my{background:rgba(226,145,78,.2);margin-left:auto;border-bottom-right-radius:5px}
+.bublina small{display:block;color:var(--dim);font-size:10.5px;margin-top:3px}
+.c-pisanie{display:flex;gap:8px;align-items:flex-end;margin-top:10px}
+
+/* telefón */
+.tel-hlava{padding:12px 14px 8px;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06)}
+.tel-telo{padding:8px 12px 14px;max-height:620px;overflow:auto}
+.tel-lista{display:flex;justify-content:space-around;padding:9px 0 12px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:var(--dim)}
+.tel-lista b{color:var(--accent-light)}
+.poznamka{margin-top:14px;font-size:12.5px;color:var(--dim);max-width:80ch}
+.spolocne{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px;margin-top:22px;color:var(--muted);font-size:13px}
+.spolocne b{color:var(--text)}
+@media (max-width:760px){.a-mriezka,.c-mriezka{grid-template-columns:1fr}.mobil{margin:0 auto}}
+</style>
+</head>
+<body>
+<main>
+<h1>Pošta vo Workspace — schránka info@prosapiens.cz</h1>
+<p class="uvod">Tri spôsoby, ako by karta Pošta mohla vyzerať. Predmety mailov sú skutočné z posledného čítania schránky (12. 11. 2026); mená, zostatky a texty sú ilustračné. Pri každom je počítač aj telefón. Nič z toho nie je nasadené.</p>
+
+<div class="prepinac">
+  <button data-n="a">A · Ako pošta</button>
+  <button data-n="b" class="on">B · Roztriedená fronta</button>
+  <button data-n="c">C · Po ľuďoch</button>
+</div>
+
+<!-- ═════════════ A ═════════════ -->
+<section class="navrh" id="a">
+  <div class="popis">
+    <h2><span class="pismeno">A</span> Ako pošta — zoznam vľavo, mail vpravo</h2>
+    <p>Klasická schránka ako v Gmaile alebo Mail. Pri mailoch od klientov je nad textom zelený pás so zostatkom a dlhom. Je to najznámejšie, ale všetkých 21 mailov stojí v jednom rade — aj ponuky na weby a newslettre.</p>
+  </div>
+  <div class="zariadenia">
+    <div class="pc">
+      <div class="stitok-zar">počítač</div>
+      <div class="karta">
+        <h3>Pošta</h3>
+        <div class="pod">info@prosapiens.cz · načítané 12. 11. o 9:00 · ďalšie o 12:00 · <a class="tl" style="text-decoration:none">↻ načítať teraz</a></div>
+        <div class="a-mriezka">
+          <div class="a-zoznam">
+            <div class="a-riadok nove on"><div class="kto">Janka Šnirychová <small>11:42</small></div><div class="pred">Re: Faktura 20261003 — ProSapiens Biomechanic</div></div>
+            <div class="a-riadok nove"><div class="kto">Radka Kovaříková <small>včera</small></div><div class="pred">Re: Re: uvodni trenink</div></div>
+            <div class="a-riadok nove"><div class="kto">support61 <small>včera</small></div><div class="pred">[Vyžaduje akci] Vaše stránka byla omezena</div></div>
+            <div class="a-riadok"><div class="kto">Petra N. <small>ut</small></div><div class="pred">Re: Váš pohybový vzorec — co statický pohled neodhalí</div></div>
+            <div class="a-riadok"><div class="kto">Správa domu Fanderlíkova <small>po</small></div><div class="pred">Re: Fwd: Vyúčtování 2024 - pro story Fanderlíkova</div></div>
+            <div class="a-riadok"><div class="kto">innogy <small>po</small></div><div class="pred">Fwd: RE: Re: Fwd: Váš přepis energií u innogy – smlouva ukončena</div></div>
+            <div class="a-riadok"><div class="kto">web-studio.cz <small>9. 11.</small></div><div class="pred">Jste vlastníkem webu prosapiens.cz?</div></div>
+            <div class="a-riadok"><div class="kto">Marek Dvořák <small>9. 11.</small></div><div class="pred">Dobrý den</div></div>
+            <div class="a-riadok"><div class="kto">FIWE <small>8. 11.</small></div><div class="pred">Discover the first attractions of FIWE 2026!</div></div>
+          </div>
+          <div class="a-detail">
+            <h4>Re: Faktura 20261003 — ProSapiens Biomechanic</h4>
+            <div class="dim" style="font-size:12px;margin-bottom:10px">Janka Šnirychová &lt;janka.s…@seznam.cz&gt; · 12. 11. o 11:42</div>
+            <div class="klient-pas"><b>● klientka</b> Janka Šnirychová · Terezka · zostatok <b>3 h</b> · dlh 0 Kč · posledný tréning 7. 11. <button class="tl z">Profil →</button></div>
+            <div class="text-mailu">Dobrý den,
+platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude.
+
+Díky, Janka</div>
+            <textarea class="odpoved" placeholder="Odpovedať Janke… (odíde z info@prosapiens.cz s pôvodnou správou pod textom)"></textarea>
+            <div class="stav"><button class="tl h">Odoslať</button><button class="tl">Vybavené</button><span>Mail ostane v schránke ako prečítaný. Vybavené ho schová z karty.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="stitok-zar">telefón</div>
+      <div class="mobil">
+        <div class="tel-hlava">‹ Pošta <span class="dim" style="font-size:12px;font-weight:400">3 nové</span></div>
+        <div class="tel-telo">
+          <div class="a-riadok nove"><div class="kto">Janka Šnirychová <small>11:42</small></div><div class="pred">Re: Faktura 20261003</div></div>
+          <div class="a-riadok nove"><div class="kto">Radka Kovaříková <small>včera</small></div><div class="pred">Re: Re: uvodni trenink</div></div>
+          <div class="a-riadok nove"><div class="kto">support61 <small>včera</small></div><div class="pred">[Vyžaduje akci] Vaše stránka byla…</div></div>
+          <div class="a-riadok"><div class="kto">Petra N. <small>ut</small></div><div class="pred">Re: Váš pohybový vzorec — co sta…</div></div>
+          <div class="a-riadok"><div class="kto">Správa domu Fanderlíkova <small>po</small></div><div class="pred">Re: Fwd: Vyúčtování 2024</div></div>
+          <div class="a-riadok"><div class="kto">innogy <small>po</small></div><div class="pred">Fwd: RE: Re: Fwd: Váš přepis…</div></div>
+          <div class="a-riadok"><div class="kto">web-studio.cz <small>9. 11.</small></div><div class="pred">Jste vlastníkem webu prosapiens…</div></div>
+          <div class="a-riadok"><div class="kto">Marek Dvořák <small>9. 11.</small></div><div class="pred">Dobrý den</div></div>
+          <div class="dim" style="font-size:11.5px;margin-top:8px">Klik na mail otvorí celý text na celú obrazovku, späť šípkou hore.</div>
+        </div>
+        <div class="tel-lista"><span>Dnes</span><b>Workspace</b><span>＋</span><span>Kalendár</span><span>Jarvis</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ B ═════════════ -->
+<section class="navrh on" id="b">
+  <div class="popis">
+    <h2><span class="pismeno">B</span> Roztriedená fronta — ako ostatné karty Workspace <span class="tip">odporúčam</span></h2>
+    <p>Kokpit maily roztriedi sám: hore klienti a noví ľudia (práca), pod tým prevádzka a peniaze, dole zbalené ponuky a newslettre. Vybavený mail z karty zmizne, ako zmeny v kalendári. Z 21 mailov v schránke je práca v štyroch — tie sú vidieť prvé.</p>
+    <p><b style="color:var(--text)">Prečo:</b> je to ten istý spôsob, ako funguje celý Workspace, a Terezka hneď vidí nové dopyty bez prekopávania sa cez reklamy. Triedenie Kokpit už vie — dnes ním vyberá dopyty.</p>
+  </div>
+  <div class="zariadenia">
+    <div class="pc">
+      <div class="stitok-zar">počítač</div>
+      <div class="karta">
+        <h3>Pošta <span class="dim" style="font-size:13px;font-weight:400">· 4 na vybavenie</span></h3>
+        <div class="pod">info@prosapiens.cz · načítané 12. 11. o 9:00 · ďalšie o 12:00 · <a class="tl" style="text-decoration:none">↻ načítať teraz</a> · 3 vybavené dnes</div>
+
+        <div class="sekcia">Klienti <span>· 1</span></div>
+        <div class="b-riadok">
+          <div class="b-hlava"><b>Janka Šnirychová</b><span class="znacka zk">klientka · Terezka</span><span class="dim" style="font-size:12px">11:42</span></div>
+          <div class="b-pred">Re: Faktura 20261003 — ProSapiens Biomechanic</div>
+          <div class="b-otvoreny">
+            <div class="klient-pas" style="margin-bottom:6px">zostatok <b>3 h</b> · dlh 0 Kč · faktúra 20261003 <b>zaplatená 12. 11.</b> · posledný tréning 7. 11. <button class="tl z">Profil →</button></div>
+            <div class="text-mailu">Dobrý den,
+platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude.
+
+Díky, Janka</div>
+            <textarea class="odpoved">Ahoj Janko, v pořádku, platba je spárovaná a faktura zaplacená. Díky, Terka</textarea>
+            <div class="b-akcie"><button class="tl h">Odoslať a vybaviť</button><button class="tl">Vybavené bez odpovede</button><button class="tl">Zbaliť</button></div>
+          </div>
+        </div>
+
+        <div class="sekcia">Noví ľudia — možný dopyt <span>· 1</span></div>
+        <div class="b-riadok">
+          <div class="b-hlava"><b>Radka Kovaříková</b><span class="znacka zd">nový človek</span><span class="dim" style="font-size:12px">včera 18:20</span></div>
+          <div class="b-pred">Re: Re: uvodni trenink</div>
+          <div class="b-ukazka">„…tak bych se ráda objednala na úvodní trénink, nejlépe v úterý nebo ve čtvrtek odpoledne…“</div>
+          <div class="b-akcie"><button class="tl o">＋ Zapísať ako dopyt</button><button class="tl">Otvoriť a odpovedať</button><button class="tl">Ponúknuť termíny</button><button class="tl">Vybavené</button></div>
+        </div>
+
+        <div class="sekcia">Web a prevádzka <span>· 2</span></div>
+        <div class="b-riadok">
+          <div class="b-hlava"><b>support61</b><span class="znacka zs">vyžaduje akciu</span><span class="dim" style="font-size:12px">včera</span></div>
+          <div class="b-pred">[Vyžaduje akci] Vaše stránka byla omezena</div>
+          <div class="b-akcie"><button class="tl">Otvoriť</button><button class="tl">Vybavené</button></div>
+        </div>
+        <div class="b-riadok">
+          <div class="b-hlava"><b>Správa domu Fanderlíkova</b><span class="znacka zp">priestor</span><span class="dim" style="font-size:12px">po</span></div>
+          <div class="b-pred">Re: Fwd: Vyúčtování 2024 - pro story Fanderlíkova</div>
+          <div class="b-akcie"><button class="tl">Otvoriť</button><button class="tl">Vybavené</button></div>
+        </div>
+
+        <div class="sekcia">Ostatné <span>· 5</span></div>
+        <div class="zbalene">▸ Obchodné ponuky, newslettre a odpovede na mailing — Jste vlastníkem webu prosapiens.cz? · Dobrý den · Discover the first attractions of FIWE 2026! · Re: Váš pohybový vzorec · innogy <span style="float:right"><button class="tl">Všetko vybavené</button></span></div>
+      </div>
+    </div>
+    <div>
+      <div class="stitok-zar">telefón</div>
+      <div class="mobil">
+        <div class="tel-hlava">Pošta <span class="dim" style="font-size:12px;font-weight:400">4 na vybavenie</span></div>
+        <div class="tel-telo">
+          <div class="sekcia">Klienti · 1</div>
+          <div class="b-riadok">
+            <div class="b-hlava"><b>Janka Šnirychová</b><span class="znacka zk">klientka</span></div>
+            <div class="b-pred">Re: Faktura 20261003</div>
+            <div class="b-akcie"><button class="tl">Otvoriť</button><button class="tl">Vybavené</button></div>
+          </div>
+          <div class="sekcia">Noví ľudia · 1</div>
+          <div class="b-riadok">
+            <div class="b-hlava"><b>Radka Kovaříková</b><span class="znacka zd">nový</span></div>
+            <div class="b-pred">Re: Re: uvodni trenink</div>
+            <div class="b-akcie"><button class="tl o">＋ Dopyt</button><button class="tl">Otvoriť</button><button class="tl">Vybavené</button></div>
+          </div>
+          <div class="sekcia">Web a prevádzka · 2</div>
+          <div class="b-riadok"><div class="b-hlava"><b>support61</b><span class="znacka zs">akcia</span></div><div class="b-pred">[Vyžaduje akci] Vaše stránka…</div></div>
+          <div class="b-riadok"><div class="b-hlava"><b>Správa domu Fanderlíkova</b></div><div class="b-pred">Re: Fwd: Vyúčtování 2024</div></div>
+          <div class="zbalene">▸ Ostatné · 5</div>
+        </div>
+        <div class="tel-lista"><span>Dnes</span><b>Workspace</b><span>＋</span><span>Kalendár</span><span>Jarvis</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ C ═════════════ -->
+<section class="navrh" id="c">
+  <div class="popis">
+    <h2><span class="pismeno">C</span> Po ľuďoch — konverzácia ako v správach</h2>
+    <p>Namiesto mailov sú ľudia. Pri každom celá výmena v bublinách (aj to, čo mu odišlo z Kokpitu — faktúry, odkazy, zmluvy) a písanie dole ako v iMessage. Najlepšie na klientov, slabšie na všetko ostatné — ponuky a systémové maily tu nemajú prirodzené miesto.</p>
+  </div>
+  <div class="zariadenia">
+    <div class="pc">
+      <div class="stitok-zar">počítač</div>
+      <div class="karta">
+        <h3>Pošta</h3>
+        <div class="pod">info@prosapiens.cz · načítané 12. 11. o 9:00 · ďalšie o 12:00</div>
+        <div class="c-mriezka">
+          <div>
+            <div class="c-osoba on"><div class="avatar k">JŠ</div><div><b style="font-size:13px">Janka Šnirychová</b><small>Re: Faktura 20261003 · 11:42</small></div></div>
+            <div class="c-osoba"><div class="avatar n">RK</div><div><b style="font-size:13px">Radka Kovaříková</b><small>nová · Re: Re: uvodni trenink</small></div></div>
+            <div class="c-osoba"><div class="avatar">PN</div><div><b style="font-size:13px">Petra N.</b><small>odpoveď na mailing</small></div></div>
+            <div class="c-osoba"><div class="avatar">SD</div><div><b style="font-size:13px">Správa domu</b><small>Vyúčtování 2024</small></div></div>
+            <div class="c-osoba"><div class="avatar">⋯</div><div><b style="font-size:13px">Ostatní · 5</b><small>ponuky, newslettre, systém</small></div></div>
+          </div>
+          <div>
+            <div class="klient-pas">Janka Šnirychová · Terezka · zostatok <b>3 h</b> · dlh 0 Kč <button class="tl z">Profil →</button></div>
+            <div class="bublina my">Faktura 20261003 — ProSapiens Biomechanic (PDF + QR)<small>Kokpit · 28. 9.</small></div>
+            <div class="bublina my">Přehled hodin a QR na platbu: prosapiens.cz/v/…<small>SMS · 5. 11.</small></div>
+            <div class="bublina on">Dobrý den, platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude. Díky, Janka<small>mail · 12. 11. 11:42</small></div>
+            <div class="c-pisanie"><textarea class="odpoved" style="min-height:44px" placeholder="Napíš Janke…"></textarea><button class="tl h">Poslať</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="stitok-zar">telefón</div>
+      <div class="mobil">
+        <div class="tel-hlava">‹ Janka Šnirychová <button class="tl z" style="font-size:11px">Profil</button></div>
+        <div class="tel-telo">
+          <div class="bublina my" style="max-width:88%">Faktura 20261003 (PDF + QR)<small>Kokpit · 28. 9.</small></div>
+          <div class="bublina my" style="max-width:88%">Přehled hodin a QR na platbu<small>SMS · 5. 11.</small></div>
+          <div class="bublina on" style="max-width:88%">Dobrý den, platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka…<small>mail · 11:42</small></div>
+          <div class="c-pisanie"><textarea class="odpoved" style="min-height:40px" placeholder="Napíš…"></textarea><button class="tl h">↑</button></div>
+        </div>
+        <div class="tel-lista"><span>Dnes</span><b>Workspace</b><span>＋</span><span>Kalendár</span><span>Jarvis</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="spolocne">
+  <b>Spoločné pre všetky tri:</b> karta je vo Workspace u Jerryho aj Terezky · schránka sa načíta každé 2–3 hodiny (napr. 6:00, 9:00, 12:00, 15:00, 18:00, 21:00) a kedykoľvek tlačidlom · Kokpit si pamätá len kto, kedy a predmet, text sa načíta až pri otvorení · odpoveď ide z info@prosapiens.cz s pôvodnou správou pod textom · „Vybavené“ mail z karty schová, v schránke ostane · prílohy, presúvanie do priečinkov a hľadanie v celej histórii zatiaľ nie.
+</div>
+</main>
+<script>
+document.querySelectorAll('.prepinac button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.prepinac button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.navrh').forEach(s=>s.classList.toggle('on',s.id===b.dataset.n));
+}));
+</script>
+</body>
+</html>
