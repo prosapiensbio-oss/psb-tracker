@@ -327,6 +327,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
     return m;
   }, [clients]);
 
+  /** Riadky „zmizli“ skryté pod otázkou „bol tam?“ — podľa uid udalosti. */
+  const zmenaPodSpornym = useRef<Map<string, Zmena>>(new Map());
   const nacitaj = useCallback(async () => {
     const [k, p, b, vp] = await Promise.all([
       fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
@@ -336,7 +338,18 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
       fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
-    const noveZdroje = { zmeny: (k?.zmeny || []) as Zmena[], presuny: k?.presuny || {}, nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) };
+    /**
+     * JEDNA UDALOSŤ, JEDNA OTÁZKA (Jerry, 12. 11. 2026: „nie je toto
+     * redundancia?“). Tréning, ktorý zmizol až po svojom čase, sa pýtal
+     * dvakrát: v „Zmizli“ (prečo) aj v „Bol tam, alebo nie?“ (konal sa?).
+     * Je to jedno rozhodnutie — ostáva len „Bol tam“; jeho odpoveď zavrie aj
+     * skrytý riadok zmeny (`zmenaPodSpornym`).
+     */
+    const sporne = (k?.sporneKonanie || []) as { uid: string }[];
+    const sporneUid = new Set(sporne.map((x) => x.uid));
+    const vsetkyZmeny = (k?.zmeny || []) as Zmena[];
+    zmenaPodSpornym.current = new Map(vsetkyZmeny.filter((z) => z.druh === "zrusene" && z.uid && sporneUid.has(z.uid)).map((z) => [z.uid as string, z]));
+    const noveZdroje = { zmeny: vsetkyZmeny.filter((z) => !(z.druh === "zrusene" && z.uid && sporneUid.has(z.uid))), presuny: k?.presuny || {}, nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) };
     setZdroje(noveZdroje);
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
@@ -857,6 +870,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
     if (!r?.ok) return;
     setOdpovedane((s) => new Set([...s, `${p.uid}|${p.trener}`]));
     if (konal) oznam("kalendar");
+    // Tá istá udalosť mala aj otázku „prečo zmizla“ — odpoveď ju zavrie:
+    // „bol tam“ rovno, „neprišiel“ cez okno s dôvodom (choroba, práca…).
+    const z = zmenaPodSpornym.current.get(p.uid);
+    if (!z) return;
+    if (konal) {
+      await posli("/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: "tréning prebehol — z kalendára zmazaný až po ňom" }).catch(() => null);
+      zmenaPodSpornym.current.delete(p.uid);
+      oznam("kalendar");
+    } else {
+      setOknoDovodu({ kluc: `zmena|${z.id}`, z: { id: z.id, uid: p.uid, kto: p.klient, zaciatok: z.pred || p.zaciatok.slice(0, 16), trener: p.trener } });
+    }
   };
 
   /** Otvorí kartu Klient s týmto človekom na stole. */
