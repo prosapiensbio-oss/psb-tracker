@@ -15,7 +15,7 @@ import { C } from "../../lib/psb/theme";
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  // „Dokiaľ ľudia dolistujú" je naostro od 11. 11. 2026 — nič sa neskúša.
+  { text: "Email (schránka info@)", tab: "workspace", sub: "email" },
 ];
 
 /**

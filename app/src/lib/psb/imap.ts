@@ -136,3 +136,32 @@ export async function stiahniSpravy(opts: {
     await s.zavri();
   }
 }
+
+
+/**
+ * CELÉ TELÁ VYBRANÝCH SPRÁV — karta Email (12. 11. 2026). Jedno prihlásenie
+ * na všetky (Dovecot po sérii prihlásení odmieta aj správne heslo). Len
+ * čítanie (`BODY.PEEK`), v schránke sa nič neoznačí. Keď sa schránka medzitým
+ * prečíslovala (iné UIDVALIDITY), nevráti nič — UID by ukazovali na iné maily.
+ */
+export async function stiahniTela(opts: {
+  host: string; port?: number; user: string; heslo: string; uids: number[]; validity: string; maxZnakov?: number;
+}): Promise<{ spravy: ImapSprava[]; platnost: boolean }> {
+  const s = new Spojenie(opts.host, opts.port || 993);
+  try {
+    await s.privitanie();
+    await s.prikaz(`LOGIN ${uvodzovky(opts.user)} ${uvodzovky(opts.heslo)}`);
+    const validity = uidValidity(await s.prikaz(`SELECT "INBOX"`));
+    if (opts.validity && validity && validity !== opts.validity) return { spravy: [], platnost: false };
+    const max = opts.maxZnakov || 20000;
+    const out: ImapSprava[] = [];
+    for (const uid of opts.uids.slice(0, 8)) {
+      const r = await s.prikaz(`UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE REPLY-TO)] BODY.PEEK[TEXT]<0.${max * 2}>)`);
+      if (!/FETCH/i.test(r)) continue;
+      out.push({ uid: String(uid), ...rozoberOdpoved(r, max) });
+    }
+    return { spravy: out, platnost: true };
+  } finally {
+    await s.zavri();
+  }
+}

@@ -87,6 +87,7 @@ import { Route as ApiFotkyRouteImport } from './routes/api/fotky'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
+import { Route as ApiEmailRouteImport } from './routes/api/email'
 import { Route as ApiEditorSnimkyRouteImport } from './routes/api/editor-snimky'
 import { Route as ApiEditorNavrhyRouteImport } from './routes/api/editor-navrhy'
 import { Route as ApiDotaznikRouteImport } from './routes/api/dotaznik'
@@ -498,6 +499,11 @@ const ApiExportRoute = ApiExportRouteImport.update({
   path: '/api/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEmailRoute = ApiEmailRouteImport.update({
+  id: '/api/email',
+  path: '/api/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEditorSnimkyRoute = ApiEditorSnimkyRouteImport.update({
   id: '/api/editor-snimky',
   path: '/api/editor-snimky',
@@ -620,6 +626,7 @@ export interface FileRoutesByFullPath {
   '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
   '/api/editor-snimky': typeof ApiEditorSnimkyRoute
+  '/api/email': typeof ApiEmailRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -720,6 +727,7 @@ export interface FileRoutesByTo {
   '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
   '/api/editor-snimky': typeof ApiEditorSnimkyRoute
+  '/api/email': typeof ApiEmailRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -821,6 +829,7 @@ export interface FileRoutesById {
   '/api/dotaznik': typeof ApiDotaznikRoute
   '/api/editor-navrhy': typeof ApiEditorNavrhyRoute
   '/api/editor-snimky': typeof ApiEditorSnimkyRoute
+  '/api/email': typeof ApiEmailRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -923,6 +932,7 @@ export interface FileRouteTypes {
     | '/api/dotaznik'
     | '/api/editor-navrhy'
     | '/api/editor-snimky'
+    | '/api/email'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1023,6 +1033,7 @@ export interface FileRouteTypes {
     | '/api/dotaznik'
     | '/api/editor-navrhy'
     | '/api/editor-snimky'
+    | '/api/email'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1123,6 +1134,7 @@ export interface FileRouteTypes {
     | '/api/dotaznik'
     | '/api/editor-navrhy'
     | '/api/editor-snimky'
+    | '/api/email'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -1224,6 +1236,7 @@ export interface RootRouteChildren {
   ApiDotaznikRoute: typeof ApiDotaznikRoute
   ApiEditorNavrhyRoute: typeof ApiEditorNavrhyRoute
   ApiEditorSnimkyRoute: typeof ApiEditorSnimkyRoute
+  ApiEmailRoute: typeof ApiEmailRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
@@ -1851,6 +1864,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/email': {
+      id: '/api/email'
+      path: '/api/email'
+      fullPath: '/api/email'
+      preLoaderRoute: typeof ApiEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/editor-snimky': {
       id: '/api/editor-snimky'
       path: '/api/editor-snimky'
@@ -2026,6 +2046,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDotaznikRoute: ApiDotaznikRoute,
   ApiEditorNavrhyRoute: ApiEditorNavrhyRoute,
   ApiEditorSnimkyRoute: ApiEditorSnimkyRoute,
+  ApiEmailRoute: ApiEmailRoute,
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,

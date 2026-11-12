@@ -98,6 +98,8 @@ const TABULKY: Tabulka[] = [
   { tab: "ponuky_terminov", stlpec: "klient" },
   { tab: "anamnezy", stlpec: "klient", unik: [] },
   { tab: "zmluvy", stlpec: "klient", unik: [] },
+  { tab: "email_spravy", stlpec: "klient", unik: [] },
+  { tab: "email_odoslane", stlpec: "klient", unik: [] },
   { tab: "klient_fotky", stlpec: "klient" },
   { tab: "klient_fotky_suhlas", stlpec: "klient", unik: [] },
   { tab: "klient_fotky_poznamky", stlpec: "klient", unik: ["den"] },

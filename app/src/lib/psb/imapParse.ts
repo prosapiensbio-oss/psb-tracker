@@ -55,7 +55,7 @@ export function imapDatum(d: Date): string {
 }
 
 /** Z odpovede FETCH vytiahne hlavičky a začiatok textu. */
-export function rozoberOdpoved(r: string): Omit<ImapSprava, "uid"> {
+export function rozoberOdpoved(r: string, maxZnakov = 3000): Omit<ImapSprava, "uid"> {
   const hlavicka = (meno: string) => {
     const m = new RegExp(`^${meno}:\\s*(.*(?:\\r\\n[ \\t].*)*)`, "im").exec(r);
     return m ? dekoduj(m[1].replace(/\r\n[ \t]+/g, " ").trim()) : "";
@@ -72,7 +72,7 @@ export function rozoberOdpoved(r: string): Omit<ImapSprava, "uid"> {
     predmet: hlavicka("Subject"),
     odpovedat: hlavicka("Reply-To"),
     datum: hlavicka("Date"),
-    text: dekodujTelo(text).slice(0, 3000),
+    text: dekodujTelo(text).slice(0, maxZnakov),
   };
 }
 

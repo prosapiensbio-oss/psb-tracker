@@ -28,8 +28,16 @@ import { posunDen, terazPraha } from "./cas";
  * vidieť, prečo sa schránka číta práve takto.
  */
 
-/** Začiatky okien v pražskom čase: ráno o 7:00, večer o 20:00. */
-export const OKNA_HODIN = [7, 20] as const;
+/**
+ * Začiatky okien v pražskom čase.
+ *
+ * DO 12. 11. 2026 DVAKRÁT DENNE (7:00 a 20:00) — kvôli zámkom z GEO ochrany
+ * schránky na Websupporte. GEO ochrana je odvtedy vypnutá a schránka je
+ * karta Email vo Workspace (Jerry: „aby sa mail načítaval každé 2 až 3
+ * hodiny"). Preto každé tri hodiny cez deň; v noci nie — nikto ju nečíta
+ * a každé prihlásenie navyše je riziko zámku.
+ */
+export const OKNA_HODIN = [7, 10, 13, 16, 19, 22] as const;
 
 /** Hodina v pražskom čase (0–23). */
 export function hodinaVPrahe(kedy: Date): number {
@@ -40,8 +48,10 @@ export function hodinaVPrahe(kedy: Date): number {
 export function oknoCitania(kedy: Date): string {
   const den = terazPraha(kedy).slice(0, 10);
   const h = hodinaVPrahe(kedy);
-  if (h < OKNA_HODIN[0]) return `${posunDen(den, -1)}|${OKNA_HODIN[1]}`;
-  return `${den}|${h < OKNA_HODIN[1] ? OKNA_HODIN[0] : OKNA_HODIN[1]}`;
+  const posledne = OKNA_HODIN[OKNA_HODIN.length - 1];
+  if (h < OKNA_HODIN[0]) return `${posunDen(den, -1)}|${posledne}`;
+  const okno = [...OKNA_HODIN].reverse().find((x) => x <= h) ?? OKNA_HODIN[0];
+  return `${den}|${okno}`;
 }
 
 /**

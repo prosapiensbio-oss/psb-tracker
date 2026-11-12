@@ -26,6 +26,11 @@ import { join } from "node:path";
 
 /** Stĺpce, ktoré sa zámerne zapisujú až neskôr, nie pri vzniku riadku. */
 const VYNIMKY: Record<string, Record<string, string>> = {
+  // Karta Email: nový mail ešte nikto neprečítal, nevybavil ani neodpísal — stav práce vzniká až klikom.
+  email_spravy: {
+    precitane_at: "prečítanie človekom, nie načítanie zo schránky", vybavene_at: "vybavenie človekom, nie načítanie zo schránky",
+    vybavil: "kto mail vybavil — pri načítaní zo schránky ešte nikto", odpovedane_at: "odpoveď z karty, nie načítanie zo schránky",
+  },
   // Zmluvu zakladá tréner; klientova polovica sa zapíše až podpisom (podpisKlienta).
   zmluvy: {
     klient_meno: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_podpis: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_suhlasy_json: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá", klient_at: "podpis klienta vzniká až na stránke /z/, pri založení zmluvy ho ešte nikto nemá",

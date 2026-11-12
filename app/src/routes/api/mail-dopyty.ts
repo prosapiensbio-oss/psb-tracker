@@ -10,6 +10,7 @@ import { bindings } from "../../lib/bindings.server";
 import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { stiahniSpravy, testSpojenia, type KurzorSchranky } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
+import { ulozHlavicky } from "../../lib/psb/email.server";
 import { adresyMailu } from "../../lib/psb/mime";
 import { deriveClients } from "../../lib/psb/compute";
 import { loadData } from "../../lib/psb/db.server";
@@ -323,6 +324,13 @@ export const Route = createFileRoute("/api/mail-dopyty")({
             }
           }
 
+          /**
+           * KARTA EMAIL (12. 11. 2026): hlavičky každej prečítanej správy do
+           * `email_spravy` — tie isté, čo prešli dopytmi, aj tie, čo nie.
+           * Chyba tu nesmie zhodiť import dopytov (napr. pred migráciou 0139).
+           */
+          const emailov = await ulozHlavicky(DB, spravy, novyKurzor.validity, n).catch(() => -1);
+
           const vysledok = {
             kedy: zaciatok.toISOString(),
             precitanych: spravy.length,
@@ -336,6 +344,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
             preskocene: preskocene.slice(0, 30),
             // Správy, ktoré sa do tohto behu nezmestili — prečíta ich ďalší.
             zostava,
+            emailov,
             chyba: "",
           };
           // Až po spracovaní: beh, ktorý spadol, začne od toho istého miesta
