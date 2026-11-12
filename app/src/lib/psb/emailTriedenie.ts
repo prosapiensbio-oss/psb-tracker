@@ -168,3 +168,21 @@ export function rozdelCitat(text: string): { nove: string; citat: string } {
   if (zaciatok <= 0) return { nove: (text || "").trim(), citat: zaciatok === 0 ? (text || "").trim() : "" };
   return { nove: riadky.slice(0, zaciatok).join("\n").trim(), citat: riadky.slice(zaciatok).join("\n").trim() };
 }
+
+/**
+ * Zalomenie po ~72 znakoch, ktoré robia poštové programy v čistom texte,
+ * rozbíja vety v úzkom okne („nějaké / kompenzace“). Riadok sa spojí
+ * s ďalším, keď je dlhý a ďalší pokračuje malým písmenom alebo číslom.
+ * Krátke riadky (pozdrav, podpis, zoznam) ostanú, ako sú.
+ */
+export function spojZalomene(text: string): string {
+  const r = (text || "").replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  for (const riadok of r) {
+    const pred = out[out.length - 1];
+    if (pred !== undefined && pred.trim().length >= 55 && /^[a-záäčďéěíĺľňóôŕřšťúůýž0-9(]/.test(riadok.trim()) && riadok.trim() && !/^[>\-*•]/.test(riadok.trim())) {
+      out[out.length - 1] = `${pred.trimEnd()} ${riadok.trim()}`;
+    } else out.push(riadok);
+  }
+  return out.join("\n");
+}

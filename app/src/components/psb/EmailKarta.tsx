@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
-import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah, rozdelCitat } from "../../lib/psb/emailTriedenie";
+import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah, rozdelCitat, spojZalomene } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
 import { najblizsieOkno } from "../../lib/psb/mailOkno";
 import { C } from "../../lib/psb/theme";
@@ -90,7 +90,7 @@ function TextMailu({ text, kompaktne }: { text: string; kompaktne?: boolean }) {
   const [otvorene, setOtvorene] = useState(false);
   return (
     <div>
-      <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{nove || "(prázdny mail)"}</div>
+      <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{spojZalomene(nove) || "(prázdny mail)"}</div>
       {citat && (
         <div style={{ marginTop: kompaktne ? 6 : 12 }}>
           <button onClick={() => setOtvorene((x) => !x)}

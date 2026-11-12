@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { maObsah, postavZnamych, rozdelCitat, roztried } from "./emailTriedenie";
+import { maObsah, postavZnamych, rozdelCitat, roztried, spojZalomene } from "./emailTriedenie";
 
 const znami = postavZnamych({
   maily: [{ email: "lukas.h@seznam.cz", klient: "Lukáš Hanus" }, { email: "a@x.cz; b@y.cz", klient: "Anna Nová" }],
@@ -84,5 +84,16 @@ describe("rozdelCitat", () => {
   });
   it("mail bez citátu ostane celý", () => {
     expect(rozdelCitat("Jen text\nbez citace")).toEqual({ nove: "Jen text\nbez citace", citat: "" });
+  });
+});
+
+describe("spojZalomene", () => {
+  it("spojí vetu zalomenú poštovým programom, pozdrav a podpis nechá", () => {
+    const t = "Dobrý den,\nráda bych se domluvila na vstupní prohlídce. I když mě tělo nebolí, nějaké\nkompenzace tam jsou.\n\nPřeji hezký den\nRadka Pelánová";
+    expect(spojZalomene(t)).toBe("Dobrý den,\nráda bych se domluvila na vstupní prohlídce. I když mě tělo nebolí, nějaké kompenzace tam jsou.\n\nPřeji hezký den\nRadka Pelánová");
+  });
+  it("nový riadok veľkým písmenom alebo odrážkou ostane", () => {
+    const t = "Tohle je dlouhý řádek, který má určitě víc než padesát pět znaků, opravdu.\nNová věta.\n- bod";
+    expect(spojZalomene(t)).toBe(t);
   });
 });
