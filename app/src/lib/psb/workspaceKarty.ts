@@ -166,7 +166,7 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     // platnosť, „sedí?" po návrate) sú súčasťou tohto kroku (5. 10. 2026).
     // Dlžníci hore, všetky platby z banky pod nimi (Jerry, 5. 10. 2026: „otoč to").
     krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("dlznici"), ...daj("platby")]),
-    // Email hneď za tromi krokmi — pošta sa číta každý deň (beta 12. 11. 2026).
+    // Email hneď za tromi krokmi — pošta sa číta každý deň (naostro 12. 11. 2026).
     ...(volby.email ? [{ druh: "email" as const, nadpis: "Email", podnadpis: "info@prosapiens.cz — klienti, noví ľudia, web a prevádzka", polozky: [] as never[] }] : []),
     /**
      * BETA 5. 10. 2026: dopyty (Terezkine), uzávierka mesiaca a mesačné

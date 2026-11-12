@@ -6,7 +6,7 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { emailPodlaId, konverzacia, vybavStarsie, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
 import type { EmailRiadok } from "../../lib/psb/email.server";
-import { PORADIE_KATEGORII } from "../../lib/psb/emailTriedenie";
+import { PORADIE_KATEGORII, maObsah } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
 import { stiahniSpravy, stiahniTela } from "../../lib/psb/imap";
 import { telefonZTextu } from "../../lib/psb/mailDopyt";
@@ -131,7 +131,7 @@ export const Route = createFileRoute("/api/email")({
             if (zle.length) return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });
             if (!adresy.length) return Response.json({ ok: false, error: "Chýba adresa." }, { status: 400 });
             const text = String(b.text || "").trim().slice(0, 20000);
-            if (!text) return Response.json({ ok: false, error: "Odpoveď je prázdna." }, { status: 400 });
+            if (!maObsah(text)) return Response.json({ ok: false, error: "Odpoveď je prázdna — napíš niečo medzi pozdrav a podpis." }, { status: 400 });
             const predmet = String(b.predmet || "").trim().slice(0, 250) || (e ? `Re: ${e.predmet}` : "ProSapiens");
             const citat = String(b.citat || "").trim().slice(0, 6000);
             const telo = citat ? `${text}\n\n${citat.split("\n").map((r) => `> ${r}`).join("\n")}` : text;

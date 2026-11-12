@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
-import { NAZVY_KATEGORII, PORADIE_KATEGORII } from "../../lib/psb/emailTriedenie";
+import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
 import { najblizsieOkno } from "../../lib/psb/mailOkno";
 import { C } from "../../lib/psb/theme";
@@ -298,6 +298,7 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
 
   const posli = async (vybav: boolean) => {
     if (posielam) return;
+    if (!maObsah(odpoved)) { setChyba("Odpoveď je prázdna — napíš niečo medzi pozdrav a podpis."); return; }
     setPosielam(true);
     const citat = !ludia && text ? `${kedyCelo(e.datum)} napsal(a) ${e.odMeno || e.odMail}:\n${text}` : "";
     const r = await api<{ komu: string[] }>("/api/email", { akcia: "odpovedz", id: e.id, komu, predmet: /^re:/i.test(e.predmet) ? e.predmet : `Re: ${e.predmet}`, text: odpoved, citat, vybav });
@@ -342,8 +343,8 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       <textarea value={odpoved} onChange={(x) => setOdpoved(x.target.value)} rows={ludia ? 5 : 7}
         style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 9, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.45, resize: "vertical" }} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, alignItems: "center" }}>
-        <button onClick={() => void posli(true)} disabled={posielam} style={tlHlavne}>{posielam ? "Posielam…" : "Odoslať a vybaviť"}</button>
-        <button onClick={() => void posli(false)} disabled={posielam} style={tl}>len odoslať</button>
+        <button onClick={() => void posli(true)} disabled={posielam || !maObsah(odpoved)} style={{ ...tlHlavne, opacity: maObsah(odpoved) ? 1 : 0.45 }}>{posielam ? "Posielam…" : "Odoslať a vybaviť"}</button>
+        <button onClick={() => void posli(false)} disabled={posielam || !maObsah(odpoved)} style={{ ...tl, opacity: maObsah(odpoved) ? 1 : 0.45 }}>len odoslať</button>
         {!ludia && <small style={{ color: C.textDim }}>pôvodný mail ide pod tvoj text</small>}
       </div>
     </div>

@@ -131,3 +131,13 @@ export function postavZnamych(v: {
   }
   return { klientPodlaMailu, klientPodlaMena, dopytoveMaily };
 }
+
+/**
+ * Má odpoveď vlastný obsah? Predvyplnený pozdrav a podpis nie sú správa.
+ * 12. 11. 2026 tak odišiel prvý mail z karty — „Dobrý den, S pozdravem
+ * Filip“ a nič medzi tým. Platí na serveri aj na obrazovke.
+ */
+export function maObsah(text: string): boolean {
+  const ZDVORILOST = /^(dobr[ýy] den|dobr[ýy] de[ňn]|ahoj|zdrav[íi]m|s pozdravem|s pozdravom|d[ěe]kuji|filip str[áa][ňn]avsk[ýy]|filip|terezka|prosapiens biomechanic)[\s,.!]*$/i;
+  return (text || "").split(/\r?\n/).map((r) => r.trim()).filter((r) => r && !ZDVORILOST.test(r)).length > 0;
+}
