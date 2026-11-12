@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prezentácia uzávierky – návrhy</title>
+<style>
+:root{--bg:#F6F9F7;--bg2:#ECF2EE;--text:#22302A;--mut:#5E6E66;--linka:#DCE5DF;--z:#2D7D5A;--zs:#8FBFA6;--o:#B07A12;--ob:#FBF3E0;--c:#A8402C;--cb:#F7E6E1}
+*{box-sizing:border-box}
+body{margin:0;background:#E6ECE8;color:var(--text);font:15px/1.55 "Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:1240px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:28px;margin:0 0 6px}
+.mut{color:var(--mut)}
+.box{background:#fff;border-radius:14px;padding:16px 18px;margin:14px 0}
+.letters{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+.let{border:1px solid var(--text);background:none;border-radius:22px;padding:8px 18px;font:700 15px/1 inherit;cursor:pointer}
+.let.on{background:var(--text);color:#fff}
+.popis{margin:10px 0 14px;max-width:900px}
+.stage{background:#141a12;border-radius:16px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.ram{width:100%;max-width:1180px;aspect-ratio:16/9;position:relative;overflow:hidden;border-radius:10px;background:var(--bg)}
+.slide{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:top left;padding:54px 64px;display:flex;flex-direction:column}
+.ovl{display:flex;gap:10px;align-items:center;color:#EAF1EC;font-size:14px}
+.ovl button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#EAF1EC;border-radius:10px;padding:8px 14px;cursor:pointer;font:600 14px inherit}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.thumbs button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#C9D6CE;border-radius:8px;padding:5px 10px;font:12px inherit;cursor:pointer}
+.thumbs button.on{background:#EAF1EC;color:#141a12}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl td,.tbl th{padding:6px 8px;border-bottom:1px solid #E3E8E5;text-align:left;vertical-align:top}
+/* obsah slajdov */
+.k{font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.h{font-size:44px;font-weight:700;line-height:1.1;margin:8px 0 6px}
+.h2{font-size:34px;font-weight:700;line-height:1.15;margin:6px 0}
+.sub{font-size:21px;color:var(--mut);line-height:1.4}
+.big{font-size:96px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.dot{display:inline-block;width:14px;height:14px;border-radius:7px;flex:0 0 auto}
+.z{background:var(--z)}.o{background:var(--o)}.c{background:var(--c)}
+.tz{color:var(--z)}.to{color:var(--o)}.tc{color:var(--c)}
+.grid{display:grid;gap:14px}
+.card{background:var(--bg2);border:1px solid var(--linka);border-radius:16px;padding:16px 20px}
+.urob{background:var(--ob);border:1px solid #E2C98B;border-radius:16px;padding:16px 22px}
+.urob b.l{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#8A5F12;display:block;margin-bottom:4px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid var(--linka);font-size:20px}
+.tes .row{font-size:17px;padding:5px 0;line-height:1.3}.tes .card{padding:12px 18px}.tes small{font-size:13px}
+.row:last-child{border-bottom:0}
+.flag{font-size:14px;font-weight:700;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.f-o{background:var(--ob);color:#8A5F12}.f-c{background:var(--cb);color:var(--c)}.f-z{background:#E2EFE8;color:var(--z)}
+.bar{height:16px;border-radius:8px;background:var(--linka);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:8px}
+.spark{display:flex;align-items:flex-end;gap:5px;height:70px}
+.spark i{flex:1;border-radius:5px 5px 2px 2px;background:var(--zs)}
+.spark i.last{background:var(--z)}
+.foot{margin-top:auto;font-size:14px;color:var(--mut)}
+.tile{background:var(--bg2);border:1px solid var(--linka);border-radius:14px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.tile:hover{border-color:var(--z)}
+.tile .n{font-size:30px;font-weight:700;line-height:1.1}
+.tile .l{font-size:14px;color:var(--mut)}
+.tile .p{font-size:13px}
+.grp{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:0 0 6px}
+.wf{display:flex;align-items:flex-end;gap:18px;height:300px;margin-top:20px}
+.wf div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;height:100%}
+.wf b{display:block;width:100%;border-radius:8px 8px 2px 2px}
+.wf span{font-size:15px;text-align:center;color:var(--mut)}
+.wf em{font-style:normal;font-size:19px;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>Prezentácia uzávierky mesiaca – tri návrhy</h1>
+<p class="mut" style="max-width:900px">Všetky čísla sú skutočné za október 2026, z reportu v Kokpite a z výpisu banky. Prezentácia sa pozerá na počítači na celej obrazovke, preto ukazujem len počítač. V každom návrhu sa dá listovať šípkami alebo klávesmi ← →.</p>
+
+<div class="box">
+<b>Čo je dnes zle, z tvojej poznámky a z kódu</b>
+<table class="tbl" style="margin-top:8px">
+<tr><th style="width:42%">Dnešné slajdy (10)</th><th>Problém</th></tr>
+<tr><td>1 titulka · 2 semafor šiestich otázok</td><td>Šesť otázok s číslom a farbou…</td></tr>
+<tr><td>3–8 šesť slajdov, otázka po otázke, každý s „Urob"</td><td>…potom tých istých šesť otázok s tým istým číslom znova…</td></tr>
+<tr><td>9 Čo to znamená (dobre / pozor)</td><td>…potom tých istých šesť viet tretíkrát…</td></tr>
+<tr><td>10 Čo urobíme</td><td>…a nakoniec všetky „Urob" zo slajdov 3–8 štvrtýkrát.</td></tr>
+<tr><td>Výdavky</td><td>Len tri najväčšie kategórie, ktoré sú každý mesiac rovnaké (nájom, Jarek, štát). Čo bolo neštandardné, nepovie.</td></tr>
+<tr><td>Vyťaženosť a rezerva</td><td>Sú len ako riadok tabuľky na slajde otázky, nie ako vec, o ktorej sa rozhoduje.</td></tr>
+</table>
+</div>
+
+<div class="letters">
+<button class="let on" data-v="A">A · Bez opakovania</button>
+<button class="let" data-v="B">B · Jedna obrazovka, odporúčam</button>
+<button class="let" data-v="C">C · Tok peňazí</button>
+</div>
+<p class="popis" id="popis"></p>
+
+<div class="stage">
+  <div class="ram" id="ram"></div>
+  <div class="ovl"><button id="pred">←</button><span id="poc"></span><button id="dalej">→</button></div>
+  <div class="thumbs" id="thumbs"></div>
+</div>
+
+<div class="box">
+<b>Čo platí pre všetky tri návrhy</b>
+<ul style="margin:8px 0 0;padding-left:20px">
+<li><b>Každé číslo je na obrazovke raz.</b> Semafor je zároveň obsah, nie úvod k nemu.</li>
+<li><b>„Urob" je jeden zoznam na konci, najviac tri veci</b>, zoradené podľa toho, koľko stojí, keď sa nič neurobí. Pri otázke sa už neopakuje.</li>
+<li><b>Výdavky dostanú vlastný slajd</b> s dvoma zoznamami: najväčšie a neštandardné. Neštandardné je výdavok aspoň o 30 % nad priemerom posledných šiestich mesiacov alebo prvý za pol roka, a nad 1 000 Kč. Pri každom stojí, prečo tam je.</li>
+<li><b>Vyťaženosť a rezerva sú vlastné slajdy</b> s rozhodnutím, nie riadok v tabuľke.</li>
+<li><b>Nič sa nepočíta nanovo.</b> Prezentácia číta report ako dnes. Pribudne len rozbor výdavkov po kategóriách, ktorý report zatiaľ nemá.</li>
+</ul>
+</div>
+
+<div class="box">
+<b>Pri ťahaní čísel som našiel dve veci, ktoré treba vedieť</b>
+<ul style="margin:8px 0 0;padding-left:20px">
+<li><b>Report radí ozvať sa Radkovi Balážovi</b>, lebo mu skončil balíček a nový neprišiel. Radek však 13. 10. ukončil spoluprácu a vrátili sme mu 15 500 Kč. Ukončený klient do zoznamu „bez obnovy" nepatrí. Opravím to s prezentáciou.</li>
+<li><b>Reklama má v Kokpite dve čísla:</b> 7 909 Kč podľa Mety (report) a 6 034 Kč odišlo z účtu v októbri. Rozdiel je v tom, kedy Meta strhne platbu. Na slajde výdavkov je číslo z banky, na slajde nových ľudí číslo z Mety, a obe to hovoria.</li>
+</ul>
+</div>
+</main>
+
+<script>
+const kc=n=>Math.round(n).toLocaleString('sk-SK').replace(/,/g,' ');
+const spark=(v)=>{const m=Math.max(...v);return `<div class="spark">${v.map((x,i)=>`<i class="${i===v.length-1?'last':''}" style="height:${Math.max(6,x/m*100)}%"></i>`).join('')}</div>`};
+const bar=(p,farba)=>`<div class="bar"><i style="width:${Math.min(100,p)}%;background:${farba}"></i></div>`;
+const MES=['apr','máj','jún','júl','aug','sep','okt'];
+
+/* spoločné slajdy */
+const S_VYDAVKY=`<div class="tes" style="display:flex;flex-direction:column;height:100%"><div class="k">Výdavky · október 2026</div>
+<div class="h2">Kam išli peniaze a čo bolo navyše</div>
+<div class="grid" style="grid-template-columns:1fr 1.15fr;margin-top:10px;gap:22px">
+ <div class="card"><div class="grp">Najväčšie (bez výplat)</div>
+  <div class="row"><span>Nájom + energie</span><b>29 750 Kč</b></div>
+  <div class="row"><span>Splátka Jarek</span><b>10 000 Kč</b></div>
+  <div class="row"><span>Štát · Jerry</span><b>9 761 Kč</b></div>
+  <div class="row"><span>AI predplatné (13 platieb)</span><b>7 694 Kč</b></div>
+  <div class="row"><span>Reklama Meta (z banky)</span><b>6 034 Kč</b></div>
+  <div class="row"><span>Štát · Terezka</span><b>4 619 Kč</b></div>
+ </div>
+ <div class="card"><div class="grp">Neštandardné · proti priemeru 6 mesiacov</div>
+  <div class="row"><span>Vrátenie Radek Baláž<br><small class="mut">jednorazové, ukončenie spolupráce · mimo P&amp;L</small></span><span class="flag f-c">15 500 Kč</span></div>
+  <div class="row"><span>Splátka Jarek<br><small class="mut">priemer 2 833 Kč, v jún a aug nič</small></span><span class="flag f-o">3,5×</span></div>
+  <div class="row"><span>Pomôcky<br><small class="mut">2 416 Kč, za pol roka raz</small></span><span class="flag f-o">5,8×</span></div>
+  <div class="row"><span>Reklama Meta<br><small class="mut">6 034 Kč, priemer 3 337 Kč</small></span><span class="flag f-o">1,8×</span></div>
+  <div class="row"><span>AI predplatné<br><small class="mut">7 694 Kč, priemer 5 638 Kč</small></span><span class="flag f-o">1,4×</span></div>
+ </div>
+</div>
+<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px;gap:22px">
+ <div class="card" style="display:flex;gap:18px;align-items:center"><div style="flex:0 0 230px">${spark([1723,2553,3550,7335,9942,8723,7694])}<div class="mut" style="font-size:13px;display:flex;justify-content:space-between">${MES.map(m=>`<span>${m}</span>`).join('')}</div></div><div style="font-size:17px"><b>AI za pol roka 4,5×.</b> Z 1 723 Kč v apríli na 7 694 Kč.</div></div>
+ <div class="card" style="font-size:17px"><b class="tz">Od novembra −2 287 Kč mesačne:</b> PTminder zrušený 1. 11. A 4 741 Kč išlo do rezervy, nie je to náklad.</div>
+</div></div>`;
+
+const S_VYTAZENOST_TELO=`<div class="grid" style="grid-template-columns:1fr 1fr;gap:26px;margin-top:22px">
+ <div class="card"><div style="display:flex;justify-content:space-between;font-size:22px"><b>Jerry</b><b class="to">132 / 120 h · 110 %</b></div><div style="margin:12px 0">${bar(110/1.2,'#B07A12')}</div><div class="mut" style="font-size:16px">Priemer 102 h. Strop prekročený o 12 h.</div></div>
+ <div class="card"><div style="display:flex;justify-content:space-between;font-size:22px"><b>Terezka</b><b class="tz">108 / 120 h · 90 %</b></div><div style="margin:12px 0">${bar(90/1.2,'#2D7D5A')}</div><div class="mut" style="font-size:16px">Priemer 98 h. Voľných 12 h.</div></div>
+</div>
+<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px;margin-top:22px">
+ <div class="card"><div class="mut">Hodín spolu</div><div style="font-size:40px;font-weight:700">240 h</div><div class="mut">priemer 199 · ▲ 21 %</div></div>
+ <div class="card"><div class="mut">Hodín na break-even</div><div style="font-size:40px;font-weight:700">214 h</div><div class="mut">26 h nad ním je zisk</div></div>
+ <div class="card"><div class="mut">Príjem na hodinu</div><div style="font-size:40px;font-weight:700">1 147 Kč</div><div class="mut">priemer 1 229 · ▼ 7 %</div></div>
+</div>
+<div class="foot">Strop 120 h na trénera mesačne. Hodiny zo sedení, break-even z P&amp;L.</div>`;
+const S_VYTAZENOST=`<div class="k">Vyťaženosť · október 2026</div>
+<div class="h2">Jerry je nad stropom, Terezka má 12 hodín voľných</div>`+S_VYTAZENOST_TELO;
+
+const S_REZERVA=`<div class="k">Rezerva a záväzky · stav k 1. 11.</div>
+<div class="h2">Rezerva drží 1,8 mesiaca. Cieľ sú 3.</div>
+<div style="display:flex;align-items:center;gap:30px;margin-top:20px">
+ <div class="big tc">1,8</div>
+ <div style="flex:1"><div style="font-size:20px;margin-bottom:10px">mesiaca nákladov, keby neprišla ani koruna</div>${bar(60,'#A8402C')}<div class="mut" style="display:flex;justify-content:space-between;font-size:14px;margin-top:4px"><span>0</span><span>cieľ 3 mesiace</span></div></div>
+</div>
+<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:18px;margin-top:28px">
+ <div class="card"><div class="mut">Odložené v októbri</div><div style="font-size:36px;font-weight:700" class="tz">4 741 Kč</div><div class="mut">prvé odloženie za pol roka</div></div>
+ <div class="card"><div class="mut">Klienti nám dlžia</div><div style="font-size:36px;font-weight:700" class="to">50 780 Kč</div><div class="mut">keď prídu, rezerva stúpne</div></div>
+ <div class="card"><div class="mut">Zaplatené, ešte neodtrénované</div><div style="font-size:36px;font-weight:700">315 h</div><div class="mut">peniaze už máme, práca príde</div></div>
+</div>
+<div class="foot">Rezerva z dlaždice Kokpitu, dlhy z jedného pravidla „zaplatený", hodiny zo zostatkov balíčkov.</div>`;
+
+const URO=[
+ ['Jerry 110 % stropu','Nových klientov v novembri dávať Terezke. Jerry má o 12 h viac, než je strop, a Terezka 12 h voľných.'],
+ ['Z dopytu klient 22 % (priemer 57 %)','Z 9 dopytov prišli 2 klienti. Prejsť 7, ktorí neprišli: kto dostal odpoveď a kto bol na úvodnom.'],
+ ['AI 7 694 Kč, za pol roka 4,5×','Prejsť 13 platieb za AI a zrušiť, čo sa už nepoužíva.'],
+];
+const S_UROB=`<div class="k">Čo urobíme v novembri</div>
+<div class="h2">Tri veci, zoradené podľa toho, čo stojí najviac</div>
+<div class="grid" style="gap:16px;margin-top:22px">${URO.map((u,i)=>`<div class="urob"><b class="l">${i+1}. ${u[0]}</b><span style="font-size:22px">${u[1]}</span></div>`).join('')}</div>
+<div class="foot">Ostatné otázky sú v poriadku a nič nechcú.</div>`;
+
+const OT=[
+ {id:'praca',o:'Máme dosť práce?',s:'z',n:'240 h',zm:'▲ 21 % nad priemerom',v:[199,180,205,190,210,215,240],odp:'Áno. 62 klientov trénovalo, Jerry je nad stropom.'},
+ {id:'klienti',o:'Držia sa klienti?',s:'z',n:'93 %',zm:'obnovilo balíček · priemer 67 %',v:[60,65,70,62,68,75,93],odp:'Áno. Bez obnovy len Natália Pečková (28. 10.).'},
+ {id:'peniaze',o:'Zarábame?',s:'z',n:'51 965 Kč',zm:'zisk · ▲ 55 % nad priemerom',v:[28,35,22,40,30,46,52],odp:'Áno. Marža 19 % pri priemere 10 %.'},
+ {id:'novi',o:'Prichádzajú noví ľudia?',s:'o',n:'9 → 2',zm:'dopyty → noví klienti',v:[5,4,6,5,4,6,9],odp:'Dopytov je viac, klientov z nich menej.'},
+ {id:'konc',o:'Nestojíme na pár ľuďoch?',s:'z',n:'7 %',zm:'tržieb od najväčšieho klienta · prah 15 %',v:[8,7,9,8,7,7,7],odp:'Nie. Horných 20 % klientov dáva 41 %.'},
+ {id:'osobne',o:'Koľko si berieme domov?',s:'z',n:'149 145 Kč',zm:'výplaty spolu · ▲ 13 %',v:[120,125,118,130,140,148,149],odp:'Spoločné výdavky 80 660 Kč, priemer 73 908 Kč.'},
+];
+const slOtazka=(q,extra='')=>`<div class="k" style="display:flex;gap:10px;align-items:center"><span class="dot ${q.s}"></span>${q.o}</div>
+<div class="grid" style="grid-template-columns:1.1fr 1fr;gap:34px;margin-top:20px;align-items:end">
+ <div><div class="big">${q.n}</div><div class="sub" style="margin-top:10px">${q.zm}</div><div class="h2" style="font-size:28px;margin-top:22px;font-weight:600">${q.odp}</div></div>
+ <div>${spark(q.v)}<div class="mut" style="font-size:13px;display:flex;justify-content:space-between">${MES.map(m=>`<span>${m}</span>`).join('')}</div></div>
+</div>${extra}<div class="foot">Porovnanie s priemerom posledných 6 mesiacov.</div>`;
+
+/* A */
+const A=[
+ ['Október',`<div class="k">Uzávierka · október 2026</div><div class="h">Zisk 51 965 Kč, päť zo šiestich otázok v poriadku</div>
+ <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px">${OT.map(q=>`<div class="card" style="display:flex;gap:12px;align-items:flex-start"><span class="dot ${q.s}" style="margin-top:8px"></span><div><div style="font-size:17px;color:var(--mut)">${q.o}</div><div style="font-size:30px;font-weight:700">${q.n}</div><div style="font-size:14px" class="mut">${q.zm}</div></div></div>`).join('')}</div>
+ <div class="foot">Toto je jediný prehľad. Ďalej idú len otázky, ktoré chcú pozornosť, a nové slajdy.</div>`],
+ ['Práca',slOtazka(OT[0])],
+ ['Vyťaženosť',S_VYTAZENOST],
+ ['Peniaze',slOtazka(OT[2],`<div class="card" style="margin-top:20px;display:flex;gap:30px;font-size:18px"><span>Príjmy <b>275 336 Kč</b></span><span>Náklady <b>223 371 Kč</b></span><span>Break-even <b>245 996 Kč</b></span></div>`)],
+ ['Výdavky',S_VYDAVKY],
+ ['Rezerva',S_REZERVA],
+ ['Noví ľudia',slOtazka(OT[3],`<div class="card" style="margin-top:20px;display:flex;gap:30px;font-size:18px"><span>Z dopytu klient <b class="tc">22 %</b> (57 %)</span><span>Reklama Meta <b>7 909 Kč</b> na 1 dopyt</span><span>Dosah reels <b>317</b> (472)</span></div>`)],
+ ['Klienti a domov',`<div class="k">Bez zmeny</div><div class="h2">Klienti, riziko a domov sú v poriadku</div>
+ <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px">${[OT[1],OT[4],OT[5]].map(q=>`<div class="card"><div style="display:flex;gap:8px;align-items:center;color:var(--mut)"><span class="dot ${q.s}"></span>${q.o}</div><div style="font-size:38px;font-weight:700;margin-top:6px">${q.n}</div><div class="mut">${q.zm}</div><div style="font-size:17px;margin-top:10px">${q.odp}</div></div>`).join('')}</div>
+ <div class="foot">Zelené otázky dostanú jeden spoločný slajd, nie tri.</div>`],
+ ['Urob',S_UROB],
+];
+
+/* B */
+const T=(id,l,n,p,s)=>`<div class="tile" data-go="${id}"><div class="l"><span class="dot ${s}" style="width:9px;height:9px;margin-right:6px"></span>${l}</div><div class="n ${s==='z'?'':'t'+s}">${n}</div><div class="p mut">${p}</div></div>`;
+const B=[
+ ['Prehľad',`<div style="display:flex;justify-content:space-between;align-items:baseline"><div><div class="k">Október 2026 · proti priemeru 6 mesiacov</div><div class="h2" style="margin-bottom:0">Zisk 51 965 Kč. Tri veci chcú rozhodnutie.</div></div><div class="mut" style="font-size:14px">klik na dlaždicu otvorí detail</div></div>
+ <div class="grid" style="grid-template-columns:repeat(4,1fr);gap:12px 14px;margin-top:16px">
+  <div><div class="grp">Práca</div><div class="grid" style="gap:10px">${T('Vyťaženosť','Hodiny','240 h','▲ 21 % · 62 klientov','z')}${T('Vyťaženosť','Jerry voči stropu','110 %','132 / 120 h','o')}${T('Vyťaženosť','Terezka voči stropu','90 %','108 / 120 h','z')}</div></div>
+  <div><div class="grp">Peniaze</div><div class="grid" style="gap:10px">${T('Prehľad','Zisk','51 965 Kč','marža 19 % · ▲ 55 %','z')}${T('Výdavky','Neštandardné výdavky','5','najväčší Baláž 15 500 Kč','o')}${T('Rezerva','Rezerva','1,8 mes.','cieľ 3 · dlhy 50 780 Kč','c')}</div></div>
+  <div><div class="grp">Klienti</div><div class="grid" style="gap:10px">${T('Prehľad','Obnova balíčkov','93 %','priemer 67 %','z')}${T('Prehľad','Retencia 6 mes.','79 %','cieľ 80 %','o')}${T('Prehľad','Najväčší klient','7 %','tržieb · prah 15 %','z')}</div></div>
+  <div><div class="grp">Noví ľudia</div><div class="grid" style="gap:10px">${T('Prehľad','Dopyty','9','priemer 5','z')}${T('Prehľad','Z dopytu klient','22 %','priemer 57 %','c')}${T('Prehľad','Dosah reels','317','priemer 472','o')}</div></div>
+ </div>
+ <div class="card" style="margin-top:14px;display:flex;gap:26px;font-size:16px;padding:10px 18px"><b>Domov</b><span>výplaty 149 145 Kč</span><span>spoločné výdavky 80 660 Kč (priemer 73 908)</span><span class="mut">Domácnosť 9 332 Kč a výlety 4 617 Kč nad priemerom</span></div>`],
+ ['Vyťaženosť',S_VYTAZENOST],
+ ['Výdavky',S_VYDAVKY],
+ ['Rezerva',S_REZERVA],
+ ['Urob',S_UROB],
+];
+
+/* C */
+const wf=`<div class="wf">
+ <div><em>275 336</em><b style="height:100%;background:#2D7D5A"></b><span>Príjmy</span></div>
+ <div><em>−74 226</em><b style="height:27%;background:#B07A12"></b><span>Prevádzka<br>(nájom, štát, appky…)</span></div>
+ <div><em>−149 145</em><b style="height:54%;background:#B07A12"></b><span>Výplaty<br>Jerry + Terezka</span></div>
+ <div><em class="tz">51 965</em><b style="height:19%;background:#2D7D5A"></b><span>Zisk · 19 %</span></div>
+</div>`;
+const C=[
+ ['Výsledok',`<div class="k">Október 2026</div><div class="h">Zostalo 51 965 Kč, o 55 % viac než bežne</div>${wf}<div class="foot">Príjmy ▲ 11 %, náklady ▲ 4 %. Break-even 245 996 Kč, nad ním 29 340 Kč.</div>`],
+ ['Kam išli',S_VYDAVKY],
+ ['Odkiaľ prišli',`<div class="k">Odkiaľ prišli peniaze</div><div class="h2">240 hodín × 1 147 Kč. Viac hodín, lacnejšia hodina.</div>`+S_VYTAZENOST_TELO],
+ ['Vydrží to?',`<div class="k">Vydrží to aj v novembri?</div><div class="h2">Klienti áno, noví ľudia a rezerva nie</div>
+ <div class="grid" style="grid-template-columns:repeat(2,1fr);gap:16px;margin-top:20px">
+  <div class="card"><div style="display:flex;gap:8px;align-items:center;font-size:18px"><span class="dot z"></span><b>Klienti</b></div><div style="font-size:18px;margin-top:8px">Obnova 93 % (priemer 67 %), retencia 79 % pri cieli 80 %. Bez obnovy len Natália Pečková.</div></div>
+  <div class="card"><div style="display:flex;gap:8px;align-items:center;font-size:18px"><span class="dot c"></span><b>Noví ľudia</b></div><div style="font-size:18px;margin-top:8px">9 dopytov → 4 úvodné → 2 klienti. Z dopytu klient 22 % pri priemere 57 %.</div></div>
+  <div class="card"><div style="display:flex;gap:8px;align-items:center;font-size:18px"><span class="dot c"></span><b>Rezerva</b></div><div style="font-size:18px;margin-top:8px">1,8 mesiaca pri cieli 3. V októbri prvé odloženie 4 741 Kč. Klienti dlžia 50 780 Kč.</div></div>
+  <div class="card"><div style="display:flex;gap:8px;align-items:center;font-size:18px"><span class="dot z"></span><b>Riziko</b></div><div style="font-size:18px;margin-top:8px">Najväčší klient 7 % tržieb. Zaplatených a neodtrénovaných 315 h.</div></div>
+ </div>`],
+ ['Domov',`<div class="k">Koľko si berieme domov</div><div class="h2">149 145 Kč výplat, doma 80 660 Kč výdavkov</div>
+ <div class="grid" style="grid-template-columns:1fr 1fr;gap:22px;margin-top:20px">
+  <div class="card"><div class="row"><span>Jerry</span><b>85 114 Kč</b></div><div class="row"><span>Terezka</span><b>64 032 Kč</b></div><div class="row"><span>Spolu · priemer 132 397</span><b>▲ 13 %</b></div></div>
+  <div class="card"><div class="grp">Spoločné výdavky nad priemerom</div><div class="row"><span>Domácnosť</span><span class="flag f-o">9 332 Kč · priemer 670</span></div><div class="row"><span>Výlety</span><span class="flag f-o">4 617 Kč · priemer 776</span></div><div class="row"><span>Potraviny</span><span class="flag f-o">30 893 Kč · ▲ 28 %</span></div></div>
+ </div>`],
+ ['Rozhodnutia',S_UROB],
+];
+
+const NAVRHY={
+ A:{d:'<b>Dnešná prezentácia bez opakovania.</b> Semafor je zároveň titulka, otázky v poriadku sú spolu na jednom slajde a pribudli tri nové slajdy: vyťaženosť, výdavky a rezerva. 9 slajdov namiesto 10, ale bez jediného čísla dvakrát.',s:A},
+ B:{d:'<b>Odporúčam.</b> Jedna obrazovka zhrnie 12 najdôležitejších čísel Kokpitu v štyroch skupinách, každé raz a s farbou. Ďalej sa ide len do toho, čo je oranžové alebo červené: vyťaženosť, výdavky, rezerva a tri rozhodnutia. 5 slajdov; zelené veci nedostanú vlastný slajd, lebo nič nechcú. Klik na dlaždicu otvorí jej detail.',s:B},
+ C:{d:'<b>Mesiac ako tok peňazí.</b> Najprv koľko zostalo (vodopád príjmy → prevádzka → výplaty → zisk), potom kam išli peniaze, odkiaľ prišli, či to vydrží a čo zostalo doma. Najviac sa podobá rozhovoru s účtovníkom. 6 slajdov.',s:C},
+};
+const q=new URLSearchParams(location.search); let v=q.get('v')||'A', i=+(q.get('i')||0);
+const ram=document.getElementById('ram');
+function kresli(){
+ const s=NAVRHY[v].s;
+ ram.innerHTML=`<div class="slide">${s[i][1]}</div>`;
+ const sc=ram.clientWidth/1280; ram.firstChild.style.transform=`scale(${sc})`;
+ document.getElementById('poc').textContent=`${i+1} / ${s.length} · ${s[i][0]}`;
+ document.getElementById('thumbs').innerHTML=s.map((x,j)=>`<button class="${j===i?'on':''}" data-i="${j}">${j+1} ${x[0]}</button>`).join('');
+ document.querySelectorAll('#thumbs button').forEach(b=>b.onclick=()=>{i=+b.dataset.i;kresli()});
+ ram.querySelectorAll('[data-go]').forEach(t=>t.onclick=()=>{const k=s.findIndex(x=>x[0]===t.dataset.go);if(k>=0){i=k;kresli()}});
+ document.getElementById('popis').innerHTML=NAVRHY[v].d;
+}
+document.querySelectorAll('.let').forEach(b=>b.onclick=()=>{v=b.dataset.v;i=0;document.querySelectorAll('.let').forEach(x=>x.classList.toggle('on',x===b));kresli()});
+document.getElementById('pred').onclick=()=>{i=Math.max(0,i-1);kresli()};
+document.getElementById('dalej').onclick=()=>{i=Math.min(NAVRHY[v].s.length-1,i+1);kresli()};
+addEventListener('keydown',e=>{if(e.key==='ArrowRight')document.getElementById('dalej').click();if(e.key==='ArrowLeft')document.getElementById('pred').click()});
+addEventListener('resize',kresli);
+kresli();
+</script>
+</body>
+</html>

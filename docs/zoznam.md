@@ -293,6 +293,10 @@ je kde pozrieť).
        vlastných tabuliek (P&L júl–sep, mzdové hodiny, história sedení, prvý
        tréning, história členstiev) — samostatná väčšia práca.
 
+## PREZENTÁCIA UZÁVIERKY — návrhy 12. 11. 2026, čaká na výber
+
+Jerry: opakuje sa (6 otázok a potom to isté znovu), chýbajú výdavky (najväčšie, neštandardné), rozšíriť o vyťaženosť, rezervu a súhrn metrík. Návrhy A–C v `navrhy-kokpitu/prezentacia-uzavierky.html` na októbrových číslach; odporúčané B (jedna obrazovka 12 metrík + detail len oranžového a červeného). Pribudne rozbor výdavkov po kategóriách proti priemeru 6 mesiacov. **Nález:** report radí ozvať sa Radkovi Balážovi „bez obnovy", hoci 13. 10. ukončil spoluprácu a dostal vrátenie 15 500 Kč — ukončený klient do toho zoznamu nepatrí; opraviť spolu s prezentáciou.
+
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 
 **Nasadené 5. 11. 2026:** migrácia 0135 aplikovaná, kód v ostrom aj v bete, obrazovka Marketing → Mailer naostro od 7. 11. 2026 (`MailerKroky.tsx`, `mailer.server.ts`). Jerry vybral: vzhľad A, témy ok, 1 mail mesačne, súhlas ako slobodné začiarknutie + darček, nezaškrtnutý newsletter v anamnéze = nepísať, `news.prosapiens.cz`, klientka je nepodstatná, o prvom maile sa rozhodne, keď to bude stáť. **Overené 6. 11. 2026 skúšobnými mailmi:** doména, webhook, meranie (`links.news`), vzhľad A cez celú šírku, odosielateľ ProSapiens Biomechanic, klik, odhlásenie, odpoveď (aj z Gmail adresy bez bodky) a jej čítanie v ostrom Kokpite. **Čaká:** 1. výber darčeka, potvrdzovací mail a znenie políčka; 3. skúšobný mail a overenie obrazovky na ostrých dátach; 4. web: políčko v `js/formulare.js`, volanie `/api/mail-prihlaska`. **Overené 9. 11. 2026: na webe ešte nie je** (živý `formulare.js` endpoint nevolá, `mail_darcek` je prázdny, v `mail_odberatelia` 0 prihlásení z webu). Poradie: Jerry vyberie darček → znenie políčka → políčko na web (súhlas Jerryho, živý WordPress).
