@@ -87,6 +87,19 @@ h1{font-size:21px;margin:0 0 4px}
 .bublina small{display:block;color:var(--dim);font-size:10.5px;margin-top:3px}
 .c-pisanie{display:flex;gap:8px;align-items:flex-end;margin-top:10px}
 
+
+/* D — prepínač Pošta | Ľudia */
+.d-mriezka{display:grid;grid-template-columns:54px 300px 1fr;gap:14px}
+.d-lista{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:4px;border-right:1px solid rgba(255,255,255,.08)}
+.prepinac-zvisly{width:40px;height:96px;border-radius:22px;background:rgba(255,255,255,.08);border:1px solid var(--border);position:relative;cursor:pointer}
+.prepinac-zvisly i{position:absolute;left:3px;width:32px;height:44px;border-radius:18px;background:rgba(226,145,78,.35);border:1px solid var(--accent);transition:top .2s}
+.d-lista small{font-size:10.5px;text-align:center;line-height:1.15}
+.d-lista small.on{color:var(--accent-light);font-weight:700}
+.d-lista small.off{color:var(--dim)}
+.prepinac-vodorovny{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.prepinac-vodorovny .trat{width:54px;height:28px;border-radius:16px;background:rgba(255,255,255,.08);border:1px solid var(--border);position:relative;cursor:pointer}
+.prepinac-vodorovny .trat i{position:absolute;top:2px;width:24px;height:22px;border-radius:12px;background:rgba(226,145,78,.45);border:1px solid var(--accent);transition:left .2s}
+.d-pohlad{display:none}.d-pohlad.on{display:block}
 /* telefón */
 .tel-hlava{padding:12px 14px 8px;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06)}
 .tel-telo{padding:8px 12px 14px;max-height:620px;overflow:auto}
@@ -105,8 +118,9 @@ h1{font-size:21px;margin:0 0 4px}
 
 <div class="prepinac">
   <button data-n="a">A · Ako pošta</button>
-  <button data-n="b" class="on">B · Roztriedená fronta</button>
+  <button data-n="b">B · Roztriedená fronta</button>
   <button data-n="c">C · Po ľuďoch</button>
+  <button data-n="d" class="on">D · B + prepínač Pošta | Ľudia</button>
 </div>
 
 <!-- ═════════════ A ═════════════ -->
@@ -169,7 +183,7 @@ Díky, Janka</div>
 </section>
 
 <!-- ═════════════ B ═════════════ -->
-<section class="navrh on" id="b">
+<section class="navrh" id="b">
   <div class="popis">
     <h2><span class="pismeno">B</span> Roztriedená fronta — ako ostatné karty Workspace <span class="tip">odporúčam</span></h2>
     <p>Kokpit maily roztriedi sám: hore klienti a noví ľudia (práca), pod tým prevádzka a peniaze, dole zbalené ponuky a newslettre. Vybavený mail z karty zmizne, ako zmeny v kalendári. Z 21 mailov v schránke je práca v štyroch — tie sú vidieť prvé.</p>
@@ -295,6 +309,87 @@ Díky, Janka</div>
   </div>
 </section>
 
+<!-- ═════════════ D ═════════════ -->
+<section class="navrh on" id="d">
+  <div class="popis">
+    <h2><span class="pismeno">D</span> B s prepínačom vľavo: Pošta | Ľudia <span class="tip">tvoje zadanie</span></h2>
+    <p>Na ľavom okraji karty je prepínač. <b style="color:var(--text)">Pošta</b> = zoznam vľavo a mail vpravo (A), ale zoznam je roztriedený ako v B a pri otvorenom maile sú tlačidlá z B. <b style="color:var(--text)">Ľudia</b> = konverzácie po ľuďoch (C). Klikni na prepínač.</p>
+  </div>
+  <div class="zariadenia">
+    <div class="pc">
+      <div class="stitok-zar">počítač</div>
+      <div class="karta">
+        <h3>Pošta <span class="dim" style="font-size:13px;font-weight:400">· 4 na vybavenie</span></h3>
+        <div class="pod">info@prosapiens.cz · načítané 12. 11. o 9:00 · ďalšie o 12:00 · <a class="tl" style="text-decoration:none">↻ načítať teraz</a></div>
+        <div class="d-mriezka">
+          <div class="d-lista">
+            <small class="on" id="dPostaL">Pošta</small>
+            <div class="prepinac-zvisly" id="dPrep" title="Pošta | Ľudia"><i id="dJazdec" style="top:3px"></i></div>
+            <small class="off" id="dLudiaL">Ľudia</small>
+          </div>
+
+          <!-- POŠTA: roztriedený zoznam + detail -->
+          <div class="d-pohlad on" id="dPostaZoznam" style="border-right:1px solid rgba(255,255,255,.08);padding-right:10px">
+            <div class="sekcia" style="margin-top:0">Klienti · 1</div>
+            <div class="a-riadok nove on"><div class="kto">Janka Šnirychová <small>11:42</small></div><div class="pred">Re: Faktura 20261003</div></div>
+            <div class="sekcia">Noví ľudia · 1</div>
+            <div class="a-riadok nove"><div class="kto">Radka Kovaříková <small>včera</small></div><div class="pred">Re: Re: uvodni trenink</div></div>
+            <div class="sekcia">Web a prevádzka · 2</div>
+            <div class="a-riadok nove"><div class="kto">support61 <small>včera</small></div><div class="pred">[Vyžaduje akci] Vaše stránka…</div></div>
+            <div class="a-riadok"><div class="kto">Správa domu <small>po</small></div><div class="pred">Re: Fwd: Vyúčtování 2024</div></div>
+            <div class="sekcia">Ostatné · 5</div>
+            <div class="zbalene">▸ ponuky, newslettre, mailing</div>
+          </div>
+          <div class="d-pohlad on" id="dPostaDetail">
+            <h4 style="margin:0 0 3px;font-size:16px">Re: Faktura 20261003 — ProSapiens Biomechanic</h4>
+            <div class="dim" style="font-size:12px;margin-bottom:10px">Janka Šnirychová · 12. 11. o 11:42</div>
+            <div class="klient-pas"><b>● klientka</b> Terezka · zostatok <b>3 h</b> · dlh 0 Kč · faktúra 20261003 <b>zaplatená</b> <button class="tl z">Profil →</button></div>
+            <div class="text-mailu">Dobrý den,
+platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude.
+
+Díky, Janka</div>
+            <textarea class="odpoved" placeholder="Odpovedať…"></textarea>
+            <div class="b-akcie"><button class="tl h">Odoslať a vybaviť</button><button class="tl o">＋ Zapísať ako dopyt</button><button class="tl">Ponúknuť termíny</button><button class="tl">Vybavené</button></div>
+          </div>
+
+          <!-- ĽUDIA -->
+          <div class="d-pohlad" id="dLudiaZoznam" style="border-right:1px solid rgba(255,255,255,.08);padding-right:10px">
+            <div class="c-osoba on"><div class="avatar k">JŠ</div><div><b style="font-size:13px">Janka Šnirychová</b><small>Re: Faktura 20261003 · 11:42</small></div></div>
+            <div class="c-osoba"><div class="avatar n">RK</div><div><b style="font-size:13px">Radka Kovaříková</b><small>nová · uvodni trenink</small></div></div>
+            <div class="c-osoba"><div class="avatar">PN</div><div><b style="font-size:13px">Petra N.</b><small>odpoveď na mailing</small></div></div>
+            <div class="c-osoba"><div class="avatar">SD</div><div><b style="font-size:13px">Správa domu</b><small>Vyúčtování 2024</small></div></div>
+          </div>
+          <div class="d-pohlad" id="dLudiaDetail">
+            <div class="klient-pas">Janka Šnirychová · Terezka · zostatok <b>3 h</b> · dlh 0 Kč <button class="tl z">Profil →</button></div>
+            <div class="bublina my">Faktura 20261003 (PDF + QR)<small>Kokpit · 28. 9.</small></div>
+            <div class="bublina my">Přehled hodin a QR na platbu<small>SMS · 5. 11.</small></div>
+            <div class="bublina on">Dobrý den, platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude. Díky, Janka<small>mail · 12. 11. 11:42</small></div>
+            <div class="c-pisanie"><textarea class="odpoved" style="min-height:44px" placeholder="Napíš Janke…"></textarea><button class="tl h">Poslať</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="stitok-zar">telefón — prepínač hore</div>
+      <div class="mobil">
+        <div class="tel-hlava">Pošta <span class="prepinac-vodorovny"><span>Pošta</span><span class="trat"><i style="left:2px"></i></span><span class="dim">Ľudia</span></span></div>
+        <div class="tel-telo">
+          <div class="sekcia" style="margin-top:4px">Klienti · 1</div>
+          <div class="a-riadok nove"><div class="kto">Janka Šnirychová <small>11:42</small></div><div class="pred">Re: Faktura 20261003</div></div>
+          <div class="sekcia">Noví ľudia · 1</div>
+          <div class="a-riadok nove"><div class="kto">Radka Kovaříková <small>včera</small></div><div class="pred">Re: Re: uvodni trenink</div></div>
+          <div class="b-akcie" style="margin:2px 0 8px 10px"><button class="tl o">＋ Dopyt</button><button class="tl">Termíny</button></div>
+          <div class="sekcia">Web a prevádzka · 2</div>
+          <div class="a-riadok nove"><div class="kto">support61 <small>včera</small></div><div class="pred">[Vyžaduje akci] Vaše stránka…</div></div>
+          <div class="a-riadok"><div class="kto">Správa domu <small>po</small></div><div class="pred">Re: Fwd: Vyúčtování 2024</div></div>
+          <div class="zbalene">▸ Ostatné · 5</div>
+        </div>
+        <div class="tel-lista"><span>Dnes</span><b>Workspace</b><span>＋</span><span>Kalendár</span><span>Jarvis</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="spolocne">
   <b>Spoločné pre všetky tri:</b> karta je vo Workspace u Jerryho aj Terezky · schránka sa načíta každé 2–3 hodiny (napr. 6:00, 9:00, 12:00, 15:00, 18:00, 21:00) a kedykoľvek tlačidlom · Kokpit si pamätá len kto, kedy a predmet, text sa načíta až pri otvorení · odpoveď ide z info@prosapiens.cz s pôvodnou správou pod textom · „Vybavené“ mail z karty schová, v schránke ostane · prílohy, presúvanie do priečinkov a hľadanie v celej histórii zatiaľ nie.
 </div>
@@ -304,6 +399,11 @@ document.querySelectorAll('.prepinac button').forEach(b=>b.addEventListener('cli
   document.querySelectorAll('.prepinac button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.navrh').forEach(s=>s.classList.toggle('on',s.id===b.dataset.n));
 }));
+const dPrep=document.getElementById('dPrep');let dLudia=false;
+dPrep.addEventListener('click',()=>{dLudia=!dLudia;document.getElementById('dJazdec').style.top=dLudia?'49px':'3px';
+  document.getElementById('dPostaL').className=dLudia?'off':'on';document.getElementById('dLudiaL').className=dLudia?'on':'off';
+  ['dPostaZoznam','dPostaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',!dLudia));
+  ['dLudiaZoznam','dLudiaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',dLudia));});
 </script>
 </body>
 </html>
