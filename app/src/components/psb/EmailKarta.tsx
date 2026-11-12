@@ -34,8 +34,17 @@ type Bublina =
   | { druh: "sms"; kedy: string; co: string; kto: string }
   | { druh: "zmluva"; kedy: string; co: string };
 
-/** Podpis odpovede z info@ — vždy Terezia Zatková, nech píše ktokoľvek (Jerry, 12. 11. 2026). */
-const PODPIS = "Terezia Zatková";
+/**
+ * Podpis odpovede z info@ — predvolene Terezia Zatková, nech píše ktokoľvek;
+ * dá sa prepnúť (Jerry, 12. 11. 2026: „daj tam možnosť výberu podpisu“).
+ * Posledná voľba sa pamätá v prehliadači.
+ */
+const PODPISY = ["Terezia Zatková", "Filip Stráňavský"] as const;
+const KLUC_PODPISU = "psb-email-podpis";
+function ulozenyPodpis(): string {
+  try { const v = localStorage.getItem(KLUC_PODPISU); if (v && (PODPISY as readonly string[]).includes(v)) return v; } catch { /* súkromné okno */ }
+  return PODPISY[0];
+}
 
 const tl = { padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted } as const;
 const tlHlavne = { ...tl, background: C.accent, color: C.onAccent, border: `1px solid ${C.accent}`, fontWeight: 600 } as const;
@@ -271,7 +280,13 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   const [text, setText] = useState<string | null>(null);
   const [bubliny, setBubliny] = useState<Bublina[] | null>(null);
   const [chybaDetailu, setChybaDetailu] = useState("");
-  const [odpoved, setOdpoved] = useState(`Dobrý den,\n\n\n\nS pozdravem\n${PODPIS}\nProSapiens Biomechanic`);
+  const [podpis, setPodpis] = useState(ulozenyPodpis);
+  const [odpoved, setOdpoved] = useState(() => `Dobrý den,\n\n\n\nS pozdravem\n${ulozenyPodpis()}\nProSapiens Biomechanic`);
+  const zmenPodpis = (novy: string) => {
+    setOdpoved((t) => (t.includes(podpis) ? t.split(podpis).join(novy) : `${t.trimEnd()}\n${novy}`));
+    setPodpis(novy);
+    try { localStorage.setItem(KLUC_PODPISU, novy); } catch { /* nevadí */ }
+  };
   const [komu, setKomu] = useState(e.odpovedatMail);
   const [posielam, setPosielam] = useState(false);
   const [preradit, setPreradit] = useState(false);
@@ -339,6 +354,15 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
     <div style={{ marginTop: 10 }}>
       <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.textDim, marginBottom: 4 }}>
         komu <input value={komu} onChange={(x) => setKomu(x.target.value)} style={{ flex: 1, minWidth: 0, padding: "4px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5 }} />
+      </div>
+      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: C.textDim, marginBottom: 4 }}>
+        podpis
+        {PODPISY.map((p) => (
+          <button key={p} onClick={() => zmenPodpis(p)}
+            style={{ ...tl, padding: "3px 9px", fontSize: 12, background: p === podpis ? C.accentBg : "transparent", color: p === podpis ? C.text : C.textMuted, fontWeight: p === podpis ? 700 : 400 }}>
+            {p}
+          </button>
+        ))}
       </div>
       <textarea value={odpoved} onChange={(x) => setOdpoved(x.target.value)} rows={ludia ? 5 : 7}
         style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 9, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.45, resize: "vertical" }} />
