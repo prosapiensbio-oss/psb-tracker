@@ -12,7 +12,10 @@
  */
 
 type Sedenie = { date: string; client: string };
-type Balicek = { klient: string; nazov: string; platnost_od: string; platnost_do: string | null; zrusene_at: string | null };
+type Balicek = { klient: string; nazov: string; platnost_od: string; platnost_do: string | null; zrusene_at: string | null; poznamka?: string | null };
+
+/** Ukončenie s vrátením zapisuje akcia `ukonci` do poznámky (rovnaký vzor ako `jeUkonceny`). */
+const ukoncenyBalicek = (b: Balicek) => /(^|·\s*)ukončené \d/.test(String(b.poznamka || ""));
 type Platba = { klient: string; datum: string; suma: number };
 
 const den = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
@@ -29,7 +32,7 @@ const jeObnovitelny = (nazov: string) => !/doplnen|uvodn|úvodn/i.test(nazov);
  * 30. 9. zaplatil 12 lekcií, balíček mu v Kokpite vznikol až 7. 10. —
  * podľa balíčka by vyzeral ako ten, kto neobnovil (Jerry, 8. 10. 2026).
  */
-export function obnovaBalickov(balicky: Balicek[], platby: Platba[], mesiac: string): { skoncilo: number; obnovene: number; bezObnovy: { klient: string; do: string }[] } {
+export function obnovaBalickov(balicky: Balicek[], platby: Platba[], mesiac: string): { skoncilo: number; obnovene: number; bezObnovy: { klient: string; do: string }[]; ukoncili: { klient: string; do: string }[] } {
   const zive = balicky.filter((b) => !b.zrusene_at);
   const skoncene = zive.filter((b) => b.platnost_do && b.platnost_do.slice(0, 7) === mesiac && jeObnovitelny(b.nazov));
   // Klient s dvoma balíčkami končiacimi v tom istom mesiaci sa ráta raz (posledný).
@@ -37,8 +40,16 @@ export function obnovaBalickov(balicky: Balicek[], platby: Platba[], mesiac: str
   for (const b of skoncene) { const k = norm(b.klient); const x = posledny.get(k); if (!x || (b.platnost_do as string) > (x.platnost_do as string)) posledny.set(k, b); }
   let obnovene = 0;
   const bezObnovy: { klient: string; do: string }[] = [];
+  // Kto spoluprácu ukončil (vrátenie), neobnovil — ale volať mu „kúp si ďalší"
+  // nemá zmysel. Do obnovy sa ráta ako neobnovený, do zoznamu „ozvi sa" nie
+  // (Radek Baláž v októbrovom reporte, 12. 11. 2026).
+  const ukoncili: { klient: string; do: string }[] = [];
   for (const b of posledny.values()) {
     const koniec = den(b.platnost_do as string);
+    if (balicky.some((x) => norm(x.klient) === norm(b.klient) && ukoncenyBalicek(x))) {
+      ukoncili.push({ klient: b.klient, do: (b.platnost_do as string).slice(0, 10) });
+      continue;
+    }
     const v = (d: string) => den(d) >= koniec - 20 * DEN && den(d) <= koniec + 30 * DEN;
     const k = norm(b.klient);
     const novyBalicek = zive.some((x) => x !== b && norm(x.klient) === k && jeObnovitelny(x.nazov) && v(x.platnost_od));
@@ -46,7 +57,7 @@ export function obnovaBalickov(balicky: Balicek[], platby: Platba[], mesiac: str
     if (novyBalicek || platba) obnovene++;
     else bezObnovy.push({ klient: b.klient, do: (b.platnost_do as string).slice(0, 10) });
   }
-  return { skoncilo: posledny.size, obnovene, bezObnovy: bezObnovy.sort((a, b) => a.do.localeCompare(b.do)) };
+  return { skoncilo: posledny.size, obnovene, bezObnovy: bezObnovy.sort((a, b) => a.do.localeCompare(b.do)), ukoncili };
 }
 
 /** Prvý tréning každého klienta. */

@@ -18,6 +18,18 @@ describe("metriky klientov", () => {
     expect(o.bezObnovy).toEqual([{ klient: "Roman Jakubiček", do: "2026-09-28" }]);
   });
 
+  it("obnova: kto ukončil s vrátením, nie je v zozname „ozvi sa“, ale obnovu nezvyšuje", () => {
+    const balicky = [
+      { klient: "Radek Balaž", nazov: "6h Balíček", platnost_od: "2026-09-20", platnost_do: "2026-10-20", zrusene_at: null, poznamka: "automaticky — prvý tréning · ukončené 13. 10. 2026 — vrátené 15 500 Kč" },
+      { klient: "Natalia Peckova", nazov: "6h Balíček", platnost_od: "2026-09-28", platnost_do: "2026-10-28", zrusene_at: null },
+    ];
+    const o = obnovaBalickov(balicky, [], "2026-10");
+    expect(o.skoncilo).toBe(2);
+    expect(o.obnovene).toBe(0);
+    expect(o.bezObnovy).toEqual([{ klient: "Natalia Peckova", do: "2026-10-28" }]);
+    expect(o.ukoncili).toEqual([{ klient: "Radek Balaž", do: "2026-10-20" }]);
+  });
+
   it("prežitie 100 dní, retencia 6 mes., odchody", () => {
     const s = (client: string, date: string) => ({ client, date });
     const sedenia = [

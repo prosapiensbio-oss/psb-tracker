@@ -14,7 +14,7 @@
  * (návrhy reportu). Návrh, ktorý Jerry vybral z troch 12. 10. 2026.
  */
 
-import { navrhyReportu, type OtazkaReportu, type Report, type RiadokDetailu, type Semafor } from "./mesacnyReport";
+import { navrhyReportu, type OtazkaReportu, type PodkladyReportu, type Report, type RiadokDetailu, type Semafor } from "./mesacnyReport";
 
 const kc = (n: number) => Math.round(n).toLocaleString("sk-SK").replace(/,/g, " ");
 
@@ -62,7 +62,26 @@ export type SlajdAkcie = {
   nadpis: string;
   akcie: { nadpis: string; text: string }[];
 };
-export type Slajd = SlajdTitulka | SlajdSemafor | SlajdOtazka | SlajdZaver | SlajdAkcie;
+/** Návrh A: titulka a semafor v jednom. Toto je jediný prehľad celého mesiaca. */
+export type SlajdPrehlad = {
+  druh: "prehlad";
+  kroky: number;
+  kicker: string;
+  nadpis: string;
+  porovnanie: string;
+  karty: SlajdSemafor["karty"];
+};
+export type SlajdVytazenost = { druh: "vytazenost"; kroky: number; nadpis: string; p: PodkladyReportu };
+export type SlajdVydavky = { druh: "vydavky"; kroky: number; nadpis: string; p: PodkladyReportu };
+export type SlajdRezerva = { druh: "rezerva"; kroky: number; nadpis: string; p: PodkladyReportu };
+/** Otázky, ktoré sú v poriadku, spolu na jednom slajde — nič nechcú. */
+export type SlajdSpolu = {
+  druh: "spolu";
+  kroky: number;
+  nadpis: string;
+  karty: { id: string; otazka: string; hodnota: string; zmena: string; odpoved: string }[];
+};
+export type Slajd = SlajdTitulka | SlajdSemafor | SlajdOtazka | SlajdZaver | SlajdAkcie | SlajdPrehlad | SlajdVytazenost | SlajdVydavky | SlajdRezerva | SlajdSpolu;
 
 /** Veľké číslo otázky ako text — „231 hodín“, alebo pomlčka, keď zdroj chýba. */
 export const cisloOtazky = (o: OtazkaReportu): string =>
@@ -159,6 +178,97 @@ export function postavPrezentaciu(r: Report): Slajd[] {
     akcie: navrhy.map((n) => ({ nadpis: n.nadpis, text: n.text })),
   });
 
+  return slajdy;
+}
+
+/**
+ * NÁVRH A (Jerry, 12. 11. 2026: „vyhráva A"). Dnešná prezentácia opakovala tých
+ * istých šesť otázok štyrikrát: semafor, slajd po slajde, záver a „Čo urobíme".
+ * Tu je každé číslo raz:
+ *   prehľad (titulka a semafor v jednom) → práca → vyťaženosť → peniaze →
+ *   výdavky → rezerva → otázky, ktoré nie sú v poriadku → zelené spolu na
+ *   jednom slajde → najviac tri veci, čo urobiť.
+ * „Urob" sa pri otázke už neukazuje, je len na konci.
+ */
+const VAHA: Record<Semafor, number> = { c: 0, o: 1, z: 2 };
+const PORADIE_AKCII = ["praca", "peniaze", "novi", "klienti", "koncentracia", "osobne"];
+
+export function postavPrezentaciuA(r: Report): Slajd[] {
+  const otazky = r.otazky || [];
+  const podla = (id: string) => otazky.find((o) => o.id === id);
+  const peniaze = podla("peniaze");
+  const vPoriadku = otazky.filter((o) => !o.hlavne.chyba && o.semafor === "z").length;
+  const pocet = otazky.length;
+  const zhrnutie = vPoriadku === pocet ? "všetky otázky v poriadku" : `${vPoriadku} ${pocet === 6 || pocet === 7 ? "zo" : "z"} ${pocet} otázok v poriadku`;
+  const nadpis = peniaze && !peniaze.hlavne.chyba
+    ? `Zisk ${cisloOtazky(peniaze).replace(" Kč zisk", " Kč")}, ${zhrnutie}`
+    : `${r.nadpis}: ${zhrnutie}`;
+
+  const slajdOtazky = (o: OtazkaReportu): SlajdOtazka => ({
+    druh: "otazka", kroky: 3, id: o.id, otazka: o.otazka, semafor: o.semafor, odpoved: o.odpoved,
+    hodnota: o.hlavne.chyba ? "—" : kc(o.hlavne.hodnota), jednotka: o.hlavne.jednotka, zmena: o.hlavne.zmena,
+    smer: o.hlavne.smer, seria: o.hlavne.seria, popisSerie: o.hlavne.popisSerie, detail: o.detail.slice(0, 4),
+    akcia: "",
+  });
+
+  const slajdy: Slajd[] = [{
+    druh: "prehlad", kroky: 1,
+    kicker: `Uzávierka · ${r.druh === "kvartal" ? `kvartál ${r.nadpis}` : r.nadpis}`,
+    nadpis: nadpis.charAt(0).toUpperCase() + nadpis.slice(1),
+    porovnanie: r.porovnanie,
+    karty: otazky.map((o) => ({ id: o.id, otazka: o.otazka, semafor: o.semafor, hodnota: cisloOtazky(o), zmena: o.hlavne.zmena, bezDat: Boolean(o.hlavne.chyba) })),
+  }];
+
+  const praca = podla("praca");
+  if (praca) slajdy.push(slajdOtazky(praca));
+  const p = r.podklady;
+  if (p && p.treneri.length) {
+    const nad = p.treneri.filter((t) => t.pct > 100);
+    const pod = p.treneri.filter((t) => t.pct < 100);
+    slajdy.push({
+      druh: "vytazenost", kroky: 1, p,
+      nadpis: nad.length
+        ? `${nad.map((t) => t.kto).join(" a ")} ${nad.length === 1 ? "je" : "sú"} nad stropom${pod.length ? `, ${pod.map((t) => `${t.kto} má ${kc(t.strop - t.hodiny)} h voľných`).join(", ")}` : ""}`
+        : `Obaja pod stropom: ${p.treneri.map((t) => `${t.kto} ${t.pct} %`).join(", ")}`,
+    });
+  }
+  if (peniaze) slajdy.push(slajdOtazky(peniaze));
+  if (p && (p.vydavky.najvacsie.length || p.vydavky.nestandardne.length)) {
+    slajdy.push({
+      druh: "vydavky", kroky: 1, p,
+      nadpis: p.vydavky.nestandardne.length ? "Kam išli peniaze a čo bolo navyše" : "Kam išli peniaze — nič neštandardné",
+    });
+  }
+  if (p && (p.rezervaMesiacov !== undefined && p.rezervaMesiacov !== null)) {
+    const m = p.rezervaMesiacov;
+    slajdy.push({
+      druh: "rezerva", kroky: 1, p,
+      nadpis: `Rezerva drží ${m.toFixed(1).replace(".", ",")} mesiaca. ${m >= 3 ? "Cieľ 3 je splnený." : "Cieľ sú 3."}`,
+    });
+  }
+
+  const ostatne = otazky.filter((o) => !["praca", "peniaze"].includes(o.id));
+  for (const o of ostatne.filter((o) => o.semafor !== "z" || o.hlavne.chyba)) slajdy.push(slajdOtazky(o));
+  const zelene = ostatne.filter((o) => o.semafor === "z" && !o.hlavne.chyba);
+  if (zelene.length) {
+    slajdy.push({
+      druh: "spolu", kroky: 1,
+      nadpis: zelene.length === 1 ? `${zelene[0].otazka} V poriadku.` : "Ostatné je v poriadku",
+      karty: zelene.map((o) => ({ id: o.id, otazka: o.otazka, hodnota: cisloOtazky(o), zmena: o.hlavne.zmena, odpoved: o.odpoved })),
+    });
+  }
+
+  const navrhy = navrhyReportu(r)
+    .map((n) => ({ ...n, sem: podla(n.otazka)?.semafor || "z" }))
+    .sort((a, b) => VAHA[a.sem] - VAHA[b.sem] || PORADIE_AKCII.indexOf(a.otazka) - PORADIE_AKCII.indexOf(b.otazka))
+    .slice(0, 3);
+  // Kroky musia pokryť všetky bloky: slajd sa ukazuje na poslednom kroku a blok
+  // s indexom i sa ukáže až od kroku 1 + i (prvá beta 12. 11. bola prázdna).
+  slajdy.push({
+    druh: "akcie", kroky: 1 + Math.max(1, navrhy.length),
+    nadpis: r.druh === "kvartal" ? "Čo urobíme v ďalšom štvrťroku" : "Čo urobíme v ďalšom mesiaci",
+    akcie: navrhy.map((n) => ({ nadpis: n.nadpis, text: n.text })),
+  });
   return slajdy;
 }
 

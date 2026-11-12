@@ -17,6 +17,8 @@
  * istých zdrojov, ktoré ukazujú obrazovky — report nič nepočíta po svojom.
  */
 
+import { rozborVydavkov, type KategoriaVydavku, type RozborVydavkov } from "./vydavkyReportu";
+
 export type MesiacReportu = {
   m: string;
   hodiny: number;
@@ -81,6 +83,12 @@ export type ExtraReportu = {
   najlepsiReel?: { hook: string; views: number };
   /** Klienti, ktorým v období skončil balíček a nový neprišiel. */
   bezObnovy?: { klient: string; do: string }[];
+  /** Skončil im balíček a spoluprácu ukončili (vrátenie) — neozývať sa ako „bez obnovy". */
+  ukoncili?: { klient: string; do: string }[];
+  /** Výdavky obdobia po kategóriách proti priemeru (vydavkyReportu.ts). */
+  vydavky?: KategoriaVydavku[];
+  /** Koľko sa v období odložilo do rezervy (kategória „rezerva" vo výpise). */
+  odlozeneDoRezervy?: number;
   obnova?: { skoncilo: number; obnovene: number };
   prezitie?: { kohorta: string; novi: number; ostali: number };
   retencia?: { kohorta: number; ostali: number };
@@ -110,7 +118,29 @@ export type OtazkaReportu = {
   zoznamy: { nadpis: string; polozky: string[] }[];
   akcia: string;
 };
-export type Report = { druh: "mesiac" | "kvartal"; nadpis: string; porovnanie: string; otazky: OtazkaReportu[] };
+/**
+ * Podklady pre prezentáciu (návrh A, 12. 11. 2026): vyťaženosť, výdavky
+ * a rezerva dostali vlastné slajdy. Čísla sú tie isté, ktoré report píše do
+ * tabuliek pri otázkach — tu len ako hodnoty, nie ako text.
+ */
+export type PodkladyReportu = {
+  hodiny: number;
+  priemerHodin?: number;
+  treneri: { kto: string; hodiny: number; strop: number; pct: number; priemer?: number }[];
+  hodinNaBe?: number;
+  prijemNaHodinu?: number;
+  priemerNaHodinu?: number;
+  prijmy?: number;
+  naklady?: number;
+  breakEven?: number;
+  rezervaMesiacov?: number | null;
+  dlzne?: number;
+  predplateneHodiny?: number;
+  odlozeneDoRezervy?: number;
+  vydavky: RozborVydavkov;
+  ai: { seria: number[]; popis: string[] };
+};
+export type Report = { druh: "mesiac" | "kvartal"; nadpis: string; porovnanie: string; otazky: OtazkaReportu[]; podklady?: PodkladyReportu };
 
 const MES = ["január", "február", "marec", "apríl", "máj", "jún", "júl", "august", "september", "október", "november", "december"];
 export const nazovMes = (m: string) => `${MES[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
@@ -477,7 +507,10 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       riadok("Prestali chodiť (počet)", akt.prestali, h("prestali"), cele, false),
       extra.hodnotaKlienta?.pocet ? riadokText("Hodnota klienta za celú spoluprácu", `${kc(extra.hodnotaKlienta.priemer)} Kč`, `${extra.hodnotaKlienta.mesiacov.toFixed(1).replace(".", ",")} mes.`, `${extra.hodnotaKlienta.pocet} klientov`) : null,
     ]),
-    zoznamy: bezObnovy.length ? [{ nadpis: "Skončil balíček, nový neprišiel", polozky: bezObnovy.map((b) => `${b.klient} (${den(b.do)})`) }] : [],
+    zoznamy: [
+      ...(bezObnovy.length ? [{ nadpis: "Skončil balíček, nový neprišiel", polozky: bezObnovy.map((b) => `${b.klient} (${den(b.do)})`) }] : []),
+      ...(extra.ukoncili?.length ? [{ nadpis: "Ukončili spoluprácu", polozky: extra.ukoncili.map((b) => `${b.klient} (${den(b.do)})`) }] : []),
+    ],
     akcia: bezObnovy.length
       ? `Ozvi sa ${bezObnovy.length === 1 ? "klientovi" : "klientom"} bez obnovy: ${bezObnovy.map((b) => b.klient).join(", ")}.`
       : extra.prezitie?.novi && extra.prezitie.ostali / extra.prezitie.novi < 0.6
@@ -507,7 +540,27 @@ export function postavReport(mesiace: MesiacReportu[], ciel: string, druh: "mesi
       : nadStropom.length ? "Nových klientov dávať trénerovi, ktorý je pod stropom." : "Bez zmeny.",
   };
 
-  return { druh, nadpis, porovnanie, otazky: [praca, klienti, peniaze, novi, koncentraciaQ, osobne] };
+  const podklady: PodkladyReportu = {
+    hodiny: akt.hodiny,
+    priemerHodin: pHodin,
+    treneri: ([["Jerry", akt.hodinyJerry, extra.strop?.jerry, priem("hodinyJerry")], ["Terezka", akt.hodinyTerezka, extra.strop?.terezka, priem("hodinyTerezka")]] as const)
+      .filter(([, hod, strop]) => hod !== undefined && !!strop)
+      .map(([kto, hod, strop, pr]) => ({ kto, hodiny: hod as number, strop: (strop as number) * nasobok, pct: Math.round(((hod as number) / ((strop as number) * nasobok)) * 100), priemer: pr })),
+    hodinNaBe: hodinNaBe(akt),
+    prijemNaHodinu: naHodinu(akt),
+    priemerNaHodinu: (() => { const v = definovane(historia.map(naHodinu)); return v.length ? priemer(v) : undefined; })(),
+    prijmy: akt.prijmy,
+    naklady: akt.naklady,
+    breakEven: akt.breakEven,
+    rezervaMesiacov: extra.rezervaMesiacov,
+    dlzne: extra.dlzne,
+    predplateneHodiny: extra.predplateneHodiny,
+    odlozeneDoRezervy: extra.odlozeneDoRezervy,
+    vydavky: rozborVydavkov(extra.vydavky || []),
+    ai: { seria: seriaMes.map((x) => x.ai || 0), popis: popisSerie },
+  };
+
+  return { druh, nadpis, porovnanie, otazky: [praca, klienti, peniaze, novi, koncentraciaQ, osobne], podklady };
 }
 
 /** Report ako markdown pre tlač do PDF (`vytlacReport`), grafy cez značky. */

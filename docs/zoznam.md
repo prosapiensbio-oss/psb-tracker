@@ -293,9 +293,9 @@ je kde pozrieť).
        vlastných tabuliek (P&L júl–sep, mzdové hodiny, história sedení, prvý
        tréning, história členstiev) — samostatná väčšia práca.
 
-## PREZENTÁCIA UZÁVIERKY — návrhy 12. 11. 2026, čaká na výber
+## PREZENTÁCIA UZÁVIERKY — Jerry vybral A (12. 11. 2026), skúša sa v bete
 
-Jerry: opakuje sa (6 otázok a potom to isté znovu), chýbajú výdavky (najväčšie, neštandardné), rozšíriť o vyťaženosť, rezervu a súhrn metrík. Návrhy A–C v `navrhy-kokpitu/prezentacia-uzavierky.html` na októbrových číslach; odporúčané B (jedna obrazovka 12 metrík + detail len oranžového a červeného). Pribudne rozbor výdavkov po kategóriách proti priemeru 6 mesiacov. **Nález:** report radí ozvať sa Radkovi Balážovi „bez obnovy", hoci 13. 10. ukončil spoluprácu a dostal vrátenie 15 500 Kč — ukončený klient do toho zoznamu nepatrí; opraviť spolu s prezentáciou.
+Jerry: opakuje sa (6 otázok a potom to isté znovu), chýbajú výdavky (najväčšie, neštandardné), rozšíriť o vyťaženosť, rezervu a súhrn metrík. Návrhy A–C v `navrhy-kokpitu/prezentacia-uzavierky.html` na októbrových číslach; odporúčané B (jedna obrazovka 12 metrík + detail len oranžového a červeného). Pribudne rozbor výdavkov po kategóriách proti priemeru 6 mesiacov. **V bete od 12. 11.:** `postavPrezentaciuA` (prehľad → práca → vyťaženosť → peniaze → výdavky → rezerva → nie zelené → zelené spolu → max 3 „Urob"), `vydavkyReportu.ts`. Rezerva v bete ukazuje menej (beta nemá BTC). Po potvrdení: v `Prezentacia.tsx` zrušiť `jeBeta()` vetvu a starý `postavPrezentaciu`, riadok z `SKUSA_SA` preč. **Opravené naostro:** report radil ozvať sa Radkovi Balážovi „bez obnovy", hoci 13. 10. ukončil spoluprácu a dostal vrátenie 15 500 Kč — ukončený klient do toho zoznamu nepatrí; opraviť spolu s prezentáciou.
 
 ## VLASTNÝ MAILER — zadanie na neskôr (Jerry, 27. 10. 2026)
 

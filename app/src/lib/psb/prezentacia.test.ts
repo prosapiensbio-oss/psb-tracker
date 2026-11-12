@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { postavReport, type MesiacReportu } from "./mesacnyReport";
-import { dalej, plnyKrok, postavPrezentaciu, spat, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "./prezentacia";
+import { dalej, plnyKrok, postavPrezentaciu, postavPrezentaciuA, spat, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "./prezentacia";
 
 const m = (mm: string, o: Partial<MesiacReportu> = {}): MesiacReportu => ({ m: mm, hodiny: 200, aktivni: 55, novi: 5, dopyty: 6, prijmy: 200000, naklady: 150000, zisk: 50000, prirastokIg: 10, dosahReels: 450, reklama: 2000, prestali: 3, ...o });
 const mesiace = [
@@ -106,5 +106,49 @@ describe("prezentácia z reportu", () => {
     const s = postavPrezentaciu(q);
     expect((s[0] as SlajdTitulka).nadpis).toBe("Kvartálny report Q3 2026");
     expect((s[s.length - 1] as SlajdAkcie).nadpis).toBe("Čo urobíme v ďalšom štvrťroku");
+  });
+});
+
+describe("prezentácia, návrh A (bez opakovania)", () => {
+  const ex = {
+    ...extra,
+    strop: { jerry: 120, terezka: 120 },
+    rezervaMesiacov: 1.8, dlzne: 50780, predplateneHodiny: 315, odlozeneDoRezervy: 4741,
+    vydavky: [
+      { kat: "fixne.prevadzka.najom", nazov: "Nájom", suma: 29750, priemer: 32000, mesiacov: 6 },
+      { kat: "fixne.apps.ai", nazov: "AI", suma: 7694, priemer: 5638, mesiacov: 6 },
+    ],
+  };
+  const r = postavReport(mesiace.map((x) => (x.m === "2026-09" ? { ...x, hodinyJerry: 132, hodinyTerezka: 99 } : x)), "2026-09", "mesiac", ex);
+  const s = postavPrezentaciuA(r);
+
+  it("každá otázka je okrem prehľadu na obrazovke najviac raz", () => {
+    expect(s[0].druh).toBe("prehlad");
+    for (const o of r.otazky) {
+      const vOtazke = s.filter((x) => x.druh === "otazka" && x.id === o.id).length;
+      const vSpolu = s.filter((x) => x.druh === "spolu" && x.karty.some((k) => k.id === o.id)).length;
+      expect(vOtazke + vSpolu).toBe(1);
+    }
+    expect(s.some((x) => x.druh === "zaver" || x.druh === "semafor" || x.druh === "titulka")).toBe(false);
+  });
+
+  it("pri otázke už nie je „Urob“, na konci najviac tri veci", () => {
+    expect(s.filter((x) => x.druh === "otazka").every((x) => x.druh === "otazka" && x.akcia === "")).toBe(true);
+    const akcie = s[s.length - 1];
+    expect(akcie.druh).toBe("akcie");
+    if (akcie.druh === "akcie") {
+      expect(akcie.akcie.length).toBeLessThanOrEqual(3);
+      // Posledný blok sa ukáže na kroku `akcie.length`; slajd sa kreslí na kroku kroky - 1.
+      expect(plnyKrok(s, s.length - 1)).toBeGreaterThanOrEqual(akcie.akcie.length);
+    }
+  });
+
+  it("vyťaženosť, výdavky a rezerva majú vlastný slajd v poradí za prácou a peniazmi", () => {
+    const druhy = s.map((x) => (x.druh === "otazka" ? x.id : x.druh));
+    expect(druhy.slice(0, 6)).toEqual(["prehlad", "praca", "vytazenost", "peniaze", "vydavky", "rezerva"]);
+    const v = s.find((x) => x.druh === "vytazenost");
+    expect(v && v.druh === "vytazenost" && v.nadpis).toBe("Jerry je nad stropom, Terezka má 21 h voľných");
+    const vy = s.find((x) => x.druh === "vydavky");
+    expect(vy && vy.druh === "vydavky" && vy.p.vydavky.nestandardne.map((n) => n.kat)).toEqual(["fixne.apps.ai"]);
   });
 });

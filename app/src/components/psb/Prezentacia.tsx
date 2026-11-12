@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { dalej, plnyKrok, postavPrezentaciu, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdSemafor, type SlajdTitulka, type SlajdZaver } from "../../lib/psb/prezentacia";
+import { dalej, plnyKrok, postavPrezentaciu, postavPrezentaciuA, spat, type Slajd, type SlajdAkcie, type SlajdOtazka, type SlajdPrehlad, type SlajdRezerva, type SlajdSemafor, type SlajdSpolu, type SlajdTitulka, type SlajdVydavky, type SlajdVytazenost, type SlajdZaver } from "../../lib/psb/prezentacia";
+import { jeBeta } from "../../lib/psb/beta";
 import type { Report, Semafor } from "../../lib/psb/mesacnyReport";
 
 /**
@@ -257,11 +258,187 @@ function AkcieSlajd({ s, krok }: { s: SlajdAkcie; krok: number }) {
   );
 }
 
+/* ── Návrh A (12. 11. 2026) ─────────────────────────────────────────── */
+
+const kcP = (n: number | undefined) => (n === undefined || n === null ? "—" : Math.round(n).toLocaleString("sk-SK").replace(/,/g, " "));
+const Karta = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ background: POZADIE2, border: `1px solid ${LINKA}`, borderRadius: 18, padding: "20px 24px", minWidth: 0, ...style }}>{children}</div>
+);
+const Kicker = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: SLABA }}>{children}</div>
+);
+const Nadpis = ({ children }: { children: React.ReactNode }) => (
+  <h2 style={{ margin: "8px 0 0", fontSize: 56, fontWeight: 800, letterSpacing: "-.02em", lineHeight: 1.1, color: TEXT }}>{children}</h2>
+);
+const Pruh = ({ pct, farba }: { pct: number; farba: string }) => (
+  <div style={{ height: 18, borderRadius: 9, background: LINKA, overflow: "hidden" }}>
+    <div style={{ width: `${Math.max(2, Math.min(100, pct))}%`, height: "100%", background: farba, borderRadius: 9 }} />
+  </div>
+);
+const Velke = ({ hodnota, popis, pod, farba }: { hodnota: string; popis: string; pod?: string; farba?: string }) => (
+  <Karta>
+    <div style={{ fontSize: 20, color: SLABA }}>{popis}</div>
+    <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-.02em", color: farba || TEXT, fontVariantNumeric: "tabular-nums", marginTop: 4 }}>{hodnota}</div>
+    {pod && <div style={{ fontSize: 19, color: SLABA, marginTop: 4 }}>{pod}</div>}
+  </Karta>
+);
+
+function PrehladSlajd({ s }: { s: SlajdPrehlad }) {
+  const r = useRozmer();
+  return (
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 26 }}>
+      <div>
+        <Kicker>{s.kicker} · {s.porovnanie}</Kicker>
+        <h1 style={{ margin: "10px 0 0", fontSize: r.naVysku ? 56 : 68, fontWeight: 800, letterSpacing: "-.025em", lineHeight: 1.06, color: TEXT }}>{s.nadpis}</h1>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr 1fr", gap: 18 }}>
+        {s.karty.map((k) => {
+          const sem = SEM[k.semafor];
+          return (
+            <Karta key={k.id} style={{ display: "flex", gap: 14 }}>
+              <span style={{ width: 16, height: 16, borderRadius: 8, background: k.bezDat ? LINKA : sem.farba, flex: "0 0 auto", marginTop: 8 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 22, color: SLABA }}>{k.otazka}</div>
+                <div style={{ fontSize: k.hodnota.length > 16 ? 32 : 42, fontWeight: 800, color: k.bezDat ? SLABA : TEXT, letterSpacing: "-.02em", lineHeight: 1.15, marginTop: 2 }}>{k.hodnota}</div>
+                <div style={{ fontSize: 19, color: SLABA, marginTop: 2 }}>{k.zmena}</div>
+              </div>
+            </Karta>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VytazenostSlajd({ s }: { s: SlajdVytazenost }) {
+  const r = useRozmer();
+  const { p } = s;
+  return (
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 24 }}>
+      <div><Kicker>Vyťaženosť trénerov</Kicker><Nadpis>{s.nadpis}</Nadpis></div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr", gap: 20 }}>
+        {p.treneri.map((t) => {
+          const farba = t.pct > 100 ? SEM.o.farba : ZELENA;
+          return (
+            <Karta key={t.kto}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 30, fontWeight: 700 }}>
+                <span>{t.kto}</span><span style={{ color: farba }}>{kcP(t.hodiny)} / {kcP(t.strop)} h · {t.pct} %</span>
+              </div>
+              <div style={{ margin: "16px 0 10px" }}><Pruh pct={(t.hodiny / (t.strop * 1.2)) * 100} farba={farba} /></div>
+              <div style={{ fontSize: 20, color: SLABA }}>
+                {t.priemer !== undefined ? `Priemer ${kcP(t.priemer)} h. ` : ""}{t.pct > 100 ? `Nad stropom o ${kcP(t.hodiny - t.strop)} h.` : `Voľných ${kcP(t.strop - t.hodiny)} h.`}
+              </div>
+            </Karta>
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr 1fr", gap: 18 }}>
+        <Velke popis="Hodín spolu" hodnota={`${kcP(p.hodiny)} h`} pod={p.priemerHodin !== undefined ? `priemer ${kcP(p.priemerHodin)}` : undefined} />
+        <Velke popis="Hodín na break-even" hodnota={p.hodinNaBe !== undefined ? `${kcP(p.hodinNaBe)} h` : "—"}
+          pod={p.hodinNaBe !== undefined ? (p.hodiny >= p.hodinNaBe ? `${kcP(p.hodiny - p.hodinNaBe)} h nad ním je zisk` : `chýba ${kcP(p.hodinNaBe - p.hodiny)} h`) : undefined} />
+        <Velke popis="Príjem na hodinu" hodnota={p.prijemNaHodinu !== undefined ? `${kcP(p.prijemNaHodinu)} Kč` : "—"} pod={p.priemerNaHodinu !== undefined ? `priemer ${kcP(p.priemerNaHodinu)} Kč` : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function VydavkySlajd({ s }: { s: SlajdVydavky }) {
+  const r = useRozmer();
+  const { najvacsie, nestandardne } = s.p.vydavky;
+  const riadok = (vlavo: React.ReactNode, vpravo: React.ReactNode, k: string) => (
+    <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "8px 0", borderTop: `1px solid ${LINKA}`, fontSize: 22 }}>{vlavo}{vpravo}</div>
+  );
+  const ai = s.p.ai;
+  return (
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 20 }}>
+      <div><Kicker>Výdavky firmy · bez výplat a domácnosti</Kicker><Nadpis>{s.nadpis}</Nadpis></div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1.15fr", gap: 20 }}>
+        <Karta>
+          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: SLABA, marginBottom: 4 }}>Najväčšie</div>
+          {najvacsie.map((v) => riadok(<span>{v.nazov}</span>, <b style={{ fontVariantNumeric: "tabular-nums" }}>{kcP(v.suma)} Kč</b>, v.kat))}
+        </Karta>
+        <Karta>
+          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: SLABA, marginBottom: 4 }}>Neštandardné · proti priemeru</div>
+          {nestandardne.length === 0 && <div style={{ fontSize: 22, color: SLABA, paddingTop: 8 }}>Nič nebolo výrazne nad priemerom.</div>}
+          {nestandardne.map((v) => riadok(
+            <span style={{ minWidth: 0 }}>{v.nazov} · <b>{kcP(v.suma)} Kč</b><br /><span style={{ fontSize: 17, color: SLABA }}>{v.dovod}{v.najvacsi ? ` · najväčšie: ${v.najvacsi.popis.slice(0, 40)}` : ""}</span></span>,
+            <span style={{ fontSize: 18, fontWeight: 700, borderRadius: 20, padding: "4px 12px", whiteSpace: "nowrap", background: "#FBF3E0", color: "#8A5F12" }}>{v.nasobok === null ? "nové" : `${String(v.nasobok).replace(".", ",")}×`}</span>,
+            v.kat,
+          ))}
+        </Karta>
+      </div>
+      {(ai.seria.some((x) => x > 0) || s.p.odlozeneDoRezervy) && (
+        <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1.4fr 1fr", gap: 20 }}>
+          {ai.seria.some((x) => x > 0) && (
+            <Karta style={{ paddingTop: 8 }}>
+              <div style={{ fontSize: 20, color: SLABA, marginTop: 8 }}>AI predplatné po mesiacoch (Kč)</div>
+              <Stlpce seria={ai.seria} popis={ai.popis} farba={ZELENA} vyska={70} />
+            </Karta>
+          )}
+          {!!s.p.odlozeneDoRezervy && (
+            <Karta><div style={{ fontSize: 22, lineHeight: 1.4 }}><b style={{ color: ZELENA }}>{kcP(s.p.odlozeneDoRezervy)} Kč išlo do rezervy.</b> Nie je to náklad, preto tu nie je.</div></Karta>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RezervaSlajd({ s }: { s: SlajdRezerva }) {
+  const r = useRozmer();
+  const m = s.p.rezervaMesiacov ?? 0;
+  const farba = m >= 3 ? ZELENA : m >= 2 ? SEM.o.farba : SEM.c.farba;
+  return (
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 28 }}>
+      <div><Kicker>Rezerva a záväzky · stav teraz</Kicker><Nadpis>{s.nadpis}</Nadpis></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 34 }}>
+        <div style={{ fontSize: 150, fontWeight: 800, color: farba, lineHeight: 1, letterSpacing: "-.03em" }}>{m.toFixed(1).replace(".", ",")}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 26, marginBottom: 12 }}>mesiaca nákladov, keby neprišla ani koruna</div>
+          <Pruh pct={(m / 3) * 100} farba={farba} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, color: SLABA, marginTop: 6 }}><span>0</span><span>cieľ 3 mesiace</span></div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : "1fr 1fr 1fr", gap: 18 }}>
+        <Velke popis="Odložené v tomto období" hodnota={`${kcP(s.p.odlozeneDoRezervy || 0)} Kč`} farba={s.p.odlozeneDoRezervy ? ZELENA : SLABA} />
+        <Velke popis="Klienti nám dlžia" hodnota={`${kcP(s.p.dlzne || 0)} Kč`} pod="keď prídu, rezerva stúpne" farba={s.p.dlzne ? SEM.o.farba : TEXT} />
+        <Velke popis="Zaplatené, ešte neodtrénované" hodnota={`${kcP(s.p.predplateneHodiny || 0)} h`} pod="peniaze už máme, práca príde" />
+      </div>
+    </div>
+  );
+}
+
+function SpoluSlajd({ s }: { s: SlajdSpolu }) {
+  const r = useRozmer();
+  return (
+    <div style={{ minHeight: r.obsahH, display: "flex", flexDirection: "column", gap: 24 }}>
+      <div><Kicker>Bez zmeny</Kicker><Nadpis>{s.nadpis}</Nadpis></div>
+      <div style={{ display: "grid", gridTemplateColumns: r.naVysku ? "1fr" : `repeat(${Math.min(3, s.karty.length)}, 1fr)`, gap: 18 }}>
+        {s.karty.map((k) => (
+          <Karta key={k.id}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 21, color: SLABA }}>
+              <span style={{ width: 14, height: 14, borderRadius: 7, background: ZELENA, flex: "0 0 auto" }} />{k.otazka}
+            </div>
+            <div style={{ fontSize: k.hodnota.length > 16 ? 34 : 46, fontWeight: 800, letterSpacing: "-.02em", marginTop: 8 }}>{k.hodnota}</div>
+            <div style={{ fontSize: 19, color: SLABA }}>{k.zmena}</div>
+            <div style={{ fontSize: 22, lineHeight: 1.4, marginTop: 14 }}>{k.odpoved}</div>
+          </Karta>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Obsah({ s, krok }: { s: Slajd; krok: number }) {
   if (s.druh === "titulka") return <Titulka s={s} krok={krok} />;
   if (s.druh === "semafor") return <SemaforSlajd s={s} krok={krok} />;
   if (s.druh === "otazka") return <OtazkaSlajd s={s} krok={krok} />;
   if (s.druh === "zaver") return <ZaverSlajd s={s} krok={krok} />;
+  if (s.druh === "prehlad") return <PrehladSlajd s={s} />;
+  if (s.druh === "vytazenost") return <VytazenostSlajd s={s} />;
+  if (s.druh === "vydavky") return <VydavkySlajd s={s} />;
+  if (s.druh === "rezerva") return <RezervaSlajd s={s} />;
+  if (s.druh === "spolu") return <SpoluSlajd s={s} />;
   return <AkcieSlajd s={s} krok={krok} />;
 }
 
@@ -336,7 +513,8 @@ export function Platno({ s, krok, pata, strana, zoSlajdov, onKlik, naVysku = fal
 }
 
 export function Prezentacia({ report, onZavri }: { report: Report; onZavri: () => void }) {
-  const slajdy = useMemo(() => postavPrezentaciu(report), [report]);
+  // Návrh A sa skúša v bete (12. 11. 2026); ostrý Kokpit ostáva po starom.
+  const slajdy = useMemo(() => (jeBeta() ? postavPrezentaciuA(report) : postavPrezentaciu(report)), [report]);
   // Slajd a krok v JEDNOM stave — posúvajú sa vždy spolu a dva settery by sa
   // pri rýchlom klikaní prečítali navzájom staré.
   const [kde, setKde] = useState(() => ({ i: 0, krok: plnyKrok(slajdy, 0) }));

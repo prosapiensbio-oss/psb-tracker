@@ -58,7 +58,7 @@ import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNo
 import { polozkaGuillermo } from "../../lib/psb/guillermo";
 import { polozkyHodin } from "../../lib/psb/notifikaciaHodin";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
-import { stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
+import { odlozeneOd, stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
 import { BetaPruh } from "./BetaPruh";
 import { Workspace } from "./Workspace";
 import type { FakturaPredvolba } from "./VydaneFaktury";
@@ -2769,6 +2769,31 @@ function skupinaFaktur(
         odmlcani,
         zositChyba: obdobie.some((o) => !hotovostMesiace.has(o)),
         topVydaje: vydaje.slice(0, 3).map(([k, v]) => ({ nazov: nazovKategorie(k), suma: v })),
+        /*
+         * Výdavky po kategóriách proti priemeru (prezentácia, 12. 11. 2026).
+         * Priemer je z rovnako dlhého obdobia z mesiacov pred reportom, ktoré
+         * výpis pokrýva (najviac 6); kategória, v ktorej sa v nich neplatilo,
+         * je „prvýkrát". Najväčší pohyb hovorí, za čo to bolo.
+         */
+        vydavky: (() => {
+          const prvy = obdobie[obdobie.length - 1];
+          const pred = Object.keys(bankaSumy).filter((o) => o < prvy).sort().slice(-6);
+          return vydaje.map(([kat, suma]) => {
+            const hodnoty = pred.map((o) => bankaSumy[o]?.[kat] || 0);
+            const priemerMes = pred.length ? hodnoty.reduce((a, v) => a + v, 0) / pred.length : 0;
+            const pohyby = obdobie.flatMap((o) => bankaPohyby[o]?.[kat] || []);
+            const naj = pohyby.reduce<Pohyb | null>((a, x) => (!a || Math.abs(x.suma) > Math.abs(a.suma) ? x : a), null);
+            return {
+              kat, nazov: nazovKategorie(kat), suma,
+              priemer: Math.round(priemerMes * obdobie.length),
+              mesiacov: hodnoty.filter((v) => v > 0).length,
+              najvacsi: naj ? { popis: naj.popis, suma: Math.abs(naj.suma) } : undefined,
+            };
+          });
+        })(),
+        // Z prevodov na rezervný účet (tie isté, z ktorých má Rezerva svoj stav) —
+        // kategória „rezerva" v súčtoch výpisu nie je.
+        odlozeneDoRezervy: odlozeneOd(data.rezervaPrevody || [], `${obdobie[obdobie.length - 1]}-01`, new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10)),
         zdroje: Object.entries(zdroje).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({ zdroj: NAZOV_ZDROJA[z] || z, pocet: n })),
         najlepsiReel: reels[0] ? { hook: reels[0].hook, views: reels[0].views } : undefined,
         noviPodlaZdroja: Object.entries(podlaZdroja).sort((a, b) => b[1] - a[1]).map(([z, n]) => ({
@@ -2787,6 +2812,7 @@ function skupinaFaktur(
           return {
             obnova: { skoncilo: obnovy.reduce((a, o) => a + o.skoncilo, 0), obnovene: obnovy.reduce((a, o) => a + o.obnovene, 0) },
             bezObnovy: obnovy.flatMap((o) => o.bezObnovy),
+            ukoncili: obnovy.flatMap((o) => o.ukoncili),
             prezitie: prezitie100(data.sessions, mk, prve),
             retencia: retencia6(data.sessions, mk),
             hodnotaKlienta: hodnotaKlienta(data.sessions, platbyVsetky, koniec),
@@ -2802,7 +2828,7 @@ function skupinaFaktur(
         })(),
       },
     };
-  }, [data, clients, bankaSumy, hotovostMesiace, mktVerzia, balickyRiadky, btcCelkom, ucetStav, hotovostStav]);
+  }, [data, clients, bankaSumy, bankaPohyby, hotovostMesiace, mktVerzia, balickyRiadky, btcCelkom, ucetStav, hotovostStav]);
 
   const podkladyMesiaca = useCallback((mk: string): string => {
     const r: string[] = [];
