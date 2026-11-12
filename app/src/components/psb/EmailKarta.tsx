@@ -67,7 +67,7 @@ function TextMailu({ text, kompaktne }: { text: string; kompaktne?: boolean }) {
             {otvorene ? "skryť citovanú správu" : "··· citovaná správa"}
           </button>
           {otvorene && (
-            <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", marginTop: 8, paddingLeft: 10, borderLeft: `3px solid ${PAPIER.linka}`, color: PAPIER.slaba, fontSize: "0.93em" }}>{citat}</div>
+            <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", marginTop: 8, paddingLeft: 10, borderLeft: `3px solid ${PAPIER.linka}`, color: PAPIER.slaba, fontSize: 13 }}>{citat}</div>
           )}
         </div>
       )}
