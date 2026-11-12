@@ -25,7 +25,7 @@ import { VyberMena } from "./VyberMena";
 type Email = {
   id: string; odMeno: string; odMail: string; odpovedatMail: string; komu: string; predmet: string; datum: string;
   kategoria: Kategoria; klient: string | null; dovod: string; stav: "nove" | "precitane" | "vybavene";
-  vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null;
+  vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null; telefon: string | null;
 };
 type Bublina =
   | { druh: "prisiel"; kedy: string; id: string; predmet: string; text: string | null }
@@ -361,6 +361,13 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
             {e.dovod ? ` · ${e.dovod}` : ""}{e.vybavil ? ` · vybavil(a) ${e.vybavil}` : ""}
           </div>
         </>
+      )}
+      {/* Telefón hore — Terezka dopytom volá, nepíše (Jerry, 12. 11. 2026). */}
+      {e.telefon && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0 2px", fontSize: 13 }}>
+          <a href={`tel:${e.telefon.replace(/[^\d+]/g, "")}`} style={{ ...tlHlavne, textDecoration: "none", display: "inline-block" }}>📞 Zavolať {e.telefon}</a>
+          <span style={{ fontSize: 12, color: C.textDim }}>po hovore daj Vybavené</span>
+        </div>
       )}
       {e.klient ? <PasKlienta meno={e.klient} data={data} clients={clients} onProfil={onProfil} />
         : ludia && <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: "4px 0 8px" }}>{e.odMeno} <span style={{ fontWeight: 400, color: C.textDim }}>{e.odMail}</span></div>}

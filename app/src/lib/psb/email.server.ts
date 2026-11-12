@@ -17,6 +17,8 @@ export type EmailRiadok = {
   odMeno: string; odMail: string; odpovedatMail: string; komu: string;
   predmet: string; datum: string; kategoria: Kategoria; klient: string | null; dovod: string;
   stav: "nove" | "precitane" | "vybavene"; vybavil: string | null; vybaveneAt: string | null; odpovedaneAt: string | null;
+  /** Telefón z dopytu (alebo klienta z PTmindera) — Terezka dopytom volá, nepíše (12. 11. 2026). */
+  telefon: string | null;
 };
 
 const naRiadok = (r: Record<string, unknown>): EmailRiadok => ({
@@ -26,6 +28,7 @@ const naRiadok = (r: Record<string, unknown>): EmailRiadok => ({
   kategoria: (r.kategoria as Kategoria) || "ostatne", klient: (r.klient as string) || null, dovod: String(r.dovod || ""),
   stav: (r.stav as EmailRiadok["stav"]) || "nove", vybavil: (r.vybavil as string) || null,
   vybaveneAt: (r.vybavene_at as string) || null, odpovedaneAt: (r.odpovedane_at as string) || null,
+  telefon: (r.telefon as string) || null,
 });
 
 /** Dátum z hlavičky do ISO; nezrozumiteľný = čas načítania (radí sa podľa neho). */
@@ -84,17 +87,24 @@ export async function vybavStarsie(DB: D1Database, pred: string): Promise<number
   return r.meta?.changes || 0;
 }
 
+/** Telefón k mailu: najnovší dopyt s tou adresou, inak klient z PTmindera. */
+const TELEFON = `COALESCE(
+  (SELECT l.telefon FROM leads l WHERE lower(l.email) = s.odpovedat_mail AND l.telefon <> '' ORDER BY l.date DESC LIMIT 1),
+  (SELECT l.telefon FROM leads l WHERE lower(l.email) = s.od_mail AND l.telefon <> '' ORDER BY l.date DESC LIMIT 1),
+  (SELECT p.telefon FROM ptminder_klienti p WHERE p.meno = s.klient AND p.telefon <> '' LIMIT 1)
+) telefon`;
+
 /** Zoznam: všetko nevybavené + vybavené za posledných `dni` dní. */
 export async function zoznamEmailov(DB: D1Database, dni = 21): Promise<EmailRiadok[]> {
   const od = new Date(Date.now() - dni * 864e5).toISOString();
   const r = await DB.prepare(
-    "SELECT * FROM email_spravy WHERE stav <> 'vybavene' OR datum >= ?1 ORDER BY datum DESC LIMIT 400",
+    `SELECT s.*, ${TELEFON} FROM email_spravy s WHERE s.stav <> 'vybavene' OR s.datum >= ?1 ORDER BY s.datum DESC LIMIT 400`,
   ).bind(od).all();
   return ((r.results || []) as Record<string, unknown>[]).map(naRiadok);
 }
 
 export async function emailPodlaId(DB: D1Database, id: string): Promise<EmailRiadok | null> {
-  const r = await DB.prepare("SELECT * FROM email_spravy WHERE id = ?1").bind(id).first<Record<string, unknown>>();
+  const r = await DB.prepare(`SELECT s.*, ${TELEFON} FROM email_spravy s WHERE s.id = ?1`).bind(id).first<Record<string, unknown>>();
   return r ? naRiadok(r) : null;
 }
 
