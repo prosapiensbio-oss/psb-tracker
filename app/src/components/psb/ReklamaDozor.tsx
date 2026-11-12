@@ -12,6 +12,7 @@ import { C, S, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3 } from "./ui";
 import { ChatConversation, type AssistantChat } from "./Assistant";
+import { PripravitKampan, type NavrhKampane } from "./KampanForm";
 import { JeNaCeluObrazovku } from "./NaCeluObrazovku";
 import { useUzke } from "./useUzke";
 import * as Sk from "../../lib/psb/sklonovanie";
@@ -315,6 +316,13 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
     return () => { posluchaci.delete(vyzdvihni); };
   }, [chat]);
   const prazdny = !chat.msgs.length;
+  /**
+   * Návrh kampane z debaty (⟦kampan|…⟧). Tlačidlo „pripraviť kampaň“ tu
+   * chýbalo — Jarvis písal „klikneš na tlačidlo nižšie“ a Jerry videl len
+   * tučný názov (12. 11. 2026). Formulár je ten istý ako vo veľkom okne;
+   * kampaň vznikne pozastavená.
+   */
+  const [navrhKampane, setNavrhKampane] = useState<NavrhKampane | null>(null);
   const RYCHLE = [
     "Ako sú na tom bežiace kampane? Pozri sa do Mety aj na dopyty a povedz, čo by si zmenil.",
     "Rozpíš výkon za posledný týždeň podľa veku a pohlavia — kde peniaze dorazia na stránku a kde nie?",
@@ -342,8 +350,17 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
           ))}
         </div>
       )}
+      {navrhKampane && (
+        <div style={{ borderBottom: `1px solid ${C.border}`, maxHeight: "62%", overflowY: "auto", position: "relative" }}>
+          <button onClick={() => setNavrhKampane(null)} aria-label="Zavrieť prípravu kampane"
+            style={{ position: "absolute", top: 8, right: 10, zIndex: 1, background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "2px 9px", color: C.textMuted, cursor: "pointer", fontFamily: "inherit", fontSize: 12 }}>
+            zavrieť ✕
+          </button>
+          <PripravitKampan key={navrhKampane.nazov} akoKarta={false} navrh={navrhKampane} />
+        </div>
+      )}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        <ChatConversation chat={chat} onNavigate={onNavigate} />
+        <ChatConversation chat={chat} onNavigate={onNavigate} onKampan={setNavrhKampane} />
       </div>
     </Card>
   );
