@@ -477,6 +477,23 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
 
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
 
+  /**
+   * DOZOR REKLÁM SA OTVÁRA PRI ROZHOVORE (Jerry, 12. 11. 2026: „zakaždým keď
+   * kliknem na Dozor reklám, mám chat na začiatku, chcem ho mať tam, kde som
+   * s ním skončil“). Na menšej obrazovke je nad rozhovorom dozor a rozhodnutia,
+   * takže karta sa otvorila navrchu a rozhovor bol pod okrajom. Rozhovor sám
+   * drží koniec; tu sa len karta posunie tak, aby bolo vidno jeho spodok.
+   */
+  const druhAktivnej = k?.druh;
+  useEffect(() => {
+    if (druhAktivnej !== "reklamy") return;
+    const t = setTimeout(() => {
+      const el = document.getElementById("reklamny-agent");
+      if (el && el.offsetParent !== null) el.scrollIntoView({ block: "end", behavior: "auto" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [druhAktivnej]);
+
   // Klik na klienta inde v appke otvorí kartu Klient — inak by človek pristál
   // na kope a musel sa k stolu preklikať sám (24. 9. 2026).
   useEffect(() => {

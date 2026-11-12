@@ -332,7 +332,7 @@ export function ReklamnyAgent({ chat, onNavigate }: { chat: AssistantChat; onNav
     // Výška tak, aby sa debata vošla do karty Workspace — pevných 640 px v karte
     // s výškou ~550 px dávalo rolovanie v rolovaní (rozbor, 1. 11. 2026). Na celej
     // obrazovke strop neplatí (Jerry, 2. 11. 2026: „stále je to zmenšené").
-    <Card style={{ display: "flex", flexDirection: "column", height: cela ? "100%" : "min(640px, max(420px, calc(72vh - 160px)))", padding: 0, overflow: "hidden" }}>
+    <Card id={cela ? undefined : "reklamny-agent"} style={{ display: "flex", flexDirection: "column", height: cela ? "100%" : "min(640px, max(420px, calc(72vh - 160px)))", padding: 0, overflow: "hidden" }}>
       <div style={{ padding: "12px 14px 8px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <b style={{ color: C.text, fontSize: 15 }}>Reklama · Jarvis</b>
         <span style={{ fontSize: 11.5, color: C.textMuted }}>jedna stála debata o reklame · vidí do Mety · každú zmenu potvrdíš tlačidlom</span>

@@ -1102,6 +1102,22 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
     if (!el || !drzatRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [msgs, busy, pending]);
+  /**
+   * NA KONIEC AJ PO ZOBRAZENÍ (Jerry, 12. 11. 2026: „zakaždým keď kliknem na
+   * Dozor reklám, mám chat na začiatku“). Karty Workspace ostávajú načítané
+   * a schované; v schovanej karte má rozhovor nulovú výšku a posun vyššie
+   * nespraví nič. Keď sa plocha ukáže (zmení sa jej veľkosť), posunie sa na
+   * koniec — pokiaľ človek sám neodroloval hore.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (drzatRef.current && el.clientHeight > 0) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const naKoniec = () => {
     const el = scrollRef.current;
     if (!el) return;
