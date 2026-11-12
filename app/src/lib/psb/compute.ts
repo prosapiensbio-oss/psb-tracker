@@ -52,11 +52,13 @@ export const membershipBucket = (m: string): string => {
   // Názvy skupín sú Předplatné a Balíček (Jerry, 29. 9. a 22. 10. 2026). Nové
   // balíčky sa volajú „6h Balíček", „18h Balíček", staré „OFF - 8 hodín
   // offline" — bez oboch tvarov padla väčšina klientov do „Iné" (59 %).
-  if (jePredplatne(s)) return "6h Předplatné";
   if (/one year|ročn|rok/.test(s)) return "Ročné";
   // "^on[ -]" matches the online product prefix ("ON - 6h…") without catching
   // words that merely start with "on" (e.g. "ONE YEAR", handled just above).
-  if (/^on[ -]|online/.test(s)) return "Online balíček";
+  // Online PRED předplatným (Jerry, 12. 11. 2026: „prečo sú len 2 online?“) —
+  // „6h Předplatné online“ padalo medzi předplatné a online klient zmizol.
+  if (/^on[ -]|online/.test(s)) return "Online";
+  if (jePredplatne(s)) return "6h Předplatné";
   if (/(^|\D)18\s*(hod|h\b)/.test(s)) return "18h Balíček";
   if (/(^|\D)8\s*(hod|h\b)/.test(s)) return "8h Balíček";
   if (/(^|\D)1\s*(hod|h\b)/.test(s)) return "1h Balíček";
@@ -75,7 +77,7 @@ export const MEMBERSHIP_ORDER = [
   "8h Balíček",
   "18h Balíček",
   "1h Balíček",
-  "Online balíček",
+  "Online",
   "Ročné",
   "Členstvo (bez balíčka hodín)",
   "Špeciál",
@@ -790,10 +792,25 @@ export function deriveClients(
       }
     }
 
-    let off = 0;
-    let on = 0;
-    for (const s of c.sessions) s.sessionType === "OFFLINE" || s.sessionType === "UVODNE" ? off++ : on++;
-    c.modality = on > off ? "Online" : "Offline";
+    /**
+     * ONLINE ALEBO OFFLINE rozhoduje balíček, ktorý platí TERAZ (Jerry,
+     * 12. 11. 2026: „prečo sú len 2 online, keď ich je viac?“). Väčšina
+     * tréningov za celý čas z klienta, ktorý roky chodil do štúdia a prešiel
+     * na online (Veronika Stoklásková), robila offline. Bez balíčka rozhodujú
+     * tréningy za posledných 90 dní, až potom celá história.
+     */
+    const nazovBalicka = (c.membership || "").toLowerCase();
+    if (nazovBalicka && !/one year/.test(nazovBalicka)) {
+      c.modality = /^\s*on[ -]|online/.test(nazovBalicka) ? "Online" : "Offline";
+    } else {
+      const hranica = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+      const nedavne = c.sessions.filter((s) => String(s.date).slice(0, 10) >= hranica);
+      const vzorka = nedavne.length ? nedavne : c.sessions;
+      let off = 0;
+      let on = 0;
+      for (const s of vzorka) s.sessionType === "OFFLINE" || s.sessionType === "UVODNE" ? off++ : on++;
+      c.modality = on > off ? "Online" : "Offline";
+    }
   }
   return map;
 }

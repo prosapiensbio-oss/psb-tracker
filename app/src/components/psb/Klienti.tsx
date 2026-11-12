@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { priemerDochadzky } from "../../lib/psb/profil";
 import { textZostatku } from "../../lib/psb/zostatokText";
-import { cenaZaSedenieVDnoch, menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
+import { cenaZaSedenieVDnoch, menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
 import { moznostiProduktov, nazovProduktu, nazovVoFiltri } from "../../lib/psb/nazvyProduktov";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
@@ -200,7 +200,7 @@ export function Premenovanie({ meno, onHotovo, vzdy }: {
   );
 }
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [], kalUdalosti, kalZmeny, onProfil }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[]; /** Kalendár — profil z neho berie posledný tréning, kým ho export nedobehne. */ kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; kalZmeny?: ZmenaVKalendari[]; /** Otvorí profil klienta — jeden a ten istý, vo Workspace (24. 9. 2026). */ onProfil?: (meno: string) => void }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, kalUdalosti, kalZmeny, onProfil }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Kalendár — profil z neho berie posledný tréning, kým ho export nedobehne. */ kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; kalZmeny?: ZmenaVKalendari[]; /** Otvorí profil klienta — jeden a ten istý, vo Workspace (24. 9. 2026). */ onProfil?: (meno: string) => void }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
@@ -610,39 +610,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           )}
         </div>
 
-        {/* Klienti, ktorí ešte nie sú v PTminderi.
-
-            Jerry, 17. 8. 2026: profil má vzniknúť po úvodnom tréningu z kalendára
-            a export ho má potvrdiť. Stoja NAD tabuľkou a nie v nej zámerne —
-            nemajú zostatok hodín, dochádzku ani segment a jeden riadok
-            s ôsmimi pomlčkami by vyzeral ako chyba. A hlavne: do žiadneho
-            súčtu na tejto obrazovke nevstupujú, takže počet klientov,
-            kapacita ani 6M sa nepohnú, kým to export nepotvrdí. */}
-        {cakajuci.length > 0 && !focusClient && !skupina && (
-          <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 9, border: `1px dashed ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.accentLight, marginBottom: 6 }}>
-              Čakajú na priradenie v Kalendári ({cakajuci.length})
-            </div>
-            {cakajuci.map((c) => (
-              <div key={c.meno} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, padding: "3px 0", flexWrap: "wrap" }}>
-                <span style={{ fontWeight: 500 }}>{c.meno}</span>
-                <Badge tone="blue">nepotvrdená</Badge>
-                {/* Tri rôzne dôvody, prečo tu človek je — a každý znamená
-                    niečo iné (24. 9. 2026). „Založený ručne" nečaká na nič
-                    v kalendári, čaká na prvý tréning v exporte. */}
-                <span style={{ color: C.textMuted, fontSize: 12 }}>
-                  {c.druh === "rucne"
-                    ? "založený ručne v Kokpite"
-                    : `${c.druh === "trening" ? "tréning" : "úvodný"} ${fmtDate(c.uvodny)}${c.trener ? ` · ${c.trener}` : ""} — z kalendára`}
-                </span>
-              </div>
-            ))}
-            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
-              Do počtu klientov, kapacity ani 6M sa nerátajú. Po nahratí exportu (záložka Upload) sa presunú do tabuľky sami.
-            </div>
-          </div>
-        )}
-
+        {/* Rámček „Čakajú na priradenie v Kalendári“ je preč (Jerry, 12. 11. 2026:
+            „je tam potrebný?“). Čakal na export z PTmindera, ktorý už nepríde;
+            91 ľudí v ňom boli hlavne ručne založení, čo nikdy netrénovali.
+            Nového človeka po úvodnom hlási register (`novy|…` v compute.ts). */}
         <TableWrap>
           <thead>
             <tr>

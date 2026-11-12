@@ -7,9 +7,7 @@ import { nazovKategorie } from "./vzas";
 describe("skupiny balíčkov z ostrých názvov", () => {
   const OCAKAVANE: [string, string][] = [
     ["OFF - 6h S viazanostou", "6h Předplatné"],
-    ["ON - 6h S viazanostou", "6h Předplatné"],
     ["6h Předplatné", "6h Předplatné"],
-    ["6h Předplatné online", "6h Předplatné"],
     ["Předplatné 6 h", "6h Předplatné"],
     ["OFF - 6h BEZ viazanosti", "6h Balíček"],
     ["6h Balíček", "6h Balíček"],
@@ -19,8 +17,10 @@ describe("skupiny balíčkov z ostrých názvov", () => {
     ["OFF - 18 hodín offline", "18h Balíček"],
     ["1h Balíček", "1h Balíček"],
     ["OFF - 1 hodina offline", "1h Balíček"],
-    ["ON - 6h BEZ viazanosti", "Online balíček"],
-    ["6h Balíček online", "Online balíček"],
+    ["ON - 6h BEZ viazanosti", "Online"],
+    ["6h Balíček online", "Online"],
+    ["6h Předplatné online", "Online"],
+    ["ON - 6h S viazanostou", "Online"],
     ["ONE YEAR", "Ročné"],
     ["Doplnenie členstva", "Členstvo (bez balíčka hodín)"],
     ["SPECIAL 3", "Špeciál"],

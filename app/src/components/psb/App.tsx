@@ -35,7 +35,6 @@ import {
 import { stavPolozkyRegistra,
   parujVysvetlenia,
   zruseneTreningy,
-  cakajuciKlienti,
   odstranDuplicity,
   najdiKlienta,
   menoKluc,
@@ -1387,19 +1386,6 @@ export function PSBApp() {
   const register = useMemo(
     () => deriveRegister(data, clients, sixM, capacity, { udalosti: kalUdalosti, zmeny: kalZmeny, buduce: buduceTreningy }),
     [data, clients, sixM, capacity, kalUdalosti, kalZmeny, buduceTreningy],
-  );
-  /**
-   * Ľudia po úvodnom, ktorých export ešte nepotvrdil.
-   *
-   * Držia sa MIMO `clients` zámerne: ten zoznam živí kapacitu, 6M, lievik aj
-   * predikciu tržieb a nepotvrdený človek by ticho posunul všetky tie čísla.
-   * Obrazovka Klienti ich ukáže nad tabuľkou ako „nepotvrdená".
-   */
-  const cakajuci = useMemo(
-    // Ručne založení klienti idú do toho istého zoznamu — sú to tiež ľudia,
-    // o ktorých appka vie, ale export ich ešte nepotvrdil (24. 9. 2026).
-    () => cakajuciKlienti(clients, kalUdalosti, kalZmeny, new Date(), Object.keys(data.clientOverrides || {})),
-    [clients, kalUdalosti, kalZmeny, data.clientOverrides],
   );
 
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
@@ -3441,7 +3427,7 @@ function skupinaFaktur(
             {/* Riadok Tréningy/Klienti je od 22. 9. 2026 HORE, spolu s Peniazmi
                 a Výsledkami — inak by boli tri úrovne pod sebou. */}
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} cakajuci={cakajuci} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} onProfil={(m) => { setActive("workspace"); setWorkspaceKlient(m); }} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} onProfil={(m) => { setActive("workspace"); setWorkspaceKlient(m); }} />}
               </>
         )}
 
