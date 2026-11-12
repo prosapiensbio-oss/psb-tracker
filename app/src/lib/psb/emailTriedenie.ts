@@ -147,3 +147,24 @@ export function maObsah(text: string): boolean {
   const ZDVORILOST = /^(dobr[ýy] den|dobr[ýy] de[ňn]|ahoj|zdrav[íi]m|s pozdravem|s pozdravom|d[ěe]kuji|filip str[áa][ňn]avsk[ýy]|filip|terezka|ter[ée]zi[ae] za[ťt]kov[áa]|prosapiens biomechanic)[\s,.!]*$/i;
   return (text || "").split(/\r?\n/).map((r) => r.trim()).filter((r) => r && !ZDVORILOST.test(r)).length > 0;
 }
+
+/**
+ * Nová časť mailu a citovaný starý rozhovor zvlášť (Jerry, 12. 11. 2026: „celé
+ * to splýva“). Citát začína riadkom „Dne … napsal(a):“, „On … wrote:“,
+ * hlavičkou preposlanej správy alebo prvým riadkom s „>“. Karta ho zbalí.
+ */
+export function rozdelCitat(text: string): { nove: string; citat: string } {
+  const riadky = (text || "").replace(/\r\n/g, "\n").split("\n");
+  const zaciatok = riadky.findIndex((r, i) => {
+    const t = r.trim();
+    if (/^>/.test(t)) return true;
+    if (/^(dne|d[ňn]a)\b.{3,160}(napsal|nap[íi]sal|napísal|napisal)/i.test(t)) return true;
+    if (/^on\b.{3,160}wrote:?$/i.test(t)) return true;
+    if (/^-{2,}\s*(p[ůu]vodn[íi] zpr[áa]va|original message|forwarded message|p[ôo]vodn[áa] spr[áa]va)/i.test(t)) return true;
+    // „Dne … uživatel X <\nmail> napsal:“ býva zalomené do dvoch riadkov
+    if (/^(dne|d[ňn]a)\b/i.test(t) && /(napsal|wrote)/i.test(riadky[i + 1] || "")) return true;
+    return false;
+  });
+  if (zaciatok <= 0) return { nove: (text || "").trim(), citat: zaciatok === 0 ? (text || "").trim() : "" };
+  return { nove: riadky.slice(0, zaciatok).join("\n").trim(), citat: riadky.slice(zaciatok).join("\n").trim() };
+}

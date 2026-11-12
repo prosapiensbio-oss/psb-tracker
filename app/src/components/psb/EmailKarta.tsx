@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
-import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah } from "../../lib/psb/emailTriedenie";
+import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah, rozdelCitat } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
 import { najblizsieOkno } from "../../lib/psb/mailOkno";
 import { C } from "../../lib/psb/theme";
@@ -48,6 +48,32 @@ function ulozenyPodpis(): string {
 
 const tl = { padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted } as const;
 const tlHlavne = { ...tl, background: C.accent, color: C.onAccent, border: `1px solid ${C.accent}`, fontWeight: 600 } as const;
+/**
+ * Doručený mail je „papier“ — svetlá plocha s tmavým písmom, ako ho uvidí
+ * v schránke. Na zelenom skle splýval s appkou (Jerry, 12. 11. 2026).
+ */
+const PAPIER = { background: "#f7f6f0", color: "#1A2E24", slaba: "#6b7568", linka: "#d9ddd2" } as const;
+
+function TextMailu({ text, kompaktne }: { text: string; kompaktne?: boolean }) {
+  const { nove, citat } = rozdelCitat(text);
+  const [otvorene, setOtvorene] = useState(false);
+  return (
+    <div>
+      <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{nove || "(prázdny mail)"}</div>
+      {citat && (
+        <div style={{ marginTop: kompaktne ? 6 : 12 }}>
+          <button onClick={() => setOtvorene((x) => !x)}
+            style={{ background: "none", border: `1px solid ${PAPIER.linka}`, borderRadius: 999, padding: "2px 10px", fontSize: 11.5, color: PAPIER.slaba, cursor: "pointer", fontFamily: "inherit" }}>
+            {otvorene ? "skryť citovanú správu" : "··· citovaná správa"}
+          </button>
+          {otvorene && (
+            <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", marginTop: 8, paddingLeft: 10, borderLeft: `3px solid ${PAPIER.linka}`, color: PAPIER.slaba, fontSize: "0.93em" }}>{citat}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function kedyKratko(iso: string): string {
   const d = new Date(iso);
@@ -341,23 +367,26 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   };
 
   const akcie = (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-      {e.kategoria !== "klient" && <button onClick={dopyt} style={tl}>＋ Zapísať ako dopyt</button>}
-      {onTerminy && <button onClick={onTerminy} style={tl}>Ponúknuť termíny</button>}
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "10px 0 8px" }}>
+      {/* Telefón prvý — Terezka dopytom volá, nepíše (Jerry, 12. 11. 2026). */}
+      {e.telefon && (
+        <a href={`tel:${e.telefon.replace(/[^\d+]/g, "")}`} style={{ ...tlHlavne, textDecoration: "none", display: "inline-block" }}>📞 Zavolať {e.telefon}</a>
+      )}
       {e.stav === "vybavene"
         ? <button onClick={() => void onStav(e, "vratit")} style={tl}>Vrátiť medzi nevybavené</button>
-        : <button onClick={() => void onStav(e, "vybavene")} style={tl}>Vybavené</button>}
+        : <button onClick={() => void onStav(e, "vybavene")} style={{ ...tl, color: C.text, fontWeight: 600 }}>✓ Vybavené</button>}
+      {e.kategoria !== "klient" && <button onClick={dopyt} style={tl}>＋ Zapísať ako dopyt</button>}
+      {onTerminy && <button onClick={onTerminy} style={tl}>Ponúknuť termíny</button>}
       <button onClick={() => setPreradit((x) => !x)} style={{ ...tl, border: "none" }}>preradiť…</button>
     </div>
   );
 
   const pisanie = (
-    <div style={{ marginTop: 10 }}>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.textDim, marginBottom: 4 }}>
-        komu <input value={komu} onChange={(x) => setKomu(x.target.value)} style={{ flex: 1, minWidth: 0, padding: "4px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5 }} />
-      </div>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: C.textDim, marginBottom: 4 }}>
-        podpis
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: C.textDim, fontWeight: 700, marginBottom: 6 }}>Odpoveď</div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: C.textDim, marginBottom: 6 }}>
+        komu <input value={komu} onChange={(x) => setKomu(x.target.value)} style={{ flex: "1 1 200px", minWidth: 0, padding: "4px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5 }} />
+        <span style={{ marginLeft: 6 }}>podpis</span>
         {PODPISY.map((p) => (
           <button key={p} onClick={() => zmenPodpis(p)}
             style={{ ...tl, padding: "3px 9px", fontSize: 12, background: p === podpis ? C.accentBg : "transparent", color: p === podpis ? C.text : C.textMuted, fontWeight: p === podpis ? 700 : 400 }}>
@@ -365,7 +394,7 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
           </button>
         ))}
       </div>
-      <textarea value={odpoved} onChange={(x) => setOdpoved(x.target.value)} rows={ludia ? 5 : 7}
+      <textarea value={odpoved} onChange={(x) => setOdpoved(x.target.value)} rows={5}
         style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 9, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontFamily: "inherit", fontSize: 13.5, lineHeight: 1.45, resize: "vertical" }} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, alignItems: "center" }}>
         <button onClick={() => void posli(true)} disabled={posielam || !maObsah(odpoved)} style={{ ...tlHlavne, opacity: maObsah(odpoved) ? 1 : 0.45 }}>{posielam ? "Posielam…" : "Odoslať a vybaviť"}</button>
@@ -378,24 +407,17 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   return (
     <div>
       {onSpat && <button onClick={onSpat} style={{ ...tl, marginBottom: 8 }}>‹ späť na zoznam</button>}
-      {!ludia && (
+      {!ludia ? (
         <>
           <h4 style={{ margin: "0 0 3px", fontSize: 16, color: C.text }}>{e.predmet || "(bez predmetu)"}</h4>
           <div style={{ fontSize: 12, color: C.textDim }}>
-            {e.odMeno}{e.odMail && e.odMail !== e.odMeno ? ` <${e.odMail}>` : ""} · {kedyCelo(e.datum)}
+            <b style={{ color: C.textMuted }}>{e.odMeno}</b>{e.odMail && e.odMail !== e.odMeno ? ` <${e.odMail}>` : ""} · {kedyCelo(e.datum)}
             {e.dovod ? ` · ${e.dovod}` : ""}{e.vybavil ? ` · vybavil(a) ${e.vybavil}` : ""}
           </div>
         </>
-      )}
-      {/* Telefón hore — Terezka dopytom volá, nepíše (Jerry, 12. 11. 2026). */}
-      {e.telefon && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0 2px", fontSize: 13 }}>
-          <a href={`tel:${e.telefon.replace(/[^\d+]/g, "")}`} style={{ ...tlHlavne, textDecoration: "none", display: "inline-block" }}>📞 Zavolať {e.telefon}</a>
-          <span style={{ fontSize: 12, color: C.textDim }}>po hovore daj Vybavené</span>
-        </div>
-      )}
-      {e.klient ? <PasKlienta meno={e.klient} data={data} clients={clients} onProfil={onProfil} />
-        : ludia && <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: "4px 0 8px" }}>{e.odMeno} <span style={{ fontWeight: 400, color: C.textDim }}>{e.odMail}</span></div>}
+      ) : !e.klient && <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{e.odMeno} <span style={{ fontWeight: 400, fontSize: 12, color: C.textDim }}>{e.odMail}</span></div>}
+      {e.klient && <PasKlienta meno={e.klient} data={data} clients={clients} onProfil={onProfil} />}
+      {akcie}
       {preradit && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", padding: 8, border: `1px dashed ${C.border}`, borderRadius: 9, margin: "6px 0" }}>
           <span style={{ fontSize: 12, color: C.textDim }}>je to klient:</span>
@@ -410,27 +432,31 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       {chybaDetailu && <div style={{ fontSize: 12.5, color: C.orange, margin: "6px 0" }}>{chybaDetailu}</div>}
 
       {!ludia ? (
-        <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 13.5, lineHeight: 1.5, color: C.text, padding: "10px 12px", borderRadius: 9, border: `1px solid ${C.border}`, maxHeight: "42vh", overflowY: "auto", marginTop: 6 }}>
-          {text === null && !chybaDetailu ? <span style={{ color: C.textDim }}>Načítavam text zo schránky…</span> : (text || "").trim() || "(prázdny mail)"}
+        <div style={{ ...PAPIER, fontSize: 14.5, lineHeight: 1.6, padding: "16px 20px", borderRadius: 10, maxHeight: "min(30vh, 360px)", overflowY: "auto", boxShadow: "0 1px 0 rgba(0,0,0,.08)" }}>
+          {text === null && !chybaDetailu ? <span style={{ color: PAPIER.slaba }}>Načítavam text zo schránky…</span> : <TextMailu text={text || ""} />}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: "48vh", overflowY: "auto", padding: "4px 2px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "min(36vh, 440px)", overflowY: "auto", padding: "4px 2px" }}>
           {bubliny === null && !chybaDetailu && <span style={{ color: C.textDim, fontSize: 13 }}>Skladám rozhovor…</span>}
           {(bubliny || []).map((b, i) => {
             const nasa = b.druh !== "prisiel";
-            const obsah = b.druh === "prisiel" ? (b.text ?? `✉ ${b.predmet}`) : b.druh === "odoslany" ? b.text
-              : b.druh === "faktura" ? `Faktúra ${b.cislo} · ${czk(b.suma)}${b.komu ? ` → ${b.komu}` : ""}` : b.co;
-            const stitok = b.druh === "prisiel" ? "mail" : b.druh === "odoslany" ? `odpoveď${b.kto ? ` · ${b.kto}` : ""}` : b.druh === "faktura" ? "Kokpit · faktúra" : b.druh === "sms" ? `SMS${b.kto ? ` · ${b.kto}` : ""}` : "Kokpit · zmluva";
+            const stitok = b.druh === "prisiel" ? "mail" : b.druh === "odoslany" ? `naša odpoveď${b.kto ? ` · ${b.kto}` : ""}` : b.druh === "faktura" ? "Kokpit · faktúra" : b.druh === "sms" ? `SMS${b.kto ? ` · ${b.kto}` : ""}` : "Kokpit · zmluva";
             const aktualny = b.druh === "prisiel" && b.id === e.id;
+            const maly = b.druh === "faktura" || b.druh === "sms" || b.druh === "zmluva";
             return (
               <div key={i} style={{
-                alignSelf: nasa ? "flex-end" : "flex-start", maxWidth: "82%", padding: "8px 11px", borderRadius: 12,
-                background: nasa ? C.accentBg : C.surface, border: `1px solid ${aktualny ? C.accent : C.border}`,
-                fontSize: 13, lineHeight: 1.45, color: C.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere",
+                alignSelf: nasa ? "flex-end" : "flex-start", maxWidth: "82%", padding: maly ? "6px 11px" : "10px 13px", borderRadius: 12,
+                ...(nasa ? { background: C.accentBg, color: C.text } : { background: PAPIER.background, color: PAPIER.color }),
+                border: aktualny ? `2px solid ${C.accent}` : "1px solid transparent",
+                fontSize: maly ? 12.5 : 13.5, lineHeight: 1.5,
               }}>
-                {b.druh === "odoslany" || b.druh === "prisiel" ? (b.predmet ? <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 2 }}>{b.predmet}</div> : null) : null}
-                {String(obsah).trim().slice(0, 1500)}
-                <small style={{ display: "block", fontSize: 10.5, color: C.textDim, marginTop: 3 }}>{stitok} · {kedyCelo(b.kedy)}</small>
+                {(b.druh === "odoslany" || b.druh === "prisiel") && b.predmet && (
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: nasa ? C.textMuted : PAPIER.slaba, marginBottom: 3 }}>{b.predmet}</div>
+                )}
+                {b.druh === "prisiel" ? (b.text === null ? <span style={{ color: PAPIER.slaba }}>(text sa nenačítal)</span> : <TextMailu text={b.text} kompaktne />)
+                  : b.druh === "odoslany" ? <TextMailu text={b.text} kompaktne />
+                  : b.druh === "faktura" ? `Faktúra ${b.cislo} · ${czk(b.suma)}${b.komu ? ` → ${b.komu}` : ""}` : b.co}
+                <small style={{ display: "block", fontSize: 10.5, color: nasa ? C.textDim : PAPIER.slaba, marginTop: 4 }}>{stitok} · {kedyCelo(b.kedy)}</small>
               </div>
             );
           })}
@@ -438,7 +464,6 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
         </div>
       )}
       {pisanie}
-      {akcie}
     </div>
   );
 }

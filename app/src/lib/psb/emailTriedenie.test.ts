@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { maObsah, postavZnamych, roztried } from "./emailTriedenie";
+import { maObsah, postavZnamych, rozdelCitat, roztried } from "./emailTriedenie";
 
 const znami = postavZnamych({
   maily: [{ email: "lukas.h@seznam.cz", klient: "Lukáš Hanus" }, { email: "a@x.cz; b@y.cz", klient: "Anna Nová" }],
@@ -68,5 +68,21 @@ describe("maObsah", () => {
   });
   it("jedna vlastná veta stačí", () => {
     expect(maObsah("Dobrý den,\nv úterý v 10 máme volno.\nS pozdravem\nFilip Stráňavský")).toBe(true);
+  });
+});
+
+describe("rozdelCitat", () => {
+  it("oddelí novú časť od citovaného rozhovoru (český Gmail, zalomená hlavička)", () => {
+    const t = "Dobrý den,\nráda bych se domluvila.\n\nPřeji hezký den\nRadka\n\nDne čt 29. 10. 2026 14:39 uživatel ProSapiens Biomechanic <\ninfo@prosapiens.cz> napsal:\n\n> Dobrý den Radka,\n> děkujeme";
+    const r = rozdelCitat(t);
+    expect(r.nove).toBe("Dobrý den,\nráda bych se domluvila.\n\nPřeji hezký den\nRadka");
+    expect(r.citat.startsWith("Dne čt 29. 10.")).toBe(true);
+  });
+  it("anglická hlavička a holé „>“", () => {
+    expect(rozdelCitat("Ok\n\nOn Mon, Nov 10 Jan wrote:\n> x").nove).toBe("Ok");
+    expect(rozdelCitat("Ok\n> x").citat).toBe("> x");
+  });
+  it("mail bez citátu ostane celý", () => {
+    expect(rozdelCitat("Jen text\nbez citace")).toEqual({ nove: "Jen text\nbez citace", citat: "" });
   });
 });
