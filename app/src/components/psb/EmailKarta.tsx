@@ -34,7 +34,8 @@ type Bublina =
   | { druh: "sms"; kedy: string; co: string; kto: string }
   | { druh: "zmluva"; kedy: string; co: string };
 
-const PODPIS: Record<string, string> = { Terezka: "Terezka", Jerry: "Filip Stráňavský" };
+/** Podpis odpovede z info@ — vždy Terezia Zatková, nech píše ktokoľvek (Jerry, 12. 11. 2026). */
+const PODPIS = "Terezia Zatková";
 
 const tl = { padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted } as const;
 const tlHlavne = { ...tl, background: C.accent, color: C.onAccent, border: `1px solid ${C.accent}`, fontWeight: 600 } as const;
@@ -270,8 +271,7 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   const [text, setText] = useState<string | null>(null);
   const [bubliny, setBubliny] = useState<Bublina[] | null>(null);
   const [chybaDetailu, setChybaDetailu] = useState("");
-  const podpis = PODPIS[ktoSom || ""] || "Filip Stráňavský";
-  const [odpoved, setOdpoved] = useState(`Dobrý den,\n\n\n\nS pozdravem\n${podpis}\nProSapiens Biomechanic`);
+  const [odpoved, setOdpoved] = useState(`Dobrý den,\n\n\n\nS pozdravem\n${PODPIS}\nProSapiens Biomechanic`);
   const [komu, setKomu] = useState(e.odpovedatMail);
   const [posielam, setPosielam] = useState(false);
   const [preradit, setPreradit] = useState(false);
