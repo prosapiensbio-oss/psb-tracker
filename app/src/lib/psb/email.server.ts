@@ -51,20 +51,37 @@ export async function znamiZDb(DB: D1Database): Promise<ZnamiLudia> {
  * Uloží hlavičky prečítaných správ. Už uložená správa sa NEPREPISUJE —
  * nesie stav práce (prečítané, vybavené) a ten patrí človeku, nie behu.
  */
-export async function ulozHlavicky(DB: D1Database, spravy: ImapSprava[], validity: string, n: { vlastne: string[]; ignoruj: string[] }, znami?: ZnamiLudia): Promise<number> {
+/**
+ * PRVÉ NAČÍTANIE: maily staršie než `pred` vojdú rovno ako vybavené. Sú to
+ * týždne staré veci, ktoré sa medzitým vybavili mimo Kokpitu (dopyty sú
+ * v appke dávno zapísané) — ako nevybavené by kartu rozsvietili celú.
+ * Vidieť sú pod „ukázať vybavené“.
+ */
+export const VYBAVIL_STARSIE = "staršie — pri prvom načítaní";
+
+export async function ulozHlavicky(DB: D1Database, spravy: ImapSprava[], validity: string, n: { vlastne: string[]; ignoruj: string[] }, znami?: ZnamiLudia, starsieAkoVybavene?: string): Promise<number> {
   if (!spravy.length || !validity) return 0;
   const z = znami || (await znamiZDb(DB));
   const teraz = new Date().toISOString();
   const prikazy = spravy.map((s) => {
     const r = roztried(s, n.vlastne, n.ignoruj, z);
+    const datum = datumIso(s.datum, teraz);
     return DB.prepare(
       `INSERT OR IGNORE INTO email_spravy (id, uid, validity, od_meno, od_mail, odpovedat_mail, komu, predmet, datum, kategoria, klient, dovod, stav, nacitane_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'nove', ?13)`,
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?14, ?13)`,
     ).bind(`${validity}:${s.uid}`, Number(s.uid), validity, r.odMeno, r.odMail, r.odpovedatMail, (s.komu || "").slice(0, 300),
-      (s.predmet || "").slice(0, 300), datumIso(s.datum, teraz), r.kategoria, r.klient, r.dovod.slice(0, 120), teraz);
+      (s.predmet || "").slice(0, 300), datum, r.kategoria, r.klient, r.dovod.slice(0, 120), teraz,
+      starsieAkoVybavene && datum < starsieAkoVybavene ? "vybavene" : "nove");
   });
   const vys = await DB.batch(prikazy);
   return vys.reduce((a, x) => a + (x.meta?.changes || 0), 0);
+}
+
+/** Staršie nové maily z prvého načítania označí za vybavené (raz, pri spustení karty). */
+export async function vybavStarsie(DB: D1Database, pred: string): Promise<number> {
+  const r = await DB.prepare("UPDATE email_spravy SET stav = 'vybavene', vybavene_at = ?2, vybavil = ?3 WHERE stav = 'nove' AND datum < ?1")
+    .bind(pred, new Date().toISOString(), VYBAVIL_STARSIE).run();
+  return r.meta?.changes || 0;
 }
 
 /** Zoznam: všetko nevybavené + vybavené za posledných `dni` dní. */

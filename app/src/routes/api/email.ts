@@ -4,7 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
-import { emailPodlaId, konverzacia, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
+import { emailPodlaId, konverzacia, vybavStarsie, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
 import type { EmailRiadok } from "../../lib/psb/email.server";
 import { PORADIE_KATEGORII } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
@@ -24,7 +24,7 @@ import { nastavenia } from "./mail-dopyty";
  *   POST { akcia: "prerad", id, kategoria?, klient? }
  *   POST { akcia: "odpovedz", id, komu, predmet, text, citat?, vybav? }
  *   POST { akcia: "dopyt", id }                 → zapíše odosielateľa do dopytov
- *   POST { akcia: "nacitaj" }                   → hlavičky za 30 dní (prvé otvorenie)
+ *   POST { akcia: "nacitaj" }                   → hlavičky za 30 dní (prvé otvorenie); staršie než týždeň ako vybavené
  *
  * Obsah mailov sa do databázy NEUKLADÁ (dohoda s Jerrym) — číta sa vždy
  * zo schránky, len na čítanie (`BODY.PEEK`). Odpoveď ide len na klik.
@@ -179,8 +179,11 @@ export const Route = createFileRoute("/api/email")({
               host: n.host, port: n.port, user: n.user, heslo: n.heslo,
               odKedy: new Date(Date.now() - dni * 864e5), limit: 80, kurzor: null,
             });
-            const pridane = await ulozHlavicky(DB, spravy, kurzor.validity, n, await znamiZDb(DB));
-            return Response.json({ ok: true, precitanych: spravy.length, pridanych: pridane }, { headers: ns });
+            const pred = new Date(Date.now() - 7 * 864e5).toISOString();
+            const pridane = await ulozHlavicky(DB, spravy, kurzor.validity, n, await znamiZDb(DB), pred);
+            // Riadky z prvého spustenia karty (12. 11. 2026) dostanú to isté pravidlo.
+            const dorovnane = await vybavStarsie(DB, pred);
+            return Response.json({ ok: true, precitanych: spravy.length, pridanych: pridane, starsieVybavene: dorovnane }, { headers: ns });
           }
           return Response.json({ ok: false, error: "Neznáma akcia." }, { status: 400 });
         } catch (x) {

@@ -73,6 +73,13 @@ export function roztried(v: ImapSprava, vlastne: string[], ignoruj: string[], zn
   const klientMenom = !vlastnaDomena && odMeno ? znami.klientPodlaMena.get(normMeno(odMeno)) : undefined;
   if (klientMenom) return { ...zaklad, kategoria: "klient", klient: klientMenom, dovod: "meno klienta" };
 
+  // Naša vlastná pošta z inej adresy (Gmail ProSapiens, DocuSeal v našom
+  // mene) — nie je to nový človek (12. 11. 2026: pozvánka na podpis padla
+  // medzi nových ľudí, lebo slovo „trénink“ bolo v pätičke).
+  if (!form && (/prosapiens/i.test(od.email.split("@")[0] || "") || /^prosapiens\b/i.test(normMeno(od.meno)))) {
+    return { ...zaklad, kategoria: "prevadzka", klient: null, dovod: "naša adresa" };
+  }
+
   const r = naDopyt(v, vlastne, ignoruj);
   if ("dopyt" in r) {
     return { ...zaklad, kategoria: "novy", klient: null, dovod: r.dopyt.zFormulara ? "formulár z webu" : "píše o tréningu" };
