@@ -95,7 +95,7 @@ const TELEFON = `COALESCE(
 ) telefon`;
 
 /** Zoznam: všetko nevybavené + vybavené za posledných `dni` dní. */
-export async function zoznamEmailov(DB: D1Database, dni = 21): Promise<EmailRiadok[]> {
+export async function zoznamEmailov(DB: D1Database, dni = 45): Promise<EmailRiadok[]> {
   const od = new Date(Date.now() - dni * 864e5).toISOString();
   const r = await DB.prepare(
     `SELECT s.*, ${TELEFON} FROM email_spravy s WHERE s.stav <> 'vybavene' OR s.datum >= ?1 ORDER BY s.datum DESC LIMIT 400`,

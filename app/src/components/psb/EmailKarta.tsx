@@ -130,6 +130,38 @@ async function api<T>(url: string, body?: unknown): Promise<T & { ok: boolean; e
   try { return JSON.parse(t); } catch { return { ok: false, error: `HTTP ${r.status}: ${t.slice(0, 300)}` } as T & { ok: boolean; error?: string }; }
 }
 
+type Clovek = { kluc: string; meno: string; kategoria: Kategoria; posledny: Email; pocet: number; nove: boolean; nevybavene: boolean };
+
+/** Kto je za mailom: klient podľa mena, inak adresa na odpoveď. */
+const klucCloveka = (e: Email) => (e.klient ? `k:${e.klient}` : (e.odpovedatMail || e.odMail || e.id).toLowerCase());
+
+/** Ľudia z mailov (návrh C). Hore tí, na ktorých sa čaká, potom podľa posledného mailu. */
+function zoskupLudi(maily: Email[]): Clovek[] {
+  const mapa = new Map<string, Clovek>();
+  for (const e of maily) {
+    const k = klucCloveka(e);
+    const o = mapa.get(k);
+    if (!o) {
+      mapa.set(k, { kluc: k, meno: e.klient || e.odMeno || e.odMail, kategoria: e.kategoria, posledny: e, pocet: 1, nove: e.stav === "nove", nevybavene: e.stav !== "vybavene" });
+      continue;
+    }
+    o.pocet++;
+    if (e.datum > o.posledny.datum) o.posledny = e;
+    if (e.stav === "nove") o.nove = true;
+    if (e.stav !== "vybavene") o.nevybavene = true;
+    // Klient a možný dopyt majú prednosť pred prevádzkou a ostatnými.
+    const vaha = (x: Kategoria) => PORADIE_KATEGORII.indexOf(x);
+    if (vaha(e.kategoria) < vaha(o.kategoria)) o.kategoria = e.kategoria;
+  }
+  return [...mapa.values()].sort((a, b) => (a.nevybavene !== b.nevybavene ? (a.nevybavene ? -1 : 1) : a.posledny.datum < b.posledny.datum ? 1 : -1));
+}
+
+function inicialy(meno: string): string {
+  const slova = (meno || "").replace(/[<>"@].*$/, "").trim().split(/\s+/).filter(Boolean);
+  if (!slova.length) return "?";
+  return ((slova[0][0] || "") + (slova.length > 1 ? slova[slova.length - 1][0] : slova[0][1] || "")).toUpperCase();
+}
+
 export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }: {
   data: PSBData; clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null;
   onProfil: (meno: string) => void; onTerminy?: () => void;
@@ -142,7 +174,6 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
   const [ludia, setLudia] = useState(false);
   const [vybrany, setVybrany] = useState<string | null>(null);
   const [ostatneOtvorene, setOstatneOtvorene] = useState(false);
-  const [ukazVybavene, setUkazVybavene] = useState(false);
   const [nacitavam, setNacitavam] = useState("");
   const prvyRaz = useRef(true);
   const plocha = useVyskaPlochy(!uzke);
@@ -186,75 +217,101 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
     await nacitaj();
   };
 
-  const nevybavene = (emaily || []).filter((e) => e.stav !== "vybavene");
-  const skupiny = useMemo(() => {
-    const out = new Map<Kategoria, Email[]>();
-    for (const k of PORADIE_KATEGORII) out.set(k, []);
-    for (const e of emaily || []) if (ukazVybavene || e.stav !== "vybavene") out.get(e.kategoria)?.push(e);
-    return out;
-  }, [emaily, ukazVybavene]);
-  const vybavenychPocet = (emaily || []).length - nevybavene.length;
+  // Pošta (návrh A): všetko od najnovšieho, ako schránka. Ľudia (návrh C):
+  // zoskupené po ľuďoch. Jerry, 12. 11. 2026 — ľavý zoznam sa mení s prepínačom.
+  const vsetky = useMemo(() => [...(emaily || [])].sort((a, b) => (a.datum < b.datum ? 1 : -1)), [emaily]);
+  const nevybavene = vsetky.filter((e) => e.stav !== "vybavene");
   const naVybavenie = nevybavene.filter((e) => e.kategoria !== "ostatne").length;
-  const otvoreny = (emaily || []).find((e) => e.id === vybrany) || null;
+  const otvoreny = vsetky.find((e) => e.id === vybrany) || null;
+  const ludiaZoznam = useMemo(() => zoskupLudi(vsetky), [vsetky]);
+  const klucOtvoreneho = otvoreny ? klucCloveka(otvoreny) : null;
 
   const zmenStav = async (e: Email, stav: "vybavene" | "vratit") => {
     const r = await api("/api/email", { akcia: "stav", id: e.id, stav });
     if (!r.ok) { setChyba(r.error || "Zápis zlyhal."); return; }
     if (stav === "vybavene") {
       setHlaska(`Vybavené: ${e.predmet || e.odMeno}`);
-      // Ďalší nevybavený v tej istej skupine, aby sa dalo ísť ďalej bez hľadania.
-      const dalsi = nevybavene.find((x) => x.id !== e.id && x.kategoria === e.kategoria) || nevybavene.find((x) => x.id !== e.id && x.kategoria !== "ostatne");
+      // Ďalší nevybavený (okrem ostatných), aby sa dalo ísť ďalej bez hľadania.
+      const dalsi = nevybavene.find((x) => x.id !== e.id && x.kategoria !== "ostatne");
       setVybrany(dalsi?.id || null);
     }
     await nacitaj();
   };
 
   const posledne = citane?.ok ? kedyCelo(citane.ok) : "";
+  const BODKA: Partial<Record<Kategoria, string>> = { klient: C.green, novy: C.accent };
+
+  /** Riadok schránky — návrh A. */
   const riadok = (e: Email) => {
     const on = e.id === vybrany;
     const nove = e.stav === "nove";
     return (
       <button key={e.id} onClick={() => setVybrany(e.id)}
         style={{
-          display: "block", width: "100%", textAlign: "left", padding: "7px 9px", margin: "1px 0", borderRadius: 8, cursor: "pointer",
-          fontFamily: "inherit", border: "none", background: on ? C.accentBg : "transparent", color: C.text,
-          opacity: e.stav === "vybavene" ? 0.55 : 1, borderLeft: `3px solid ${nove ? C.accent : "transparent"}`,
+          display: "block", width: "100%", textAlign: "left", padding: "8px 10px", margin: 0, borderRadius: 8, cursor: "pointer",
+          fontFamily: "inherit", border: "none", borderBottom: `1px solid ${C.border}`, background: on ? C.accentBg : "transparent", color: C.text,
+          opacity: e.stav === "vybavene" ? 0.6 : 1,
         }}>
         <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+          {BODKA[e.kategoria] && <span title={NAZVY_KATEGORII[e.kategoria]} style={{ width: 7, height: 7, borderRadius: 9, background: BODKA[e.kategoria], flexShrink: 0, alignSelf: "center" }} />}
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: nove ? 700 : 500, fontSize: 13 }}>
             {e.klient || e.odMeno || e.odMail}
           </span>
+          {e.stav === "vybavene" && <span title="vybavené" style={{ fontSize: 11, color: C.green }}>✓</span>}
           {e.odpovedaneAt && <span title="odpovedané" style={{ fontSize: 11, color: C.green }}>↩</span>}
-          <small style={{ color: C.textDim, fontSize: 11, flexShrink: 0 }}>{kedyKratko(e.datum)}</small>
+          <small style={{ color: nove ? C.text : C.textDim, fontWeight: nove ? 700 : 400, fontSize: 11, flexShrink: 0 }}>{kedyKratko(e.datum)}</small>
         </div>
-        <div style={{ fontSize: 12, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.predmet || "(bez predmetu)"}</div>
+        <div style={{ fontSize: 12, color: nove ? C.textMuted : C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.predmet || "(bez predmetu)"}</div>
       </button>
     );
   };
 
-  const zoznam = (
+  const zoznamPosty = (
     <div>
-      {PORADIE_KATEGORII.map((k) => {
-        const s = skupiny.get(k) || [];
-        if (!s.length && k !== "klient" && k !== "novy") return null;
-        const zbalene = k === "ostatne" && !ostatneOtvorene;
-        return (
-          <div key={k} style={{ marginBottom: 8 }}>
-            <button onClick={() => k === "ostatne" && setOstatneOtvorene((x) => !x)}
-              style={{ background: "none", border: "none", padding: "4px 2px", cursor: k === "ostatne" ? "pointer" : "default", fontFamily: "inherit", fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: C.textDim, fontWeight: 700 }}>
-              {k === "ostatne" ? (zbalene ? "▸ " : "▾ ") : ""}{NAZVY_KATEGORII[k]} <span style={{ fontWeight: 400 }}>· {s.filter((e) => e.stav !== "vybavene").length}</span>
-            </button>
-            {!zbalene && (s.length ? s.map(riadok) : <div style={{ fontSize: 12, color: C.textDim, padding: "2px 9px" }}>nič</div>)}
-          </div>
-        );
-      })}
-      {vybavenychPocet > 0 && (
-        <button onClick={() => setUkazVybavene((x) => !x)} style={{ ...tl, fontSize: 11.5, marginTop: 4 }}>
-          {ukazVybavene ? "skryť vybavené" : `ukázať vybavené (${vybavenychPocet})`}
-        </button>
-      )}
+      {vsetky.length ? vsetky.map(riadok) : <div style={{ fontSize: 12.5, color: C.textDim, padding: 8 }}>{emaily === null ? "Načítavam…" : "Schránka je prázdna."}</div>}
     </div>
   );
+
+  /** Človek — návrh C: iniciály v krúžku, meno, posledný predmet a čas. */
+  const osoba = (o: Clovek) => {
+    const on = klucOtvoreneho === o.kluc;
+    const farba = o.kategoria === "klient" ? C.green : o.kategoria === "novy" ? C.accent : C.textDim;
+    return (
+      <button key={o.kluc} onClick={() => setVybrany(o.posledny.id)}
+        style={{ display: "flex", gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "8px 8px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", background: on ? C.accentBg : "transparent", color: C.text }}>
+        <span style={{ width: 36, height: 36, borderRadius: 99, flexShrink: 0, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700, color: farba, border: `1.5px solid ${farba}`, background: C.track }}>{inicialy(o.meno)}</span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+            <b style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: o.nove ? 800 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.meno}</b>
+            <small style={{ fontSize: 11, color: C.textDim, flexShrink: 0 }}>{kedyKratko(o.posledny.datum)}</small>
+          </span>
+          <small style={{ display: "block", fontSize: 11.5, color: o.nove ? C.textMuted : C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {o.nove ? `nové · ` : o.kategoria === "klient" ? "klient · " : o.kategoria === "novy" ? "možný dopyt · " : ""}{o.posledny.predmet || "(bez predmetu)"}{o.pocet > 1 ? ` · ${o.pocet} maily` : ""}
+          </small>
+        </span>
+      </button>
+    );
+  };
+
+  const hlavni = ludiaZoznam.filter((o) => o.kategoria !== "ostatne");
+  const ostatni = ludiaZoznam.filter((o) => o.kategoria === "ostatne");
+  const zoznamLudi = (
+    <div>
+      {hlavni.map(osoba)}
+      {ostatni.length > 0 && (
+        <>
+          <button onClick={() => setOstatneOtvorene((x) => !x)}
+            style={{ display: "flex", gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "8px 8px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", background: "transparent", color: C.textMuted }}>
+            <span style={{ width: 36, height: 36, borderRadius: 99, display: "grid", placeItems: "center", background: C.track, color: C.textDim, fontWeight: 700 }}>⋯</span>
+            <span><b style={{ fontSize: 13 }}>Ostatní · {ostatni.length}</b><small style={{ display: "block", fontSize: 11.5, color: C.textDim }}>{ostatneOtvorene ? "skryť" : "ponuky, newslettre, systém"}</small></span>
+          </button>
+          {ostatneOtvorene && ostatni.map(osoba)}
+        </>
+      )}
+      {!ludiaZoznam.length && <div style={{ fontSize: 12.5, color: C.textDim, padding: 8 }}>{emaily === null ? "Načítavam…" : "Nikto."}</div>}
+    </div>
+  );
+  const zoznam = ludia ? zoznamLudi : zoznamPosty;
 
   const prepinac = uzke ? (
     <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 999, padding: 2 }}>
@@ -281,7 +338,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
         onProfil={onProfil} onTerminy={onTerminy} onStav={zmenStav} onZmena={nacitaj} setHlaska={setHlaska} setChyba={setChyba}
         onSpat={uzke ? () => setVybrany(null) : undefined} naVysku={!uzke} />
     : <div style={{ color: C.textDim, fontSize: 13, padding: "30px 10px", textAlign: "center" }}>
-        {emaily === null ? "Načítavam…" : naVybavenie ? "Vyber mail vľavo." : "Všetko vybavené."}
+        {emaily === null ? "Načítavam…" : ludia ? "Vyber človeka vľavo." : naVybavenie ? "Vyber mail vľavo." : "Všetko vybavené."}
       </div>;
 
   return (
