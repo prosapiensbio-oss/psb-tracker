@@ -52,6 +52,13 @@ const tlHlavne = { ...tl, background: C.accent, color: C.onAccent, border: `1px 
  * Doručený mail je „papier“ — svetlá plocha s tmavým písmom, ako ho uvidí
  * v schránke. Na zelenom skle splýval s appkou (Jerry, 12. 11. 2026).
  */
+/**
+ * Výška plochy karty na počítači: obrazovka mínus hlavička appky a karty.
+ * Zoznam aj mail rolujú samy — inak bola odpoveď odrezaná pod kartou
+ * (Jerry, 12. 11. 2026).
+ */
+const VYSKA_PLOCHY = "max(380px, calc(100vh - 290px))";
+
 const PAPIER = { background: "#f7f6f0", color: "#1A2E24", slaba: "#6b7568", linka: "#d9ddd2" } as const;
 
 function TextMailu({ text, kompaktne }: { text: string; kompaktne?: boolean }) {
@@ -247,7 +254,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
   const detail = otvoreny
     ? <Detail key={`${otvoreny.id}|${ludia ? "l" : "e"}`} e={otvoreny} ludia={ludia} data={data} clients={clients} mena={mena} ktoSom={ktoSom}
         onProfil={onProfil} onTerminy={onTerminy} onStav={zmenStav} onZmena={nacitaj} setHlaska={setHlaska} setChyba={setChyba}
-        onSpat={uzke ? () => setVybrany(null) : undefined} />
+        onSpat={uzke ? () => setVybrany(null) : undefined} naVysku={!uzke} />
     : <div style={{ color: C.textDim, fontSize: 13, padding: "30px 10px", textAlign: "center" }}>
         {emaily === null ? "Načítavam…" : naVybavenie ? "Vyber mail vľavo." : "Všetko vybavené."}
       </div>;
@@ -274,10 +281,10 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
       {uzke ? (
         <div style={{ marginTop: 8 }}>{otvoreny ? detail : zoznam}</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "44px minmax(220px, 300px) minmax(0, 1fr)", gap: 12, marginTop: 10, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "44px minmax(220px, 300px) minmax(0, 1fr)", gap: 12, marginTop: 10, alignItems: "stretch", height: VYSKA_PLOCHY }}>
           {prepinac}
-          <div style={{ borderRight: `1px solid ${C.border}`, paddingRight: 10, maxHeight: "70vh", overflowY: "auto" }}>{zoznam}</div>
-          <div style={{ minWidth: 0 }}>{detail}</div>
+          <div style={{ borderRight: `1px solid ${C.border}`, paddingRight: 10, overflowY: "auto", minHeight: 0 }}>{zoznam}</div>
+          <div style={{ minWidth: 0, minHeight: 0 }}>{detail}</div>
         </div>
       )}
     </div>
@@ -298,10 +305,12 @@ function PasKlienta({ meno, data, clients, onProfil }: { meno: string; data: PSB
   );
 }
 
-function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, onStav, onZmena, setHlaska, setChyba, onSpat }: {
+function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, onStav, onZmena, setHlaska, setChyba, onSpat, naVysku }: {
   e: Email; ludia: boolean; data: PSBData; clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null;
   onProfil: (m: string) => void; onTerminy?: () => void; onStav: (e: Email, s: "vybavene" | "vratit") => Promise<void>;
   onZmena: () => Promise<unknown>; setHlaska: (s: string) => void; setChyba: (s: string) => void; onSpat?: () => void;
+  /** Na počítači vyplní výšku plochy: hlavička hore, mail v strede roluje, odpoveď dole. */
+  naVysku?: boolean;
 }) {
   const [text, setText] = useState<string | null>(null);
   const [bubliny, setBubliny] = useState<Bublina[] | null>(null);
@@ -315,6 +324,8 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   };
   const [komu, setKomu] = useState(e.odpovedatMail);
   const [posielam, setPosielam] = useState(false);
+  /** Odpoveď je zbalená — Terezka dopytom volá; mail sa píše len občas. */
+  const [pisem, setPisem] = useState(false);
   const [preradit, setPreradit] = useState(false);
   const [klientNovy, setKlientNovy] = useState("");
 
@@ -381,8 +392,12 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
     </div>
   );
 
-  const pisanie = (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+  const pisanie = !pisem ? (
+    <div style={{ marginTop: 10, flex: "none" }}>
+      <button onClick={() => setPisem(true)} style={{ ...tl, color: C.text }}>✉ Odpísať mailom</button>
+    </div>
+  ) : (
+    <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}`, flex: "none" }}>
       <div style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: C.textDim, fontWeight: 700, marginBottom: 6 }}>Odpoveď</div>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: C.textDim, marginBottom: 6 }}>
         komu <input value={komu} onChange={(x) => setKomu(x.target.value)} style={{ flex: "1 1 200px", minWidth: 0, padding: "4px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5 }} />
@@ -405,7 +420,7 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
   );
 
   return (
-    <div>
+    <div style={naVysku ? { display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" } : undefined}>
       {onSpat && <button onClick={onSpat} style={{ ...tl, marginBottom: 8 }}>‹ späť na zoznam</button>}
       {!ludia ? (
         <>
@@ -432,11 +447,11 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       {chybaDetailu && <div style={{ fontSize: 12.5, color: C.orange, margin: "6px 0" }}>{chybaDetailu}</div>}
 
       {!ludia ? (
-        <div style={{ ...PAPIER, fontSize: 14.5, lineHeight: 1.6, padding: "16px 20px", borderRadius: 10, maxHeight: "min(30vh, 360px)", overflowY: "auto", boxShadow: "0 1px 0 rgba(0,0,0,.08)" }}>
+        <div style={{ ...PAPIER, fontSize: 14.5, lineHeight: 1.6, padding: "16px 20px", borderRadius: 10, ...(naVysku ? { flex: "1 1 0", minHeight: 150 } : { maxHeight: "50vh" }), overflowY: "auto", boxShadow: "0 1px 0 rgba(0,0,0,.08)" }}>
           {text === null && !chybaDetailu ? <span style={{ color: PAPIER.slaba }}>Načítavam text zo schránky…</span> : <TextMailu text={text || ""} />}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "min(36vh, 440px)", overflowY: "auto", padding: "4px 2px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, ...(naVysku ? { flex: "1 1 0", minHeight: 160 } : { maxHeight: "55vh" }), overflowY: "auto", padding: "4px 2px" }}>
           {bubliny === null && !chybaDetailu && <span style={{ color: C.textDim, fontSize: 13 }}>Skladám rozhovor…</span>}
           {(bubliny || []).map((b, i) => {
             const nasa = b.druh !== "prisiel";
