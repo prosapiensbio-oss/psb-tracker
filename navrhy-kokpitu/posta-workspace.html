@@ -313,7 +313,7 @@ Díky, Janka</div>
 <section class="navrh on" id="d">
   <div class="popis">
     <h2><span class="pismeno">D</span> B s prepínačom vľavo: Pošta | Ľudia <span class="tip">tvoje zadanie</span></h2>
-    <p>Na ľavom okraji karty je prepínač. <b style="color:var(--text)">Pošta</b> = zoznam vľavo a mail vpravo (A), ale zoznam je roztriedený ako v B a pri otvorenom maile sú tlačidlá z B. <b style="color:var(--text)">Ľudia</b> = konverzácie po ľuďoch (C). Klikni na prepínač.</p>
+    <p>Na ľavom okraji karty je prepínač. <b style="color:var(--text)">Pošta</b> = zoznam vľavo a mail vpravo (A), ale zoznam je roztriedený ako v B a pri otvorenom maile sú tlačidlá z B. <b style="color:var(--text)">Ľudia</b> = ten istý roztriedený zoznam vľavo, ale otvorený mail sa ukáže ako celá konverzácia s tým človekom v bublinách (C) — aj s faktúrami a SMS z Kokpitu. Prepínač mení len pravú stranu. Klikni naň.</p>
   </div>
   <div class="zariadenia">
     <div class="pc">
@@ -329,7 +329,7 @@ Díky, Janka</div>
           </div>
 
           <!-- POŠTA: roztriedený zoznam + detail -->
-          <div class="d-pohlad on" id="dPostaZoznam" style="border-right:1px solid rgba(255,255,255,.08);padding-right:10px">
+          <div class="d-pohlad on" id="dZoznam" style="border-right:1px solid rgba(255,255,255,.08);padding-right:10px">
             <div class="sekcia" style="margin-top:0">Klienti · 1</div>
             <div class="a-riadok nove on"><div class="kto">Janka Šnirychová <small>11:42</small></div><div class="pred">Re: Faktura 20261003</div></div>
             <div class="sekcia">Noví ľudia · 1</div>
@@ -352,19 +352,14 @@ Díky, Janka</div>
             <div class="b-akcie"><button class="tl h">Odoslať a vybaviť</button><button class="tl o">＋ Zapísať ako dopyt</button><button class="tl">Ponúknuť termíny</button><button class="tl">Vybavené</button></div>
           </div>
 
-          <!-- ĽUDIA -->
-          <div class="d-pohlad" id="dLudiaZoznam" style="border-right:1px solid rgba(255,255,255,.08);padding-right:10px">
-            <div class="c-osoba on"><div class="avatar k">JŠ</div><div><b style="font-size:13px">Janka Šnirychová</b><small>Re: Faktura 20261003 · 11:42</small></div></div>
-            <div class="c-osoba"><div class="avatar n">RK</div><div><b style="font-size:13px">Radka Kovaříková</b><small>nová · uvodni trenink</small></div></div>
-            <div class="c-osoba"><div class="avatar">PN</div><div><b style="font-size:13px">Petra N.</b><small>odpoveď na mailing</small></div></div>
-            <div class="c-osoba"><div class="avatar">SD</div><div><b style="font-size:13px">Správa domu</b><small>Vyúčtování 2024</small></div></div>
-          </div>
+          <!-- ĽUDIA: ten istý zoznam vľavo, mení sa len pravá strana -->
           <div class="d-pohlad" id="dLudiaDetail">
             <div class="klient-pas">Janka Šnirychová · Terezka · zostatok <b>3 h</b> · dlh 0 Kč <button class="tl z">Profil →</button></div>
             <div class="bublina my">Faktura 20261003 (PDF + QR)<small>Kokpit · 28. 9.</small></div>
             <div class="bublina my">Přehled hodin a QR na platbu<small>SMS · 5. 11.</small></div>
             <div class="bublina on">Dobrý den, platbu jsem poslala dnes ráno, jen jsem omylem do zprávy napsala číslo faktury bez lomítka. Snad to vadit nebude. Díky, Janka<small>mail · 12. 11. 11:42</small></div>
             <div class="c-pisanie"><textarea class="odpoved" style="min-height:44px" placeholder="Napíš Janke…"></textarea><button class="tl h">Poslať</button></div>
+            <div class="b-akcie"><button class="tl o">＋ Zapísať ako dopyt</button><button class="tl">Ponúknuť termíny</button><button class="tl">Vybavené</button></div>
           </div>
         </div>
       </div>
@@ -402,8 +397,8 @@ document.querySelectorAll('.prepinac button').forEach(b=>b.addEventListener('cli
 const dPrep=document.getElementById('dPrep');let dLudia=false;
 dPrep.addEventListener('click',()=>{dLudia=!dLudia;document.getElementById('dJazdec').style.top=dLudia?'49px':'3px';
   document.getElementById('dPostaL').className=dLudia?'off':'on';document.getElementById('dLudiaL').className=dLudia?'on':'off';
-  ['dPostaZoznam','dPostaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',!dLudia));
-  ['dLudiaZoznam','dLudiaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',dLudia));});
+  ['dPostaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',!dLudia));
+  ['dLudiaDetail'].forEach(i=>document.getElementById(i).classList.toggle('on',dLudia));});
 </script>
 </body>
 </html>
