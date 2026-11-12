@@ -370,10 +370,11 @@ export function pripravSadu(v: {
     name: `${v.nazov} — sada`,
     status: "PAUSED",
     billing_event: "IMPRESSIONS",
-    // Pri návštevnosti sa optimalizuje na kliky, pri dopytoch na zobrazenie
-    // cieľovej stránky — konverzie sa optimalizovať nedajú, kým je konverzná
-    // akcia rozbitá (meria zobrazenie stránky, nie odoslaný formulár).
-    optimization_goal: v.ciel === "dopyty" ? "LANDING_PAGE_VIEWS" : "LINK_CLICKS",
+    // Vždy na zobrazenie cieľovej stránky, nie na klik (Jerry, 12. 11. 2026:
+    // „povedz Jarvisovi nech to nastaví na zobrazenia stránky“). Klik platil
+    // aj za ľudí, ktorým sa stránka nenačítala — v septembri dorazilo na web
+    // len 41–68 % klikov. Konverzie sa optimalizovať nedajú (Lead je málo).
+    optimization_goal: "LANDING_PAGE_VIEWS",
     destination_type: "WEBSITE",
     /**
      * Mesto + okruh, keď je zadané. Pre štúdio v Brne je celá krajina

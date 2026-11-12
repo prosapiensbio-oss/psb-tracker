@@ -216,7 +216,7 @@ describe("pripravSadu", () => {
   });
 
   it("cieľ určuje, na čo sa optimalizuje", () => {
-    expect(pripravSadu(zaklad).optimization_goal).toBe("LINK_CLICKS");
+    expect(pripravSadu(zaklad).optimization_goal).toBe("LANDING_PAGE_VIEWS");
     expect(pripravSadu({ ...zaklad, ciel: "dopyty" }).optimization_goal).toBe("LANDING_PAGE_VIEWS");
   });
 
