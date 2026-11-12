@@ -157,7 +157,10 @@ export async function stiahniTela(opts: {
     const out: ImapSprava[] = [];
     for (const uid of opts.uids.slice(0, 8)) {
       const r = await s.prikaz(`UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE REPLY-TO)] BODY.PEEK[TEXT]<0.${max * 2}>)`);
-      if (!/FETCH/i.test(r)) continue;
+      // Len skutočná odpoveď „* N FETCH“ — „k3 OK Fetch completed“ príde aj
+      // vtedy, keď správa v schránke už nie je (12. 11. 2026: zmazaný
+      // podvodný mail sa tváril ako prázdny).
+      if (!/^\* \d+ FETCH/im.test(r)) continue;
       out.push({ uid: String(uid), ...rozoberOdpoved(r, max) });
     }
     return { spravy: out, platnost: true };
@@ -165,3 +168,4 @@ export async function stiahniTela(opts: {
     await s.zavri();
   }
 }
+

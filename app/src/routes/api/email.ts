@@ -69,7 +69,7 @@ export const Route = createFileRoute("/api/email")({
             if (!e) return Response.json({ ok: false, error: "Mail sa v Kokpite nenašiel." }, { status: 404 });
             const t = await tela(DB, [e], 20000);
             const s = t.get(e.uid);
-            if (!s) return Response.json({ ok: false, error: "V schránke tento mail už nie je (zmazaný alebo presunutý)." }, { status: 404 });
+            if (!s) return Response.json({ ok: false, error: "V schránke tento mail už nie je — niekto ho zmazal alebo ho server presunul do spamu. Daj Vybavené." }, { status: 404 });
             if (e.stav === "nove") await nastavStav(DB, e.id, "precitane", kto);
             return Response.json({ ok: true, text: s.text, komu: s.komu }, { headers: ns });
           }
