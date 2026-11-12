@@ -64,7 +64,7 @@ describe("maObsah", () => {
   it("samotný pozdrav a podpis nie sú odpoveď", () => {
     expect(maObsah("Dobrý den,\n\n\n\nS pozdravem\nFilip Stráňavský\nProSapiens Biomechanic")).toBe(false);
     expect(maObsah("Dobrý den,\n\nS pozdravem\nTerezka\nProSapiens Biomechanic")).toBe(false);
-    expect(maObsah("Dobrý den,\n\n\nS pozdravem\nTerezia Zatková\nProSapiens Biomechanic")).toBe(false);
+    expect(maObsah("Dobrý den,\n\n\nS pozdravem\nTerézia Zaťková\nProSapiens Biomechanic")).toBe(false);
   });
   it("jedna vlastná veta stačí", () => {
     expect(maObsah("Dobrý den,\nv úterý v 10 máme volno.\nS pozdravem\nFilip Stráňavský")).toBe(true);

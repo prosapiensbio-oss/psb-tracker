@@ -35,11 +35,11 @@ type Bublina =
   | { druh: "zmluva"; kedy: string; co: string };
 
 /**
- * Podpis odpovede z info@ — predvolene Terezia Zatková, nech píše ktokoľvek;
+ * Podpis odpovede z info@ — predvolene Terézia Zaťková (tvar z webu), nech píše ktokoľvek;
  * dá sa prepnúť (Jerry, 12. 11. 2026: „daj tam možnosť výberu podpisu“).
  * Posledná voľba sa pamätá v prehliadači.
  */
-const PODPISY = ["Terezia Zatková", "Filip Stráňavský"] as const;
+const PODPISY = ["Terézia Zaťková", "Filip Stráňavský"] as const;
 const KLUC_PODPISU = "psb-email-podpis";
 function ulozenyPodpis(): string {
   try { const v = localStorage.getItem(KLUC_PODPISU); if (v && (PODPISY as readonly string[]).includes(v)) return v; } catch { /* súkromné okno */ }

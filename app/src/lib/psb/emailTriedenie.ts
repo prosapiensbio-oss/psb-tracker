@@ -144,6 +144,6 @@ export function postavZnamych(v: {
  * Filip“ a nič medzi tým. Platí na serveri aj na obrazovke.
  */
 export function maObsah(text: string): boolean {
-  const ZDVORILOST = /^(dobr[ýy] den|dobr[ýy] de[ňn]|ahoj|zdrav[íi]m|s pozdravem|s pozdravom|d[ěe]kuji|filip str[áa][ňn]avsk[ýy]|filip|terezka|terezi[ae] zatkov[áa]|prosapiens biomechanic)[\s,.!]*$/i;
+  const ZDVORILOST = /^(dobr[ýy] den|dobr[ýy] de[ňn]|ahoj|zdrav[íi]m|s pozdravem|s pozdravom|d[ěe]kuji|filip str[áa][ňn]avsk[ýy]|filip|terezka|ter[ée]zi[ae] za[ťt]kov[áa]|prosapiens biomechanic)[\s,.!]*$/i;
   return (text || "").split(/\r?\n/).map((r) => r.trim()).filter((r) => r && !ZDVORILOST.test(r)).length > 0;
 }
