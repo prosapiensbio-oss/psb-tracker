@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import { NAZVY_KATEGORII, PORADIE_KATEGORII, maObsah, rozdelCitat } from "../../lib/psb/emailTriedenie";
@@ -53,11 +53,35 @@ const tlHlavne = { ...tl, background: C.accent, color: C.onAccent, border: `1px 
  * v schránke. Na zelenom skle splýval s appkou (Jerry, 12. 11. 2026).
  */
 /**
- * Výška plochy karty na počítači: obrazovka mínus hlavička appky a karty.
- * Zoznam aj mail rolujú samy — inak bola odpoveď odrezaná pod kartou
- * (Jerry, 12. 11. 2026).
+ * Výška plochy karty na počítači sa MERIA: od vrchu plochy po spodok karty,
+ * ktorá roluje (alebo obrazovky). Zoznam aj mail potom rolujú samy — inak
+ * bola odpoveď odrezaná pod kartou (Jerry, 12. 11. 2026). Odhad „100vh mínus
+ * hlavička“ nesedel o 60 px, lebo kartu obkolesuje rad kariet a bodky.
  */
-const VYSKA_PLOCHY = "max(380px, calc(100vh - 290px))";
+function useVyskaPlochy(zapnute: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [vyska, setVyska] = useState(420);
+  useLayoutEffect(() => {
+    if (!zapnute) return;
+    const zmeraj = () => {
+      const el = ref.current;
+      if (!el) return;
+      let p = el.parentElement;
+      let spodok = window.innerHeight;
+      while (p) {
+        const cs = getComputedStyle(p);
+        if (/(auto|scroll)/.test(cs.overflowY)) { spodok = Math.min(spodok, p.getBoundingClientRect().bottom); break; }
+        p = p.parentElement;
+      }
+      const posun = p ? p.scrollTop : window.scrollY;
+      setVyska(Math.max(300, Math.round(spodok - (el.getBoundingClientRect().top + posun) - 18)));
+    };
+    zmeraj();
+    window.addEventListener("resize", zmeraj);
+    return () => window.removeEventListener("resize", zmeraj);
+  }, [zapnute]);
+  return { ref, vyska };
+}
 
 const PAPIER = { background: "#f7f6f0", color: "#1A2E24", slaba: "#6b7568", linka: "#d9ddd2" } as const;
 
@@ -121,6 +145,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
   const [ukazVybavene, setUkazVybavene] = useState(false);
   const [nacitavam, setNacitavam] = useState("");
   const prvyRaz = useRef(true);
+  const plocha = useVyskaPlochy(!uzke);
   // Hláška o úspechu zmizne sama, chyba nie — tá čaká, kým si ju človek prečíta.
   useEffect(() => {
     if (!hlaska) return;
@@ -281,7 +306,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
       {uzke ? (
         <div style={{ marginTop: 8 }}>{otvoreny ? detail : zoznam}</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "44px minmax(220px, 300px) minmax(0, 1fr)", gap: 12, marginTop: 10, alignItems: "stretch", height: VYSKA_PLOCHY }}>
+        <div ref={plocha.ref} style={{ display: "grid", gridTemplateColumns: "44px minmax(220px, 300px) minmax(0, 1fr)", gap: 12, marginTop: 10, alignItems: "stretch", height: plocha.vyska }}>
           {prepinac}
           <div style={{ borderRight: `1px solid ${C.border}`, paddingRight: 10, overflowY: "auto", minHeight: 0 }}>{zoznam}</div>
           <div style={{ minWidth: 0, minHeight: 0 }}>{detail}</div>
@@ -447,7 +472,7 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       {chybaDetailu && <div style={{ fontSize: 12.5, color: C.orange, margin: "6px 0" }}>{chybaDetailu}</div>}
 
       {!ludia ? (
-        <div style={{ ...PAPIER, fontSize: 14.5, lineHeight: 1.6, padding: "16px 20px", borderRadius: 10, ...(naVysku ? { flex: "1 1 0", minHeight: 150 } : { maxHeight: "50vh" }), overflowY: "auto", boxShadow: "0 1px 0 rgba(0,0,0,.08)" }}>
+        <div style={{ ...PAPIER, fontSize: 14.5, lineHeight: 1.6, padding: "16px 20px", borderRadius: 10, ...(naVysku ? { flex: "1 1 0", minHeight: 120 } : { maxHeight: "50vh" }), overflowY: "auto", boxShadow: "0 1px 0 rgba(0,0,0,.08)" }}>
           {text === null && !chybaDetailu ? <span style={{ color: PAPIER.slaba }}>Načítavam text zo schránky…</span> : <TextMailu text={text || ""} />}
         </div>
       ) : (
