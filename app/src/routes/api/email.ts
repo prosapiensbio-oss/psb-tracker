@@ -12,6 +12,7 @@ import { stiahniSpravy, stiahniTela } from "../../lib/psb/imap";
 import { telefonZTextu } from "../../lib/psb/mailDopyt";
 import { adresyMailu } from "../../lib/psb/mime";
 import { posliMail } from "../../lib/psb/smtp.server";
+import { PODPISUJUCI, PREDVOLENY_PODPIS, odpovedHtml } from "../../lib/psb/emailSablona";
 import { nastavenia } from "./mail-dopyty";
 
 /**
@@ -134,12 +135,30 @@ export const Route = createFileRoute("/api/email")({
             if (!maObsah(text)) return Response.json({ ok: false, error: "Odpoveď je prázdna — napíš niečo medzi pozdrav a podpis." }, { status: 400 });
             const predmet = String(b.predmet || "").trim().slice(0, 250) || (e ? `Re: ${e.predmet}` : "ProSapiens");
             const citat = String(b.citat || "").trim().slice(0, 6000);
-            const telo = citat ? `${text}\n\n${citat.split("\n").map((r) => `> ${r}`).join("\n")}` : text;
+            const citatHlavicka = String(b.citatHlavicka || "").trim().slice(0, 200);
+            const telo = citat ? `${text}\n\n${[citatHlavicka, ...citat.split("\n")].filter((r, i) => i > 0 || r).map((r) => `> ${r}`).join("\n")}` : text;
+            /**
+             * HTML podoba — návrh A (Jerry, 12. 11. 2026). Logo a fotka toho,
+             * kto podpisuje, idú ako prílohy s cid; keď sa nenačítajú, mail
+             * odíde bez nich (logo nahradí nápis), nie vôbec.
+             */
+            const podpis = PODPISUJUCI[String(b.podpis || "")] ? String(b.podpis) : PREDVOLENY_PODPIS;
+            const { ASSETS } = bindings() as { ASSETS?: { fetch: (r: Request) => Promise<Response> } };
+            const origin = new URL(request.url).origin;
+            const obrazok = (cesta: string) => ASSETS?.fetch(new Request(`${origin}${cesta}`)).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null) ?? Promise.resolve(null);
+            const [logo, foto] = await Promise.all([obrazok("/znacka-napis-mail.png"), obrazok(PODPISUJUCI[podpis].foto)]);
+            const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
+            const fotoCid = `foto-${crypto.randomUUID()}@prosapiens`;
+            const html = odpovedHtml({ text, podpis, citat, citatHlavicka, logoCid: logo ? logoCid : undefined, fotoCid: foto ? fotoCid : undefined });
+            const prilohy = [
+              ...(logo ? [{ meno: "prosapiens.png", typ: "image/png", data: logo, cid: logoCid }] : []),
+              ...(foto ? [{ meno: "podpis.jpg", typ: "image/jpeg", data: foto, cid: fotoCid }] : []),
+            ];
             const n = await nastavenia(DB);
             if (!n.host || !n.user || !n.heslo) return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
             const v = await posliMail(
               { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
-              { od: n.user, odMeno: "ProSapiens Biomechanic", komu: adresy, predmet, telo },
+              { od: n.user, odMeno: `${podpis} · ProSapiens Biomechanic`, komu: adresy, predmet, telo, html, prilohy },
             );
             if (!v.ok) {
               await audit(DB, { action: "email-odpoved-zlyhala", predmet: adresy.join(", "), old: v.chyba, actor: kto });

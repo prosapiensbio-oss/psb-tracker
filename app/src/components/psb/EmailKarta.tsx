@@ -315,8 +315,9 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
     if (posielam) return;
     if (!maObsah(odpoved)) { setChyba("Odpoveď je prázdna — napíš niečo medzi pozdrav a podpis."); return; }
     setPosielam(true);
-    const citat = !ludia && text ? `${kedyCelo(e.datum)} napsal(a) ${e.odMeno || e.odMail}:\n${text}` : "";
-    const r = await api<{ komu: string[] }>("/api/email", { akcia: "odpovedz", id: e.id, komu, predmet: /^re:/i.test(e.predmet) ? e.predmet : `Re: ${e.predmet}`, text: odpoved, citat, vybav });
+    const citat = !ludia && text ? text : "";
+    const citatHlavicka = citat ? `${kedyCelo(e.datum)} napsal(a) ${e.odMeno || e.odMail}:` : "";
+    const r = await api<{ komu: string[] }>("/api/email", { akcia: "odpovedz", id: e.id, komu, predmet: /^re:/i.test(e.predmet) ? e.predmet : `Re: ${e.predmet}`, text: odpoved, citat, citatHlavicka, podpis, vybav });
     setPosielam(false);
     if (!r.ok) { setChyba(r.error || "Mail neodišiel."); return; }
     setHlaska(`Odoslané na ${(r.komu || []).join(", ")}${vybav ? " · vybavené" : ""}`);
