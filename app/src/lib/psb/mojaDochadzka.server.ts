@@ -73,3 +73,27 @@ export async function prevzatieGuillerma(DB: D1Database, kto: string): Promise<{
   }
   return out.filter((x) => x.hodiny > 0);
 }
+
+/**
+ * Cena 1 BTC v Kč aj v € — aby karta vedela povedať, koľko satoshi poslať
+ * (Guillermo 65 €/h, platí sa na josefp@blink.sv). Coinbase (ten istý zdroj
+ * ako `kurzBtc`), schovaný na 10 minút. Bez kurzu karta sats nepíše.
+ */
+export async function kurzBtcMeny(DB: D1Database): Promise<{ czk: number; eur: number; kedy: string } | null> {
+  const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'btc_kurz_meny'").first<{ value: string }>().catch(() => null);
+  try {
+    const k = r?.value ? (JSON.parse(r.value) as { czk: number; eur: number; kedy: string }) : null;
+    if (k && k.czk > 0 && k.eur > 0 && Date.now() - Date.parse(k.kedy) < 10 * 60_000) return k;
+  } catch { /* prepíše sa */ }
+  try {
+    const res = await fetch("https://api.coinbase.com/v2/exchange-rates?currency=BTC", { headers: { accept: "application/json", "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)" } });
+    const j = (await res.json().catch(() => null)) as { data?: { rates?: Record<string, string> } } | null;
+    const czk = Number(j?.data?.rates?.CZK) || 0, eur = Number(j?.data?.rates?.EUR) || 0;
+    if (!(czk > 0 && eur > 0)) return null;
+    const k = { czk, eur, kedy: new Date().toISOString() };
+    await DB.prepare("INSERT INTO vzas_settings (key, value) VALUES ('btc_kurz_meny', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(JSON.stringify(k)).run().catch(() => null);
+    return k;
+  } catch {
+    return null;
+  }
+}

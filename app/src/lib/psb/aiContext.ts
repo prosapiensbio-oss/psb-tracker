@@ -8,7 +8,7 @@ import { platbyNaZaplatenie, stavPlatieb, type StavPlatby } from "./platbyMesiac
 import { ROCNE_PLATBY, rocneNaZaplatenie } from "./rocnePlatby";
 import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
-import { dlhKc, stavAktivity, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
+import { dlhVMene, satsSpolu, stavAktivity, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
 import { priemerDochadzky } from "./profil";
 import { textZostatku } from "./zostatokText";
 import { klucZdroja } from "./zdroje";
@@ -330,7 +330,7 @@ export function buildAiContext(
   const _dochadzka = mojaDochadzka
     ? mojaDochadzka.d.aktivity.map((a) => {
         const s = stavAktivity(a, mojaDochadzka.d.nakupy, mojaDochadzka.udalosti, mojaDochadzka.teraz);
-        return { kto: a.kto, aktivita: a.nazov, zostatok: s.zostatok, cenaHodinyKc: a.cenaHodiny ?? null, minusKc: dlhKc(a, s.zostatok), kupene: s.kupene, odtrenovane: s.odtrenovane, dojde: s.dojde, naplanovane: s.naplanovane, poslednaPlatba: s.poslednyNakup ? { datum: s.poslednyNakup.datum, hodiny: s.poslednyNakup.hodiny, sumaKc: s.poslednyNakup.sumaKc } : null };
+        return { kto: a.kto, aktivita: a.nazov, zostatok: s.zostatok, cenaHodiny: a.cenaHodiny ? { suma: a.cenaHodiny, mena: a.mena || "CZK" } : null, minusVMene: dlhVMene(a, s.zostatok), zaplateneSatsSpolu: satsSpolu(a, mojaDochadzka.d.nakupy) || null, kupene: s.kupene, odtrenovane: s.odtrenovane, dojde: s.dojde, naplanovane: s.naplanovane, poslednaPlatba: s.poslednyNakup ? { datum: s.poslednyNakup.datum, hodiny: s.poslednyNakup.hodiny, sumaKc: s.poslednyNakup.sumaKc, sats: s.poslednyNakup.sats ?? null } : null };
       })
     : null;
   const pnlSuhrn: Record<string, Record<string, number>> = {};
@@ -1333,7 +1333,7 @@ export function buildAiContext(
     },
     mojaDochadzka: _dochadzka
       ? {
-          poznamka: "MOJA DOCHÁDZKA — súkromné aktivity trénerov (Box, Guillermo/FP Spain), Workspace → Moja dochádzka. HOTOVÉ čísla z toho istého výpočtu ako karta: PREČÍTAJ `zostatok` (hodiny, ktoré ostávajú; záporné = mínus), `dojde` (deň poslednej zaplatenej hodiny podľa kalendára), `minusKc` (mínus v korunách podľa ceny hodiny — toľko treba doplatiť). NEPOČÍTAJ si ich sám. Guillermo sa ráta z udalostí typu guillermo v oboch kalendároch, ostatné z kalendára majiteľa podľa názvu. Platby Guillermovi (FP Spain) sú Jerryho OSOBNÝ výdaj, nie firemný náklad — nikdy do P&L. Stará karta Guillermo a tabuľka guillermo_hodiny sa od 14. 11. 2026 nepoužívajú.",
+          poznamka: "MOJA DOCHÁDZKA — súkromné aktivity trénerov (Box, Guillermo/FP Spain), Workspace → Moja dochádzka. HOTOVÉ čísla z toho istého výpočtu ako karta: PREČÍTAJ `zostatok` (hodiny, ktoré ostávajú; záporné = mínus), `dojde` (deň poslednej zaplatenej hodiny podľa kalendára), `minusVMene` (mínus v mene ceny hodiny — toľko treba doplatiť; Guillermo 65 €/h, Box 800 Kč/h), `zaplateneSatsSpolu` (satoshi zaplatené spolu — Guillermovi sa platí v BTC na josefp@blink.sv). NEPOČÍTAJ si ich sám. Guillermo sa ráta z udalostí typu guillermo v oboch kalendároch, ostatné z kalendára majiteľa podľa názvu. Platby Guillermovi (FP Spain) sú Jerryho OSOBNÝ výdaj, nie firemný náklad — nikdy do P&L. Stará karta Guillermo a tabuľka guillermo_hodiny sa od 14. 11. 2026 nepoužívajú.",
           aktivity: _dochadzka,
         }
       : null,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { citajDochadzku, dlhKc, hodinyZaSumu, polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
+import { citajDochadzku, dlhKc, dlhVMene, hodinyZaSumu, satsSpolu, satsZaSumu, polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
 
 const BOX: Aktivita = { id: "a1", kto: "Jerry", nazov: "Box", nazvy: ["Box"], vytvorene: "" };
 const nakup = (datum: string, hodiny: number): Nakup => ({ id: datum, aktivitaId: "a1", datum, hodiny, sumaKc: 5000, poznamka: "", vytvorene: datum });
@@ -91,5 +91,20 @@ describe("Box: cena hodiny 800 Kč", () => {
   it("mínus v korunách", () => {
     expect(dlhKc(box, -3)).toBe(2400);
     expect(dlhKc(box, 2)).toBeNull();
+  });
+});
+
+describe("Guillermo: 65 €/h, platby v bitcoine", () => {
+  const g: Aktivita = { id: "g", kto: "Jerry", nazov: "Guillermo", nazvy: [], cenaHodiny: 65, mena: "EUR", vytvorene: "2026-11-14" };
+  it("mínus v eurách, nie v korunách", () => {
+    expect(dlhVMene(g, -3)).toEqual({ suma: 195, mena: "EUR" });
+    expect(dlhKc(g, -3)).toBeNull();
+    expect(hodinyZaSumu(g, 195)).toBeNull();
+  });
+  it("satoshi spolu a za sumu", () => {
+    const n = (sats: number | null): Nakup => ({ id: String(sats), aktivitaId: "g", datum: "2026-07-29", hodiny: 1, sumaKc: null, sats, poznamka: "", vytvorene: "x" });
+    expect(satsSpolu(g, [n(922296), n(659692), n(null)])).toBe(1581988);
+    expect(satsZaSumu(195, 100_000)).toBe(195000);
+    expect(satsZaSumu(195, null)).toBeNull();
   });
 });

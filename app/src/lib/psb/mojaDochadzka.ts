@@ -31,6 +31,8 @@ export type Aktivita = {
    * podľa nej dopočítajú hodiny a mínus sa ukáže aj v korunách.
    */
   cenaHodiny?: number;
+  /** V čom je cena hodiny: Kč (Box) alebo € (Guillermo 65 €/h, platí sa v BTC). */
+  mena?: "CZK" | "EUR";
   vytvorene: string;
 };
 
@@ -44,6 +46,8 @@ export type Nakup = {
   datum: string;
   hodiny: number;
   sumaKc: number | null;
+  /** Platba v bitcoine — koľko satoshi odišlo (Guillermo: na josefp@blink.sv). */
+  sats?: number | null;
   poznamka: string;
   vytvorene: string;
 };
@@ -156,14 +160,33 @@ export function stavAktivity(a: Aktivita, nakupy: Nakup[], udalosti: UdalostDoch
   };
 }
 
-/** Mínus v korunách podľa ceny hodiny; null, keď nie je mínus alebo cena. */
-export function dlhKc(a: Aktivita, zostatok: number): number | null {
-  return zostatok < 0 && a.cenaHodiny && a.cenaHodiny > 0 ? -zostatok * a.cenaHodiny : null;
+export const menaAktivity = (a: Aktivita): "CZK" | "EUR" => (a.mena === "EUR" ? "EUR" : "CZK");
+export const sMenou = (suma: number, mena: "CZK" | "EUR") => `${Math.round(suma).toLocaleString("cs-CZ")} ${mena === "EUR" ? "€" : "Kč"}`;
+
+/** Mínus v mene aktivity podľa ceny hodiny; null, keď nie je mínus alebo cena. */
+export function dlhVMene(a: Aktivita, zostatok: number): { suma: number; mena: "CZK" | "EUR" } | null {
+  return zostatok < 0 && a.cenaHodiny && a.cenaHodiny > 0 ? { suma: -zostatok * a.cenaHodiny, mena: menaAktivity(a) } : null;
 }
 
-/** Koľko hodín je za zaplatenú sumu (celé hodiny), alebo null bez ceny. */
+/** Mínus v korunách (len pri cene v Kč). */
+export function dlhKc(a: Aktivita, zostatok: number): number | null {
+  const d = dlhVMene(a, zostatok);
+  return d && d.mena === "CZK" ? d.suma : null;
+}
+
+/** Satoshi zaplatené za aktivitu spolu (len platby so sats). */
+export function satsSpolu(a: Aktivita, nakupy: Nakup[]): number {
+  return nakupy.filter((n) => n.aktivitaId === a.id && n.sats && n.sats > 0).reduce((s, n) => s + (n.sats || 0), 0);
+}
+
+/** Koľko satoshi je suma v danej mene pri kurze (cena 1 BTC v tej mene). */
+export function satsZaSumu(suma: number, cenaBtc: number | null | undefined): number | null {
+  return suma > 0 && cenaBtc && cenaBtc > 0 ? Math.ceil((suma / cenaBtc) * 100_000_000) : null;
+}
+
+/** Koľko hodín je za zaplatenú sumu v Kč (celé hodiny), alebo null bez ceny v Kč. */
 export function hodinyZaSumu(a: Aktivita | undefined, suma: number): number | null {
-  if (!a?.cenaHodiny || !(a.cenaHodiny > 0) || !(suma > 0)) return null;
+  if (!a?.cenaHodiny || !(a.cenaHodiny > 0) || !(suma > 0) || menaAktivity(a) !== "CZK") return null;
   return Math.round(suma / a.cenaHodiny);
 }
 
@@ -189,11 +212,11 @@ export function polozkyDochadzky(d: DataDochadzky, udalosti: UdalostDochadzky[],
       });
     }
     if (s.zostatok < 0) {
-      const kc = dlhKc(a, s.zostatok);
+      const dv = dlhVMene(a, s.zostatok);
       out.push({
         key: `dochadzka-minus|${a.id}|${s.poslednyNakup.datum}`, kto: a.kto, aktivitaId: a.id, tone: "orange",
         title: `${a.nazov}: ${s.zostatok} h`,
-        detail: `${a.nazov}: odtrénované ${s.odtrenovane} h, zaplatené ${s.kupene} h — si v mínuse ${s.zostatok}${kc ? ` (${kc.toLocaleString("cs-CZ")} Kč)` : ""}. Po platbe zapíš nákup vo Workspace → Moja dochádzka.`,
+        detail: `${a.nazov}: odtrénované ${s.odtrenovane} h, zaplatené ${s.kupene} h — si v mínuse ${s.zostatok}${dv ? ` (${sMenou(dv.suma, dv.mena)})` : ""}. Po platbe zapíš nákup vo Workspace → Moja dochádzka.`,
       });
     }
   }

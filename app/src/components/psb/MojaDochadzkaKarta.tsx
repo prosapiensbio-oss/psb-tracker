@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { posunDen } from "../../lib/psb/cas";
-import { dlhKc, hodinyZaSumu, patri, stavAktivity, type Aktivita, type Nakup, type RucnyTrening, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
+import { dlhVMene, hodinyZaSumu, menaAktivity, patri, satsSpolu, satsZaSumu, sMenou, stavAktivity, type Aktivita, type Nakup, type RucnyTrening, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -16,6 +16,8 @@ type Odpoved = {
   ok: boolean; error?: string; kto: string; teraz: string;
   aktivity: Aktivita[]; nakupy: Nakup[]; udalosti: UdalostDochadzky[]; rucne?: RucnyTrening[];
   kandidati: { nazov: string; pocet: number; guillermo: boolean }[];
+  /** Cena 1 BTC v Kč a v € — na „koľko satoshi poslať“. */
+  kurz?: { czk: number; eur: number; kedy: string } | null;
 };
 
 const tl = { padding: "5px 11px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted } as const;
@@ -25,6 +27,7 @@ const DNI = ["ne", "po", "ut", "st", "št", "pi", "so"];
 
 const den = (iso: string) => { const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`); return `${DNI[d.getUTCDay()]} ${d.getUTCDate()}. ${d.getUTCMonth() + 1}.`; };
 const czk = (n: number) => `${Math.round(n).toLocaleString("cs-CZ")} Kč`;
+const sats = (n: number) => `${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} sats`;
 const pondelok = (iso: string) => { const d = new Date(`${iso}T12:00:00Z`); return posunDen(iso, -((d.getUTCDay() + 6) % 7)); };
 
 function Nadpis({ children }: { children: string }) {
@@ -38,7 +41,7 @@ export function MojaDochadzkaKarta() {
   const [hlaska, setHlaska] = useState("");
   const [tyzden, setTyzden] = useState<string | null>(null);
   const [novaAkt, setNovaAkt] = useState("");
-  const [form, setForm] = useState({ aktivitaId: "", datum: "", hodiny: "10", suma: "", poznamka: "" });
+  const [form, setForm] = useState({ aktivitaId: "", datum: "", hodiny: "10", suma: "", sats: "", poznamka: "" });
   const [bezi, setBezi] = useState(false);
   const [pridavam, setPridavam] = useState(false);
   const [sPoznamkou, setSPoznamkou] = useState(false);
@@ -72,9 +75,12 @@ export function MojaDochadzkaKarta() {
     const balik = s.poslednyNakup?.hodiny || 0;
     const farba = s.zostatok <= 0 ? C.red : s.zostatok <= 2 ? C.orange : C.green;
     const minute = Math.max(0, balik - Math.max(0, s.zostatok));
-    const kc = dlhKc(s.aktivita, s.zostatok);
+    const dlh = dlhVMene(s.aktivita, s.zostatok);
+    const vBtc = satsSpolu(s.aktivita, d.nakupy);
+    // Kto platí v bitcoine, chce vedieť, koľko satoshi poslať — podľa dnešného kurzu.
+    const dlhSats = dlh && vBtc ? satsZaSumu(dlh.suma, dlh.mena === "EUR" ? d.kurz?.eur : d.kurz?.czk) : null;
     const nastavCenu = () => {
-      const v = prompt(`Cena jednej hodiny — ${s.aktivita.nazov} (Kč, prázdne = bez ceny):`, s.aktivita.cenaHodiny ? String(s.aktivita.cenaHodiny) : "");
+      const v = prompt(`Cena jednej hodiny — ${s.aktivita.nazov} (napr. 800 = Kč, 65 € = eurá; prázdne = bez ceny):`, s.aktivita.cenaHodiny ? `${s.aktivita.cenaHodiny}${menaAktivity(s.aktivita) === "EUR" ? " €" : ""}` : "");
       if (v !== null) void posli({ akcia: "aktivita-cena", id: s.aktivita.id, cenaHodiny: v }, "Cena hodiny uložená.");
     };
     return (
@@ -87,7 +93,7 @@ export function MojaDochadzkaKarta() {
         {s.poslednyNakup ? (
           <>
             <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.05, color: farba }}>{s.zostatok} <span style={{ fontSize: 14, color: C.textDim, fontWeight: 500 }}>{s.zostatok === 1 ? "hodina" : "h"} zostáva</span></div>
-            {kc != null && <div style={{ fontSize: 13, fontWeight: 700, color: C.red, marginTop: 2 }}>doplatiť {czk(kc)}</div>}
+            {dlh && <div style={{ fontSize: 13, fontWeight: 700, color: C.red, marginTop: 2 }}>doplatiť {sMenou(dlh.suma, dlh.mena)}{dlhSats ? <span style={{ fontWeight: 500 }}> ≈ {sats(dlhSats)} dnes</span> : null}</div>}
             <div style={{ height: 8, borderRadius: 9, background: C.track, overflow: "hidden", margin: "10px 0 6px" }}>
               <i style={{ display: "block", height: "100%", width: `${balik ? Math.min(100, (minute / balik) * 100) : 100}%`, background: farba }} />
             </div>
@@ -96,15 +102,16 @@ export function MojaDochadzkaKarta() {
                 : s.naplanovane ? <>v kalendári {s.naplanovane} — zaplatené pokryje</> : <span style={{ color: C.textDim }}>v kalendári nič naplánované</span>}
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-              posledná platba {den(s.poslednyNakup.datum)} · {s.poslednyNakup.hodiny} h{s.poslednyNakup.sumaKc != null ? ` · ${czk(s.poslednyNakup.sumaKc)}` : ""}
+              posledná platba {den(s.poslednyNakup.datum)} · {s.poslednyNakup.hodiny} h{s.poslednyNakup.sumaKc != null ? ` · ${czk(s.poslednyNakup.sumaKc)}` : ""}{s.poslednyNakup.sats ? ` · ${sats(s.poslednyNakup.sats)}` : ""}
             </div>
+            {vBtc > 0 && <div style={{ fontSize: 12, color: C.textDim }}>v bitcoine spolu {sats(vBtc)}</div>}
           </>
         ) : (
           <div style={{ fontSize: 12.5, color: C.textMuted, margin: "6px 0" }}>Zatiaľ bez platby — zapíš prvú dole a odpočet sa rozbehne od jej dňa.</div>
         )}
         <button onClick={nastavCenu} title="Cena jednej hodiny — z platby sa dopočítajú hodiny"
           style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "6px 0 0", display: "block" }}>
-          {s.aktivita.cenaHodiny ? `${czk(s.aktivita.cenaHodiny)} / h · zmeniť` : "+ cena za hodinu"}
+          {s.aktivita.cenaHodiny ? `${sMenou(s.aktivita.cenaHodiny, menaAktivity(s.aktivita))} / h · zmeniť` : "+ cena za hodinu"}
         </button>
         <button onClick={() => { setForm((f) => ({ ...f, aktivitaId: s.aktivita.id })); document.getElementById("dochadzka-formular")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
           style={{ ...tl, marginTop: 10, color: C.green, borderColor: mix(C.green, 45) }}>+ zapísať platbu</button>
@@ -210,6 +217,9 @@ export function MojaDochadzkaKarta() {
           setForm({ ...form, suma: e.target.value, ...(h ? { hodiny: String(h) } : {}) });
         }} placeholder="nepovinné" style={{ ...pole, width: 110 }} />
       </label>
+      <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3 }}>v bitcoine (sats)
+        <input inputMode="numeric" value={form.sats} onChange={(e) => setForm({ ...form, sats: e.target.value })} placeholder="nepovinné" style={{ ...pole, width: 120 }} />
+      </label>
       {sPoznamkou ? (
         <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3, flex: "1 1 140px" }}>poznámka
           <input autoFocus value={form.poznamka} onChange={(e) => setForm({ ...form, poznamka: e.target.value })} style={pole} />
@@ -218,7 +228,7 @@ export function MojaDochadzkaKarta() {
         <button onClick={() => setSPoznamkou(true)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "0 0 8px" }}>+ poznámka</button>
       )}
       <button disabled={bezi || !form.aktivitaId || !form.datum || !(Number(form.hodiny) > 0)}
-        onClick={() => void posli({ akcia: "nakup-pridaj", aktivitaId: form.aktivitaId, datum: form.datum, hodiny: Number(form.hodiny), sumaKc: form.suma.trim(), poznamka: form.poznamka }, "Platba zapísaná.").then((ok) => { if (ok) { setForm((f) => ({ ...f, suma: "", poznamka: "" })); setSPoznamkou(false); } })}
+        onClick={() => void posli({ akcia: "nakup-pridaj", aktivitaId: form.aktivitaId, datum: form.datum, hodiny: Number(form.hodiny), sumaKc: form.suma.trim(), sats: form.sats.trim(), poznamka: form.poznamka }, "Platba zapísaná.").then((ok) => { if (ok) { setForm((f) => ({ ...f, suma: "", sats: "", poznamka: "" })); setSPoznamkou(false); } })}
         style={tlHlavne}>{bezi ? "Zapisujem…" : "Zapísať platbu"}</button>
     </div>
   );
@@ -254,7 +264,7 @@ export function MojaDochadzkaKarta() {
                   <td style={{ padding: "5px 6px" }}>{r.s.aktivita.nazov}</td>
                   <td style={{ padding: "5px 6px", color: r.nakup ? C.text : C.textMuted }}>{r.nakup ? `platba${r.nakup.poznamka ? ` · ${r.nakup.poznamka}` : ""}` : `tréning ${r.datum.slice(11, 16)}${rucnyPre(r.bod?.uid)?.poznamka ? ` · ${rucnyPre(r.bod?.uid)!.poznamka}` : rucnyPre(r.bod?.uid) ? " · zapísaný ručne" : ""}`}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: r.nakup ? C.green : C.textMuted }}>{r.nakup ? `+${r.nakup.hodiny}` : "−1"}</td>
-                  <td style={{ padding: "5px 6px", textAlign: "right" }}>{r.nakup?.sumaKc != null ? czk(r.nakup.sumaKc) : ""}</td>
+                  <td style={{ padding: "5px 6px", textAlign: "right" }}>{r.nakup?.sumaKc != null ? czk(r.nakup.sumaKc) : ""}{r.nakup?.sats ? <div style={{ fontSize: 11, color: C.textDim }}>{sats(r.nakup.sats)}</div> : null}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: r.zost < 0 ? C.red : r.zost === 0 ? C.orange : C.text }}>{r.zost}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right" }}>
                     {r.nakup && <button onClick={() => { if (confirm("Zmazať túto platbu?")) void posli({ akcia: "nakup-zmaz", id: r.nakup!.id }, "Platba zmazaná."); }} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer" }}>×</button>}

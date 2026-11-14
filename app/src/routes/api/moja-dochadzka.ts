@@ -7,7 +7,7 @@ import { terazPraha } from "../../lib/psb/cas";
 import { normName } from "../../lib/psb/format";
 import { rucneAkoUdalosti, sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
-import { kandidatiDochadzky, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
+import { kandidatiDochadzky, kurzBtcMeny, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
 
 /**
  * MOJA DOCHÁDZKA — súkromné aktivity trénera (Box, Guillermo), 14. 11. 2026.
@@ -18,7 +18,8 @@ import { kandidatiDochadzky, nacitajDochadzku, prevzatieGuillerma, udalostiDocha
  *   POST { akcia: "aktivita-zmaz", id }
  *   POST { akcia: "nakup-pridaj", aktivitaId, datum, hodiny, sumaKc?, poznamka? }
  *   POST { akcia: "nakup-zmaz", id }
- *   POST { akcia: "aktivita-cena", id, cenaHodiny }   (prázdne = bez ceny)
+ *   POST { akcia: "aktivita-cena", id, cenaHodiny }   („65 €“ = v eurách, prázdne = bez ceny)
+ *   nakup-pridaj berie aj `sats` (platba v bitcoine)
  *
  * Každý mení len svoje. Uložené vo vzas_settings.moja_dochadzka (JSON) —
  * pár riadkov na človeka.
@@ -45,7 +46,8 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
         };
         const udalosti = [...(await udalostiDochadzky(DB, moje.aktivity)), ...rucneAkoUdalosti(moje)];
         const kandidati = vsetci ? [] : (await kandidatiDochadzky(DB, kto)).filter((k) => !moje.aktivity.some((a) => (k.guillermo ? a.guillermo : a.nazvy.some((n) => normName(n) === normName(k.nazov)))));
-        return Response.json({ ok: true, kto, teraz: terazPraha(), ...moje, udalosti, kandidati }, { headers: ns });
+        const kurz = moje.aktivity.some((a) => a.cenaHodiny) ? await kurzBtcMeny(DB) : null;
+        return Response.json({ ok: true, kto, teraz: terazPraha(), ...moje, udalosti, kandidati, kurz }, { headers: ns });
       },
       POST: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
@@ -93,7 +95,9 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           if (hodiny < 1 || hodiny > 500) return chyba("Počet hodín musí byť 1 až 500.");
           const suma = b.sumaKc === "" || b.sumaKc == null ? null : Math.round(Number(String(b.sumaKc).replace(",", ".").replace(/\s/g, "")));
           if (suma != null && (!Number.isFinite(suma) || suma < 0)) return chyba("Suma nevyzerá ako číslo.");
-          d.nakupy.push({ id: id(), aktivitaId: a.id, datum, hodiny, sumaKc: suma, poznamka: String(b.poznamka || "").trim().slice(0, 200), vytvorene: teraz });
+          const sats = b.sats === "" || b.sats == null ? null : Math.round(Number(String(b.sats).replace(/\s/g, "")));
+          if (sats != null && (!Number.isFinite(sats) || sats < 0)) return chyba("Satoshi nevyzerajú ako číslo.");
+          d.nakupy.push({ id: id(), aktivitaId: a.id, datum, hodiny, sumaKc: suma, ...(sats ? { sats } : {}), poznamka: String(b.poznamka || "").trim().slice(0, 200), vytvorene: teraz });
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-nakup", predmet: `${kto} · ${a.nazov}`, neu: { datum, hodiny, suma }, actor: kto });
           return Response.json({ ok: true }, { headers: ns });
@@ -131,12 +135,15 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
         if (b.akcia === "aktivita-cena") {
           const a = moja(String(b.id || ""));
           if (!a) return chyba("Aktivita sa nenašla.", 404);
-          const raw = String(b.cenaHodiny ?? "").replace(/\s/g, "").replace(",", ".");
+          // „65 €“ / „65 eur“ = cena v eurách, inak koruny.
+          const text = String(b.cenaHodiny ?? "");
+          const eur = b.mena === "EUR" || /€|eur/i.test(text);
+          const raw = text.replace(/€|eur|kč|kc|czk/gi, "").replace(/\s/g, "").replace(",", ".");
           const cena = raw === "" ? 0 : Math.round(Number(raw));
           if (!Number.isFinite(cena) || cena < 0 || cena > 100000) return chyba("Cena hodiny nevyzerá ako číslo.");
-          if (cena) a.cenaHodiny = cena; else delete a.cenaHodiny;
+          if (cena) { a.cenaHodiny = cena; a.mena = eur ? "EUR" : "CZK"; } else { delete a.cenaHodiny; delete a.mena; }
           await ulozDochadzku(DB, d);
-          await audit(DB, { action: "dochadzka-cena", predmet: `${kto} · ${a.nazov}`, neu: cena, actor: kto });
+          await audit(DB, { action: "dochadzka-cena", predmet: `${kto} · ${a.nazov}`, neu: `${cena} ${eur ? "EUR" : "CZK"}`, actor: kto });
           return Response.json({ ok: true }, { headers: ns });
         }
         if (b.akcia === "aktivita-serie") {
