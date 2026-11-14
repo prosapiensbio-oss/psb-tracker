@@ -55,7 +55,6 @@ import { stavPolozkyRegistra,
 import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
-import { polozkaGuillermo } from "../../lib/psb/guillermo";
 import { polozkyDochadzky, type DataDochadzky, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { polozkyHodin } from "../../lib/psb/notifikaciaHodin";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -2011,12 +2010,7 @@ function skupinaFaktur(
     // ranná správa na telefón.
     // (0d) Moja dochádzka — „Box — dnes posledný tréning“, mínus. Patrí majiteľovi aktivity, nie Jerrymu.
     if (dochadzka) out.push(...registerDochadzky(dochadzka, ack));
-    const g = polozkaGuillermo(guillermoZazn, guillermoUdal);
-    if (g) out.push({
-      key: g.key, category: "Anomália", tone: g.zostatok < 0 ? "orange" : "blue",
-      title: g.title, detail: g.detail, priority: 30, client: "vzas|vyplaty", trener: "Jerry",
-      ...stavPolozkyRegistra(g.key, ack, "guillermo"),
-    });
+    // Stará notifikácia „Guillermo: sedenia minuté“ je preč (14. 11. 2026) — nahradila ju Moja dochádzka (0d).
 
     const beziaci = dnesPraha().slice(0, 7);
     const mesiace = Object.keys(bankaSumy).filter((m) => m < beziaci).sort();
@@ -3015,7 +3009,7 @@ function skupinaFaktur(
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
       },
-      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, null, null, { porovnanie: null, cakaju: platbyCakaju },
+      dochadzka, null, null, { porovnanie: null, cakaju: platbyCakaju },
       // Tie isté dve fronty, aké ukazuje Workspace — hotové, nie na dopočítanie.
       fronty),
     [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, platbyCakaju, fronty, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps

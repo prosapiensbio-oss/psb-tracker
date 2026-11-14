@@ -9,7 +9,6 @@ import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode, use
 import { PlatobneKanaly } from "./PlatobneKanaly";
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { FinancieObsah } from "./Financie";
-import { GuillermoKarta } from "./Kalendar";
 import { objednaneVerzia, monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, mesiacCely, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -1707,7 +1706,6 @@ function SalaryTab({ sessions }: { sessions: PSBData["sessions"] }) {
 
       {/* Guillermo až za spoločnými výdavkami: je to Jerryho osobné čerpanie,
           nie prvá vec, ktorú chce na tejto obrazovke vidieť. */}
-      <GuillermoKarta />
 
       <DebtTrendCard idx={idx} />
 

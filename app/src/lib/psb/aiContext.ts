@@ -8,7 +8,7 @@ import { platbyNaZaplatenie, stavPlatieb, type StavPlatby } from "./platbyMesiac
 import { ROCNE_PLATBY, rocneNaZaplatenie } from "./rocnePlatby";
 import { nechceHovor } from "./dopytTestPostury";
 import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
-import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
+import { stavAktivity, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
 import { priemerDochadzky } from "./profil";
 import { textZostatku } from "./zostatokText";
 import { klucZdroja } from "./zdroje";
@@ -124,7 +124,8 @@ export function buildAiContext(
   uzavierka?: UzavierkaPreAi,
   rezerva?: RezervaPreAi,
   btc?: BtcPreAi,
-  guillermo?: { zaznamy: GuillermoZaznam[]; udalosti: GuillermoUdalost[] },
+  /** Moja dochádzka (Box, Guillermo) — nahradila starú kartu Guillermo 14. 11. 2026. */
+  mojaDochadzka?: { d: DataDochadzky; udalosti: UdalostDochadzky[]; teraz: string } | null,
   /** Hotové meradlo súbežného chodu zo servera — sem sa neprepočítava. */
   porovnanie?: unknown,
   /** To isté pre balíčky (`/api/balicky`). */
@@ -326,7 +327,12 @@ export function buildAiContext(
   // začiatku roka", lebo v kontexte mal Jerryho POSLANÉ len za posledný mesiac
   // (dlhyVyplaty.poslanePoslednyMesiac) a spadol na prázdne SQL vzas_payments.
   const _sc = { jerry: pnlSalary("jerry"), terezka: pnlSalary("terezka") };
-  const _g = guillermo ? guillermoZostatok(guillermo.zaznamy, guillermo.udalosti) : null;
+  const _dochadzka = mojaDochadzka
+    ? mojaDochadzka.d.aktivity.map((a) => {
+        const s = stavAktivity(a, mojaDochadzka.d.nakupy, mojaDochadzka.udalosti, mojaDochadzka.teraz);
+        return { kto: a.kto, aktivita: a.nazov, zostatok: s.zostatok, kupene: s.kupene, odtrenovane: s.odtrenovane, dojde: s.dojde, naplanovane: s.naplanovane, poslednaPlatba: s.poslednyNakup ? { datum: s.poslednyNakup.datum, hodiny: s.poslednyNakup.hodiny, sumaKc: s.poslednyNakup.sumaKc } : null };
+      })
+    : null;
   const pnlSuhrn: Record<string, Record<string, number>> = {};
   for (const mk of pnlMesiace) {
     const idx = VZAS_MONTHS.indexOf(mk);
@@ -1325,13 +1331,10 @@ export function buildAiContext(
       poznamka: "HOTOVÝ P&L po mesiacoch — to isté číslo, aké ukazuje obrazovka Peniaze → Zisky a straty a dlaždica uzavretého mesiaca na obrazovke Dnes. Na otázku „aký bol zisk / tržby / náklady v mesiaci X“ PREČÍTAJ hruby_zisk / prijmy / naklady_spolu odtiaľto a NEPOČÍTAJ si ho sám z bankových pohybov ani z payments. 19. 8. 2026 si na „hrubý zisk júl 2026“ odpovedal 157 498 Kč — poskladal si to z banky a zabudol väčšinu výplat; obrazovka mala 133 465. Banka má pohyby, P&L má pravidlá (čo je náklad, čo výplata, čo osobné, čo barter) — bez tých pravidiel vyjde iné číslo. vyplaty_poslane sú VŠETKY poslané výplaty za mesiac (Jerry, Terezka, Matyáš, spoločné), nie len dva riadky z fio_transactions. VÝPLATA PO OSOBE A HODINOVKA: poslane_jerry / poslane_terezka = reálne poslané tomu človeku v tom mesiaci (mzdový model salaryCalc, to isté číslo ako riadok „Jerry/Terezka Poslané“ na obrazovke Peniaze → J&T Výplaty); narok_jerry/narok_terezka = nárok podľa modelu; hodiny_jerry/hodiny_terezka = mzdotvorné hodiny (offline+online, bez úvodných). PREČÍTAJ ich odtiaľto — NIKDY nehľadaj poslané v tabuľkách vzas_payments / vzas_payment_splits (sú prázdne, appka poslané drží v MODELI, nie v SQL) ani v bankových pohyboch (tam sa „Jerry vyplata“ mieša s osobnými nákupmi). Reálna hodinovka za obdobie = SÚČET poslane_<osoba> cez mesiace ÷ SÚČET hodiny_<osoba> cez tie isté mesiace (nie priemer mesačných hodinoviek). Keď sa ťa niekto spýta, odkiaľ číslo máš, povedz: z P&L appky, kľúč pnlSuhrn.",
       mesiace: pnlSuhrn,
     },
-    guillermo: _g
+    mojaDochadzka: _dochadzka
       ? {
-          poznamka: "Zostatok sedení u Guillerma (FP Spain) — HOTOVÉ číslo z toho istého výpočtu ako karta „Guillermo“ v Peniaze → J&T Výplaty (lib guillermoZostatok). PREČÍTAJ `zostatok` — NEPOČÍTAJ si ho sám z guillermo_hodiny ani z kal_udalosti; počítanie „odtrénované od kotvy“ je jemné a ľahko sa pomýli. Kladné = koľko sedení má Jerry ešte dopredu; záporné = koľko dlží. `kotvaDatum` je deň posledného ručného stavu, od ktorého sa ráta (+ kúpené, − odtrénované guillermo tréningy). FP Spain je Jerryho OSOBNÝ výdaj, nie firemný náklad — nikdy to neprehadzuj do P&L.",
-          zostatok: _g.zostatok,
-          kupene_po_kotve: _g.kupene,
-          odtrenovane_po_kotve: _g.odtrenovane,
-          kotvaDatum: _g.kotvaDatum,
+          poznamka: "MOJA DOCHÁDZKA — súkromné aktivity trénerov (Box, Guillermo/FP Spain), Workspace → Moja dochádzka. HOTOVÉ čísla z toho istého výpočtu ako karta: PREČÍTAJ `zostatok` (hodiny, ktoré ostávajú; záporné = mínus), `dojde` (deň poslednej zaplatenej hodiny podľa kalendára). NEPOČÍTAJ si ich sám. Guillermo sa ráta z udalostí typu guillermo v oboch kalendároch, ostatné z kalendára majiteľa podľa názvu. Platby Guillermovi (FP Spain) sú Jerryho OSOBNÝ výdaj, nie firemný náklad — nikdy do P&L. Stará karta Guillermo a tabuľka guillermo_hodiny sa od 14. 11. 2026 nepoužívajú.",
+          aktivity: _dochadzka,
         }
       : null,
     pnlPolozky,

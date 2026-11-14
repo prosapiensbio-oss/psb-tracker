@@ -10,7 +10,6 @@ import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
-import { polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "../../lib/psb/guillermo";
 import { polozkyDochadzky, sNazvamiKontaktov } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
 import { nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
@@ -123,20 +122,9 @@ export const Route = createFileRoute("/api/push-rano")({
           // „5 dní" tam, kde obrazovka hovorí „14" (14. 10. 2026).
           "SELECT MAX(substr(date,1,10)) d FROM fio_transactions WHERE typ <> 'hotovosť' AND amount_czk < 0",
         ).first<{ d: string | null }>();
-        // Guillermo (Jerryho sedenia vo FP Spain) — pár riadkov, dva malé dopyty.
-        const [gz, gu] = await DB.batch([
-          DB.prepare("SELECT datum, druh, hodiny FROM guillermo_hodiny"),
-          DB.prepare("SELECT typ, zaciatok FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL"),
-        ]);
-        const g = polozkaGuillermo(gz.results as unknown as GuillermoZaznam[], gu.results as unknown as GuillermoUdalost[]);
         const penazne = [
           polozkaZastaranaBanka(poslednyPohyb?.d || "", data.anomalyAck || {}),
           ...polozkyBtcNesedi(data.payments, await btcPlatby(), data.anomalyAck || {}),
-          g ? {
-            key: g.key, category: "Anomália" as const, tone: (g.zostatok < 0 ? "orange" : "blue") as "orange" | "blue",
-            title: g.title, detail: g.detail, priority: 30, client: "vzas|vyplaty", trener: "Jerry",
-            ...stavPolozkyRegistra(g.key, data.anomalyAck || {}, "guillermo"),
-          } : null,
         ].filter(Boolean) as ReturnType<typeof polozkyBtcNesedi>;
         // Moja dochádzka (14. 11. 2026) — „Box — dnes posledný tréning“, patrí majiteľovi aktivity.
         try {

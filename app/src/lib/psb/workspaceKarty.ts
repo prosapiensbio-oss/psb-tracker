@@ -170,7 +170,7 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("dlznici"), ...daj("platby")]),
     // Email hneď za tromi krokmi — pošta sa číta každý deň (naostro 12. 11. 2026).
     ...(volby.email ? [{ druh: "email" as const, nadpis: "Email", podnadpis: "info@prosapiens.cz — klienti, noví ľudia, web a prevádzka", polozky: [] as never[] }] : []),
-    // Moja dochádzka (beta 14. 11. 2026) — každý vidí len svoje aktivity.
+    // Moja dochádzka (naostro 14. 11. 2026) — každý vidí len svoje aktivity.
     ...(volby.dochadzka ? [{ druh: "dochadzka" as const, nadpis: "Moja dochádzka", podnadpis: "box, Guillermo — koľko hodín ti ostáva a kedy dôjdu", polozky: [] as never[] }] : []),
     /**
      * BETA 5. 10. 2026: dopyty (Terezkine), uzávierka mesiaca a mesačné
