@@ -11,6 +11,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { useUzke } from "./useUzke";
 import { VyberMena } from "./VyberMena";
+import { najdiSukromny, type SukromnyKontakt } from "../../lib/psb/sukromneKontakty";
 import { cisloPreBranu } from "../../lib/psb/sms";
 
 /**
@@ -71,6 +72,11 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const [ponuky, setPonuky] = useState<Ponuka[]>([]);
   /** Mená s číslom, aj ľudia bez profilu (`klient_fakturacia`). */
   const [kontakty, setKontakty] = useState<{ klient: string; telefon: string }[]>([]);
+  /** Súkromné kontakty — dostanú termíny, klientmi nie sú (Leon Box, 14. 11. 2026). */
+  const [sukromne, setSukromne] = useState<SukromnyKontakt[]>([]);
+  const [ukladamSukromny, setUkladamSukromny] = useState(false);
+  const [aktivita, setAktivita] = useState("");
+  const [sukromnyFormular, setSukromnyFormular] = useState(false);
   /** Ponuka, ku ktorej je otvorené okno SMS. */
   const [smsPonuka, setSmsPonuka] = useState("");
   const predvyplnene = useRef("");
@@ -89,7 +95,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   }, [pondelok]);
   const nacitajPonuky = useCallback(async () => {
     const j = await fetch("/api/ponuky", { credentials: "same-origin", cache: "no-store" }).then((r) => r.json()).catch(() => null);
-    if (j?.ok) { setPonuky(j.ponuky || []); setKontakty(j.kontakty || []); }
+    if (j?.ok) { setPonuky(j.ponuky || []); setKontakty(j.kontakty || []); setSukromne(j.sukromne || []); }
   }, []);
   useEffect(() => { setUdalosti(null); void nacitajTyzden(); }, [nacitajTyzden]);
   useEffect(() => { void nacitajPonuky(); }, [nacitajPonuky]);
@@ -102,7 +108,8 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
 
   /** Nový človek z dopytu: meno nie je v klientoch, číslo z dopytu. */
   const dopyty = useMemo(() => leads.filter((l) => l.name && l.status !== "zruseny").slice(-60), [leads]);
-  const jeKlient = mena.includes(klient);
+  const sukromny = najdiSukromny(klient, sukromne);
+  const jeKlient = mena.includes(klient) && !sukromny;
   const dopyt = !jeKlient ? dopyty.find((l) => l.name === klient) : undefined;
   // Číslo sa doplní z dopytu alebo kontaktov. Pri zmene mena sa doplnené číslo
   // zase vyprázdni, aby SMS nešla na číslo predošlého človeka; napísané ostáva.
@@ -117,6 +124,18 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const ponukaMena = useMemo(() => [...new Set([...mena, ...dopyty.map((l) => l.name), ...kontakty.map((k) => k.klient)])], [mena, dopyty, kontakty]);
   const cisloVMene = menoJeCislo(klient.trim());
   const kohoCislo = cisloVMene ? kontakty.find((k) => cisloPreBranu(k.telefon) === cisloPreBranu(klient))?.klient : undefined;
+
+  const ulozSukromny = async () => {
+    setUkladamSukromny(true); setChyba("");
+    const r = await fetch("/api/ponuky", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "sukromny-kontakt", meno: klient.trim(), telefon: telefon.trim(), aktivita: aktivita.trim() }),
+    }).then((x) => x.json()).catch(() => null) as { ok?: boolean; error?: string } | null;
+    setUkladamSukromny(false);
+    if (!r?.ok) { setChyba(r?.error || "Kontakt sa neuložil."); return; }
+    setSukromnyFormular(false);
+    await nacitajPonuky();
+  };
 
   const obsadeneV = (xs: Navrh[], den: string, tr: string, od: number, doMin: number, okrem?: number) =>
     (udalosti || []).some((u) => u.trener === tr && u.zaciatok.slice(0, 10) === den
@@ -360,7 +379,28 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
         )}
         {klient.trim() && !jeKlient && !cisloVMene && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>{dopyt ? "nový z dopytu" : "nový človek"} — dostane <b>úvodný tréning</b></div>
+            {sukromny ? (
+              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.45 }}>
+                <b style={{ color: C.text }}>súkromný kontakt · {sukromny.aktivita}</b> — nie je klient. Vybraný termín sa ti zapíše do kalendára ako súkromné „{sukromny.aktivita}“; žiadny balíček, platba ani notifikácia.
+              </div>
+            ) : (
+              <div style={{ fontSize: 11.5, color: C.textMuted }}>
+                {dopyt ? "nový z dopytu" : "nový človek"} — dostane <b>úvodný tréning</b>
+                {" · "}
+                <button type="button" onClick={() => setSukromnyFormular((x) => !x)} style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline" }}>
+                  nie je to klient?
+                </button>
+              </div>
+            )}
+            {!sukromny && sukromnyFormular && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 8, border: `1px dashed ${C.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.45 }}>Súkromný kontakt (napr. tvoj tréner): Kokpit si pamätá len meno a číslo a termín zapíše ako tvoju súkromnú udalosť.</div>
+                <input value={aktivita} onChange={(e) => setAktivita(e.target.value)} placeholder="ako sa udalosť volá v kalendári, napr. Box"
+                  style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
+                <button type="button" disabled={ukladamSukromny || !aktivita.trim()} onClick={() => void ulozSukromny()}
+                  style={{ ...tl, alignSelf: "flex-start" }}>{ukladamSukromny ? "Ukladám…" : "Uložiť ako súkromný kontakt"}</button>
+              </div>
+            )}
             <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="telefón, napr. 777 123 456" inputMode="tel"
               style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${telefon.trim() && !cisloPreBranu(telefon) ? C.orange : C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
             {/* Číslo sa overí hneď — bez neho by sa na zlé číslo prišlo až

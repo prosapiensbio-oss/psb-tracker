@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { najdiSukromny } from "../lib/psb/sukromneKontakty";
+import { nacitajSukromne } from "../lib/psb/sukromneKontakty.server";
 
 import { bindings } from "../lib/bindings.server";
 import { dnesPraha, terazPraha } from "../lib/psb/cas";
@@ -122,8 +124,12 @@ export const Route = createFileRoute("/t/$token")({
         const minut = c === rozsah
           ? (Number(c.koniec.slice(11, 13)) * 60 + Number(c.koniec.slice(14, 16))) - (Number(c.zaciatok.slice(11, 13)) * 60 + Number(c.zaciatok.slice(14, 16)))
           : DLZKA_TRENINGU;
+        // Súkromný kontakt (Leon Box): v kalendári sa objaví aktivita („Box“), nie meno ako klient.
+        const nazovUdalosti = x.p.typ === "sukromne"
+          ? (najdiSukromny(x.p.klient, await nacitajSukromne(DB))?.aktivita || x.p.klient)
+          : x.p.klient;
         const r = await zapisTrening(DB, GCAL_SA_KLUC, {
-          klient: x.p.klient, den: c.zaciatok.slice(0, 10), cas: c.zaciatok.slice(11, 16), minut, trener: c.trener, typ: x.p.typ,
+          klient: nazovUdalosti, den: c.zaciatok.slice(0, 10), cas: c.zaciatok.slice(11, 16), minut, trener: c.trener, typ: x.p.typ,
         }, `${x.p.klient} (ponuka termínov)`, "trening-z-ponuky").catch((e) => ({ ok: false as const, chyba: String(e), status: 500 }));
         if (!r.ok) {
           await uvolni();

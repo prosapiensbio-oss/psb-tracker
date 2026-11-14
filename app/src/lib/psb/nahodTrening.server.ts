@@ -145,12 +145,14 @@ export async function zapisTrening(
    * človek; do kalendára aj do pravidla ide jeho tvar. Pri dvoch zhodách sa
    * nehádá (`klientPodlaCelehoMena` vráti null) a ostane, čo prišlo.
    */
+  // Súkromný termín (box s Leonom, 14. 11. 2026): názov je aktivita, nie klient.
+  const sukromny = String(vstup.typ || "") === "sukromne";
   const zadane = String(vstup.klient || "").trim();
-  const kanonicke = zadane ? klientPodlaCelehoMena(zadane, await znamiKlienti(DB)) : null;
+  const kanonicke = zadane && !sukromny ? klientPodlaCelehoMena(zadane, await znamiKlienti(DB)) : null;
   if (kanonicke && kanonicke !== zadane) vstup = { ...vstup, klient: kanonicke };
   const v = pripravTrening(vstup);
   if (!v.ok) return { ok: false, chyba: v.chyba, status: 400 };
-  const typNovej = String(vstup.typ || "trening") === "uvodny" ? "uvodny" : "trening";
+  const typNovej = sukromny ? "sukromne" : String(vstup.typ || "trening") === "uvodny" ? "uvodny" : "trening";
 
   let idUdalosti = "";
   try {
@@ -169,17 +171,17 @@ export async function zapisTrening(
   // „zrušený tréning“, hoci sa nič nezrušilo.
   const uid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
   const kedy = new Date().toISOString();
-  const klient = String(vstup.klient || "").trim();
+  const klient = sukromny ? null : String(vstup.klient || "").trim();
   await DB.batch([
     // Úvodný nesie ručnú značku: pravidlo mena je `trening` a sťahovanie
     // by mu inak druh prepísalo (21. 10. 2026).
     DB.prepare(
       `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, typ_rucne, prvy_raz, naposledy, zmizla_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?9, ?7, ?7, NULL)`,
-    ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej, typRucnePreNovu(typNovej)),
+    ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej, sukromny ? 1 : typRucnePreNovu(typNovej)),
     // Mapovanie: plné meno klienta ako názov → klient. Bez času,
     // platí pre všetky jeho budúce udalosti s týmto názvom.
-    ...pravidloCelehoMena(DB, klient, v.t.trener),
+    ...(klient ? pravidloCelehoMena(DB, klient, v.t.trener) : []),
   ]);
   await audit(DB, { action: akciaAuditu, predmet: `${v.t.nazov} · ${v.t.zaciatok} · ${v.t.trener}`, neu: uid, actor: kto });
   return { ok: true, uid, zaciatok: v.t.zaciatok };

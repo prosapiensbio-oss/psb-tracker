@@ -209,6 +209,9 @@ export const DOVODY_ZRUSENIA = [
   "zrušil na poslednú chvíľu / meškal",
   "neprišiel bez ozvania",
   "zrušil tréner",
+  // Sviatok (Jerry, 14. 11. 2026) — štátny sviatok, zatvorené; nie je to
+  // klientova výhovorka, preto sa do zrušení klientom nepočíta.
+  "sviatok",
   "presunuli sme",
   "chyba v zápise",
 ] as const;
@@ -221,7 +224,7 @@ export const DOVODY_ZRUSENIA = [
  * odpoveď „chyba v zápise". Bez odpovede sa riadok počíta — appka nevie, a karta
  * Zmeny sa na to pýta.
  */
-const NIE_JE_ZRUSENIE_KLIENTOM = /^\s*(chyba v zápise|presunuli sme|zrušil tréner)/i;
+const NIE_JE_ZRUSENIE_KLIENTOM = /^\s*(chyba v zápise|presunuli sme|zrušil tréner|sviatok)/i;
 export function jeZrusenieKlientom(z: { druh: string; poznamka?: string | null }): boolean {
   return z.druh === "zrusene" && !NIE_JE_ZRUSENIE_KLIENTOM.test(z.poznamka || "");
 }

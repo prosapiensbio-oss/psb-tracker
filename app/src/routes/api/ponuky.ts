@@ -9,6 +9,8 @@ import { DLZKA_TRENINGU, menoJeCislo, platiDo, prekryva, prekryvVPonuke, smsKPon
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, type RiadokPonuky } from "../../lib/psb/ponukaTerminov.server";
 import { cisloPreBranu } from "../../lib/psb/sms";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
+import { najdiSukromny, upravSukromne } from "../../lib/psb/sukromneKontakty";
+import { nacitajSukromne, odklientuj, ulozSukromne } from "../../lib/psb/sukromneKontakty.server";
 
 /**
  * PONUKA TERMÍNOV — Kokpit (Workspace → Ponuka termínov), 7. 10. 2026.
@@ -62,7 +64,12 @@ export const Route = createFileRoute("/api/ponuky")({
             smsKedy: smsKedy ? smsKedy[p.token] : undefined,
           });
         }
-        return Response.json({ ok: true, ponuky: von, kontakty }, { headers: { "cache-control": "no-store" } });
+        const sukromne = await nacitajSukromne(DB);
+        return Response.json({
+          ok: true, ponuky: von, sukromne,
+          // Súkromný kontakt sa ukazuje so svojím číslom zo zoznamu súkromných, nie ako klient.
+          kontakty: [...kontakty.filter((k) => !najdiSukromny(k.klient, sukromne)), ...sukromne.map((k) => ({ klient: k.meno, telefon: k.telefon }))],
+        }, { headers: { "cache-control": "no-store" } });
       },
 
       POST: async ({ request }) => {
@@ -81,12 +88,37 @@ export const Route = createFileRoute("/api/ponuky")({
           return Response.json({ ok: true });
         }
 
+        /**
+         * SÚKROMNÝ KONTAKT (Jerry, 14. 11. 2026 — Leon Box, tréner boxu). Uloží
+         * meno, číslo a aktivitu; ak bol človek doteraz vedený ako klient,
+         * jeho udalosti prejdú na súkromné a samo založený balíček sa zruší.
+         */
+        if (b.akcia === "sukromny-kontakt") {
+          const meno = String(b.meno || "").replace(/\s+/g, " ").trim().slice(0, 120);
+          if (!meno) return chyba("Chýba meno.");
+          const zoznam = await nacitajSukromne(DB);
+          if (b.zmaz) {
+            await ulozSukromne(DB, upravSukromne(zoznam, { meno, telefon: "", aktivita: "" }, true));
+            await audit(DB, { action: "sukromny-kontakt-zmazany", predmet: meno, actor: kto || undefined });
+            return Response.json({ ok: true });
+          }
+          const telefon = String(b.telefon || "").trim().slice(0, 40);
+          if (telefon && !cisloPreBranu(telefon)) return chyba("Toto číslo nevyzerá ako telefón.");
+          const aktivita = String(b.aktivita || "").replace(/\s+/g, " ").trim().slice(0, 60) || meno;
+          await ulozSukromne(DB, upravSukromne(zoznam, { meno, telefon, aktivita }));
+          const v = await odklientuj(DB, meno);
+          await audit(DB, { action: "sukromny-kontakt", predmet: meno, neu: { aktivita, ...v }, actor: kto || undefined });
+          return Response.json({ ok: true, ...v });
+        }
+
         if (b.akcia !== "vytvor") return chyba("neznáma akcia");
         const klient = String(b.klient || "").replace(/\s+/g, " ").trim().slice(0, 120);
         if (!klient) return chyba("Komu? Chýba meno.");
         if (menoJeCislo(klient)) return chyba("Do „Komu“ patrí meno — číslo daj do políčka na telefón pod ním.");
         const telefon = String(b.telefon || "").trim().slice(0, 40) || null;
-        const typ = b.typ === "uvodny" ? "uvodny" : "trening";
+        // Súkromnému kontaktu sa termín zapíše ako súkromná udalosť, nie tréning klienta.
+        const sukromny = najdiSukromny(klient, await nacitajSukromne(DB));
+        const typ = sukromny ? "sukromne" : b.typ === "uvodny" ? "uvodny" : "trening";
         const vstup = Array.isArray(b.casy) ? (b.casy as Record<string, unknown>[]) : [];
         if (!vstup.length) return chyba("Chýba aspoň jeden termín.");
         if (vstup.length > 40) return chyba("Priveľa termínov naraz.");
@@ -127,7 +159,7 @@ export const Route = createFileRoute("/api/ponuky")({
          * kontaktom, ale existujúce číslo neprepíše. Ponuku to nezhodí — už stojí.
          */
         let upozornenie = "";
-        if (telefon && cisloPreBranu(telefon)) {
+        if (telefon && cisloPreBranu(telefon) && !sukromny) {
           await DB.prepare(
             `INSERT INTO klient_fakturacia (klient, telefon, updated_at) VALUES (?1,?2,?3)
              ON CONFLICT(klient) DO UPDATE SET telefon = excluded.telefon, updated_at = excluded.updated_at WHERE telefon = ''`,
