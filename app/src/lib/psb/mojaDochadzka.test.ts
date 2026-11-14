@@ -28,7 +28,8 @@ describe("stavAktivity", () => {
     expect(s.zostatok).toBe(8);
   });
   it("Guillermo sa ráta podľa typu udalosti, nie názvu", () => {
-    const g: Aktivita = { ...BOX, id: "g", nazov: "Guillermo", nazvy: [], guillermo: true, kto: "Terezka" };
+    // Jerryho Guillermo, sedenie zapísané v Terezkinom kalendári — ráta sa.
+    const g: Aktivita = { ...BOX, id: "g", nazov: "Guillermo", nazvy: [], guillermo: true, kto: "Jerry" };
     const u = [{ uid: "1", trener: "Terezka", zaciatok: "2026-10-01T10:00", nazov: "TR", typ: "guillermo" }];
     expect(stavAktivity(g, [{ ...nakup("2026-09-01", 3), aktivitaId: "g" }], u, "2026-10-02T08:00").odtrenovane).toBe(1);
   });

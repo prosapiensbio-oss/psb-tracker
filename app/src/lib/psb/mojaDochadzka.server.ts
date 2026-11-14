@@ -39,5 +39,35 @@ export async function kandidatiDochadzky(DB: D1Database, kto: string): Promise<{
       WHERE trener = ?1 AND zmizla_at IS NULL AND typ IN ('sukromne', 'guillermo') AND zaciatok >= date('now', '-120 days') AND nazov IS NOT NULL
       GROUP BY n, g HAVING COUNT(*) >= 3 ORDER BY pocet DESC LIMIT 8`,
   ).bind(kto).all<{ n: string; g: number; pocet: number }>().catch(() => ({ results: [] as { n: string; g: number; pocet: number }[] }));
-  return (r.results || []).map((x) => ({ nazov: x.n, pocet: x.pocet, guillermo: !!x.g }));
+  const out = (r.results || []).map((x) => ({ nazov: x.n, pocet: x.pocet, guillermo: !!x.g }));
+  // Guillermo patrí tomu, kto má nákupy na starej karte (ucastnik), aj keď sú
+  // sedenia v cudzom kalendári.
+  if (!out.some((x) => x.guillermo)) {
+    const g = await DB.prepare("SELECT (SELECT COUNT(*) FROM guillermo_hodiny WHERE ucastnik = ?1) moje, (SELECT COUNT(*) FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL) pocet")
+      .bind(kto).first<{ moje: number; pocet: number }>().catch(() => null);
+    if (g && Number(g.moje) > 0) out.unshift({ nazov: "Guillermo", pocet: Number(g.pocet) || 0, guillermo: true });
+  }
+  return out;
+}
+
+/**
+ * Pri pridaní Guillerma sa prevezme stará karta: posledná kotva (zostatok
+ * k dňu) ako prvá platba a nákupy po nej. Suma pri kotve je súčet nákupov
+ * do nej — aby zošit povedal, koľko to stálo.
+ */
+export async function prevzatieGuillerma(DB: D1Database, kto: string): Promise<{ datum: string; hodiny: number; sumaKc: number | null; poznamka: string }[]> {
+  const r = await DB.prepare("SELECT datum, druh, hodiny, suma_czk FROM guillermo_hodiny WHERE ucastnik = ?1 OR ucastnik IS NULL ORDER BY datum")
+    .bind(kto).all<{ datum: string; druh: string; hodiny: number; suma_czk: number | null }>().catch(() => ({ results: [] }));
+  const z = r.results || [];
+  const kotva = z.filter((x) => x.druh === "zostatok").pop();
+  const od = kotva?.datum || "";
+  const out: { datum: string; hodiny: number; sumaKc: number | null; poznamka: string }[] = [];
+  if (kotva) {
+    const suma = z.filter((x) => x.druh === "nakup" && x.datum <= od).reduce((s, x) => s + (Number(x.suma_czk) || 0), 0);
+    out.push({ datum: od, hodiny: Number(kotva.hodiny) || 0, sumaKc: suma || null, poznamka: "prevzaté zo starej karty Guillermo" });
+  }
+  for (const x of z.filter((y) => y.druh === "nakup" && y.datum > od)) {
+    out.push({ datum: x.datum, hodiny: Number(x.hodiny) || 0, sumaKc: x.suma_czk ?? null, poznamka: "prevzaté zo starej karty Guillermo" });
+  }
+  return out.filter((x) => x.hodiny > 0);
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { posunDen } from "../../lib/psb/cas";
-import { stavAktivity, type Aktivita, type Nakup, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
+import { patri, stavAktivity, type Aktivita, type Nakup, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -40,7 +40,8 @@ export function MojaDochadzkaKarta() {
   const [novaAkt, setNovaAkt] = useState("");
   const [form, setForm] = useState({ aktivitaId: "", datum: "", hodiny: "10", suma: "", poznamka: "" });
   const [bezi, setBezi] = useState(false);
-  const [filter, setFilter] = useState("");
+  const [pridavam, setPridavam] = useState(false);
+  const [sPoznamkou, setSPoznamkou] = useState(false);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/moja-dochadzka", { cache: "no-store" }).then((x) => x.json()).catch(() => null) as Odpoved | null;
@@ -100,13 +101,13 @@ export function MojaDochadzkaKarta() {
     );
   };
 
-  const novaDlazdica = (
-    <div style={{ border: `1px dashed ${C.border}`, borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ fontSize: 12, color: C.textDim, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>+ nová aktivita</div>
+  // Nová aktivita: „+“ pri nadpise, nie vlastný štvorec (Jerry, 14. 11. 2026).
+  const pridatPanel = (
+    <div style={{ border: `1px dashed ${C.border}`, borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
       {d.kandidati.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {d.kandidati.map((k) => (
-            <button key={k.nazov} disabled={bezi} onClick={() => void posli({ akcia: "aktivita-pridaj", nazov: k.nazov, nazvy: [k.nazov], guillermo: k.guillermo }, `Sledujem ${k.nazov}.`)}
+            <button key={k.nazov} disabled={bezi} onClick={() => void posli({ akcia: "aktivita-pridaj", nazov: k.nazov, nazvy: [k.nazov], guillermo: k.guillermo }, `Sledujem ${k.nazov}.`).then((ok) => { if (ok) setPridavam(false); })}
               style={{ ...tl, color: C.accentLight, borderColor: mix(C.accent, 45) }}>
               {k.nazov} <span style={{ color: C.textDim }}>· {k.pocet}× v kalendári</span>
             </button>
@@ -115,9 +116,9 @@ export function MojaDochadzkaKarta() {
       )}
       <div style={{ display: "flex", gap: 6 }}>
         <input value={novaAkt} onChange={(e) => setNovaAkt(e.target.value)} placeholder="názov udalosti v kalendári" style={{ ...pole, flex: 1, minWidth: 0 }} />
-        <button disabled={bezi || !novaAkt.trim()} onClick={() => void posli({ akcia: "aktivita-pridaj", nazov: novaAkt.trim(), nazvy: [novaAkt.trim()] }, `Sledujem ${novaAkt.trim()}.`).then((ok) => { if (ok) setNovaAkt(""); })} style={tl}>pridať</button>
+        <button disabled={bezi || !novaAkt.trim()} onClick={() => void posli({ akcia: "aktivita-pridaj", nazov: novaAkt.trim(), nazvy: [novaAkt.trim()] }, `Sledujem ${novaAkt.trim()}.`).then((ok) => { if (ok) { setNovaAkt(""); setPridavam(false); } })} style={tl}>pridať</button>
       </div>
-      <div style={{ fontSize: 11.5, color: C.textDim }}>Ráta sa tvoj kalendár, udalosti s presne týmto názvom.</div>
+      <div style={{ fontSize: 11.5, color: C.textDim }}>Ráta sa tvoj kalendár, udalosti s presne týmto názvom. Guillermo sa ráta z oboch kalendárov a prevezme platby zo starej karty.</div>
     </div>
   );
 
@@ -126,12 +127,13 @@ export function MojaDochadzkaKarta() {
   const dniTyzdna = Array.from({ length: 7 }, (_, i) => posunDen(tyzdenOd, i));
   const bodyTyzdna = stavy.flatMap((s) => {
     const podlaUid = new Map(s.body.map((b) => [b.uid, b]));
-    return d.udalosti.filter((u) => u.trener === d.kto && podlaUid.has(u.uid) && dniTyzdna.includes(u.zaciatok.slice(0, 10)))
+    return d.udalosti.filter((u) => podlaUid.has(u.uid) && dniTyzdna.includes(u.zaciatok.slice(0, 10)))
       .map((u) => ({ u, b: podlaUid.get(u.uid)!, a: s.aktivita }));
   });
   // Udalosti pred prvou platbou tiež ukázať — bez odznaku, nech je vidno, čo kalendár ráta.
-  const mimo = d.udalosti.filter((u) => u.trener === d.kto && dniTyzdna.includes(u.zaciatok.slice(0, 10)) && !bodyTyzdna.some((x) => x.u.uid === u.uid)
-    && d.aktivity.some((a) => (a.guillermo ? u.typ === "guillermo" : a.nazvy.some((n) => n.toLowerCase() === (u.nazov || "").toLowerCase()))));
+  const mimo = d.udalosti.filter((u) => dniTyzdna.includes(u.zaciatok.slice(0, 10)) && !bodyTyzdna.some((x) => x.u.uid === u.uid)
+    && d.aktivity.some((a) => patri(a, u)));
+  const nazovPre = (u: UdalostDochadzky) => d.aktivity.find((a) => patri(a, u))?.nazov || u.nazov || "";
   const blok = (zaciatok: string, nazov: string, b: { poradie: number | null; zBalika: number | null; minus: number | null; posledna: boolean; minule: boolean } | null) => {
     const znak = !b ? "bez platby" : b.minus ? `−${b.minus}` : `${b.poradie}/${b.zBalika}${b.posledna ? " · posledná" : ""}`;
     const farba = !b ? C.textDim : b.minus ? C.red : b.posledna ? C.orange : C.blue;
@@ -153,7 +155,7 @@ export function MojaDochadzkaKarta() {
       <div style={{ display: "grid", gridTemplateColumns: uzke ? "1fr" : "repeat(7, minmax(0, 1fr))", gap: 6 }}>
         {dniTyzdna.map((dd) => {
           const tu = [...bodyTyzdna.filter((x) => x.u.zaciatok.slice(0, 10) === dd).map((x) => ({ z: x.u.zaciatok, el: blok(x.u.zaciatok, x.a.nazov, x.b) })),
-            ...mimo.filter((u) => u.zaciatok.slice(0, 10) === dd).map((u) => ({ z: u.zaciatok, el: blok(u.zaciatok, u.nazov || "", null) }))].sort((x, y) => x.z.localeCompare(y.z));
+            ...mimo.filter((u) => u.zaciatok.slice(0, 10) === dd).map((u) => ({ z: u.zaciatok, el: blok(u.zaciatok, nazovPre(u), null) }))].sort((x, y) => x.z.localeCompare(y.z));
           if (uzke && !tu.length) return null;
           const dnes = dd === d.teraz.slice(0, 10);
           return (
@@ -169,7 +171,7 @@ export function MojaDochadzkaKarta() {
   );
 
   // ── D · zápis platby + zošit ───────────────────────────────────
-  const riadky = stavy.filter((s) => !filter || s.aktivita.id === filter).flatMap((s) => {
+  const riadky = stavy.flatMap((s) => {
     const nak = d.nakupy.filter((n) => n.aktivitaId === s.aktivita.id).map((n) => ({ datum: n.datum, poradie: 0, s, nakup: n as Nakup | null, bod: null as null | (typeof s.body)[number] }));
     const tr = s.body.filter((b) => b.minule).map((b) => ({ datum: b.zaciatok, poradie: 1, s, nakup: null, bod: b }));
     let zost = 0;
@@ -193,24 +195,21 @@ export function MojaDochadzkaKarta() {
       <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3 }}>zaplatené Kč
         <input inputMode="numeric" value={form.suma} onChange={(e) => setForm({ ...form, suma: e.target.value })} placeholder="nepovinné" style={{ ...pole, width: 110 }} />
       </label>
-      <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3, flex: "1 1 140px" }}>poznámka
-        <input value={form.poznamka} onChange={(e) => setForm({ ...form, poznamka: e.target.value })} placeholder="napr. hotovosť Leonovi" style={pole} />
-      </label>
+      {sPoznamkou ? (
+        <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3, flex: "1 1 140px" }}>poznámka
+          <input autoFocus value={form.poznamka} onChange={(e) => setForm({ ...form, poznamka: e.target.value })} style={pole} />
+        </label>
+      ) : (
+        <button onClick={() => setSPoznamkou(true)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "0 0 8px" }}>+ poznámka</button>
+      )}
       <button disabled={bezi || !form.aktivitaId || !form.datum || !(Number(form.hodiny) > 0)}
-        onClick={() => void posli({ akcia: "nakup-pridaj", aktivitaId: form.aktivitaId, datum: form.datum, hodiny: Number(form.hodiny), sumaKc: form.suma.trim(), poznamka: form.poznamka }, "Platba zapísaná.").then((ok) => { if (ok) setForm((f) => ({ ...f, suma: "", poznamka: "" })); })}
+        onClick={() => void posli({ akcia: "nakup-pridaj", aktivitaId: form.aktivitaId, datum: form.datum, hodiny: Number(form.hodiny), sumaKc: form.suma.trim(), poznamka: form.poznamka }, "Platba zapísaná.").then((ok) => { if (ok) { setForm((f) => ({ ...f, suma: "", poznamka: "" })); setSPoznamkou(false); } })}
         style={tlHlavne}>{bezi ? "Zapisujem…" : "Zapísať platbu"}</button>
     </div>
   );
 
   const zosit = (
     <div style={{ marginTop: 10 }}>
-      {d.aktivity.length > 1 && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-          {[{ id: "", nazov: "všetko" }, ...d.aktivity].map((a) => (
-            <button key={a.id} onClick={() => setFilter(a.id)} style={{ ...tl, padding: "3px 10px", fontSize: 12, background: filter === a.id ? C.accentBg : "transparent", color: filter === a.id ? C.text : C.textMuted }}>{a.nazov}</button>
-          ))}
-        </div>
-      )}
       {riadky.length ? (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.8 }}>
@@ -245,11 +244,19 @@ export function MojaDochadzkaKarta() {
       {chyba && <div style={{ fontSize: 12.5, color: C.red, marginTop: 6 }}>{chyba}</div>}
       {hlaska && <div style={{ fontSize: 12.5, color: C.green, marginTop: 6 }}>{hlaska}</div>}
 
-      <Nadpis>Moje aktivity</Nadpis>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
-        {stavy.map(dlazdica)}
-        {novaDlazdica}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 8px" }}>
+        <span style={{ fontSize: 11.5, letterSpacing: 0.4, textTransform: "uppercase", color: C.textDim, fontWeight: 700 }}>Moje aktivity</span>
+        <button onClick={() => setPridavam((x) => !x)} title="Pridať aktivitu" aria-label="Pridať aktivitu"
+          style={{ width: 24, height: 24, borderRadius: 99, border: `1px solid ${mix(C.accent, 55)}`, background: pridavam ? C.accentBg : "transparent", color: C.accentLight, cursor: "pointer", fontSize: 15, lineHeight: "20px", padding: 0, fontFamily: "inherit" }}>
+          {pridavam ? "×" : "+"}
+        </button>
       </div>
+      {(pridavam || !d.aktivity.length) && pridatPanel}
+      {d.aktivity.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+          {stavy.map(dlazdica)}
+        </div>
+      )}
 
       {d.aktivity.length > 0 && <><Nadpis>Kalendár</Nadpis>{kalendar}</>}
 

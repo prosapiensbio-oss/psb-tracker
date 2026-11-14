@@ -54,8 +54,10 @@ export function citajDochadzku(hodnota: string | null | undefined): DataDochadzk
 
 /** Patrí udalosť k aktivite? Kalendár toho istého človeka a jej názov (alebo Guillermo). */
 export function patri(a: Aktivita, u: UdalostDochadzky): boolean {
-  if (u.trener !== a.kto) return false;
+  // Guillermove sedenia sú zapísané hlavne v Terezkinom kalendári („TR“),
+  // hoci sú Jerryho — ráta sa každý kalendár, ako na starej karte Guillermo.
   if (a.guillermo) return u.typ === "guillermo";
+  if (u.trener !== a.kto) return false;
   const n = normName(u.nazov || "");
   return !!n && a.nazvy.some((x) => normName(x) === n);
 }

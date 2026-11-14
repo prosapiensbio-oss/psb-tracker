@@ -7,7 +7,7 @@ import { terazPraha } from "../../lib/psb/cas";
 import { normName } from "../../lib/psb/format";
 import { sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
-import { kandidatiDochadzky, nacitajDochadzku, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
+import { kandidatiDochadzky, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
 
 /**
  * MOJA DOCHÁDZKA — súkromné aktivity trénera (Box, Guillermo), 14. 11. 2026.
@@ -63,7 +63,11 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           const nazvy = (Array.isArray(b.nazvy) ? b.nazvy.map(String) : [nazov]).map((x) => x.trim()).filter(Boolean).slice(0, 5);
           if (!guillermo && !nazvy.length) return chyba("Chýba názov udalosti v kalendári.");
           if (d.aktivity.some((a) => a.kto === kto && normName(a.nazov) === normName(nazov))) return chyba(`Aktivitu „${nazov}“ už máš.`);
-          d.aktivity.push({ id: id(), kto, nazov, nazvy: guillermo ? [] : nazvy, ...(guillermo ? { guillermo: true } : {}), vytvorene: teraz });
+          const novaId = id();
+          d.aktivity.push({ id: novaId, kto, nazov, nazvy: guillermo ? [] : nazvy, ...(guillermo ? { guillermo: true } : {}), vytvorene: teraz });
+          if (guillermo) {
+            for (const n of await prevzatieGuillerma(DB, kto)) d.nakupy.push({ id: id(), aktivitaId: novaId, ...n, vytvorene: teraz });
+          }
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-aktivita", predmet: `${kto} · ${nazov}`, actor: kto });
           return Response.json({ ok: true }, { headers: ns });
