@@ -26,6 +26,11 @@ export type Aktivita = {
    * chodia z Google kalendára ako „Busy“ — názov v iCal nie je (14. 11. 2026).
    */
   serie?: string[];
+  /**
+   * Cena jednej hodiny v Kč (Box: 800 Kč, Jerry 14. 11. 2026). Z platby sa
+   * podľa nej dopočítajú hodiny a mínus sa ukáže aj v korunách.
+   */
+  cenaHodiny?: number;
   vytvorene: string;
 };
 
@@ -151,6 +156,17 @@ export function stavAktivity(a: Aktivita, nakupy: Nakup[], udalosti: UdalostDoch
   };
 }
 
+/** Mínus v korunách podľa ceny hodiny; null, keď nie je mínus alebo cena. */
+export function dlhKc(a: Aktivita, zostatok: number): number | null {
+  return zostatok < 0 && a.cenaHodiny && a.cenaHodiny > 0 ? -zostatok * a.cenaHodiny : null;
+}
+
+/** Koľko hodín je za zaplatenú sumu (celé hodiny), alebo null bez ceny. */
+export function hodinyZaSumu(a: Aktivita | undefined, suma: number): number | null {
+  if (!a?.cenaHodiny || !(a.cenaHodiny > 0) || !(suma > 0)) return null;
+  return Math.round(suma / a.cenaHodiny);
+}
+
 export type PolozkaDochadzky = { key: string; title: string; detail: string; tone: "orange" | "blue"; kto: string; aktivitaId: string };
 
 /**
@@ -173,10 +189,11 @@ export function polozkyDochadzky(d: DataDochadzky, udalosti: UdalostDochadzky[],
       });
     }
     if (s.zostatok < 0) {
+      const kc = dlhKc(a, s.zostatok);
       out.push({
         key: `dochadzka-minus|${a.id}|${s.poslednyNakup.datum}`, kto: a.kto, aktivitaId: a.id, tone: "orange",
         title: `${a.nazov}: ${s.zostatok} h`,
-        detail: `${a.nazov}: odtrénované ${s.odtrenovane} h, zaplatené ${s.kupene} h — si v mínuse ${s.zostatok}. Po platbe zapíš nákup vo Workspace → Moja dochádzka.`,
+        detail: `${a.nazov}: odtrénované ${s.odtrenovane} h, zaplatené ${s.kupene} h — si v mínuse ${s.zostatok}${kc ? ` (${kc.toLocaleString("cs-CZ")} Kč)` : ""}. Po platbe zapíš nákup vo Workspace → Moja dochádzka.`,
       });
     }
   }

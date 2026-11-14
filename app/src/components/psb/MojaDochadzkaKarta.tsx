@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { posunDen } from "../../lib/psb/cas";
-import { patri, stavAktivity, type Aktivita, type Nakup, type RucnyTrening, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
+import { dlhKc, hodinyZaSumu, patri, stavAktivity, type Aktivita, type Nakup, type RucnyTrening, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -72,6 +72,11 @@ export function MojaDochadzkaKarta() {
     const balik = s.poslednyNakup?.hodiny || 0;
     const farba = s.zostatok <= 0 ? C.red : s.zostatok <= 2 ? C.orange : C.green;
     const minute = Math.max(0, balik - Math.max(0, s.zostatok));
+    const kc = dlhKc(s.aktivita, s.zostatok);
+    const nastavCenu = () => {
+      const v = prompt(`Cena jednej hodiny — ${s.aktivita.nazov} (Kč, prázdne = bez ceny):`, s.aktivita.cenaHodiny ? String(s.aktivita.cenaHodiny) : "");
+      if (v !== null) void posli({ akcia: "aktivita-cena", id: s.aktivita.id, cenaHodiny: v }, "Cena hodiny uložená.");
+    };
     return (
       <div key={s.aktivita.id} style={{ border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, background: C.card }}>
         <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
@@ -82,6 +87,7 @@ export function MojaDochadzkaKarta() {
         {s.poslednyNakup ? (
           <>
             <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.05, color: farba }}>{s.zostatok} <span style={{ fontSize: 14, color: C.textDim, fontWeight: 500 }}>{s.zostatok === 1 ? "hodina" : "h"} zostáva</span></div>
+            {kc != null && <div style={{ fontSize: 13, fontWeight: 700, color: C.red, marginTop: 2 }}>doplatiť {czk(kc)}</div>}
             <div style={{ height: 8, borderRadius: 9, background: C.track, overflow: "hidden", margin: "10px 0 6px" }}>
               <i style={{ display: "block", height: "100%", width: `${balik ? Math.min(100, (minute / balik) * 100) : 100}%`, background: farba }} />
             </div>
@@ -96,6 +102,10 @@ export function MojaDochadzkaKarta() {
         ) : (
           <div style={{ fontSize: 12.5, color: C.textMuted, margin: "6px 0" }}>Zatiaľ bez platby — zapíš prvú dole a odpočet sa rozbehne od jej dňa.</div>
         )}
+        <button onClick={nastavCenu} title="Cena jednej hodiny — z platby sa dopočítajú hodiny"
+          style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "6px 0 0", display: "block" }}>
+          {s.aktivita.cenaHodiny ? `${czk(s.aktivita.cenaHodiny)} / h · zmeniť` : "+ cena za hodinu"}
+        </button>
         <button onClick={() => { setForm((f) => ({ ...f, aktivitaId: s.aktivita.id })); document.getElementById("dochadzka-formular")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
           style={{ ...tl, marginTop: 10, color: C.green, borderColor: mix(C.green, 45) }}>+ zapísať platbu</button>
       </div>
@@ -194,7 +204,11 @@ export function MojaDochadzkaKarta() {
         <input type="number" min={1} max={500} value={form.hodiny} onChange={(e) => setForm({ ...form, hodiny: e.target.value })} style={{ ...pole, width: 80 }} />
       </label>
       <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3 }}>zaplatené Kč
-        <input inputMode="numeric" value={form.suma} onChange={(e) => setForm({ ...form, suma: e.target.value })} placeholder="nepovinné" style={{ ...pole, width: 110 }} />
+        <input inputMode="numeric" value={form.suma} onChange={(e) => {
+          // Pri známej cene hodiny sa hodiny dopočítajú zo sumy (4 000 Kč pri 800 Kč/h = 5 h).
+          const h = hodinyZaSumu(d.aktivity.find((a) => a.id === form.aktivitaId), Number(e.target.value.replace(/\s/g, "").replace(",", ".")));
+          setForm({ ...form, suma: e.target.value, ...(h ? { hodiny: String(h) } : {}) });
+        }} placeholder="nepovinné" style={{ ...pole, width: 110 }} />
       </label>
       {sPoznamkou ? (
         <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3, flex: "1 1 140px" }}>poznámka

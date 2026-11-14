@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { citajDochadzku, polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
+import { citajDochadzku, dlhKc, hodinyZaSumu, polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
 
 const BOX: Aktivita = { id: "a1", kto: "Jerry", nazov: "Box", nazvy: ["Box"], vytvorene: "" };
 const nakup = (datum: string, hodiny: number): Nakup => ({ id: datum, aktivitaId: "a1", datum, hodiny, sumaKc: 5000, poznamka: "", vytvorene: datum });
@@ -78,5 +78,18 @@ describe("Guillermo: neskorá platba, séria a ručné tréningy", () => {
   it("ručne zapísaný tréning sa ráta rovnako ako kalendár", () => {
     const d = { aktivity: [G], nakupy: [n("2025-01-01", 2)], rucne: [{ id: "r1", aktivitaId: "g", zaciatok: "2025-01-08T12:00", poznamka: "zo správ" }] };
     expect(stavAktivity(G, d.nakupy, rucneAkoUdalosti(d), "2025-02-01T08:00").zostatok).toBe(1);
+  });
+});
+
+describe("Box: cena hodiny 800 Kč", () => {
+  const box: Aktivita = { id: "b", kto: "Jerry", nazov: "Box", nazvy: ["Box"], cenaHodiny: 800, vytvorene: "2026-11-14" };
+  it("zo sumy dopočíta hodiny", () => {
+    expect(hodinyZaSumu(box, 4000)).toBe(5);
+    expect(hodinyZaSumu(box, 1600)).toBe(2);
+    expect(hodinyZaSumu({ ...box, cenaHodiny: undefined }, 4000)).toBeNull();
+  });
+  it("mínus v korunách", () => {
+    expect(dlhKc(box, -3)).toBe(2400);
+    expect(dlhKc(box, 2)).toBeNull();
   });
 });

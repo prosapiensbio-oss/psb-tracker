@@ -18,6 +18,7 @@ import { kandidatiDochadzky, nacitajDochadzku, prevzatieGuillerma, udalostiDocha
  *   POST { akcia: "aktivita-zmaz", id }
  *   POST { akcia: "nakup-pridaj", aktivitaId, datum, hodiny, sumaKc?, poznamka? }
  *   POST { akcia: "nakup-zmaz", id }
+ *   POST { akcia: "aktivita-cena", id, cenaHodiny }   (prázdne = bez ceny)
  *
  * Každý mení len svoje. Uložené vo vzas_settings.moja_dochadzka (JSON) —
  * pár riadkov na človeka.
@@ -125,6 +126,17 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           d.rucne = (d.rucne || []).filter((x) => x.id !== r.id);
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-trening-zmazany", predmet: `${kto} · ${r.zaciatok}`, actor: kto });
+          return Response.json({ ok: true }, { headers: ns });
+        }
+        if (b.akcia === "aktivita-cena") {
+          const a = moja(String(b.id || ""));
+          if (!a) return chyba("Aktivita sa nenašla.", 404);
+          const raw = String(b.cenaHodiny ?? "").replace(/\s/g, "").replace(",", ".");
+          const cena = raw === "" ? 0 : Math.round(Number(raw));
+          if (!Number.isFinite(cena) || cena < 0 || cena > 100000) return chyba("Cena hodiny nevyzerá ako číslo.");
+          if (cena) a.cenaHodiny = cena; else delete a.cenaHodiny;
+          await ulozDochadzku(DB, d);
+          await audit(DB, { action: "dochadzka-cena", predmet: `${kto} · ${a.nazov}`, neu: cena, actor: kto });
           return Response.json({ ok: true }, { headers: ns });
         }
         if (b.akcia === "aktivita-serie") {
