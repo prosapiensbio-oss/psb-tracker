@@ -10,7 +10,7 @@ import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
-import { polozkyDochadzky, sNazvamiKontaktov } from "../../lib/psb/mojaDochadzka";
+import { polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
 import { nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
 import { terazPraha } from "../../lib/psb/cas";
@@ -131,7 +131,7 @@ export const Route = createFileRoute("/api/push-rano")({
           const ulozene = await nacitajDochadzku(DB);
           const dd = { ...ulozene, aktivity: sNazvamiKontaktov(ulozene.aktivity, await nacitajSukromne(DB)) };
           if (dd.aktivity.length) {
-            const ud = await udalostiDochadzky(DB, dd.aktivity);
+            const ud = [...(await udalostiDochadzky(DB, dd.aktivity)), ...rucneAkoUdalosti(dd)];
             for (const p of polozkyDochadzky(dd, ud, terazPraha())) {
               penazne.push({
                 key: p.key, category: "Anomália", tone: p.tone, title: p.title, detail: p.detail, priority: 30,

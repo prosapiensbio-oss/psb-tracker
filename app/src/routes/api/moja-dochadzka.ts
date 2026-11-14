@@ -5,7 +5,7 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { terazPraha } from "../../lib/psb/cas";
 import { normName } from "../../lib/psb/format";
-import { sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
+import { rucneAkoUdalosti, sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
 import { kandidatiDochadzky, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
 
@@ -40,8 +40,9 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
         const moje: DataDochadzky = vsetci ? d : {
           aktivity: d.aktivity.filter((a) => a.kto === kto),
           nakupy: d.nakupy.filter((n) => d.aktivity.some((a) => a.id === n.aktivitaId && a.kto === kto)),
+          rucne: (d.rucne || []).filter((r) => d.aktivity.some((a) => a.id === r.aktivitaId && a.kto === kto)),
         };
-        const udalosti = await udalostiDochadzky(DB, moje.aktivity);
+        const udalosti = [...(await udalostiDochadzky(DB, moje.aktivity)), ...rucneAkoUdalosti(moje)];
         const kandidati = vsetci ? [] : (await kandidatiDochadzky(DB, kto)).filter((k) => !moje.aktivity.some((a) => (k.guillermo ? a.guillermo : a.nazvy.some((n) => normName(n) === normName(k.nazov)))));
         return Response.json({ ok: true, kto, teraz: terazPraha(), ...moje, udalosti, kandidati }, { headers: ns });
       },
@@ -77,6 +78,7 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           if (!a) return chyba("Aktivita sa nenašla.", 404);
           d.aktivity = d.aktivity.filter((x) => x.id !== a.id);
           d.nakupy = d.nakupy.filter((n) => n.aktivitaId !== a.id);
+          d.rucne = (d.rucne || []).filter((r) => r.aktivitaId !== a.id);
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-aktivita-zmazana", predmet: `${kto} · ${a.nazov}`, actor: kto });
           return Response.json({ ok: true }, { headers: ns });
@@ -101,6 +103,36 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           d.nakupy = d.nakupy.filter((x) => x.id !== n.id);
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-nakup-zmazany", predmet: `${kto} · ${n.datum}`, old: n, actor: kto });
+          return Response.json({ ok: true }, { headers: ns });
+        }
+        /**
+         * Tréning mimo kalendára (Guillermo 2025 — poznáme ho zo správ s Josém)
+         * a séria opakovanej udalosti (Guillermove „Busy“ stredy).
+         */
+        if (b.akcia === "trening-pridaj") {
+          const a = moja(String(b.aktivitaId || ""));
+          if (!a) return chyba("Vyber aktivitu.");
+          const zaciatok = String(b.zaciatok || "");
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(zaciatok)) return chyba("Dátum a čas tréningu chýba.");
+          d.rucne = [...(d.rucne || []), { id: id(), aktivitaId: a.id, zaciatok, poznamka: String(b.poznamka || "").trim().slice(0, 200) }];
+          await ulozDochadzku(DB, d);
+          await audit(DB, { action: "dochadzka-trening", predmet: `${kto} · ${a.nazov} · ${zaciatok}`, actor: kto });
+          return Response.json({ ok: true }, { headers: ns });
+        }
+        if (b.akcia === "trening-zmaz") {
+          const r = (d.rucne || []).find((x) => x.id === String(b.id || ""));
+          if (!r || !moja(r.aktivitaId)) return chyba("Tréning sa nenašiel.", 404);
+          d.rucne = (d.rucne || []).filter((x) => x.id !== r.id);
+          await ulozDochadzku(DB, d);
+          await audit(DB, { action: "dochadzka-trening-zmazany", predmet: `${kto} · ${r.zaciatok}`, actor: kto });
+          return Response.json({ ok: true }, { headers: ns });
+        }
+        if (b.akcia === "aktivita-serie") {
+          const a = moja(String(b.id || ""));
+          if (!a) return chyba("Aktivita sa nenašla.", 404);
+          a.serie = (Array.isArray(b.serie) ? b.serie.map(String) : []).map((x) => x.trim()).filter((x) => /^[A-Za-z0-9_-]{8,}$/.test(x)).slice(0, 10);
+          await ulozDochadzku(DB, d);
+          await audit(DB, { action: "dochadzka-serie", predmet: `${kto} · ${a.nazov}`, neu: a.serie.join(", "), actor: kto });
           return Response.json({ ok: true }, { headers: ns });
         }
         return chyba("Neznáma akcia.");

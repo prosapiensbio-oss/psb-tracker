@@ -17,14 +17,16 @@ export async function udalostiDochadzky(DB: D1Database, aktivity: Aktivita[]): P
   if (!aktivity.length) return [];
   const nazvy = [...new Set(aktivity.flatMap((a) => a.nazvy.map((n) => n.trim().toLowerCase())).filter(Boolean))].slice(0, 40);
   const guillermo = aktivity.some((a) => a.guillermo);
+  const serie = [...new Set(aktivity.flatMap((a) => a.serie || []).map((x) => x.trim()).filter((x) => /^[A-Za-z0-9_-]{8,}$/.test(x)))].slice(0, 10);
   const podmienky = [
     ...(nazvy.length ? [`lower(nazov) IN (${nazvy.map((_, i) => `?${i + 1}`).join(",")})`] : []),
     ...(guillermo ? ["typ = 'guillermo'"] : []),
+    ...serie.map((_, i) => `uid LIKE ?${nazvy.length + i + 1} || '%'`),
   ];
   if (!podmienky.length) return [];
   const r = await DB.prepare(
     `SELECT uid, trener, zaciatok, koniec, nazov, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND (${podmienky.join(" OR ")}) ORDER BY zaciatok`,
-  ).bind(...nazvy).all<UdalostDochadzky>();
+  ).bind(...nazvy, ...serie).all<UdalostDochadzky>();
   return r.results || [];
 }
 

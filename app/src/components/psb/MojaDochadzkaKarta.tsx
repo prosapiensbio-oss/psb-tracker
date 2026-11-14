@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { posunDen } from "../../lib/psb/cas";
-import { patri, stavAktivity, type Aktivita, type Nakup, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
+import { patri, stavAktivity, type Aktivita, type Nakup, type RucnyTrening, type StavAktivity, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -14,7 +14,7 @@ import { useUzke } from "./useUzke";
 
 type Odpoved = {
   ok: boolean; error?: string; kto: string; teraz: string;
-  aktivity: Aktivita[]; nakupy: Nakup[]; udalosti: UdalostDochadzky[];
+  aktivity: Aktivita[]; nakupy: Nakup[]; udalosti: UdalostDochadzky[]; rucne?: RucnyTrening[];
   kandidati: { nazov: string; pocet: number; guillermo: boolean }[];
 };
 
@@ -42,6 +42,7 @@ export function MojaDochadzkaKarta() {
   const [bezi, setBezi] = useState(false);
   const [pridavam, setPridavam] = useState(false);
   const [sPoznamkou, setSPoznamkou] = useState(false);
+  const [rucnyTrening, setRucnyTrening] = useState<string | null>(null);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/moja-dochadzka", { cache: "no-store" }).then((x) => x.json()).catch(() => null) as Odpoved | null;
@@ -208,6 +209,21 @@ export function MojaDochadzkaKarta() {
     </div>
   );
 
+  const rucnyPre = (uid?: string) => (uid?.startsWith("rucne:") ? (d.rucne || []).find((x) => uid.endsWith(`:${x.id}`)) : undefined);
+  const pridatRucny = (
+    <div style={{ marginTop: 8, fontSize: 12 }}>
+      {rucnyTrening === null ? (
+        <button onClick={() => setRucnyTrening(`${d.teraz.slice(0, 10)}T12:00`)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: 0 }}>+ tréning, ktorý nie je v kalendári</button>
+      ) : (
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="datetime-local" value={rucnyTrening} onChange={(e) => setRucnyTrening(e.target.value)} style={pole} />
+          <button disabled={bezi || !form.aktivitaId} onClick={() => void posli({ akcia: "trening-pridaj", aktivitaId: form.aktivitaId, zaciatok: rucnyTrening.slice(0, 16) }, "Tréning zapísaný.").then((ok) => { if (ok) setRucnyTrening(null); })} style={tl}>zapísať tréning ({d.aktivity.find((a) => a.id === form.aktivitaId)?.nazov || "—"})</button>
+          <button onClick={() => setRucnyTrening(null)} style={{ ...tl, border: "none" }}>zrušiť</button>
+        </span>
+      )}
+    </div>
+  );
+
   const zosit = (
     <div style={{ marginTop: 10 }}>
       {riadky.length ? (
@@ -222,12 +238,13 @@ export function MojaDochadzkaKarta() {
                 <tr key={i} style={{ borderTop: `1px solid ${C.border}`, background: r.nakup ? mix(C.green, 6) : undefined }}>
                   <td style={{ padding: "5px 6px", whiteSpace: "nowrap" }}>{den(r.datum)}</td>
                   <td style={{ padding: "5px 6px" }}>{r.s.aktivita.nazov}</td>
-                  <td style={{ padding: "5px 6px", color: r.nakup ? C.text : C.textMuted }}>{r.nakup ? `platba${r.nakup.poznamka ? ` · ${r.nakup.poznamka}` : ""}` : `tréning ${r.datum.slice(11, 16)}`}</td>
+                  <td style={{ padding: "5px 6px", color: r.nakup ? C.text : C.textMuted }}>{r.nakup ? `platba${r.nakup.poznamka ? ` · ${r.nakup.poznamka}` : ""}` : `tréning ${r.datum.slice(11, 16)}${rucnyPre(r.bod?.uid)?.poznamka ? ` · ${rucnyPre(r.bod?.uid)!.poznamka}` : rucnyPre(r.bod?.uid) ? " · zapísaný ručne" : ""}`}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: r.nakup ? C.green : C.textMuted }}>{r.nakup ? `+${r.nakup.hodiny}` : "−1"}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right" }}>{r.nakup?.sumaKc != null ? czk(r.nakup.sumaKc) : ""}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", fontWeight: 700, color: r.zost < 0 ? C.red : r.zost === 0 ? C.orange : C.text }}>{r.zost}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right" }}>
                     {r.nakup && <button onClick={() => { if (confirm("Zmazať túto platbu?")) void posli({ akcia: "nakup-zmaz", id: r.nakup!.id }, "Platba zmazaná."); }} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer" }}>×</button>}
+                    {rucnyPre(r.bod?.uid) && <button onClick={() => { if (confirm("Zmazať tento ručne zapísaný tréning?")) void posli({ akcia: "trening-zmaz", id: rucnyPre(r.bod?.uid)!.id }, "Tréning zmazaný."); }} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer" }}>×</button>}
                   </td>
                 </tr>
               ))}
@@ -260,7 +277,7 @@ export function MojaDochadzkaKarta() {
 
       {d.aktivity.length > 0 && <><Nadpis>Kalendár</Nadpis>{kalendar}</>}
 
-      {d.aktivity.length > 0 && <><Nadpis>Nová platba a zošit</Nadpis>{zapis}{zosit}</>}
+      {d.aktivity.length > 0 && <><Nadpis>Nová platba a zošit</Nadpis>{zapis}{pridatRucny}{zosit}</>}
     </div>
   );
 }

@@ -21,8 +21,16 @@ export type Aktivita = {
   nazvy: string[];
   /** Ráta udalosti typu Guillermo (vzdelávanie), nie podľa názvu. */
   guillermo?: boolean;
+  /**
+   * Opakované udalosti podľa ICS UID série (začiatok `uid`). Guillermove stredy
+   * chodia z Google kalendára ako „Busy“ — názov v iCal nie je (14. 11. 2026).
+   */
+  serie?: string[];
   vytvorene: string;
 };
+
+/** Tréning, ktorý v kalendári nie je (rok 2025 u Guillerma) — zapísaný ručne. */
+export type RucnyTrening = { id: string; aktivitaId: string; zaciatok: string; poznamka: string };
 
 export type Nakup = {
   id: string;
@@ -35,7 +43,7 @@ export type Nakup = {
   vytvorene: string;
 };
 
-export type DataDochadzky = { aktivity: Aktivita[]; nakupy: Nakup[] };
+export type DataDochadzky = { aktivity: Aktivita[]; nakupy: Nakup[]; rucne?: RucnyTrening[] };
 
 export type UdalostDochadzky = { uid: string; trener: string; zaciatok: string; koniec?: string | null; nazov: string | null; typ: string | null };
 
@@ -49,6 +57,7 @@ export function citajDochadzku(hodnota: string | null | undefined): DataDochadzk
   return {
     aktivity: Array.isArray(o.aktivity) ? o.aktivity.filter((a) => a && a.id && a.kto && a.nazov) : [],
     nakupy: Array.isArray(o.nakupy) ? o.nakupy.filter((n) => n && n.id && n.aktivitaId && /^\d{4}-\d{2}-\d{2}$/.test(String(n.datum)) && Number(n.hodiny) > 0) : [],
+    rucne: Array.isArray(o.rucne) ? o.rucne.filter((r) => r && r.id && r.aktivitaId && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(r.zaciatok))) : [],
   };
 }
 
@@ -56,6 +65,8 @@ export function citajDochadzku(hodnota: string | null | undefined): DataDochadzk
 export function patri(a: Aktivita, u: UdalostDochadzky): boolean {
   // Guillermove sedenia sú zapísané hlavne v Terezkinom kalendári („TR“),
   // hoci sú Jerryho — ráta sa každý kalendár, ako na starej karte Guillermo.
+  if (u.uid.startsWith(`rucne:${a.id}:`)) return true;
+  if (a.serie?.some((x) => x && u.uid.startsWith(x))) return true;
   if (a.guillermo) return u.typ === "guillermo";
   if (u.trener !== a.kto) return false;
   const n = normName(u.nazov || "");
@@ -89,29 +100,47 @@ export type StavAktivity = {
   predEvidenciou: number;
 };
 
+/** Ručne zapísané tréningy ako udalosti — aby sa rátali rovnako ako kalendár. */
+export function rucneAkoUdalosti(d: DataDochadzky): UdalostDochadzky[] {
+  return (d.rucne || []).map((r) => {
+    const a = d.aktivity.find((x) => x.id === r.aktivitaId);
+    return { uid: `rucne:${r.aktivitaId}:${r.id}`, trener: a?.kto || "", zaciatok: r.zaciatok, nazov: r.poznamka || a?.nazov || "", typ: "rucne" };
+  });
+}
+
 /**
- * Odpočet jednej aktivity. Udalosť sa míňa z najstaršieho balíka, ktorý v ten
- * deň už bol kúpený a má voľnú hodinu; keď taký nie je, ide do mínusu
- * (a ďalší nákup ho NEprekryje spätne — ako pri klientoch, mínus je značka).
+ * Odpočet jednej aktivity, chronologicky. Platba pridá hodiny a NAJPRV vyrovná
+ * mínus (tréningy, ktoré prebehli skôr, než prišla platba — u Guillerma bežné,
+ * platí sa spätne); potom sa míňa najstarší balík. Mínus sa platbou vynuluje,
+ * ako pri klientoch. Zostatok = kúpené − odtrénované.
  */
 export function stavAktivity(a: Aktivita, nakupy: Nakup[], udalosti: UdalostDochadzky[], teraz: string): StavAktivity {
   const moje = nakupy.filter((n) => n.aktivitaId === a.id).sort((x, y) => x.datum.localeCompare(y.datum) || x.vytvorene.localeCompare(y.vytvorene));
   const prvy = moje[0]?.datum || null;
   const vsetky = udalosti.filter((u) => patri(a, u)).sort((x, y) => x.zaciatok.localeCompare(y.zaciatok));
   const vEvidencii = prvy ? vsetky.filter((u) => u.zaciatok.slice(0, 10) >= prvy) : [];
-  const zvysok = moje.map((n) => ({ n, volne: n.hodiny }));
-  let minus = 0;
+  const baliky: { n: Nakup; pouzite: number }[] = [];
+  let dlh = 0;
+  let ni = 0;
+  const pridajNakupyDo = (den: string) => {
+    while (ni < moje.length && moje[ni].datum <= den) {
+      const b = { n: moje[ni], pouzite: 0 };
+      const vyrovna = Math.min(dlh, b.n.hodiny);
+      b.pouzite += vyrovna; dlh -= vyrovna;
+      baliky.push(b); ni++;
+    }
+  };
   const body: BodOdpoctu[] = vEvidencii.map((u) => {
     const den = u.zaciatok.slice(0, 10);
-    const b = zvysok.find((x) => x.volne > 0 && x.n.datum <= den);
+    pridajNakupyDo(den);
     const minule = u.zaciatok.slice(0, 16) <= teraz.slice(0, 16);
-    if (!b) { minus++; return { uid: u.uid, zaciatok: u.zaciatok, minule, poradie: null, zBalika: null, minus, posledna: false }; }
-    b.volne--;
-    const poradie = b.n.hodiny - b.volne;
-    const ostava = zvysok.filter((x) => x.n.datum <= den).reduce((s, x) => s + x.volne, 0);
-    return { uid: u.uid, zaciatok: u.zaciatok, minule, poradie, zBalika: b.n.hodiny, minus: null, posledna: ostava === 0 };
+    const b = baliky.find((x) => x.pouzite < x.n.hodiny);
+    if (!b) { dlh++; return { uid: u.uid, zaciatok: u.zaciatok, minule, poradie: null, zBalika: null, minus: dlh, posledna: false }; }
+    b.pouzite++;
+    const ostava = baliky.reduce((sum, x) => sum + (x.n.hodiny - x.pouzite), 0);
+    return { uid: u.uid, zaciatok: u.zaciatok, minule, poradie: b.pouzite, zBalika: b.n.hodiny, minus: null, posledna: ostava === 0 };
   });
-  const kupene = moje.reduce((s, n) => s + n.hodiny, 0);
+  const kupene = moje.reduce((sum, n) => sum + n.hodiny, 0);
   const odtrenovane = body.filter((b) => b.minule).length;
   const buduce = body.filter((b) => !b.minule);
   const dojde = body.find((b) => b.posledna && !b.minule)?.zaciatok.slice(0, 10) || null;
