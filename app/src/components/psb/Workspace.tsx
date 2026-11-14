@@ -12,6 +12,8 @@ import { EditorKarta } from "./EditorKarta";
 import { OknoDovoduZrusenia, type ZrusenaHodina } from "./Kalendar";
 import { ZmluvyKarta } from "./ZmluvyKarta";
 import { EmailKarta } from "./EmailKarta";
+import { MojaDochadzkaKarta } from "./MojaDochadzkaKarta";
+import { jeBeta } from "../../lib/psb/beta";
 import { ReklamaPracovisko } from "./ReklamaDozor";
 import { RadKariet } from "./RadKariet";
 
@@ -465,7 +467,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
   );
   const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
     : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
-  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: true, ja: trenerKroku, email: true }) : karty), [poKrokoch, karty, trenerKroku]);
+  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: true, ja: trenerKroku, email: true, dochadzka: jeBeta() }) : karty), [poKrokoch, karty, trenerKroku]);
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
@@ -1079,6 +1081,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
               {/* EDITOR — fotky predtým/potom a videá chôdze a behu (6. 10. 2026). */}
               {k.druh === "editor" && <EditorKarta mena={mena} />}
               {k.druh === "zmluvy" && <ZmluvyKarta data={data} clients={clients} mena={mena} />}
+              {/* MOJA DOCHÁDZKA — súkromné aktivity (beta 14. 11. 2026). */}
+              {k.druh === "dochadzka" && <MojaDochadzkaKarta />}
               {/* EMAIL — schránka info@ (naostro 12. 11. 2026, návrh D). */}
               {k.druh === "email" && <EmailKarta data={data} clients={clients} mena={mena} ktoSom={ktoSom} onProfil={naStol} onTerminy={onNavigate ? () => onNavigate("kalendar") : undefined} />}
               {/* DOZOR REKLÁM — tá istá obrazovka ako bola v Marketingu (19. 10. 2026). */}

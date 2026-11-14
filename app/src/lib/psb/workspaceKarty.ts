@@ -110,6 +110,8 @@ export type Karta =
    * ťahá sama (`/api/email`). Vidí ju Jerry aj Terezka — dopyty sú jej práca.
    */
   | { druh: "email"; nadpis: string; podnadpis: string; polozky: never[] }
+  /** Moja dochádzka — súkromné aktivity trénera (Box, Guillermo), 14. 11. 2026. Karta si dáta ťahá sama. */
+  | { druh: "dochadzka"; nadpis: string; podnadpis: string; polozky: never[] }
   /**
    * Editor — fotky predtým/potom a videá chôdze a behu (Jerry, 6. 10. 2026:
    * „pridaj ešte jednu kartu editor, tam budú dve možnosti, foto a video").
@@ -132,7 +134,7 @@ export type Karta =
 export type Krok = "kalendar" | "sms" | "platby" | "dopyty" | "uzavierka" | "kontroly";
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
-export const BEZ_FRONTY: Karta["druh"][] = ["klient", "email", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "krok"];
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "email", "dochadzka", "faktury", "anamnezy", "zmluvy", "editor", "reklamy", "krok"];
 
 /**
  * KARTY BETY — štyri kroky namiesto ôsmich kariet.
@@ -148,7 +150,7 @@ export const BEZ_FRONTY: Karta["druh"][] = ["klient", "email", "faktury", "anamn
  * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát. Zoznam
  * preto kŕmi krok 2 (`zoznamSms`, parameter `bezHodin`), nie vlastnú kartu.
  */
-export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: string | null; email?: boolean } = {}): Karta[] {
+export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: string | null; email?: boolean; dochadzka?: boolean } = {}): Karta[] {
   /**
    * Čie sú mesačné karty (Jerry, 5. 10. 2026): dopyty len Terezkine,
    * uzávierka a kontroly len jeho. Pri „všetko" (`ja` prázdne) sú všetky.
@@ -168,6 +170,8 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("dlznici"), ...daj("platby")]),
     // Email hneď za tromi krokmi — pošta sa číta každý deň (naostro 12. 11. 2026).
     ...(volby.email ? [{ druh: "email" as const, nadpis: "Email", podnadpis: "info@prosapiens.cz — klienti, noví ľudia, web a prevádzka", polozky: [] as never[] }] : []),
+    // Moja dochádzka (beta 14. 11. 2026) — každý vidí len svoje aktivity.
+    ...(volby.dochadzka ? [{ druh: "dochadzka" as const, nadpis: "Moja dochádzka", podnadpis: "box, Guillermo — koľko hodín ti ostáva a kedy dôjdu", polozky: [] as never[] }] : []),
     /**
      * BETA 5. 10. 2026: dopyty (Terezkine), uzávierka mesiaca a mesačné
      * kontroly (Jerryho) — „Workspace má byť miesto práce", nič z toho nemá

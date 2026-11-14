@@ -16,7 +16,7 @@ import { C } from "../../lib/psb/theme";
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
   // Prezentácia uzávierky A naostro od 12. 11. 2026 — nič sa neskúša.
-  // Karta Email je naostro od 12. 11. 2026 — nič sa neskúša.
+  { text: "Moja dochádzka", tab: "workspace", sub: "dochadzka" },
 ];
 
 /**

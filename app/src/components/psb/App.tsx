@@ -56,6 +56,7 @@ import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { polozkaGuillermo } from "../../lib/psb/guillermo";
+import { polozkyDochadzky, type DataDochadzky, type UdalostDochadzky } from "../../lib/psb/mojaDochadzka";
 import { polozkyHodin } from "../../lib/psb/notifikaciaHodin";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { odlozeneOd, stavRezervnehoUctu } from "../../lib/psb/rezervaOdlozenie";
@@ -112,7 +113,7 @@ import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nesediSPravidlom, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type NesediSPravidlom, type Pohyb, type PravidloNaKontrolu } from "../../lib/psb/kontrolaNakladov";
 import { KANALY, MKT_MESACNE, MKT_TOP, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 import { UDALOST_DO_EDITORA } from "../../lib/psb/doEditora";
 import { mozeDopredu, mozeSpat, posun, pridaj, tu, zacni, type Stopa } from "../../lib/psb/stopaPohybu";
 import * as Sk from "../../lib/psb/sklonovanie";
@@ -386,6 +387,21 @@ type Miesto = {
   vysledkySub: string; marketingSub: string; treningySub: string; klientiSub: string;
   wsKarta: string; wsKlient: string;
 };
+
+
+/**
+ * Moja dochádzka do registra (14. 11. 2026). Mimo bloku peňažných kontrol:
+ * tie patria Jerrymu, toto majiteľovi aktivity (Box môže mať aj Terezka).
+ */
+function registerDochadzky(
+  v: { d: DataDochadzky; udalosti: UdalostDochadzky[] },
+  ack: Parameters<typeof stavPolozkyRegistra>[1],
+) {
+  return polozkyDochadzky(v.d, v.udalosti, terazPraha()).map((p) => ({
+    key: p.key, category: "Anomália" as const, tone: p.tone, title: p.title, detail: p.detail, priority: 30,
+    client: "workspace|dochadzka", trener: p.kto, ...stavPolozkyRegistra(p.key, ack, "dochadzka"),
+  }));
+}
 
 export function PSBApp() {
   // Zvolená paleta sa musí nasadiť pri ŠTARTE appky.
@@ -1216,6 +1232,21 @@ export function PSBApp() {
   // vie zostatok sedení. Berú sa z toho istého /api/kalendar fetchu ako udalosti.
   const [guillermoZazn, setGuillermoZazn] = useState<{ datum: string; druh: string; hodiny: number }[]>([]);
   const [guillermoUdal, setGuillermoUdal] = useState<KalUdalost[]>([]);
+  /**
+   * Moja dochádzka (14. 11. 2026) — súkromné aktivity oboch trénerov, len na
+   * notifikácie „Box — dnes posledný tréning“. Karta si dáta ťahá sama.
+   */
+  const [dochadzka, setDochadzka] = useState<{ d: DataDochadzky; udalosti: UdalostDochadzky[]; teraz: string } | null>(null);
+  useEffect(() => {
+    const nacitaj = () => void fetch("/api/moja-dochadzka?vsetci=1", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { ok?: boolean; aktivity?: DataDochadzky["aktivity"]; nakupy?: DataDochadzky["nakupy"]; udalosti?: UdalostDochadzky[]; teraz?: string } | null) => {
+        if (j?.ok) setDochadzka({ d: { aktivity: j.aktivity || [], nakupy: j.nakupy || [] }, udalosti: j.udalosti || [], teraz: j.teraz || "" });
+      })
+      .catch(() => undefined);
+    nacitaj();
+    return pocuvaj("kalendar", nacitaj);
+  }, []);
   /** Zmeny, ktoré ešte nikto nevysvetlil — `vysvetlene = 0`. */
   const [kalNevysvetlene, setKalNevysvetlene] = useState<KalZmena[]>([]);
   /**
@@ -1978,6 +2009,8 @@ function skupinaFaktur(
     // (0c) Sedenia u Guillerma minuté (Jerry, 9. 10. 2026: „guillermo −1 mi
     // nevyskakuje"). Výpočet aj kľúč sú v lib/psb/guillermo.ts — volá ju aj
     // ranná správa na telefón.
+    // (0d) Moja dochádzka — „Box — dnes posledný tréning“, mínus. Patrí majiteľovi aktivity, nie Jerrymu.
+    if (dochadzka) out.push(...registerDochadzky(dochadzka, ack));
     const g = polozkaGuillermo(guillermoZazn, guillermoUdal);
     if (g) out.push({
       key: g.key, category: "Anomália", tone: g.zostatok < 0 ? "orange" : "blue",
@@ -2186,7 +2219,7 @@ function skupinaFaktur(
     out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}, undefined, data.fakturyNaDalsi, zaplateneVopredNaDalsi(data)));
 
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal, pravidloNesedi, zamknuteMesiace]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy, guillermoZazn, guillermoUdal, pravidloNesedi, zamknuteMesiace, dochadzka]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};

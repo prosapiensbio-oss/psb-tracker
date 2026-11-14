@@ -60,6 +60,7 @@ import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiOpravaTextuRouteImport } from './routes/api/oprava-textu'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiNapadObrazokRouteImport } from './routes/api/napad-obrazok'
+import { Route as ApiMojaDochadzkaRouteImport } from './routes/api/moja-dochadzka'
 import { Route as ApiMetricoolSpatRouteImport } from './routes/api/metricool-spat'
 import { Route as ApiMetricoolRouteImport } from './routes/api/metricool'
 import { Route as ApiMetaMediaRouteImport } from './routes/api/meta-media'
@@ -364,6 +365,11 @@ const ApiNapadObrazokRoute = ApiNapadObrazokRouteImport.update({
   path: '/api/napad-obrazok',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMojaDochadzkaRoute = ApiMojaDochadzkaRouteImport.update({
+  id: '/api/moja-dochadzka',
+  path: '/api/moja-dochadzka',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMetricoolSpatRoute = ApiMetricoolSpatRouteImport.update({
   id: '/api/metricool-spat',
   path: '/api/metricool-spat',
@@ -654,6 +660,7 @@ export interface FileRoutesByFullPath {
   '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/metricool': typeof ApiMetricoolRoute
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
+  '/api/moja-dochadzka': typeof ApiMojaDochadzkaRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
@@ -755,6 +762,7 @@ export interface FileRoutesByTo {
   '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/metricool': typeof ApiMetricoolRoute
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
+  '/api/moja-dochadzka': typeof ApiMojaDochadzkaRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
@@ -857,6 +865,7 @@ export interface FileRoutesById {
   '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/metricool': typeof ApiMetricoolRoute
   '/api/metricool-spat': typeof ApiMetricoolSpatRoute
+  '/api/moja-dochadzka': typeof ApiMojaDochadzkaRoute
   '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/oprava-textu': typeof ApiOpravaTextuRoute
@@ -960,6 +969,7 @@ export interface FileRouteTypes {
     | '/api/meta-media'
     | '/api/metricool'
     | '/api/metricool-spat'
+    | '/api/moja-dochadzka'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/oprava-textu'
@@ -1061,6 +1071,7 @@ export interface FileRouteTypes {
     | '/api/meta-media'
     | '/api/metricool'
     | '/api/metricool-spat'
+    | '/api/moja-dochadzka'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/oprava-textu'
@@ -1162,6 +1173,7 @@ export interface FileRouteTypes {
     | '/api/meta-media'
     | '/api/metricool'
     | '/api/metricool-spat'
+    | '/api/moja-dochadzka'
     | '/api/napad-obrazok'
     | '/api/napady'
     | '/api/oprava-textu'
@@ -1264,6 +1276,7 @@ export interface RootRouteChildren {
   ApiMetaMediaRoute: typeof ApiMetaMediaRoute
   ApiMetricoolRoute: typeof ApiMetricoolRoute
   ApiMetricoolSpatRoute: typeof ApiMetricoolSpatRoute
+  ApiMojaDochadzkaRoute: typeof ApiMojaDochadzkaRoute
   ApiNapadObrazokRoute: typeof ApiNapadObrazokRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiOpravaTextuRoute: typeof ApiOpravaTextuRoute
@@ -1675,6 +1688,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNapadObrazokRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/moja-dochadzka': {
+      id: '/api/moja-dochadzka'
+      path: '/api/moja-dochadzka'
+      fullPath: '/api/moja-dochadzka'
+      preLoaderRoute: typeof ApiMojaDochadzkaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/metricool-spat': {
       id: '/api/metricool-spat'
       path: '/api/metricool-spat'
@@ -2074,6 +2094,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMetaMediaRoute: ApiMetaMediaRoute,
   ApiMetricoolRoute: ApiMetricoolRoute,
   ApiMetricoolSpatRoute: ApiMetricoolSpatRoute,
+  ApiMojaDochadzkaRoute: ApiMojaDochadzkaRoute,
   ApiNapadObrazokRoute: ApiNapadObrazokRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiOpravaTextuRoute: ApiOpravaTextuRoute,

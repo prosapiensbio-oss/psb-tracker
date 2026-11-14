@@ -1,0 +1,53 @@
+import { describe, expect, it } from "bun:test";
+
+import { citajDochadzku, polozkyDochadzky, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
+
+const BOX: Aktivita = { id: "a1", kto: "Jerry", nazov: "Box", nazvy: ["Box"], vytvorene: "" };
+const nakup = (datum: string, hodiny: number): Nakup => ({ id: datum, aktivitaId: "a1", datum, hodiny, sumaKc: 5000, poznamka: "", vytvorene: datum });
+const box = (zaciatok: string, trener = "Jerry", nazov = "Box"): UdalostDochadzky => ({ uid: zaciatok + trener, trener, zaciatok, nazov, typ: "sukromne" });
+
+describe("stavAktivity", () => {
+  const ud = [box("2026-09-01T12:00"), box("2026-09-07T12:00"), box("2026-09-09T12:00"), box("2026-09-15T12:00"), box("2026-09-18T12:00"), box("2026-09-20T12:00", "Terezka")];
+  it("odpočet beží od nákupu, ráta len kalendár majiteľa, staršie sa nepočíta", () => {
+    const s = stavAktivity(BOX, [nakup("2026-09-05", 3)], ud, "2026-09-30T08:00");
+    expect(s.predEvidenciou).toBe(1);
+    expect(s.body.map((b) => b.poradie ?? -(b.minus || 0))).toEqual([1, 2, 3, -1]);
+    expect(s.zostatok).toBe(-1);
+    expect(s.body[2].posledna).toBe(true);
+  });
+  it("budúce udalosti sa neodpočítajú, ale povedia, kedy to dôjde", () => {
+    const s = stavAktivity(BOX, [nakup("2026-09-05", 3)], ud, "2026-09-08T08:00");
+    expect(s.odtrenovane).toBe(1);
+    expect(s.zostatok).toBe(2);
+    expect(s.dojde).toBe("2026-09-15");
+    expect(s.naplanovane).toBe(3);
+  });
+  it("nový balík začína znova od 1", () => {
+    const s = stavAktivity(BOX, [nakup("2026-09-05", 2), nakup("2026-09-10", 10)], ud, "2026-09-30T08:00");
+    expect(s.body.map((b) => `${b.poradie}/${b.zBalika}`)).toEqual(["1/2", "2/2", "1/10", "2/10"]);
+    expect(s.zostatok).toBe(8);
+  });
+  it("Guillermo sa ráta podľa typu udalosti, nie názvu", () => {
+    const g: Aktivita = { ...BOX, id: "g", nazov: "Guillermo", nazvy: [], guillermo: true, kto: "Terezka" };
+    const u = [{ uid: "1", trener: "Terezka", zaciatok: "2026-10-01T10:00", nazov: "TR", typ: "guillermo" }];
+    expect(stavAktivity(g, [{ ...nakup("2026-09-01", 3), aktivitaId: "g" }], u, "2026-10-02T08:00").odtrenovane).toBe(1);
+  });
+});
+
+describe("polozkyDochadzky", () => {
+  it("v deň poslednej zaplatenej hodiny príde notifikácia majiteľovi", () => {
+    const d = { aktivity: [BOX], nakupy: [nakup("2026-09-05", 2)] };
+    const p = polozkyDochadzky(d, [box("2026-09-07T12:00"), box("2026-09-09T12:00")], "2026-09-09T07:00");
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatchObject({ title: "Box — dnes posledný tréning", kto: "Jerry" });
+  });
+  it("mínus má vlastnú notifikáciu", () => {
+    const d = { aktivity: [BOX], nakupy: [nakup("2026-09-05", 1)] };
+    const p = polozkyDochadzky(d, [box("2026-09-07T12:00"), box("2026-09-09T12:00")], "2026-09-10T07:00");
+    expect(p.map((x) => x.title)).toEqual(["Box: -1 h"]);
+  });
+  it("bez nákupu mlčí a zlý JSON nezhodí nič", () => {
+    expect(polozkyDochadzky({ aktivity: [BOX], nakupy: [] }, [box("2026-09-07T12:00")], "2026-09-07T07:00")).toEqual([]);
+    expect(citajDochadzku("nezmysel")).toEqual({ aktivity: [], nakupy: [] });
+  });
+});

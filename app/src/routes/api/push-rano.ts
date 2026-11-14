@@ -11,6 +11,8 @@ import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
 import { polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "../../lib/psb/guillermo";
+import { polozkyDochadzky } from "../../lib/psb/mojaDochadzka";
+import { nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
 import { terazPraha } from "../../lib/psb/cas";
 import { smieRannaDavka } from "../../lib/psb/tichyCas";
 
@@ -135,6 +137,19 @@ export const Route = createFileRoute("/api/push-rano")({
             ...stavPolozkyRegistra(g.key, data.anomalyAck || {}, "guillermo"),
           } : null,
         ].filter(Boolean) as ReturnType<typeof polozkyBtcNesedi>;
+        // Moja dochádzka (14. 11. 2026) — „Box — dnes posledný tréning“, patrí majiteľovi aktivity.
+        try {
+          const dd = await nacitajDochadzku(DB);
+          if (dd.aktivity.length) {
+            const ud = await udalostiDochadzky(DB, dd.aktivity);
+            for (const p of polozkyDochadzky(dd, ud, terazPraha())) {
+              penazne.push({
+                key: p.key, category: "Anomália", tone: p.tone, title: p.title, detail: p.detail, priority: 30,
+                client: "workspace|dochadzka", trener: p.kto, ...stavPolozkyRegistra(p.key, data.anomalyAck || {}, "dochadzka"),
+              } as (typeof penazne)[number]);
+            }
+          }
+        } catch { /* dochádzka nesmie zhodiť rannú správu */ }
 
         // Týždenné a mesačné zápisy — bez nich by v rannej správe chýbali
         // rituály (mesačné kontroly, týždenná únava, uzávierka). Dve malé
