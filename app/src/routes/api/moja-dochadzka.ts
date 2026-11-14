@@ -5,7 +5,8 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { terazPraha } from "../../lib/psb/cas";
 import { normName } from "../../lib/psb/format";
-import type { DataDochadzky } from "../../lib/psb/mojaDochadzka";
+import { sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
+import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
 import { kandidatiDochadzky, nacitajDochadzku, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
 
 /**
@@ -33,7 +34,8 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
         const { DB } = bindings();
         if (!DB) return chyba("no_db", 500);
         const kto = (await currentUser(request)) || "";
-        const d = await nacitajDochadzku(DB);
+        const ulozene = await nacitajDochadzku(DB);
+        const d = { ...ulozene, aktivity: sNazvamiKontaktov(ulozene.aktivity, await nacitajSukromne(DB)) };
         const vsetci = new URL(request.url).searchParams.get("vsetci") === "1";
         const moje: DataDochadzky = vsetci ? d : {
           aktivity: d.aktivity.filter((a) => a.kto === kto),

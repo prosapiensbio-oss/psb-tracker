@@ -11,7 +11,8 @@ import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
 import { polozkaGuillermo, type GuillermoUdalost, type GuillermoZaznam } from "../../lib/psb/guillermo";
-import { polozkyDochadzky } from "../../lib/psb/mojaDochadzka";
+import { polozkyDochadzky, sNazvamiKontaktov } from "../../lib/psb/mojaDochadzka";
+import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
 import { nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
 import { terazPraha } from "../../lib/psb/cas";
 import { smieRannaDavka } from "../../lib/psb/tichyCas";
@@ -139,7 +140,8 @@ export const Route = createFileRoute("/api/push-rano")({
         ].filter(Boolean) as ReturnType<typeof polozkyBtcNesedi>;
         // Moja dochádzka (14. 11. 2026) — „Box — dnes posledný tréning“, patrí majiteľovi aktivity.
         try {
-          const dd = await nacitajDochadzku(DB);
+          const ulozene = await nacitajDochadzku(DB);
+          const dd = { ...ulozene, aktivity: sNazvamiKontaktov(ulozene.aktivity, await nacitajSukromne(DB)) };
           if (dd.aktivity.length) {
             const ud = await udalostiDochadzky(DB, dd.aktivity);
             for (const p of polozkyDochadzky(dd, ud, terazPraha())) {

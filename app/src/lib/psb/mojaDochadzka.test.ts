@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { citajDochadzku, polozkyDochadzky, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
+import { citajDochadzku, polozkyDochadzky, sNazvamiKontaktov, stavAktivity, type Aktivita, type Nakup, type UdalostDochadzky } from "./mojaDochadzka";
 
 const BOX: Aktivita = { id: "a1", kto: "Jerry", nazov: "Box", nazvy: ["Box"], vytvorene: "" };
 const nakup = (datum: string, hodiny: number): Nakup => ({ id: datum, aktivitaId: "a1", datum, hodiny, sumaKc: 5000, poznamka: "", vytvorene: datum });
@@ -49,5 +49,14 @@ describe("polozkyDochadzky", () => {
   it("bez nákupu mlčí a zlý JSON nezhodí nič", () => {
     expect(polozkyDochadzky({ aktivity: [BOX], nakupy: [] }, [box("2026-09-07T12:00")], "2026-09-07T07:00")).toEqual([]);
     expect(citajDochadzku("nezmysel")).toEqual({ aktivity: [], nakupy: [] });
+  });
+});
+
+describe("sNazvamiKontaktov", () => {
+  it("Box ráta aj termín, ktorý sa volá menom súkromného kontaktu", () => {
+    const [a] = sNazvamiKontaktov([BOX], [{ meno: "Leon Box", aktivita: "Box" }]);
+    expect(a.nazvy).toEqual(["Box", "Leon Box"]);
+    const s = stavAktivity(a, [nakup("2026-11-01", 10)], [box("2026-11-13T12:30", "Jerry", "Leon Box")], "2026-11-14T08:00");
+    expect(s.odtrenovane).toBe(1);
   });
 });

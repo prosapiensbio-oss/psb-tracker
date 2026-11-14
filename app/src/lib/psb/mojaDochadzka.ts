@@ -151,3 +151,16 @@ export function polozkyDochadzky(d: DataDochadzky, udalosti: UdalostDochadzky[],
   }
   return out;
 }
+
+/**
+ * Udalosti súkromného kontaktu patria k jeho aktivite: termín, ktorý si Leon
+ * vybral cez ponuku pred 14. 11. 2026, sa v kalendári volá „Leon Box“, nie
+ * „Box“. Aktivita „Box“ ho preto ráta tiež — názvy sa doplnia pri čítaní.
+ */
+export function sNazvamiKontaktov(aktivity: Aktivita[], kontakty: { meno: string; aktivita: string }[]): Aktivita[] {
+  return aktivity.map((a) => {
+    if (a.guillermo) return a;
+    const navyse = kontakty.filter((k) => a.nazvy.some((n) => normName(n) === normName(k.aktivita))).map((k) => k.meno);
+    return navyse.length ? { ...a, nazvy: [...new Set([...a.nazvy, ...navyse])] } : a;
+  });
+}
