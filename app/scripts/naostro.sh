@@ -53,6 +53,9 @@ stiahni payments     "SELECT date,client_name,amount_czk,payment_method FROM pay
 stiahni services     "SELECT date,client_name,service_type,service_description,price_czk,is_6m,trainer FROM services"
 stiahni zavery       "SELECT id, datum, tema, zaver, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'"
 stiahni poplatky     "SELECT id,datum,client_name,popis,suma_czk FROM poplatky"
+# Nová pošta v schránke info@ (15. 11. 2026) — vstupuje do registra (notifikácia
+# Terezke „treba odpísať"), preto musí byť aj tu. „ostatne" je zbalený kôš ponúk.
+stiahni nova_posta   "SELECT id,od_meno,od_mail,predmet,datum,kategoria FROM email_spravy WHERE stav = 'nove' AND kategoria != 'ostatne' ORDER BY datum DESC LIMIT 50"
 stiahni platby_pohyby "SELECT date,amount_czk,category,counterparty,note FROM fio_transactions WHERE amount_czk < 0 AND date >= date('now','start of month','-1 month')"
 stiahni kal_udalosti "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zaciatok >= date('now','-40 days')"
 stiahni kal_zmeny    "SELECT id,kedy,trener,druh,nazov,klient,pred,po,vysvetlene,poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300"

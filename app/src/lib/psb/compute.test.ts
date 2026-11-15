@@ -972,6 +972,47 @@ describe("nový dopyt čaká na odpoveď", () => {
   });
 });
 
+describe("nová pošta v schránke → notifikácia Terezke", () => {
+  const mail = (o: Record<string, unknown> = {}) => ({
+    id: "1234:5", od: "Jana Nováková", predmet: "Dotaz na tréning", datum: "2026-11-15T09:00", kategoria: "novy", ...o,
+  });
+  const posta = (novaPosta: Record<string, unknown>[]) =>
+    deriveRegister({ ...EMPTY_DATA, novaPosta } as never, {}, [], []).filter((r) => r.key.startsWith("posta|"));
+
+  it("jeden nový mail dá zoskupenú položku pre Terezku, kľúč nesie id mailu", () => {
+    const [x] = posta([mail()]);
+    expect(x).toBeTruthy();
+    expect(x.trener).toBe("Terezka");
+    expect(x.key).toBe("posta|1234:5");
+    expect(x.client).toBe("workspace|email");
+    expect(x.title).toContain("Nová pošta v schránke (1)");
+    expect(x.detail).toContain("Jana Nováková");
+    expect(x.detail).toContain("Dotaz na tréning");
+  });
+
+  it("viac mailov je JEDNA položka s počtom, kľúč nesie najnovší (prvý) mail", () => {
+    const zoznam = posta([mail({ id: "a" }), mail({ id: "b" }), mail({ id: "c" })]);
+    expect(zoznam).toHaveLength(1);
+    expect(zoznam[0].key).toBe("posta|a");
+    expect(zoznam[0].title).toContain("(3)");
+  });
+
+  it("prázdna schránka mlčí", () => {
+    expect(posta([])).toHaveLength(0);
+  });
+
+  it("odloženie (ack) umlčí len daný kľúč; nový mail s iným id sa vráti", () => {
+    const ack = { "posta|a": { note: "videla som", acked_at: new Date().toISOString() } };
+    const sAck = deriveRegister({ ...EMPTY_DATA, novaPosta: [mail({ id: "a" })], anomalyAck: ack } as never, {}, [], [])
+      .filter((r) => r.key.startsWith("posta|"));
+    expect(sAck[0].acked).toBe(true);
+    const novy = deriveRegister({ ...EMPTY_DATA, novaPosta: [mail({ id: "b" }), mail({ id: "a" })], anomalyAck: ack } as never, {}, [], [])
+      .filter((r) => r.key.startsWith("posta|"));
+    expect(novy[0].key).toBe("posta|b");
+    expect(novy[0].acked).toBe(false);
+  });
+});
+
 describe("profil pri dohodnutom úvodnom", () => {
   const ses = (client: string, date: string) => ({
     id: `${client}-${date}`, date, time: "10:00", client, sessionTrainer: "Jerry",

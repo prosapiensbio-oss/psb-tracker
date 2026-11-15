@@ -109,13 +109,27 @@ export async function emailPodlaId(DB: D1Database, id: string): Promise<EmailRia
 }
 
 /** Zmena stavu. Prečítané sa nikdy nevráti na nové samo; vybavené vie vrátiť len človek. */
-export async function nastavStav(DB: D1Database, id: string, stav: EmailRiadok["stav"], kto: string): Promise<boolean> {
+// Štyri rôzne zmeny stavu, zámerne rozlíšené:
+//   vybavene    — mail je vybavený (zapíše čas a kto).
+//   precitane   — otvorenie: nové → prečítané (vybavené nechá vybavené).
+//   vratit      — „Vrátiť medzi nevybavené": z vybaveného späť na prečítané.
+//   neprecitane — „Označiť neprečítané": späť na NOVÉ, zmaže stopu prečítania
+//                 aj vybavenia, takže sa mail znova vráti medzi nové a do
+//                 notifikácií (Jerry, 15. 11. 2026).
+export async function nastavStav(
+  DB: D1Database,
+  id: string,
+  stav: "vybavene" | "precitane" | "vratit" | "neprecitane",
+  kto: string,
+): Promise<boolean> {
   const teraz = new Date().toISOString();
   const sql = stav === "vybavene"
     ? "UPDATE email_spravy SET stav = 'vybavene', vybavene_at = ?2, vybavil = ?3, precitane_at = COALESCE(precitane_at, ?2) WHERE id = ?1"
     : stav === "precitane"
       ? "UPDATE email_spravy SET stav = CASE WHEN stav = 'nove' THEN 'precitane' ELSE stav END, precitane_at = COALESCE(precitane_at, ?2) WHERE id = ?1 AND ?3 = ?3"
-      : "UPDATE email_spravy SET stav = 'precitane', vybavene_at = NULL, vybavil = NULL WHERE id = ?1 AND ?2 = ?2 AND ?3 = ?3";
+      : stav === "vratit"
+        ? "UPDATE email_spravy SET stav = 'precitane', vybavene_at = NULL, vybavil = NULL WHERE id = ?1 AND ?2 = ?2 AND ?3 = ?3"
+        : "UPDATE email_spravy SET stav = 'nove', precitane_at = NULL, vybavene_at = NULL, vybavil = NULL WHERE id = ?1 AND ?2 = ?2 AND ?3 = ?3";
   const r = await DB.prepare(sql).bind(id, teraz, kto).run();
   return (r.meta?.changes || 0) > 0;
 }

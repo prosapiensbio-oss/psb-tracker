@@ -65,7 +65,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     chybySekcii.push(sekcia);
     return { results: [] as unknown[] };
   };
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly, viazanePl] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, druhy, kalOd, balickyK, merania, webKontroly, viazanePl, novaPostaR] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -134,6 +134,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     ).all().catch(volitelna("kontroly webu")),
     // Platba priradená k faktúre patrí balíčku na faktúre (`viazane`).
     DB.prepare(DOPYT_VIAZANYCH_PLATIEB).all().catch(volitelna("väzby faktúr na platby")),
+    // Nové maily v schránke info@ — hlavičky na notifikáciu Terezke. „ostatne"
+    // je zbalený kôš obchodných ponúk, do upozornení nepatrí. Len z DB
+    // (`email_spravy`), žiadne IMAP — telo mailu sa načíta až v karte Email.
+    DB.prepare(
+      "SELECT id, od_meno, od_mail, predmet, datum, kategoria FROM email_spravy WHERE stav = 'nove' AND kategoria != 'ostatne' ORDER BY datum DESC LIMIT 50",
+    ).all().catch(volitelna("nová pošta (email_spravy)")),
   ]);
 
   const sessionsPtminder: SessionRow[] = (sessions.results as any[]).map((r) => ({
@@ -284,6 +290,13 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     magnety: (leads.results as any[]).filter((r) => (r.druh || "dopyt") === "magnet").map((r) => ({
       id: r.id, date: r.date, name: r.name || "", email: r.email || "",
       stranka: r.stranka || "", kampan: r.kampan || "", source: r.source,
+    })),
+    novaPosta: (novaPostaR.results as any[]).map((r) => ({
+      id: String(r.id),
+      od: (r.od_meno || r.od_mail || "").toString().trim() || "(bez odosielateľa)",
+      predmet: (r.predmet || "").toString().trim(),
+      datum: r.datum || "",
+      kategoria: r.kategoria || "ostatne",
     })),
     uploadLog: (log.results as any[]).map((r) => ({
       date: r.date,

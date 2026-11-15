@@ -55,6 +55,11 @@ const base: PSBData = {
     overit: r.overit, overitDo: r.overit_do, stav: r.stav })),
   poplatky: nacitaj("poplatky").map((r: any) => ({
     id: String(r.id), datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: r.suma_czk })),
+  // Nová pošta — to isté mapovanie ako `loadData` (15. 11. 2026). Bez nej by
+  // kontrola nevidela notifikáciu „nová pošta v schránke" pre Terezku.
+  novaPosta: (() => { try { return nacitaj("nova_posta"); } catch { return []; } })().map((r: any) => ({
+    id: String(r.id), od: (r.od_meno || r.od_mail || "").toString().trim() || "(bez odosielateľa)",
+    predmet: (r.predmet || "").toString().trim(), datum: r.datum || "", kategoria: r.kategoria || "ostatne" })),
   clientOverrides: {}, anomalyAck: {},
   // Platby mesiaca — to isté mapovanie ako `loadData` (30. 10. 2026). Bez
   // nich by kontrola hlásila každý nájom ako nezaplatený.

@@ -226,7 +226,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
   const ludiaZoznam = useMemo(() => zoskupLudi(vsetky), [vsetky]);
   const klucOtvoreneho = otvoreny ? klucCloveka(otvoreny) : null;
 
-  const zmenStav = async (e: Email, stav: "vybavene" | "vratit") => {
+  const zmenStav = async (e: Email, stav: "vybavene" | "vratit" | "neprecitane") => {
     const r = await api("/api/email", { akcia: "stav", id: e.id, stav });
     if (!r.ok) { setChyba(r.error || "Zápis zlyhal."); return; }
     if (stav === "vybavene") {
@@ -234,6 +234,8 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
       // Ďalší nevybavený (okrem ostatných), aby sa dalo ísť ďalej bez hľadania.
       const dalsi = nevybavene.find((x) => x.id !== e.id && x.kategoria !== "ostatne");
       setVybrany(dalsi?.id || null);
+    } else if (stav === "neprecitane") {
+      setHlaska(`Označené ako neprečítané: ${e.predmet || e.odMeno}`);
     }
     await nacitaj();
   };
@@ -259,7 +261,11 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
       <button key={e.id} onClick={() => setVybrany(e.id)}
         style={{
           display: "block", width: "100%", textAlign: "left", padding: "8px 10px", margin: 0, borderRadius: 8, cursor: "pointer",
-          fontFamily: "inherit", border: "none", borderBottom: `1px solid ${C.border}`, background: on ? C.accentBg : "transparent", color: C.text,
+          fontFamily: "inherit", border: "none", borderBottom: `1px solid ${C.border}`,
+          // Nový (neotvorený) mail svieti: ľavý pruh + jemné pozadie. Po otvorení
+          // sa stav zmení na „precitane" a zvýraznenie zhasne (Jerry, 15. 11. 2026).
+          borderLeft: `3px solid ${nove ? C.accent : "transparent"}`,
+          background: on ? C.accentBg : nove ? C.track : "transparent", color: C.text,
           opacity: e.stav === "vybavene" ? 0.6 : 1,
         }}>
         <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
@@ -267,6 +273,7 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: nove ? 700 : 500, fontSize: 13 }}>
             {e.klient || e.odMeno || e.odMail}
           </span>
+          {nove && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.4, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 4, padding: "0 4px", lineHeight: "14px", flexShrink: 0 }}>NOVÉ</span>}
           {e.stav === "vybavene" && <span title="vybavené" style={{ fontSize: 11, color: C.green }}>✓</span>}
           {e.odpovedaneAt && <span title="odpovedané" style={{ fontSize: 11, color: C.green }}>↩</span>}
           <small style={{ color: nove ? C.text : C.textDim, fontWeight: nove ? 700 : 400, fontSize: 11, flexShrink: 0 }}>{kedyKratko(e.datum)}</small>
@@ -399,7 +406,7 @@ function PasKlienta({ meno, data, clients, onProfil }: { meno: string; data: PSB
 
 function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, onStav, onOdstran, onZmena, setHlaska, setChyba, onSpat, naVysku }: {
   e: Email; ludia: boolean; data: PSBData; clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null;
-  onProfil: (m: string) => void; onTerminy?: () => void; onStav: (e: Email, s: "vybavene" | "vratit") => Promise<void>;
+  onProfil: (m: string) => void; onTerminy?: () => void; onStav: (e: Email, s: "vybavene" | "vratit" | "neprecitane") => Promise<void>;
   onOdstran: (e: Email) => Promise<void>;
   onZmena: () => Promise<unknown>; setHlaska: (s: string) => void; setChyba: (s: string) => void; onSpat?: () => void;
   /** Na počítači vyplní výšku plochy: hlavička hore, mail v strede roluje, odpoveď dole. */
@@ -479,6 +486,8 @@ function Detail({ e, ludia, data, clients, mena, ktoSom, onProfil, onTerminy, on
       {e.stav === "vybavene"
         ? <button onClick={() => void onStav(e, "vratit")} style={tl}>Vrátiť medzi nevybavené</button>
         : <button onClick={() => void onStav(e, "vybavene")} style={{ ...tl, color: C.text, fontWeight: 600 }}>✓ Vybavené</button>}
+      {/* Späť medzi nové — mail sa vráti aj do notifikácií (Jerry, 15. 11. 2026). */}
+      {e.stav !== "nove" && <button onClick={() => void onStav(e, "neprecitane")} style={tl} title="Vráti mail medzi nové a späť do notifikácií">Označiť neprečítané</button>}
       {e.kategoria !== "klient" && <button onClick={dopyt} style={tl}>＋ Zapísať ako dopyt</button>}
       {onTerminy && <button onClick={onTerminy} style={tl}>Ponúknuť termíny</button>}
       <button onClick={() => setPreradit((x) => !x)} style={{ ...tl, border: "none" }}>preradiť…</button>

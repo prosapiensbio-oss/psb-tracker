@@ -757,6 +757,13 @@ export function PSBApp() {
       setWorkspaceKartu("reklamy");
       return;
     }
+    // „workspace|email" — notifikácia o novej pošte otvorí kartu Email
+    // (nie krok kopy; Email je karta, rovnako ako Dozor reklám).
+    if (tab === "workspace" && sub === "email") {
+      setActive("workspace");
+      setWorkspaceKartu("email");
+      return;
+    }
     // „workspace|kalendar", „workspace|uzavierka"… — rovno na krok kopy.
     if (tab === "workspace") {
       setActive("workspace");

@@ -5,7 +5,6 @@ import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { emailPodlaId, konverzacia, oznacOdstraneny, vybavStarsie, nastavStav, preradEmail, ulozHlavicky, zapisOdoslany, znamiZDb, zoznamEmailov } from "../../lib/psb/email.server";
-import type { EmailRiadok } from "../../lib/psb/email.server";
 import { PORADIE_KATEGORII, maObsah } from "../../lib/psb/emailTriedenie";
 import type { Kategoria } from "../../lib/psb/emailTriedenie";
 import { presunDoKosa, stiahniSpravy, stiahniTela } from "../../lib/psb/imap";
@@ -21,7 +20,7 @@ import { nastavenia } from "./mail-dopyty";
  *   GET                      → zoznam (hlavičky + stav práce) a kedy sa naposledy čítalo
  *   GET ?telo=<id>           → celý text jedného mailu zo schránky (označí prečítané)
  *   GET ?ludia=<id>          → rozhovor s tým človekom: maily, naše odpovede, faktúry, SMS, zmluvy
- *   POST { akcia: "stav", id, stav }            → precitane | vybavene | vratit
+ *   POST { akcia: "stav", id, stav }            → precitane | vybavene | vratit | neprecitane
  *   POST { akcia: "prerad", id, kategoria?, klient? }
  *   POST { akcia: "odpovedz", id, komu, predmet, text, citat?, vybav? }
  *   POST { akcia: "dopyt", id }                 → zapíše odosielateľa do dopytov
@@ -112,7 +111,12 @@ export const Route = createFileRoute("/api/email")({
         try {
           if (b.akcia === "stav") {
             const stav = String(b.stav);
-            const cielovy: EmailRiadok["stav"] | null = stav === "vybavene" ? "vybavene" : stav === "precitane" ? "precitane" : stav === "vratit" ? "nove" : null;
+            const cielovy: "vybavene" | "precitane" | "vratit" | "neprecitane" | null =
+              stav === "vybavene" ? "vybavene"
+                : stav === "precitane" ? "precitane"
+                  : stav === "vratit" ? "vratit"
+                    : stav === "neprecitane" ? "neprecitane"
+                      : null;
             if (!cielovy) return Response.json({ ok: false, error: "Neznámy stav." }, { status: 400 });
             const ok = await nastavStav(DB, id, cielovy, kto);
             return Response.json(ok ? { ok: true } : { ok: false, error: "Mail sa nenašiel." }, { status: ok ? 200 : 404 });

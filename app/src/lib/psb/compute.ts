@@ -3602,6 +3602,41 @@ export function deriveRegister(
     );
   }
 
+  // ── nová pošta v schránke čaká na Terezku ────────────────────────────────
+  //
+  // Jerry, 15. 11. 2026: „nové maily pridaj Terezke do notifikácií." Blok
+  // nižšie hlási len maily, ktoré import rozpoznal ako DOPYT (`leads`,
+  // source "mail"); bežný mail, ktorý sa dopytom nestal, ležal v karte Email
+  // bez toho, aby o ňom niekto vedel. Toto je zvonček nad celou schránkou.
+  //
+  // Jedna ZOSKUPENÁ položka, nie jedna na mail — register nesmie svietiť celý.
+  // Kľúč nesie id najnovšieho mailu (`novaPosta` je zoradená od najnovšieho):
+  // keď príde nový mail, kľúč sa zmení a notifikácia sa vráti aj po tom, čo ju
+  // Terezka odložila. Sama zmizne, keď sa maily v karte otvoria (prejdú zo
+  // stavu „nove") alebo sa na ne odpovie. „ostatne" (kôš ponúk) sa sem
+  // nedostane už z `loadData`.
+  {
+    const posta = data.novaPosta || [];
+    if (posta.length) {
+      const zoznam = posta
+        .slice(0, 6)
+        .map((p) => `${p.od}${p.predmet ? ` — „${p.predmet.slice(0, 60)}“` : ""}`)
+        .join("; ");
+      const dalsie = posta.length > 6 ? ` …a ďalších ${posta.length - 6}` : "";
+      add(
+        `posta|${posta[0].id}`,
+        "Zápis",
+        "orange",
+        `Nová pošta v schránke (${posta.length}) — treba odpísať`,
+        `V schránke info@ čaká ${posta.length} ${posta.length === 1 ? "nový mail" : posta.length < 5 ? "nové maily" : "nových mailov"}: ${zoznam}${dalsie}. Otvor Workspace → Email; keď mail otvoríš alebo naň odpíšeš, z notifikácie zmizne. (Mail späť medzi nové vrátiš v karte tlačidlom „Označiť neprečítané".)`,
+        5,
+        "workspace|email",
+        "posta",
+        { trener: "Terezka" },
+      );
+    }
+  }
+
   // ── nový dopyt čaká na odpoveď ───────────────────────────────────────────
   //
   // Jerry, 21. 9. 2026: „vedel by si vytvoriť notifikáciu pre Terezku, že

@@ -246,6 +246,13 @@ export type PSBData = {
   uploadLog: UploadLogEntry[];
   leads: Lead[];
   /**
+   * Nové (neprečítané) maily v schránke info@ — hlavičky zo `email_spravy`,
+   * stav `nove`, bez kategórie „ostatne" (to je zbalený kôš ponúk). Slúžia
+   * jedinej veci: notifikácii Terezke, že v schránke čaká pošta (Jerry,
+   * 15. 11. 2026). Celý mail sa načíta až v karte Email.
+   */
+  novaPosta: { id: string; od: string; predmet: string; datum: string; kategoria: string }[];
+  /**
    * Stiahnutia lead magnetu. Sú to e-maily do zoznamu, nie otázky na tréning,
    * takže do `leads` nepatria a do počtu dopytov sa nerátajú — ale stratiť sa
    * nesmú, mailing z nich žije.
@@ -394,6 +401,7 @@ export const EMPTY_DATA: PSBData = {
   anomalyAck: {},
   uploadLog: [],
   leads: [],
+  novaPosta: [],
   objednaneUvodne: [],
   magnety: [],
   webKontroly: [],
