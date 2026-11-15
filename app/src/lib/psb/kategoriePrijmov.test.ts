@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { jeKategoriaPrijmu, jeVratenieVydavku, PRIJEM_INE, PRIJEM_PRODUKT, prijemDoPnl } from "./kategoriePrijmov";
+import { jeKategoriaPrijmu, jeVratenieVydavku, jeZaradenyPrijem, KATEGORIE_PRIJMU_BANKA, PRIJEM_INE, PRIJEM_PRODUKT, prijemDoPnl } from "./kategoriePrijmov";
 
 describe("kategórie príjmov", () => {
   it("loptička ide do P&L až od mesiaca tržieb z Kokpitu — predtým je v PTminderi", () => {
@@ -46,5 +46,14 @@ describe("Iné príjmy nezávisia od poradia dopytov", () => {
     const src = readFileSync(new URL("../../components/psb/App.tsx", import.meta.url), "utf8");
     expect(/if \(!dataHotove\) return;\s+void fetch\("\/api\/marketing"/.test(src)).toBe(true);
     expect(src).not.toContain("}, [data.uploadLog]);");
+  });
+});
+
+describe("hotovosť vložená na účet", () => {
+  it("je v ponuke pri príjme z banky, nie je to príjem do P&L", () => {
+    expect(KATEGORIE_PRIJMU_BANKA.some((k) => k.value === "presun")).toBe(true);
+    expect(jeZaradenyPrijem("presun")).toBe(true);
+    expect(jeKategoriaPrijmu("presun")).toBe(false);
+    expect(prijemDoPnl("presun", "2026-11", "2026-10")).toBe(false);
   });
 });

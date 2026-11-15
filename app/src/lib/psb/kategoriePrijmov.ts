@@ -26,6 +26,24 @@ export const KATEGORIE_PRIJMU: { value: string; label: string }[] = [
 
 export const jeKategoriaPrijmu = (k: string | null | undefined) => k === PRIJEM_PRODUKT || k === PRIJEM_INE;
 
+/**
+ * HOTOVOSŤ VLOŽENÁ NA ÚČET (Jerry, 15. 11. 2026: „potreboval by som pridať
+ * kategóriu… hotovosť sme si dali na účet"). Kategória už existovala —
+ * `presun` vo fio.ts, pravidlo „vklad do bankomatu" ju dáva samo —, ale
+ * výber pri PRÍJME ju neponúkal. Vklad sa tak ukázal ako „Platba klienta"
+ * a 13. 11. skončil ako „Iný príjem", teda by sa do P&L započítal druhýkrát
+ * (tie peniaze už sú v zošite). Hodnota je tá istá ako `PRESUN` vo fio.ts;
+ * do P&L nejde (`prijemDoPnl` ju zámerne nepozná) a pravidlo sa z nej učiť
+ * smie. V zošite sa neponúka — tam hotovosť na účet ODCHÁDZA, nie prichádza.
+ */
+export const PRESUN_HOTOVOSTI = "presun";
+export const KATEGORIE_PRIJMU_BANKA: { value: string; label: string }[] = [
+  ...KATEGORIE_PRIJMU,
+  { value: PRESUN_HOTOVOSTI, label: "Hotovosť vložená na účet" },
+];
+/** Príjem z banky, ktorý už má zaradenie a na klienta nečaká. */
+export const jeZaradenyPrijem = (k: string | null | undefined) => jeKategoriaPrijmu(k) || k === PRESUN_HOTOVOSTI;
+
 export const nazovPrijmu = (k: string | null | undefined) => KATEGORIE_PRIJMU.find((x) => x.value === (k || ""))?.label || "";
 
 /** Patrí tento príjem do Iných príjmov v P&L za daný mesiac? */

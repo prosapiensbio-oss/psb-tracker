@@ -7,7 +7,7 @@ import { denVTyzdniPraha, dnesPraha, posunDen } from "../../lib/psb/cas";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
-import { jeKategoriaPrijmu, KATEGORIE_PRIJMU } from "../../lib/psb/kategoriePrijmov";
+import { jeZaradenyPrijem, KATEGORIE_PRIJMU_BANKA } from "../../lib/psb/kategoriePrijmov";
 import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, type FilterPohybov } from "../../lib/psb/filtrePohybov";
 import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { suhrnPodlaKategorie, vydavkySoZnamymPravidlom } from "../../lib/psb/vydavkySPravidlom";
@@ -508,11 +508,11 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
                               {st === "klient" && <span style={{ color: C.green }}>✓ {p.klienti}</span>}
                               {/* Druh príjmu: platba klienta (krok 3) / predaj produktu / iný. */}
                               {st !== "klient" && (
-                                <select value={jeKategoriaPrijmu(p.kategoria) ? p.kategoria : ""} disabled={busy}
+                                <select value={jeZaradenyPrijem(p.kategoria) ? p.kategoria : ""} disabled={busy}
                                   onChange={(e) => void zmen(e.target.value, [p.kluc])}
                                   aria-label={`Druh príjmu ${p.protistrana}`}
                                   style={{ display: "block", marginBottom: 3, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 11.5, padding: "3px 6px", cursor: "pointer", fontFamily: "inherit" }}>
-                                  {KATEGORIE_PRIJMU.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                                  {KATEGORIE_PRIJMU_BANKA.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
                                 </select>
                               )}
                               {st === "nieKlient" && <span style={{ color: C.textMuted }}>nie je klient</span>}

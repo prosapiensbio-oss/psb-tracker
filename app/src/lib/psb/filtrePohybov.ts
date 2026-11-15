@@ -8,7 +8,7 @@
  * 67 bez kategórie a všetko to boli platby klientov.
  */
 
-import { jeKategoriaPrijmu } from "./kategoriePrijmov";
+import { jeZaradenyPrijem } from "./kategoriePrijmov";
 
 export type FilterPohybov = "nezaradene" | "potvrdit" | "potvrdene" | "naklady" | "vyplaty" | "sukromne" | "prijmy" | "vsetko";
 
@@ -40,8 +40,9 @@ export type StavPrijmu = "klient" | "zaradeny" | "nieKlient" | "rozdelene" | "ca
 export function stavPrijmu(p: PohybNaFilter, maSplit = false): StavPrijmu {
   if (maSplit) return "rozdelene";
   if (p.klienti) return "klient";
-  // Predaj produktu / iný príjem — nie je to platba klienta, nečaká na nikoho.
-  if (jeKategoriaPrijmu(p.kategoria)) return "zaradeny";
+  // Predaj produktu / iný príjem / vlastná hotovosť na účet — nie je to
+  // platba klienta, nečaká na nikoho.
+  if (jeZaradenyPrijem(p.kategoria)) return "zaradeny";
   if (p.nieKlient) return "nieKlient";
   return "caka";
 }
