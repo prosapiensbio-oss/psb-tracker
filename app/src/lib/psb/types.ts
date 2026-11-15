@@ -134,6 +134,8 @@ export type ClientOverride = {
   zdroj?: string;
   /** Pri referencii: kto konkrétne ho poslal. */
   zdrojKto?: string;
+  /** Dočasná dohoda o balíčku — JSON `{ hodiny, cena, do, poznamka }`, viď `dohodaBalicka.ts`. */
+  dohodaBalicka?: string;
   /** Dátum narodenia (YYYY-MM-DD). PTminder ho neexportuje, dopĺňa sa ručne. */
   narodeniny?: string;
   /**

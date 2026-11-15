@@ -26,6 +26,7 @@ import { pokracovaniePredplatneho, type PokracovaniePredplatneho } from "./pokra
 import type { PSBData } from "./types";
 import { jeUkonceny } from "./ukoncenieBalicka";
 import { klucNezaplateneho } from "./zostatokKokpitu";
+import { jeZDohody } from "./dohodaBalicka";
 
 /**
  * Dáta a odvodení klienti — najdrahšia časť behu (loadData + deriveClients).
@@ -54,7 +55,8 @@ export async function navrhyPokracovaniaPredplatneho(DB: D1Database, dnes: strin
     klient: String(r.klient), nazov: String(r.nazov || ""), hodiny: r.hodiny == null ? null : Number(r.hodiny),
     platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
     zruseneAt: r.zrusene_at || null, kotva: /^\s*zostatok prevzatý/i.test(String(r.poznamka || "")), ukonceny: jeUkonceny(r),
-    cena: r.cena_czk == null ? null : Number(r.cena_czk), zdroj: String(r.zdroj || ""),
+    // Dočasná dohoda nie je cena, pri ktorej klient ostáva (15. 11. 2026).
+    cena: r.cena_czk == null || jeZDohody(r.poznamka) ? null : Number(r.cena_czk), zdroj: String(r.zdroj || ""),
   }));
   const zadarmo = new Set((data.treningyZdarma || []).map((z) => `${normName(z.klient)}|${z.den}`));
   const nezaplatene = new Set((data.bezHodin || []).filter((d) => !d.dvojca).map((d) => klucNezaplateneho(d.klient, d.den)));

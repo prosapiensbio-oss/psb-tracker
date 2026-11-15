@@ -19,6 +19,7 @@ import { UVODNY } from "../../lib/psb/uvodnaStranka";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { treningyDoplneni } from "../../lib/psb/doplnenieTreningy";
+import { citajDohodu, vetaDohody } from "../../lib/psb/dohodaBalicka";
 import { mesiacovVztahu, priemerDochadzky, sedeniaPoMesiacoch, skupinaKlienta, tempoMesacne, type SkupinaZoznamu } from "../../lib/psb/profil";
 import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
@@ -1483,6 +1484,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               zapis={zapisOverride}
               onUlozene={() => { oznam("klienti"); oznam("peniaze"); }}
               onPremenovane={(nove) => { setMeno(nove); oznam("klienti"); oznam("peniaze"); oznam("kalendar"); }}
+              dohoda={data.clientOverrides?.[meno]?.dohodaBalicka || ""}
             />
           </div>
         )}
@@ -2213,7 +2215,7 @@ function tyzdne(n: number): string {
  *    sem len pripája. Mlčky premenovať klienta spolu s narodeninami by
  *    znamenalo nevratnú operáciu schovanú v bežnom uložení.
  */
-function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene, onPremenovane }: {
+function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene, onPremenovane, dohoda }: {
   meno: string;
   c: { narodeniny?: string; zdroj?: string; zdrojKto?: string } | null;
   email: string;
@@ -2222,6 +2224,8 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene, onPremenovan
   onUlozene: () => void;
   /** Po premenovaní ostane profil otvorený — pod novým menom. */
   onPremenovane?: (nove: string) => void;
+  /** Dočasná dohoda o balíčku (JSON z `client_overrides.dohoda_balicka`). */
+  dohoda?: string;
 }) {
   const [otvorene, setOtvorene] = useState(false);
   const [f, setF] = useState({ email: "", telefon: "", narodeniny: "", zdroj: "", zdrojKto: "" });
@@ -2335,6 +2339,7 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene, onPremenovan
         }}>zavrieť</button>
       </div>
       {hlaska && <div style={{ fontSize: 11.5, color: hlaska === "Uložené." ? C.green : C.orange, marginTop: 7 }}>{hlaska}</div>}
+      <DohodaBalickaPole dohoda={dohoda || ""} zapis={zapis} onUlozene={onUlozene} />
     </div>
   );
 }
@@ -3737,6 +3742,63 @@ function SmsPoUvodnomDlazdica({ meno, kalUdalosti, acks }: {
           <SmsPoUvodnom meno={meno} trener={uv.trener} dalsiTrening={dalsi} klucNotifikacie={kluc} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Dočasná dohoda o balíčku (Jerry, 15. 11. 2026, Eva Doležalová: 2 mesiace
+ * 4 h za 4 660 Kč). Automat podľa nej zakladá balíčky do zadaného dňa, potom
+ * zase cenník. Ukladá sa až tlačidlom; „Uložené" až po odpovedi servera.
+ */
+function DohodaBalickaPole({ dohoda, zapis, onUlozene }: {
+  dohoda: string;
+  zapis: (kluc: string, hodnota: unknown) => Promise<void>;
+  onUlozene: () => void;
+}) {
+  const d = citajDohodu(dohoda);
+  const [hodiny, setHodiny] = useState(d ? String(d.hodiny) : "");
+  const [cena, setCena] = useState(d ? String(d.cena) : "");
+  const [doDna, setDoDna] = useState(d?.do || "");
+  const [poznamka, setPoznamka] = useState(d?.poznamka || "");
+  const [bezi, setBezi] = useState(false);
+  const [hlaska, setHlaska] = useState("");
+  const uloz = async (zrus: boolean) => {
+    setBezi(true); setHlaska("");
+    const nova = zrus ? "" : JSON.stringify({ hodiny: Number(hodiny), cena: Number(cena), do: doDna, poznamka: poznamka.trim() || undefined });
+    if (!zrus && !citajDohodu(nova)) { setBezi(false); setHlaska("Vyplň hodiny, cenu aj dátum, do kedy dohoda platí."); return; }
+    await zapis("dohodaBalicka", nova);
+    setBezi(false);
+    if (zrus) { setHodiny(""); setCena(""); setDoDna(""); setPoznamka(""); }
+    setHlaska(zrus ? "Dohoda zrušená — ďalší balíček pôjde podľa cenníka." : "Uložené.");
+    onUlozene();
+  };
+  const pole = (label: string, hodnota: string, nastav: (v: string) => void, w: number, typ = "text", min?: number) => (
+    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: C.textDim }}>
+      {label}
+      <input type={typ} value={hodnota} min={min} onChange={(e) => nastav(e.target.value)}
+        style={{ width: w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark", fontFamily: "inherit" }} />
+    </label>
+  );
+  return (
+    <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 3 }}>Dočasná dohoda o balíčku</div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 7 }}>
+        {d ? `Platí: ${vetaDohody(d).replace(/^dočasná dohoda: /, "")}. Balíčky, ktoré vzniknú do toho dňa, budú takéto; potom zase cenník.`
+          : "Napr. „2 mesiace 4 h za 4 660 Kč“ — automat bude zakladať takéto balíčky do zadaného dňa, potom zase podľa cenníka."}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        {pole("hodiny", hodiny, setHodiny, 70, "number", 1)}
+        {pole("cena (Kč)", cena, setCena, 100, "number", 1)}
+        {pole("platí do", doDna, setDoDna, 150, "date")}
+        {pole("poznámka", poznamka, setPoznamka, 220)}
+        <button onClick={() => void uloz(false)} disabled={bezi} style={{
+          padding: "8px 13px", borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: bezi ? "default" : "pointer",
+          fontFamily: "inherit", border: `1px solid ${mix(C.accent, 55)}`, background: mix(C.accent, 16), color: C.accentLight,
+        }}>{bezi ? "…" : d ? "Zmeniť dohodu" : "Uložiť dohodu"}</button>
+        {d && <button onClick={() => void uloz(true)} disabled={bezi} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>zrušiť dohodu</button>}
+      </div>
+      {hlaska && <div style={{ fontSize: 11.5, color: hlaska === "Uložené." || hlaska.startsWith("Dohoda zrušená") ? C.green : C.orange, marginTop: 6 }}>{hlaska}</div>}
     </div>
   );
 }

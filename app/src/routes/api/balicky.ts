@@ -1,4 +1,5 @@
 import { balicekBerieFakturu, balicekZFaktury } from "../../lib/psb/fakturaNaDalsi";
+import { dohodaPreDen, vetaDohody } from "../../lib/psb/dohodaBalicka";
 import { cakajucaFaktura, pripojFakturuKBalicku } from "../../lib/psb/fakturaNaDalsi.server";
 import { createFileRoute } from "@tanstack/react-router";
 import { KOKPIT_OD } from "../../lib/psb/sedeniaZKalendara";
@@ -75,6 +76,19 @@ async function nacitaj(DB: D1Database) {
  * Doplnenie členstva presun nedostane: to nie je ďalší balíček, len
  * predĺžené staré hodiny.
  */
+/**
+ * Dočasná dohoda pri klientovi (15. 11. 2026): hodiny a cena podľa nej, kým
+ * balíček začína najneskôr v deň `do`. Názov a platnosť ostávajú — je to ten
+ * istý produkt (Předplatné), len za dohodnutú cenu a počet hodín.
+ */
+async function podlaDohody(DB: D1Database, klient: string, nazov: string, hodiny: number | null, od: string) {
+  if (/doplnen|prenesen|úvodn|uvodn/i.test(nazov) || hodiny === 1) return null;
+  const rs = await DB.prepare("SELECT name, dohoda_balicka FROM client_overrides WHERE dohoda_balicka IS NOT NULL AND dohoda_balicka <> ''").all();
+  const r = ((rs.results || []) as { name: string; dohoda_balicka: string }[]).find((x) => normName(x.name) === normName(klient));
+  const d = r ? dohodaPreDen(r.dohoda_balicka, od) : null;
+  return d && { hodiny: d.hodiny, cena: d.cena, veta: vetaDohody(d) };
+}
+
 /** Čakajúca faktúra určuje balíček: klient má dostať to, čo má na doklade. */
 async function podlaFaktury(DB: D1Database, klient: string, nazov: string, hodiny: number | null, od: string) {
   const f = await cakajucaFaktura(DB, klient);
@@ -390,10 +404,11 @@ export const Route = createFileRoute("/api/balicky")({
               p.cenaPoznamka || "",
             ].filter(Boolean).join(" · ");
             const podlaFa = await podlaFaktury(DB, p.klient, p.nazov, p.hodiny, p.odDna);
+            const dohoda = podlaFa ? null : await podlaDohody(DB, p.klient, p.nazov, p.hodiny, p.odDna);
             const { vznikol } = await zapisBalicek(DB, {
-              klient: p.klient, nazov: podlaFa?.nazov ?? p.nazov, hodiny: podlaFa?.hodiny ?? p.hodiny, od: p.odDna,
-              doDna: podlaFa ? podlaFa.doDna : p.doDna, cena: podlaFa?.cena ?? p.cena,
-              poznamka: podlaFa ? `${poznamka} · ${podlaFa.veta}`.slice(0, 400) : poznamka,
+              klient: p.klient, nazov: podlaFa?.nazov ?? p.nazov, hodiny: podlaFa?.hodiny ?? dohoda?.hodiny ?? p.hodiny, od: p.odDna,
+              doDna: podlaFa ? podlaFa.doDna : p.doDna, cena: podlaFa?.cena ?? dohoda?.cena ?? p.cena,
+              poznamka: podlaFa || dohoda ? `${poznamka} · ${(podlaFa || dohoda)!.veta}`.slice(0, 400) : poznamka,
             }, kto || "kokpit", "balicek-predplatne-pokracuje");
             zapisane = true;
             if (vznikol) vznikli.push({ klient: p.klient, nazov: p.nazov, od: p.odDna, navrat: false });
@@ -412,10 +427,11 @@ export const Route = createFileRoute("/api/balicky")({
               n.cenaPoznamka || "",
             ].filter(Boolean).join(" · ");
             const podlaFa = await podlaFaktury(DB, n.klient, n.nazov, n.hodiny, n.odDna);
+            const dohoda = podlaFa ? null : await podlaDohody(DB, n.klient, n.nazov, n.hodiny, n.odDna);
             const { vznikol } = await zapisBalicek(DB, {
-              klient: n.klient, nazov: podlaFa?.nazov ?? n.nazov, hodiny: podlaFa?.hodiny ?? n.hodiny, od: n.odDna,
-              doDna: podlaFa ? podlaFa.doDna : n.platnostDo || null, cena: podlaFa?.cena ?? n.cena,
-              poznamka: podlaFa ? `${poznamka} · ${podlaFa.veta}`.slice(0, 400) : poznamka,
+              klient: n.klient, nazov: podlaFa?.nazov ?? n.nazov, hodiny: podlaFa?.hodiny ?? dohoda?.hodiny ?? n.hodiny, od: n.odDna,
+              doDna: podlaFa ? podlaFa.doDna : n.platnostDo || null, cena: podlaFa?.cena ?? dohoda?.cena ?? n.cena,
+              poznamka: podlaFa || dohoda ? `${poznamka} · ${(podlaFa || dohoda)!.veta}`.slice(0, 400) : poznamka,
             }, kto || "kokpit", "balicek-automaticky");
             if (vznikol) vznikli.push({ klient: n.klient, nazov: n.nazov, od: n.odDna, navrat: n.navrat });
           }

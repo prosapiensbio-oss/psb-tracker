@@ -18,6 +18,7 @@ import { CENNIK, platnostDo, type Sablona } from "./cennik";
 import { UVODNY } from "./uvodnaStranka";
 import { fmtCZK, normName } from "./format";
 import { posunDen } from "./cas";
+import { jeZDohody } from "./dohodaBalicka";
 import type { Udalost } from "./klientOsCasu";
 import { nazovProduktu } from "./nazvyProduktov";
 import { NAZOV_PRENESENYCH } from "./platnostZostatok";
@@ -210,12 +211,14 @@ export function ponukaNovehoBalicka(
 /** Ceny balíčkov klienta podľa dňa začiatku — z Kokpitu aj z histórie PTmindera. */
 export function cenyBalickovKlienta(
   klient: string,
-  balicky: { klient: string; platnost_od: string; cena_czk: number | null; zrusene_at?: string | null }[],
+  balicky: { klient: string; platnost_od: string; cena_czk: number | null; zrusene_at?: string | null; poznamka?: string | null }[],
   historia: { client: string; validFrom?: string; payment?: number | null }[],
 ): { den: string; cena: number | null }[] {
   const k = normName(klient);
   return [
-    ...balicky.filter((b) => normName(b.klient) === k && !b.zrusene_at).map((b) => ({ den: b.platnost_od, cena: b.cena_czk })),
+    // Cena z dočasnej dohody nie je cena klienta (15. 11. 2026) — inak by dva
+    // mesiace zľavy spravili z nej trvalú „stálu inú cenu".
+    ...balicky.filter((b) => normName(b.klient) === k && !b.zrusene_at).map((b) => ({ den: b.platnost_od, cena: jeZDohody(b.poznamka) ? null : b.cena_czk })),
     ...historia.filter((h) => normName(h.client) === k).map((h) => ({ den: h.validFrom || "", cena: h.payment ?? null })),
   ];
 }

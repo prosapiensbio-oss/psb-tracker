@@ -38,6 +38,7 @@ import { nedavnoPodpisane, podpisaneKlientov } from "./zmluvy.server";
 import { znamiKlienti } from "./nahodTrening.server";
 import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
 import { klientiSCakajucouFakturou } from "./fakturaNaDalsi.server";
+import { citajDohodu } from "./dohodaBalicka";
 
 const uid = () => crypto.randomUUID();
 
@@ -322,6 +323,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       duch: String(r.duch || ""),
       zdroj: String(r.zdroj || ""),
       zdrojKto: String(r.zdroj_kto || ""),
+      dohodaBalicka: String(r.dohoda_balicka || ""),
       narodeniny: String(r.narodeniny || ""),
       prvyKontakt: String(r.prvy_kontakt || ""),
       v6m: String(r.v6m || ""),
@@ -1152,6 +1154,7 @@ export async function setOverride(
     duch: "duch",
     zdroj: "zdroj",
     zdrojKto: "zdroj_kto",
+    dohodaBalicka: "dohoda_balicka",
     narodeniny: "narodeniny",
     prvyKontakt: "prvy_kontakt",
     v6m: "v6m",
@@ -1169,6 +1172,11 @@ export async function setOverride(
   if (col === "btc_zlava") v = value === "" || value == null ? null : Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
   // „Platí za" príde z obrazovky ako pole mien; v stĺpci je jeden reťazec.
   if (col === "plati_za") v = zapisPlatiZa(value);
+  // Dohoda sa ukladá len celá a platná; prázdno ju zruší.
+  if (col === "dohoda_balicka") {
+    const d = citajDohodu(typeof value === "string" ? value : value == null ? "" : JSON.stringify(value));
+    v = d ? JSON.stringify(d) : null;
+  }
 
   const r = await DB.prepare(
     `INSERT INTO client_overrides (name, ${col}, updated_at) VALUES (?1, ?2, ?3)
