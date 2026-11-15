@@ -49,7 +49,7 @@ describe("polozkyDochadzky", () => {
   });
   it("bez nákupu mlčí a zlý JSON nezhodí nič", () => {
     expect(polozkyDochadzky({ aktivity: [BOX], nakupy: [] }, [box("2026-09-07T12:00")], "2026-09-07T07:00")).toEqual([]);
-    expect(citajDochadzku("nezmysel")).toEqual({ aktivity: [], nakupy: [], rucne: [] });
+    expect(citajDochadzku("nezmysel")).toEqual({ aktivity: [], nakupy: [], rucne: [], zamietnute: [] });
   });
 });
 
@@ -106,5 +106,41 @@ describe("Guillermo: 65 €/h, platby v bitcoine", () => {
     expect(satsSpolu(g, [n(922296), n(659692), n(null)])).toBe(1581988);
     expect(satsZaSumu(195, 100_000)).toBe(195000);
     expect(satsZaSumu(195, null)).toBeNull();
+  });
+});
+
+describe("platby zapísané samy", async () => {
+  const { navrhyNakupov, jePlatbaGuillermovi } = await import("./mojaDochadzka");
+  const boxJ: Aktivita = { id: "bj", kto: "Jerry", nazov: "Box", nazvy: ["Box", "Leon Box"], cenaHodiny: 800, vytvorene: "" };
+  const boxT: Aktivita = { id: "bt", kto: "Terezka", nazov: "Box", nazvy: ["Box"], cenaHodiny: 800, vytvorene: "" };
+  const gui: Aktivita = { id: "g", kto: "Jerry", nazov: "Guillermo", nazvy: [], guillermo: true, cenaHodiny: 65, mena: "EUR", vytvorene: "" };
+  const n = (aktivitaId: string, datum: string, extra: Partial<Nakup> = {}): Nakup => ({ id: datum, aktivitaId, datum, hodiny: 5, sumaKc: 4000, poznamka: "", vytvorene: datum, ...extra });
+
+  it("Fio „Jerry vyplata box“ 6 400 Kč = 8 h Jerryho boxu, aj keď box má aj Terezka", () => {
+    const d = { aktivity: [boxJ, boxT], nakupy: [n("bj", "2026-10-07")], rucne: [] };
+    const r = navrhyNakupov(d, [{ id: "77", datum: "2026-11-15", suma: 6400, text: "Jerry vyplata box" }], [], null);
+    expect(r).toEqual([expect.objectContaining({ aktivitaId: "bj", hodiny: 8, sumaKc: 6400, zdroj: "fio:77" })]);
+  });
+  it("bez mena pri dvoch boxoch, staršia platba a už zapísaná sa nezapíšu", () => {
+    const d = { aktivity: [boxJ, boxT], nakupy: [n("bj", "2026-10-07"), n("bj", "2026-10-09", { zdroj: "fio:5" })], rucne: [] };
+    expect(navrhyNakupov(d, [{ id: "1", datum: "2026-11-15", suma: 1600, text: "platba box" }], [], null)).toEqual([]);
+    expect(navrhyNakupov(d, [{ id: "2", datum: "2026-10-01", suma: 1600, text: "Jerry box" }], [], null)).toEqual([]);
+    expect(navrhyNakupov(d, [{ id: "5", datum: "2026-11-15", suma: 1600, text: "Jerry box" }], [], null)).toEqual([]);
+    expect(navrhyNakupov({ ...d, zamietnute: ["fio:9"] }, [{ id: "9", datum: "2026-11-15", suma: 1600, text: "Jerry box" }], [], null)).toEqual([]);
+    expect(navrhyNakupov(d, [{ id: "3", datum: "2026-11-15", suma: 1600, text: "Jerry boxerky" }], [], null)).toEqual([]);
+  });
+  it("Guillermo z BTC knihy: poznámka fp, hodiny z 65 € pri kurze, staré a rovnaké sats nie", () => {
+    const d = { aktivity: [gui], nakupy: [n("g", "2026-07-29", { sats: 922296 })], rucne: [] };
+    const btc = [
+      { datum: "2026-11-14", sats: 700000, czk: 9500, poznamka: "FP spain jerry" },
+      { datum: "2026-07-29", sats: 922296, czk: 12563, poznamka: "FP spain jerry" },
+      { datum: "2026-11-14", sats: 50000, czk: 700, poznamka: "Jerry vyplata" },
+    ];
+    const r = navrhyNakupov(d, [], btc, 24.4);
+    expect(r).toEqual([expect.objectContaining({ aktivitaId: "g", hodiny: 6, sats: 700000, zdroj: "btc:2026-11-14|700000" })]);
+  });
+  it("rozpozná platbu Guillermovi podľa poznámky", () => {
+    expect(["Jerry vyplata fp", "FpSpain", "FP spain jerry", "guillermo"].every(jePlatbaGuillermovi)).toBe(true);
+    expect(["Confirmo invILFpS7slx2Vy", "Jerry vyplata", "Pay to Blink Wallet User"].some(jePlatbaGuillermovi)).toBe(false);
   });
 });

@@ -7,7 +7,7 @@ import { terazPraha } from "../../lib/psb/cas";
 import { normName } from "../../lib/psb/format";
 import { rucneAkoUdalosti, sNazvamiKontaktov, type DataDochadzky } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
-import { kandidatiDochadzky, kurzBtcMeny, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
+import { doplnPlatbyDochadzky, kandidatiDochadzky, kurzBtcMeny, nacitajDochadzku, prevzatieGuillerma, udalostiDochadzky, ulozDochadzku } from "../../lib/psb/mojaDochadzka.server";
 
 /**
  * MOJA DOCHÁDZKA — súkromné aktivity trénera (Box, Guillermo), 14. 11. 2026.
@@ -36,7 +36,8 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
         const { DB } = bindings();
         if (!DB) return chyba("no_db", 500);
         const kto = (await currentUser(request)) || "";
-        const ulozene = await nacitajDochadzku(DB);
+        // Platby z Fio („Jerry vyplata box") a z BTC knihy (Guillermo) sa zapíšu samy.
+        const ulozene = (await doplnPlatbyDochadzky(DB, await nacitajDochadzku(DB)).catch(async () => ({ d: await nacitajDochadzku(DB) }))).d;
         const d = { ...ulozene, aktivity: sNazvamiKontaktov(ulozene.aktivity, await nacitajSukromne(DB)) };
         const vsetci = new URL(request.url).searchParams.get("vsetci") === "1";
         const moje: DataDochadzky = vsetci ? d : {
@@ -106,6 +107,8 @@ export const Route = createFileRoute("/api/moja-dochadzka")({
           const n = d.nakupy.find((x) => x.id === String(b.id || ""));
           if (!n || !moja(n.aktivitaId)) return chyba("Nákup sa nenašiel.", 404);
           d.nakupy = d.nakupy.filter((x) => x.id !== n.id);
+          // Zmazaný automatický zápis sa pri ďalšom čítaní nesmie vrátiť.
+          if (n.zdroj) d.zamietnute = [...new Set([...(d.zamietnute || []), n.zdroj])];
           await ulozDochadzku(DB, d);
           await audit(DB, { action: "dochadzka-nakup-zmazany", predmet: `${kto} · ${n.datum}`, old: n, actor: kto });
           return Response.json({ ok: true }, { headers: ns });

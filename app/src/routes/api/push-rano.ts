@@ -12,7 +12,7 @@ import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNo
 import { TRAINERS, stavPolozkyRegistra } from "../../lib/psb/compute";
 import { polozkyDochadzky, rucneAkoUdalosti, sNazvamiKontaktov } from "../../lib/psb/mojaDochadzka";
 import { nacitajSukromne } from "../../lib/psb/sukromneKontakty.server";
-import { nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
+import { doplnPlatbyDochadzky, nacitajDochadzku, udalostiDochadzky } from "../../lib/psb/mojaDochadzka.server";
 import { terazPraha } from "../../lib/psb/cas";
 import { smieRannaDavka } from "../../lib/psb/tichyCas";
 
@@ -128,7 +128,8 @@ export const Route = createFileRoute("/api/push-rano")({
         ].filter(Boolean) as ReturnType<typeof polozkyBtcNesedi>;
         // Moja dochádzka (14. 11. 2026) — „Box — dnes posledný tréning“, patrí majiteľovi aktivity.
         try {
-          const ulozene = await nacitajDochadzku(DB);
+          // Ranná dávka beží po nočnom Fio (4:10 UTC): nová platba za box sa zapíše skôr, než príde „si v mínuse".
+          const ulozene = (await doplnPlatbyDochadzky(DB, await nacitajDochadzku(DB)).catch(async () => ({ d: await nacitajDochadzku(DB) }))).d;
           const dd = { ...ulozene, aktivity: sNazvamiKontaktov(ulozene.aktivity, await nacitajSukromne(DB)) };
           if (dd.aktivity.length) {
             const ud = [...(await udalostiDochadzky(DB, dd.aktivity)), ...rucneAkoUdalosti(dd)];

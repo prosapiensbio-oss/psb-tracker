@@ -50,9 +50,17 @@ export type Nakup = {
   sats?: number | null;
   poznamka: string;
   vytvorene: string;
+  /** Odkiaľ prišiel sám: „fio:<id>" alebo „btc:<deň>|<sats>". Ručný zápis nemá. */
+  zdroj?: string;
 };
 
-export type DataDochadzky = { aktivity: Aktivita[]; nakupy: Nakup[]; rucne?: RucnyTrening[] };
+export type DataDochadzky = {
+  aktivity: Aktivita[];
+  nakupy: Nakup[];
+  rucne?: RucnyTrening[];
+  /** Zdroje automaticky zapísaných nákupov, ktoré človek zmazal — znova sa nezapíšu. */
+  zamietnute?: string[];
+};
 
 export type UdalostDochadzky = { uid: string; trener: string; zaciatok: string; koniec?: string | null; nazov: string | null; typ: string | null };
 
@@ -67,6 +75,7 @@ export function citajDochadzku(hodnota: string | null | undefined): DataDochadzk
     aktivity: Array.isArray(o.aktivity) ? o.aktivity.filter((a) => a && a.id && a.kto && a.nazov) : [],
     nakupy: Array.isArray(o.nakupy) ? o.nakupy.filter((n) => n && n.id && n.aktivitaId && /^\d{4}-\d{2}-\d{2}$/.test(String(n.datum)) && Number(n.hodiny) > 0) : [],
     rucne: Array.isArray(o.rucne) ? o.rucne.filter((r) => r && r.id && r.aktivitaId && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(r.zaciatok))) : [],
+    zamietnute: Array.isArray(o.zamietnute) ? o.zamietnute.filter((x) => typeof x === "string") : [],
   };
 }
 
@@ -234,4 +243,69 @@ export function sNazvamiKontaktov(aktivity: Aktivita[], kontakty: { meno: string
     const navyse = kontakty.filter((k) => a.nazvy.some((n) => normName(n) === normName(k.aktivita))).map((k) => k.meno);
     return navyse.length ? { ...a, nazvy: [...new Set([...a.nazvy, ...navyse])] } : a;
   });
+}
+
+/**
+ * PLATBY ZAPÍSANÉ SAMY (Jerry, 15. 11. 2026: „platbu s poznámkou box rovno
+ * priradiť do boxu a Guillerma priraďovať na základe BTC appky").
+ *
+ *  - Fio: výdavok, v ktorého texte stojí názov aktivity ako celé slovo
+ *    („Jerry vyplata box" → Box). Hodiny z ceny hodiny v Kč.
+ *  - BTC kniha: výber s poznámkou „fp", „FP spain" alebo „Guillermo" →
+ *    aktivita Guillermo. Hodiny z ceny v € pri dnešnom kurze € / Kč.
+ *
+ * Berie sa len platba novšia než posledný nákup tej aktivity — história je
+ * zapísaná ručne a nesmie sa zdvojiť. Zmazaný automatický nákup sa nevráti
+ * (`zamietnute`).
+ */
+export type PlatbaFio = { id: string; datum: string; suma: number; text: string };
+export type PlatbaBtc = { datum: string; sats: number; czk: number | null; poznamka: string };
+export type NavrhNakupu = Omit<Nakup, "id" | "vytvorene"> & { zdroj: string };
+
+const slova = (t: string) => new Set(normName(t).split(/[^a-z0-9]+/).filter(Boolean));
+export const jePlatbaGuillermovi = (poznamka: string) => /(^|[^a-z])fp([^a-z]|$)|fp\s*spain|guillerm/i.test(poznamka || "");
+
+function poslednyNakup(d: DataDochadzky, aktivitaId: string): string {
+  return d.nakupy.filter((n) => n.aktivitaId === aktivitaId).reduce((a, n) => (n.datum > a ? n.datum : a), "");
+}
+
+/** Komu platba patrí, keď majú aktivitu s rovnakým názvom obaja: meno v texte, inak nikomu. */
+function aktivitaPodlaTextu(d: DataDochadzky, text: string): Aktivita | null {
+  const t = slova(text);
+  const kandidati = d.aktivity.filter((a) => !a.guillermo && [a.nazov, ...a.nazvy].some((n) => { const w = [...slova(n)]; return w.length > 0 && w.every((x) => t.has(x)); }));
+  if (kandidati.length <= 1) return kandidati[0] || null;
+  const podlaMena = kandidati.filter((a) => {
+    const k = normName(a.kto);
+    return t.has(k) || (k === "terezka" && (t.has("terka") || t.has("tereza")));
+  });
+  return podlaMena.length === 1 ? podlaMena[0] : null;
+}
+
+export function navrhyNakupov(d: DataDochadzky, fio: PlatbaFio[], btc: PlatbaBtc[], eurCzk: number | null): NavrhNakupu[] {
+  const out: NavrhNakupu[] = [];
+  const uz = new Set([...d.nakupy.map((n) => n.zdroj).filter(Boolean) as string[], ...(d.zamietnute || [])]);
+  for (const p of fio) {
+    const zdroj = `fio:${p.id}`;
+    if (uz.has(zdroj) || !(p.suma > 0)) continue;
+    const a = aktivitaPodlaTextu(d, p.text);
+    if (!a || p.datum <= poslednyNakup(d, a.id)) continue;
+    const hodiny = hodinyZaSumu(a, p.suma);
+    if (!hodiny) continue;
+    out.push({ aktivitaId: a.id, datum: p.datum, hodiny, sumaKc: Math.round(p.suma), poznamka: `zapísané samo z Fio: ${p.text.slice(0, 80)}`, zdroj });
+  }
+  const g = d.aktivity.filter((a) => a.guillermo);
+  if (g.length === 1 && eurCzk && eurCzk > 0) {
+    const a = g[0];
+    const sats = new Set(d.nakupy.filter((n) => n.aktivitaId === a.id && n.sats).map((n) => n.sats));
+    for (const p of btc) {
+      const zdroj = `btc:${p.datum}|${p.sats}`;
+      if (uz.has(zdroj) || !jePlatbaGuillermovi(p.poznamka) || sats.has(p.sats) || p.datum <= poslednyNakup(d, a.id)) continue;
+      if (!p.czk || !a.cenaHodiny) continue;
+      const cenaKc = a.cenaHodiny * (menaAktivity(a) === "EUR" ? eurCzk : 1);
+      const hodiny = Math.round(p.czk / cenaKc);
+      if (hodiny < 1) continue;
+      out.push({ aktivitaId: a.id, datum: p.datum, hodiny, sumaKc: p.czk, sats: p.sats, poznamka: `zapísané samo z BTC knihy: ${p.poznamka.slice(0, 60)}`, zdroj });
+    }
+  }
+  return out;
 }

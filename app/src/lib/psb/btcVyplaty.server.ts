@@ -34,3 +34,27 @@ export async function btcVyplatyJerryho(): Promise<PohybFio[] | null> {
     return null;
   }
 }
+
+/**
+ * Výplaty z bitcoinovej knihy tak, ako sú (deň, sats, Kč v čase, poznámka) —
+ * Moja dochádzka z nich spozná platbu Guillermovi (15. 11. 2026). `null` =
+ * kniha neodpovedala (v bete nie je token).
+ */
+export async function btcVyplatySurove(): Promise<{ datum: string; sats: number; czk: number | null; poznamka: string }[] | null> {
+  try {
+    const env = bindings();
+    const token = env.BTC_RESERVE_TOKEN;
+    if (!token) return null;
+    const exp = Date.now() + 60_000;
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sig = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`exp=${exp}`)))]
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+    const url = `https://btc.prosapiensbio.workers.dev/api/reserve?exp=${exp}&sig=${sig}&vyplaty=1`;
+    const r = env.BTC ? await env.BTC.fetch(new Request(url)) : await fetch(url);
+    if (!r.ok) return null;
+    const j = (await r.json()) as { vyplaty?: { datum: string; sats: number; czk: number | null; poznamka?: string }[] };
+    return (j.vyplaty || []).map((v) => ({ datum: String(v.datum).slice(0, 10), sats: Number(v.sats) || 0, czk: typeof v.czk === "number" ? v.czk : null, poznamka: String(v.poznamka || "") }));
+  } catch {
+    return null;
+  }
+}

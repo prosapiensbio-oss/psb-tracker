@@ -1,6 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { citajDochadzku, KLUC_DOCHADZKY, type Aktivita, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
+import { audit } from "./audit.server";
+import { btcVyplatySurove } from "./btcVyplaty.server";
+import { citajDochadzku, KLUC_DOCHADZKY, navrhyNakupov, type Aktivita, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
 
 export async function nacitajDochadzku(DB: D1Database): Promise<DataDochadzky> {
   const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(KLUC_DOCHADZKY).first<{ value: string }>().catch(() => null);
@@ -96,4 +98,37 @@ export async function kurzBtcMeny(DB: D1Database): Promise<{ czk: number; eur: n
   } catch {
     return null;
   }
+}
+
+/**
+ * Doplní platby, ktoré prišli z Fio a z bitcoinovej knihy (15. 11. 2026).
+ * Volá sa pri každom čítaní karty aj notifikácií; čo už je zapísané alebo
+ * zmazané, sa nezopakuje. Chyba zdroja nič nezhodí — karta ukáže, čo má.
+ */
+export async function doplnPlatbyDochadzky(DB: D1Database, d: DataDochadzky): Promise<{ d: DataDochadzky; pridane: number }> {
+  if (!d.aktivity.length) return { d, pridane: 0 };
+  const od = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+  const fio = ((await DB.prepare(
+    `SELECT id, date, amount_czk, counterparty, note, moja_poznamka FROM fio_transactions WHERE amount_czk < 0 AND date >= ?1`,
+  ).bind(od).all<{ id: string | number; date: string; amount_czk: number; counterparty: string | null; note: string | null; moja_poznamka: string | null }>().catch(() => ({ results: [] }))).results || [])
+    .map((r) => ({ id: String(r.id), datum: String(r.date).slice(0, 10), suma: -Number(r.amount_czk), text: [r.counterparty, r.note, r.moja_poznamka].filter(Boolean).join(" · ") }));
+  const guillermo = d.aktivity.some((a) => a.guillermo);
+  const btc = guillermo ? (await btcVyplatySurove()) || [] : [];
+  const kurz = guillermo ? await kurzBtcMeny(DB) : null;
+  const navrhy = navrhyNakupov(d, fio, btc, kurz ? kurz.czk / kurz.eur : null);
+  if (!navrhy.length) return { d, pridane: 0 };
+  const teraz = new Date().toISOString();
+  const nove: DataDochadzky = { ...d, nakupy: [...d.nakupy, ...navrhy.map((n, i) => ({ ...n, id: `${Date.now().toString(36)}${i}${Math.random().toString(36).slice(2, 6)}`, vytvorene: teraz }))] };
+  // Medzitým mohol niekto zapísať: zapíše sa nad čerstvým stavom, nie nad tým, čo sa čítalo.
+  const cerstve = await nacitajDochadzku(DB);
+  const uz = new Set(cerstve.nakupy.map((n) => n.zdroj).filter(Boolean));
+  const naozaj = navrhy.filter((n) => !uz.has(n.zdroj));
+  if (!naozaj.length) return { d: cerstve, pridane: 0 };
+  const vysledok: DataDochadzky = { ...cerstve, nakupy: [...cerstve.nakupy, ...nove.nakupy.filter((n) => n.zdroj && naozaj.some((x) => x.zdroj === n.zdroj))] };
+  await ulozDochadzku(DB, vysledok);
+  for (const n of naozaj) {
+    const a = vysledok.aktivity.find((x) => x.id === n.aktivitaId);
+    await audit(DB, { action: "dochadzka-nakup-samo", predmet: `${a?.kto || ""} · ${a?.nazov || ""}`, neu: { datum: n.datum, hodiny: n.hodiny, suma: n.sumaKc, zdroj: n.zdroj }, actor: "kokpit" }).catch(() => {});
+  }
+  return { d: vysledok, pridane: naozaj.length };
 }
