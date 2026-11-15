@@ -28,6 +28,23 @@ export function rozpisFaktury(polozky: PolozkaPlatby[], zlava: (meno: string) =>
   return [...podla].map(([klient, kusy]) => ({ klient, czk: czkZaPolozky(kusy, zlava).czk }));
 }
 
+/**
+ * Rozpis NEZAPLATENEJ bitcoinovej žiadosti po premenovaní klienta.
+ *
+ * Rozpis páruje zaplatenie s riadkom knihy podľa mena (`dielyZFaktury`).
+ * Keď premenovanie prepísalo `ln_faktury.klient`, ale rozpis nie, zaplatená
+ * žiadosť sa so starým menom nespárovala a navrhla platbu klientovi, ktorý už
+ * neexistuje (Matěj Procházka, 15. 11. 2026, 4 žiadosti). Zaplatené rozpisy
+ * sa nemenia — sú záznamom toho, čo stránka v tej chvíli ukázala.
+ * Vráti nový JSON, alebo null, keď v ňom staré meno nie je.
+ */
+export function premenujVRozpise(json: string, zo: string, na: string): string | null {
+  let rozpis: DielFaktury[];
+  try { rozpis = JSON.parse(json) as DielFaktury[]; } catch { return null; }
+  if (!Array.isArray(rozpis) || !rozpis.some((d) => d?.klient === zo)) return null;
+  return JSON.stringify(rozpis.map((d) => (d.klient === zo ? { ...d, klient: na } : d)));
+}
+
 /** Hash platby je posledný kus overovacej adresy; id faktúry, kým neexistuje iné. */
 export const idFaktury = (overit: string): string => overit.split("/").filter(Boolean).pop() || overit;
 

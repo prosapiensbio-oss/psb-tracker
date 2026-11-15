@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { btcNaPotvrdenie, dielyZFaktury, idFaktury, kluczKnihy, navrhDielov, satsDielov, type LnFaktura } from "./btcSledovanie";
+import { btcNaPotvrdenie, dielyZFaktury, idFaktury, kluczKnihy, navrhDielov, premenujVRozpise, satsDielov, type LnFaktura } from "./btcSledovanie";
 
 const rozpis = [{ klient: "Jakub Kaňovský", czk: 7401 }, { klient: "Anna Kadličkova", czk: 7401 }];
 const faktura: LnFaktura = { id: "abc", klient: "Jakub Kaňovský", czk: 14802, sats: 875951, vytvorena: "2026-11-02T14:00:00Z", zaplatenaAt: "2026-11-02T15:00:00Z", rozpis };
@@ -90,5 +90,17 @@ describe("pomôcky", () => {
   it("delenie satoshi dá späť celok", () => {
     expect(satsDielov(875951, 2)).toEqual([437976, 437975]);
     expect(satsDielov(100, 3).reduce((a, b) => a + b, 0)).toBe(100);
+  });
+});
+
+describe("premenujVRozpise", () => {
+  it("prepíše len diel premenovaného klienta", () => {
+    const j = JSON.stringify([{ klient: "Matej Prochadzka", czk: 7401 }, { klient: "Iva Nová", czk: 100 }]);
+    expect(JSON.parse(premenujVRozpise(j, "Matej Prochadzka", "Matěj Procházka") as string))
+      .toEqual([{ klient: "Matěj Procházka", czk: 7401 }, { klient: "Iva Nová", czk: 100 }]);
+  });
+  it("bez starého mena alebo s poškodeným JSON vráti null", () => {
+    expect(premenujVRozpise(JSON.stringify([{ klient: "Iva Nová", czk: 1 }]), "Matej Prochadzka", "X")).toBeNull();
+    expect(premenujVRozpise("{zle", "A", "B")).toBeNull();
   });
 });

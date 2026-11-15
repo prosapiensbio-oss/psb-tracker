@@ -5,6 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { menaPlatiZa, zapisPlatiZa } from "../../lib/psb/platiZa";
+import { premenujVRozpise } from "../../lib/psb/btcSledovanie";
 
 /**
  * Premenovanie klienta naprieč celou databázou.
@@ -117,8 +118,9 @@ const TABULKY: Tabulka[] = [
   // toho klienta používa"): kontrola stĺpcov v schéme našla štyri miesta.
   // Kto ho odporučil inému klientovi a ktorého dopytu je odporúčateľ, adresát
   // odkazu pre rodiča (Lenka Přinosilová za Matyho) a bitcoinové faktúry.
-  // `ln_faktury.rozpis_json` meno nesie tiež, ale v JSON — ten sa nemení,
-  // je to záznam toho, čo stránka v tej chvíli ukázala.
+  // `ln_faktury.rozpis_json` meno nesie tiež, ale v JSON: zaplatený sa
+  // nemení (záznam toho, čo stránka ukázala), nezaplatený áno — viď
+  // `premenujVRozpise` (15. 11. 2026).
   { tab: "client_overrides", stlpec: "zdroj_kto" },
   { tab: "leads", stlpec: "referrer" },
   { tab: "klient_odkazy_pre", stlpec: "prijemca", unik: ["klient"] },
@@ -235,6 +237,12 @@ export const Route = createFileRoute("/api/premenuj")({
           if (kontakty.length) { dotknute.fakturacne_kontakty = kontakty.length; spolu += kontakty.length; }
           const platia = await platitelia(DB, zo);
           if (platia.length) { dotknute["client_overrides.plati_za"] = platia.length; spolu += platia.length; }
+          const rozpisy = (((await DB.prepare(
+            "SELECT id, rozpis_json FROM ln_faktury WHERE zaplatena_at IS NULL AND instr(rozpis_json, ?1) > 0",
+          ).bind(JSON.stringify(zo)).all().catch(() => ({ results: [] }))).results || []) as unknown as { id: string; rozpis_json: string }[])
+            .map((r) => ({ id: r.id, json: premenujVRozpise(r.rozpis_json, zo, na) }))
+            .filter((r): r is { id: string; json: string } => r.json !== null);
+          if (rozpisy.length) { dotknute["ln_faktury.rozpis"] = rozpisy.length; spolu += rozpisy.length; }
           if (!spolu) return Response.json({ ok: false, error: `Pod menom „${zo}“ nič nie je.` }, { status: 404 });
           if (!naozaj) return Response.json({ ok: true, nahlad: true, dotknute, spolu });
 
@@ -263,6 +271,9 @@ export const Route = createFileRoute("/api/premenuj")({
               DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
                 .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).map((x) => (x === zo ? na : x)))),
             );
+          }
+          for (const r of rozpisy) {
+            prikazy.push(DB.prepare("UPDATE ln_faktury SET rozpis_json = ?2 WHERE id = ?1").bind(r.id, r.json));
           }
           // Jedna dávka = jedna transakcia: keď spadne ktorýkoľvek UPDATE,
           // nezmení sa nič a chyba ide späť (catch nižšie), nie polovičné meno.
