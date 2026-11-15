@@ -142,3 +142,4 @@
 0137_fio_moja_poznamka.sql
 0138_zmluvy.sql
 0139_email.sql
+0140_dohoda_balicka.sql
