@@ -917,3 +917,42 @@ načítanie je teraz 429 kB a najťažšie v ňom je naše písmo
 - **Dve klientky „Marketa"** — tým istým zásahom.
 
 - **1. 11. 2026, rozbor a veľká oprava:** 9 balíkov nasadených (verzia 2277), podrobne v CLAUDE.md „Rozbor a veľká oprava“.
+
+## Magnety na webe konečne posielajú mail — 16. 11. 2026
+
+Jolana Hořovská hlásila 10. 11., že jej protokol nikdy nedorazil. Príčina
+nebola v jej schránke a nebola ani len v chýbajúcom autoresponderi:
+**Forminator NEMAL vyplneného odosielateľa**, takže si bral adresu správcu
+WordPressu (`jerrystranavsky@gmail.com`). Websupport odmietne poslať poštu
+z cudzej domény cez svoj SMTP a vráti `550 5.7.1 Command rejected` — a keďže
+padlo prvé oznámenie, nedoručilo sa ani to druhé. **Žiadny magnet na webe tak
+neposlal ani jeden mail, vrátane upozornenia pre Jerryho.**
+
+Opravené na všetkých desiatich formulároch (odosielateľ `online@prosapiens.cz`,
+teda tá istá schránka, cez ktorú web odosiela):
+
+| Formulár | Oznámenie klientovi | PDF |
+|---|---|---|
+| Protokol (3696) | Protokol myofasciálního uvolňování | Myofascialne-uvonovani |
+| Dychanie (5445) | Příručka Struktura před technikou | Proc_nedychas_spravne |
+| Principy biomechaniky (3774) | Dokument Principy biomechaniky | Biomechanika |
+| Fascie voda v nás (3787) | Dokument Fascie: Voda v nás | Fascie-voda-v-nas |
+| Mechanotransdukce (3792) | Dokument Mechanotransdukce | Mechanotransdukcia |
+| Strečing (3828) | Dokument Strečink: Mýty a legendy | Strecing-Myty-a-legendy |
+| Postura (3813) | Dokument Postura: Držení těla | Postura |
+| Výživa (3804) | Dokument Výživa k lepší regeneraci | Vyziva |
+| Ideální přístup (3819) | Dokument Ideální přístup | Idealni-pristup |
+| Co očekávat (3807) | Dokument Co očekávat od biomechanického tréninku | Co-ocekavat |
+
+Mail je podoba **C** (papier `#F2EFE7`, čierny nadpis, tmavé tlačidlo), ktorú
+Jerry vybral 16. 11., bez osobného podpisu. Odpoveď chodí na `info@`.
+Overené naživo dvoma odoslaniami (Protokol a Dychanie) — oba maily dorazili
+do schránky, nie do spamu, s diakritikou a funkčným odkazom na PDF.
+
+**Otvorené:**
+- V odpovediach formulára Protokol ležia moje testovacie záznamy **922–928**
+  („Test …"). Dajú sa zmazať hromadnou akciou; nechal som ich, aby som
+  omylom nezmazal všetkých 249.
+- Vo WP Mail SMTP je „Vynutit z e-mailu" VYPNUTÉ. Keby sa niekedy pridal
+  ďalší formulár bez vyplneného odosielateľa, bude mlčať presne takto.
+  Zapnutie toho prepínača by to zabezpečilo raz navždy.
