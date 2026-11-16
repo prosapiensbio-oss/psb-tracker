@@ -2231,6 +2231,23 @@ export function deriveAnomalies(
   const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"], platneOd?: string, kto?: { trener?: string; oKom?: string }) =>
     out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie, platneOd, trener: kto?.trener, oKom: kto?.oKom });
 
+  // ── Nočná kontrola dát (16. 11. 2026, `nocnaKontrola.ts`) ──────────────
+  //
+  // Meno toho istého klienta v inom tvare v kalendári alebo v banke
+  // (Svatopluk Stoklásek). Hlási sa trénerovi klienta. Beh starší než tri dni
+  // sa nehlási: plánovač zrejme nebežal a starý nález by svietil nad vecou,
+  // ktorá je možno dávno opravená — výpadok automatu ukáže Zdravie Kokpitu.
+  const nesparovaniVKalendari = new Set<string>();
+  {
+    const n = data.nocnaKontrola;
+    const cerstvy = !!n && Date.now() - Date.parse(n.beh) < 3 * 86400_000;
+    for (const x of cerstvy && n ? n.nalezy : []) {
+      if (x.druh === "kalendar") for (const k of x.kandidati) nesparovaniVKalendari.add(normName(k));
+      const label = x.druh === "kalendar" ? "Tréning bez klienta" : x.druh === "platba" ? "Platba bez klienta" : "Iné meno v banke";
+      push(x.kluc, "orange", label, x.text, x.klient, undefined, undefined, { trener: x.trener, oKom: x.klient });
+    }
+  }
+
   // ── Kontrola webu ────────────────────────────────────────────────────────
   //
   // Nočná kontrola (migrácia 0102) overuje, či sa dá dopyt z webu vôbec
@@ -2498,7 +2515,9 @@ export function deriveAnomalies(
     // Kto má termín v kalendári alebo otvorený záver, nie je duch — tá istá
     // podmienka ako pri „Prestal chodiť" (Svetopluk Stoklasko mal 12. 10.
     // objednaný tréning a svietil ako duch, 9. 10. 2026).
-    if (days >= 30 && !duch && !odchodVysvetleny && !odpovedEpizody
+    // Kto má v kalendári tréning bez klienta s podobným menom, nie je duch —
+    // je nespárovaný (Svatopluk Stoklásek, 16. 11. 2026). Hlási to nočná kontrola.
+    if (days >= 30 && !duch && !odchodVysvetleny && !odpovedEpizody && !nesparovaniVKalendari.has(normName(c.name))
       && !najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
       const hodiny = c.packageRemaining > 0
         ? ` a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín`

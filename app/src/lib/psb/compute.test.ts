@@ -1062,3 +1062,28 @@ describe("profil pri dohodnutom úvodnom", () => {
     expect(Object.keys(postav([]))).toHaveLength(0);
   });
 });
+
+describe("nočná kontrola dát v registri (16. 11. 2026)", () => {
+  const nalez = { druh: "kalendar" as const, kluc: "kontrola-dat|kalendar|Terezka|Svetopluk Stoklasko", trener: "Terezka", klient: "Svatopluk Stoklásek", kandidati: ["Svatopluk Stoklásek"], text: "Tréning „Svetopluk Stoklasko“ …" };
+  const zaklad = (beh: string) => {
+    const data = {
+      sessions: [], services: [], payments: [], packages: [],
+      clientOverrides: {}, anomalyAck: {}, uploadLog: [], leads: [], zavery: [], vedomosti: [],
+      nocnaKontrola: { beh, nalezy: [nalez] },
+    } as never;
+    const clients = {
+      "Svatopluk Stoklásek": { name: "Svatopluk Stoklásek", status: "Aktívny", segment: "Stabilný", lastSession: "2026-06-01", packageRemaining: 7, packageTotal: 8 },
+    } as never;
+    return deriveAnomalies(data, clients);
+  };
+  test("nález ide trénerovi a otázka „duch“ sa pri nespárovanom tréningu nepoloží", () => {
+    const a = zaklad(new Date().toISOString());
+    expect(a.find((x) => x.key === nalez.kluc)).toMatchObject({ trener: "Terezka", client: "Svatopluk Stoklásek" });
+    expect(a.some((x) => x.key === "duch|Svatopluk Stoklásek")).toBe(false);
+  });
+  test("starý beh (plánovač nebežal) sa nehlási a duch sa pýta ako predtým", () => {
+    const a = zaklad("2026-01-01T00:00:00Z");
+    expect(a.some((x) => x.key === nalez.kluc)).toBe(false);
+    expect(a.some((x) => x.key === "duch|Svatopluk Stoklásek")).toBe(true);
+  });
+});

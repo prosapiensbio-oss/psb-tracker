@@ -187,6 +187,20 @@ const strazcaVyberu = (env: Env) =>
     }),
   );
 
+/**
+ * Nočná kontrola dát (Jerry, 16. 11. 2026): meno toho istého klienta v inom
+ * tvare v kalendári alebo v banke (Svatopluk Stoklásek). Po banke (4:10)
+ * a balíčkoch (4:15), pred rannou dávkou (4:30/5:30), aby ranné notifikácie
+ * niesli dnešný stav.
+ */
+const kontrolaDat = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/kontrola-dat", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+    }),
+  );
+
 const push = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/push-beh", {
@@ -367,6 +381,10 @@ export default {
     }
     if (event.cron === "15 4 * * *") {  // po banke (4:10), pred rannou dávkou
       ctx.waitUntil(ohlas(env, "balicky-automaticky", automatickeBalicky(env)));
+      return;
+    }
+    if (event.cron === "25 4 * * *") {  // 06:25 v lete, 05:25 v zime — po banke, pred rannou dávkou
+      ctx.waitUntil(ohlas(env, "kontrola-dat", kontrolaDat(env)));
       return;
     }
     if (event.cron === "45 6 * * *") {  // 08:45 v lete, 07:45 v zime — po banke a rannej dávke

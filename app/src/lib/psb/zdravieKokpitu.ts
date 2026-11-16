@@ -66,6 +66,7 @@ export const MENA_AUTOMATOV: Record<string, string> = {
   "mail-fronta": "Mailer — dokončenie odoslaného mailu",
   "balicky-automaticky": "Automatické balíčky",
   "strazca-vyberu": "Strážca výberov (Peniaze manažér)",
+  "kontrola-dat": "Nočná kontrola dát (mená v kalendári a v banke)",
 };
 
 /** Všetky automaty, ktoré majú bežať — aby bolo vidieť aj TIE, ktoré mlčia. */

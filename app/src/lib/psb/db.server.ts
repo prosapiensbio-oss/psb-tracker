@@ -533,6 +533,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
 
   data.fakturyNaDalsi = await klientiSCakajucouFakturou(DB).catch((e) => { volitelna("faktúry na ďalší balíček")(e); return []; });
 
+  // Nočná kontrola dát (16. 11. 2026, `nocnaKontrola.ts`) — posledný beh, z ktorého register robí položky.
+  const nocna = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'kontrola_dat'")
+    .first<{ value: string }>().catch((e) => { volitelna("nočná kontrola dát")(e); return null; });
+  if (nocna?.value) {
+    try { data.nocnaKontrola = JSON.parse(nocna.value) as PSBData["nocnaKontrola"]; }
+    catch { chybySekcii.push("nočná kontrola dát (poškodený zápis)"); }
+  }
+
   if (chybySekcii.length) data.chybySekcii = chybySekcii;
   return data;
 }

@@ -76,6 +76,7 @@ import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLeadWebRouteImport } from './routes/api/lead-web'
+import { Route as ApiKontrolaDatRouteImport } from './routes/api/kontrola-dat'
 import { Route as ApiKalendarMobilRouteImport } from './routes/api/kalendar-mobil'
 import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
@@ -445,6 +446,11 @@ const ApiLeadWebRoute = ApiLeadWebRouteImport.update({
   path: '/api/lead-web',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKontrolaDatRoute = ApiKontrolaDatRouteImport.update({
+  id: '/api/kontrola-dat',
+  path: '/api/kontrola-dat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiKalendarMobilRoute = ApiKalendarMobilRouteImport.update({
   id: '/api/kalendar-mobil',
   path: '/api/kalendar-mobil',
@@ -645,6 +651,7 @@ export interface FileRoutesByFullPath {
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
+  '/api/kontrola-dat': typeof ApiKontrolaDatRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -747,6 +754,7 @@ export interface FileRoutesByTo {
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
+  '/api/kontrola-dat': typeof ApiKontrolaDatRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -850,6 +858,7 @@ export interface FileRoutesById {
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/kalendar-mobil': typeof ApiKalendarMobilRoute
+  '/api/kontrola-dat': typeof ApiKontrolaDatRoute
   '/api/lead-web': typeof ApiLeadWebRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
@@ -954,6 +963,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/kalendar-mobil'
+    | '/api/kontrola-dat'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -1056,6 +1066,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/kalendar-mobil'
+    | '/api/kontrola-dat'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -1158,6 +1169,7 @@ export interface FileRouteTypes {
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/kalendar-mobil'
+    | '/api/kontrola-dat'
     | '/api/lead-web'
     | '/api/leads'
     | '/api/login'
@@ -1261,6 +1273,7 @@ export interface RootRouteChildren {
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiKalendarRoute: typeof ApiKalendarRoute
   ApiKalendarMobilRoute: typeof ApiKalendarMobilRoute
+  ApiKontrolaDatRoute: typeof ApiKontrolaDatRoute
   ApiLeadWebRoute: typeof ApiLeadWebRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
@@ -1800,6 +1813,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLeadWebRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/kontrola-dat': {
+      id: '/api/kontrola-dat'
+      path: '/api/kontrola-dat'
+      fullPath: '/api/kontrola-dat'
+      preLoaderRoute: typeof ApiKontrolaDatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/kalendar-mobil': {
       id: '/api/kalendar-mobil'
       path: '/api/kalendar-mobil'
@@ -2079,6 +2099,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiKalendarRoute: ApiKalendarRoute,
   ApiKalendarMobilRoute: ApiKalendarMobilRoute,
+  ApiKontrolaDatRoute: ApiKontrolaDatRoute,
   ApiLeadWebRoute: ApiLeadWebRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,

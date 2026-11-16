@@ -266,6 +266,11 @@ export type PSBData = {
    * o rozbitom formulári by sa Jerry dozvedel znova až ručným pokusom.
    */
   webKontroly: { kluc: string; nazov: string; stav: "ok" | "varovanie" | "chyba"; detail: string; beh: string }[];
+  /**
+   * Posledný beh nočnej kontroly dát (`nocnaKontrola.ts`, 16. 11. 2026): meno
+   * toho istého klienta v inom tvare v kalendári alebo v banke.
+   */
+  nocnaKontrola?: { beh: string; nalezy: { druh: "kalendar" | "platba" | "meno"; kluc: string; trener: string; klient: string; kandidati: string[]; text: string }[] };
   /** Voliteľné sekcie, ktoré sa pri tomto načítaní nenačítali (Zdravie Kokpitu). */
   chybySekcii?: string[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
