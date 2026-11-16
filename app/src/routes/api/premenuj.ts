@@ -6,6 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { menaPlatiZa, zapisPlatiZa } from "../../lib/psb/platiZa";
 import { premenujVRozpise } from "../../lib/psb/btcSledovanie";
+import { normName } from "../../lib/psb/format";
 
 /**
  * Premenovanie klienta naprieč celou databázou.
@@ -243,6 +244,25 @@ export const Route = createFileRoute("/api/premenuj")({
             .map((r) => ({ id: r.id, json: premenujVRozpise(r.rozpis_json, zo, na) }))
             .filter((r): r is { id: string; json: string } => r.json !== null);
           if (rozpisy.length) { dotknute["ln_faktury.rozpis"] = rozpisy.length; spolu += rozpisy.length; }
+          /**
+           * NÁZVY Z KALENDÁRA, KTORÉ SEDELI LEN NA STARÉ MENO (16. 11. 2026).
+           *
+           * Udalosť „Svetopluk Stoklasko“ sa párovala bez pravidla, cez celé
+           * meno klienta (`klientPodlaCelehoMena`). Po premenovaní na
+           * „Svatopluk Stoklásek“ také meno nemal nikto, ďalšie stiahnutie
+           * kalendára vzalo budúcim tréningom klienta a appka hlásila „35 dní
+           * bez tréningu“, hoci chodil. Google kalendár premenovanie nevidí,
+           * preto sa každý taký názov zapíše ako pravidlo mena na nové meno.
+           * Udalosť s klientom určeným ručne (`klient_rucne`) pravidlo nerobí:
+           * jej názov môže patriť inému človeku („Albert Matl“, 21. 10. 2026).
+           */
+          const nazvy = (((await DB.prepare(
+            `SELECT DISTINCT u.nazov, u.trener FROM kal_udalosti u
+              WHERE u.klient = ?1 AND COALESCE(u.klient_rucne, 0) = 0 AND NOT EXISTS
+                (SELECT 1 FROM kal_mapovanie m WHERE m.nazov = u.nazov AND m.trener = u.trener AND m.cas = '')`,
+          ).bind(zo).all().catch(() => ({ results: [] }))).results || []) as unknown as { nazov: string; trener: string }[])
+            .filter((r) => r.nazov && normName(r.nazov) !== normName(na));
+          if (nazvy.length) { dotknute["kal_mapovanie.nove"] = nazvy.length; spolu += nazvy.length; }
           if (!spolu) return Response.json({ ok: false, error: `Pod menom „${zo}“ nič nie je.` }, { status: 404 });
           if (!naozaj) return Response.json({ ok: true, nahlad: true, dotknute, spolu });
 
@@ -271,6 +291,11 @@ export const Route = createFileRoute("/api/premenuj")({
               DB.prepare("UPDATE client_overrides SET plati_za = ?2 WHERE name = ?1")
                 .bind(p.name, zapisPlatiZa(menaPlatiZa(p.plati_za).map((x) => (x === zo ? na : x)))),
             );
+          }
+          for (const r of nazvy) {
+            prikazy.push(DB.prepare(
+              "INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?1, ?2, '', ?3, 'trening', ?4, 0)",
+            ).bind(r.nazov, r.trener, na, new Date().toISOString()));
           }
           for (const r of rozpisy) {
             prikazy.push(DB.prepare("UPDATE ln_faktury SET rozpis_json = ?2 WHERE id = ?1").bind(r.id, r.json));
