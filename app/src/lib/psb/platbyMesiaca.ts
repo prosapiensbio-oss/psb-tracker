@@ -62,7 +62,7 @@ export const PRAVIDELNE_PLATBY: PravidelnaPlatba[] = [
   },
   {
     // „pripomenúť do 25." — zaplatiť do 25., preto pripomienka o päť dní skôr.
-    id: "splatka-jarek", nazov: "Splátka Jarek", suma: "5\u00A0000–6\u00A0000\u00A0Kč", den: 20, termin: "do 25.",
+    id: "splatka-jarek", nazov: "Splátka Jarek", suma: "5\u00A0000\u00A0Kč", den: 20, termin: "do 25.",
     je: (p) => p.kategoria === "fixne.prevadzka.splatkaJarek",
   },
 ];

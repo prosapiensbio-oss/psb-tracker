@@ -293,6 +293,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     }, terazPraha()) : []),
     [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti, data.anomalyAck, data.historiaBalickov, data.doplneniaHodiny, data.druhyTreningov],
   );
+  /**
+   * „Označiť ako úvodný" len pri prvých dvoch dňoch s tréningom (Jerry,
+   * 17. 11. 2026: „potom je to zbytočné"). Tréning, ktorý už úvodný JE,
+   * prepínač nechá — inak by sa omyl nedal vrátiť.
+   */
+  const prveDniTreningu = useMemo(
+    () => new Set([...new Set(os.filter((x) => x.druh === "trening").map((x) => x.den))].sort().slice(0, 2)),
+    [os],
+  );
 
   /**
    * Stav hodín pri každom riadku osi.
@@ -2113,7 +2122,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 pracujem={pracujem}
                 onZdarma={(zrus) => (zrus || zdarmaDen === x.den ? void oznacZdarma(x.den, zrus) : (setZdarmaDen(x.den), setZdarmaDovod("")))}
                 onZrusZapis={() => { setZdarmaDen(""); setZdarmaDovod(""); }}
-                onDruh={x.druh === "trening" ? (uvodny) => void zmenDruh(x.den, uvodny) : undefined}
+                onDruh={x.druh === "trening" && (x.uvodny || prveDniTreningu.has(x.den)) ? (uvodny) => void zmenDruh(x.den, uvodny) : undefined}
               />
               {filter === "vsetko" && zmluvaKlienta && i === vsetky.length - 1 && naOsiPred(vsetky, vsetky.length, zmluvaKlienta.at.slice(0, 10)) && <RiadokZmluvy z={zmluvaKlienta} />}
               </Fragment>
