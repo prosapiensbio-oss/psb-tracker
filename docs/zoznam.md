@@ -950,10 +950,12 @@ Jerry vybral 16. 11., bez osobného podpisu. Odpoveď chodí na `info@`.
 Overené naživo dvoma odoslaniami (Protokol a Dychanie) — oba maily dorazili
 do schránky, nie do spamu, s diakritikou a funkčným odkazom na PDF.
 
-**Otvorené:**
-- V odpovediach formulára Protokol ležia moje testovacie záznamy **922–928**
-  („Test …"). Dajú sa zmazať hromadnou akciou; nechal som ich, aby som
-  omylom nezmazal všetkých 249.
-- Vo WP Mail SMTP je „Vynutit z e-mailu" VYPNUTÉ. Keby sa niekedy pridal
-  ďalší formulár bez vyplneného odosielateľa, bude mlčať presne takto.
-  Zapnutie toho prepínača by to zabezpečilo raz navždy.
+**Dorobené 18. 11. 2026:** Jerry zmazal testovacie odpovede (Protokol 249 → 239,
+Dychanie bez testu) a zapol vo WP Mail SMTP **„Vynutit z e-mailu"**. Odteraz
+ide každý mail z WordPressu z `online@prosapiens.cz` bez ohľadu na to, čo si
+nastaví plugin — formulár bez vyplneného odosielateľa už nezmĺkne. Overené
+na Postúre: odoslanie z webu → mail dorazil do schránky 18. 11. o 10:04.
+Wordfence posiela ďalej, takže vynútenie nič iné nerozbilo.
+
+**Otvorené:** vo Postúre ostala moja kontrolná odpoveď **933** („Kontrola 18.11.").
+Mne sa zaškrtávacie políčko v zozname klikom neoznačí, Jerrymu áno.
