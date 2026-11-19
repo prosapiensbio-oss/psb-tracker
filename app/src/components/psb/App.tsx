@@ -906,6 +906,34 @@ export function PSBApp() {
   useEffect(() => pocuvaj("peniaze", () => void load(true)), [load]);
   // Dozor reklám je v `/api/data` (register) — po rozhodnutí sa načíta znova.
   useEffect(() => pocuvaj("reklama", () => void load(true)), [load]);
+  /**
+   * NÁVRAT DO APPKY = ČERSTVÉ DÁTA (Jerry, 19. 11. 2026). iPad ukazoval
+   * Romana Pavlíka „nič nedlhuje · 13 lekcií · naposledy pred 7 dňami",
+   * telefón v tú istú minútu „nezaplatené 7 790 · 1 h nad rámec · 14 lekcií"
+   * — iPad mal dáta načítané pred ranným tréningom a pri návrate sa
+   * kontrolovala len verzia appky, nie dáta. Po 10 minútach mimo appky
+   * (alebo každých 15 minút, keď je appka otvorená) sa načíta to isté ako
+   * po zápise: `/api/data` a kalendár. Ticho, rozpísané sa nestratí.
+   */
+  useEffect(() => {
+    let posledne = Date.now();
+    const obnov = () => {
+      posledne = Date.now();
+      oznam("klienti");
+      oznam("kalendar");
+    };
+    const priNavrate = () => {
+      if (document.visibilityState === "visible" && Date.now() - posledne >= 10 * 60 * 1000) obnov();
+    };
+    document.addEventListener("visibilitychange", priNavrate);
+    window.addEventListener("focus", priNavrate);
+    const t = setInterval(() => { if (document.visibilityState === "visible") obnov(); }, 15 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", priNavrate);
+      window.removeEventListener("focus", priNavrate);
+      clearInterval(t);
+    };
+  }, []);
 
   const clients = useMemo(() => deriveClients(data), [data]);
   // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
