@@ -9,7 +9,7 @@ describe("ponuka na úvodný", () => {
   it("pri výbere povie cenu a že adresa príde po výbere", () => {
     const h = ponukaStrankaHtml({ ...zaklad, stav: { druh: "vyber", volne: [cas], platiDo: "2026-11-29" }, uvod: { url: "https://x.cz/u/abc", cena: null } });
     expect(h).toContain("úvodní lekce trvá hodinu a stojí 1 100 Kč");
-    expect(h).toContain("Po výběru ti ukážeme adresu");
+    expect(h).toContain("Po výběru ti ukážeme informace o úvodní lekci");
   });
 
   it("zadarmo sa povie slovom", () => {
@@ -20,7 +20,8 @@ describe("ponuka na úvodný", () => {
   it("po výbere vedie na stránku pred úvodným", () => {
     const h = ponukaStrankaHtml({ ...zaklad, stav: { druh: "vybrane", cas }, uvod: { url: "https://x.cz/u/abc", cena: 1100 } });
     expect(h).toContain('href="https://x.cz/u/abc"');
-    expect(h).toContain("Adresa a co si vzít s sebou");
+    expect(h).toContain(">Informace o úvodní lekci</a>");
+    expect(h).toContain("Než přijdeš, otevři si prosím informace o úvodní lekci");
   });
 
   it("bežná ponuka bez úvodu ostáva, ako bola", () => {

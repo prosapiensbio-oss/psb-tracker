@@ -121,7 +121,7 @@ export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener:
     telo = `
 <h1>${esc(nadpisUvod)}</h1>
 <p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yber si, kdy můžeš začít — ${v.uvod ? `úvodní lekce trvá hodinu${cenaUvodu(v.uvod.cena)}` : "trénink trvá hodinu"}. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
-${v.uvod ? `<p class="veta" style="margin-top:8px">Po výběru ti ukážeme adresu a co si vzít s sebou.</p>` : ""}
+${v.uvod ? `<p class="veta" style="margin-top:8px">Po výběru ti ukážeme informace o úvodní lekci — adresu a co si vzít s sebou.</p>` : ""}
 ${v.stav.chyba ? `<p class="chyba">${esc(v.stav.chyba)}</p>` : ""}
 <form method="post" class="kal">
 ${dni.map((den) => `
@@ -140,9 +140,9 @@ ${kalendarPonukyHtml(moznosti, volby)}
 <div class="hotovo">
 <div class="fajka">✓</div>
 <h1>Máš zarezervováno</h1>
-<p class="veta">Těšíme se na tebe. Kdyby se něco změnilo, stačí napsat.</p>
+<p class="veta">${v.uvod ? "Těšíme se na tebe. Než přijdeš, otevři si prosím informace o úvodní lekci — je tam adresa a co si vzít s sebou." : "Těšíme se na tebe. Kdyby se něco změnilo, stačí napsat."}</p>
 <div class="kedy">${esc(denCz(c.zaciatok))}<br>${esc(casHHMM(c.zaciatok))}–${esc(casHHMM(c.koniec))}<small>${esc(t === "Terezka" ? "Terezka" : "Filip")} · ProSapiens Biomechanic</small></div>
-${v.uvod ? `<a class="tlacidlo" href="${esc(v.uvod.url)}" style="margin-bottom:10px">Adresa a co si vzít s sebou</a>` : ""}
+${v.uvod ? `<a class="tlacidlo" href="${esc(v.uvod.url)}" style="margin-bottom:10px">Informace o úvodní lekci</a>` : ""}
 <a class="tlacidlo tmave" href="/t/${esc(v.token)}?ics=1">Přidat do kalendáře</a>
 <a class="nehodi" href="sms:${esc(cislo(tr.telefon))}">Napsat ${esc(komu)}</a>
 </div>`;
