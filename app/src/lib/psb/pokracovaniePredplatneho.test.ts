@@ -56,6 +56,17 @@ describe("předplatné pokračuje prvým tréningom po konci (Jerry, 22. a 25. 1
     expect(pokracovaniePredplatneho(R, k, historia, poKonci, "2026-10-22")?.odDna).toBe("2026-10-22");
   });
 
+  it("doplnenie od konca sa odtrénuje skôr, než začne ďalší mesiac (Robin, 22. 11. 2026)", () => {
+    const d = [...robin, { klient: R, nazov: "Doplnenie členstva", hodiny: 3, platnostOd: "2026-10-20", platnostDo: null, cena: 0 }];
+    // Tri tréningy po konci idú z doplnenia — mesiac nevzniká.
+    const tri = [...treningy, t("2026-10-22"), t("2026-10-25"), t("2026-10-27")];
+    expect(pokracovaniePredplatneho(R, d, historia, tri, "2026-10-28")).toBeNull();
+    // Štvrtý ho založí.
+    expect(pokracovaniePredplatneho(R, d, historia, [...tri, t("2026-10-30")], "2026-10-30")?.odDna).toBe("2026-10-30");
+    // Zrušený mesiac z 22. 10. nebráni tomu, aby ten tréning minul hodinu doplnenia.
+    expect(pokracovaniePredplatneho(R, d, historia, [...tri, t("2026-10-30")], "2026-10-30", new Set(), new Set(), new Set(["2026-10-22"]))?.odDna).toBe("2026-10-30");
+  });
+
   it("po 6 mesiacoch pokračuje ďalší polrok (Jerry, 22. 10. 2026)", () => {
     const dlho = [{ nazov: "OFF - 6h S viazanostou", od: "2026-03-01", do: "2026-03-31" },
       { nazov: "OFF - 6h S viazanostou", od: "2026-04-01", do: "2026-04-30" },

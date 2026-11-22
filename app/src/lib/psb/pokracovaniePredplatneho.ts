@@ -91,14 +91,31 @@ export function pokracovaniePredplatneho(
    * dnešný tréning o 18:00 ráno nič nezaloží.
    */
   const koniec = den(posledne.platnostDo);
-  const prvy = sedenia
-    .filter((s) => normName(s.client) === k && den(s.date) > koniec && den(s.date) <= dnes && !zadarmo.has(`${k}|${den(s.date)}`) && !zruseneDni.has(den(s.date)))
+  const poKonci = sedenia
+    .filter((s) => normName(s.client) === k && den(s.date) > koniec && den(s.date) <= dnes && !zadarmo.has(`${k}|${den(s.date)}`))
     .map((s) => den(s.date))
-    .sort()[0];
+    .sort();
+  /**
+   * DOPLNENIE IDE PRVÉ (Jerry, 22. 11. 2026, Robin Martinek). Doplnenie od
+   * konca mesiaca je Jerryho rozhodnutie o zvyšku nad 2 h pri chorobe alebo
+   * ohlásenej dovolenke — tie hodiny sa odtrénujú skôr, než začne ďalší
+   * platený mesiac. Robin mal 3 h doplnenia od 20. 11. a jeho tréning 22. 11.
+   * založil nezaplatený mesiac: karta naraz hlásila 2 h a dlh 6 990 Kč.
+   * Nový mesiac preto začína až tréningom PO vyčerpaní doplnenia.
+   * „Prenesené hodiny" (najviac 2 h) sem nepatria — tie sú súčasťou nového
+   * mesiaca a nič neodkladajú (Kalva).
+   */
+  const doplnenieHodin = moje
+    .filter((b) => /doplnenie/i.test(b.nazov) && (b.hodiny || 0) > 0 && den(b.platnostOd) >= koniec)
+    .reduce((s, b) => s + (b.hodiny || 0), 0);
+  // Zrušený automatický mesiac blokuje len ZAČIATOK v ten deň — hodinu
+  // z doplnenia ten tréning minul aj tak.
+  const prvy = poKonci.slice(doplnenieHodin).find((d) => !zruseneDni.has(d));
   if (!prvy) return null;
   const odDna = prvy;
   // Kto po konci mesiac neprišiel, nepokračuje automaticky — to je návrat.
-  if (odDna > posunDni(koniec, MEDZERA_DNI)) return null;
+  const odkedyMedzera = doplnenieHodin > 0 ? poKonci[doplnenieHodin - 1] : koniec;
+  if (odDna > posunDni(odkedyMedzera, MEDZERA_DNI)) return null;
 
   // Začiatok záväzku: prvé předplatné v rade za sebou (Kokpit aj PTminder).
   const obdobia = [
