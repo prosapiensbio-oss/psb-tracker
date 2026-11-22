@@ -5,7 +5,7 @@ import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
 import { rozmerKalendara } from "../../lib/psb/kalendarRozmer";
 import { TRENERI } from "../../lib/psb/mailFaktury";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
-import { menoJeCislo, textSmsPonuky, zaciatokPoKliku } from "../../lib/psb/ponukaTerminov";
+import { menoJeCislo, textSmsPonuky, textSmsPonukyUvodnej, zaciatokPoKliku } from "../../lib/psb/ponukaTerminov";
 import type { Lead } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { SmsKlientovi } from "./SmsKlientovi";
@@ -68,7 +68,16 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const [telefon, setTelefon] = useState("");
   const [bezi, setBezi] = useState(false);
   const [chyba, setChyba] = useState("");
-  const [hotovo, setHotovo] = useState<{ url: string; klient: string; telefon: string; trener: string } | null>(null);
+  const [hotovo, setHotovo] = useState<{ url: string; klient: string; telefon: string; trener: string; typ: string } | null>(null);
+  /**
+   * Súkromný kontakt ako klient na úvodnom (Jerry, 22. 11. 2026: Leon Box —
+   * „má problémy s chrbtom a chcel by prísť na úvodný"). Pod menom kontaktu
+   * by sa termín rátal ako box, preto úvodný ide pod jeho celým menom.
+   */
+  const [uvodnySukromnemu, setUvodnySukromnemu] = useState(false);
+  const [menoKlienta, setMenoKlienta] = useState("");
+  /** Cena úvodného pri odkaze; prázdna = bežná, 0 = zadarmo. */
+  const [cenaUvodu, setCenaUvodu] = useState("1100");
   const [ponuky, setPonuky] = useState<Ponuka[]>([]);
   /** Mená s číslom, aj ľudia bez profilu (`klient_fakturacia`). */
   const [kontakty, setKontakty] = useState<{ klient: string; telefon: string }[]>([]);
@@ -124,6 +133,12 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const ponukaMena = useMemo(() => [...new Set([...mena, ...dopyty.map((l) => l.name), ...kontakty.map((k) => k.klient)])], [mena, dopyty, kontakty]);
   const cisloVMene = menoJeCislo(klient.trim());
   const kohoCislo = cisloVMene ? kontakty.find((k) => cisloPreBranu(k.telefon) === cisloPreBranu(klient))?.klient : undefined;
+
+  const uvodnyPreSukromny = !!sukromny && uvodnySukromnemu;
+  const komuNaozaj = uvodnyPreSukromny ? menoKlienta.replace(/\s+/g, " ").trim() : klient.trim();
+  const typPonuky = uvodnyPreSukromny ? "uvodny" : sukromny ? "sukromne" : jeKlient ? "trening" : "uvodny";
+  const zleMenoKlienta = uvodnyPreSukromny && (komuNaozaj.length < 3 || !!najdiSukromny(komuNaozaj, sukromne) || menoJeCislo(komuNaozaj));
+  const cenaZla = typPonuky === "uvodny" && cenaUvodu.trim() !== "" && !(Number(cenaUvodu) >= 0 && Number(cenaUvodu) <= 100000);
 
   const ulozSukromny = async () => {
     setUkladamSukromny(true); setChyba("");
@@ -246,19 +261,20 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   };
 
   const vytvor = async () => {
-    if (!klient.trim() || !navrhy.length) return;
+    if (!komuNaozaj || !navrhy.length || zleMenoKlienta || cenaZla) return;
     setBezi(true); setChyba("");
     const r = await fetch("/api/ponuky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        akcia: "vytvor", klient: klient.trim(), telefon: telefon.trim() || undefined, typ: jeKlient ? "trening" : "uvodny",
+        akcia: "vytvor", klient: komuNaozaj, telefon: telefon.trim() || undefined, typ: typPonuky === "trening" ? "trening" : "uvodny",
+        ...(typPonuky === "uvodny" && cenaUvodu.trim() !== "" ? { cena: Number(cenaUvodu) } : {}),
         casy: navrhy.map((n) => ({ trener: n.trener, den: n.den, cas: hhmm(n.od), minut: n.minut })),
       }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
     setBezi(false);
     if (!r?.ok) { setChyba(r?.error || "Ponuka sa nevytvorila."); return; }
     const tr = navrhy[0]?.trener || trener || "Jerry";
-    setHotovo({ url: r.url, klient: klient.trim(), telefon: telefon.trim(), trener: tr });
+    setHotovo({ url: r.url, klient: komuNaozaj, telefon: telefon.trim(), trener: tr, typ: String(r.typ || typPonuky) });
     if (r.upozornenie) setChyba(r.upozornenie);
     setNavrhy([]);
     void nacitajPonuky();
@@ -364,7 +380,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
       {/* ── PANEL ── */}
       <div style={{ width: uzke ? "100%" : 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={stitok}>Komu</div>
-        <VyberMena hodnota={klient} mena={ponukaMena} onZmen={(v) => { setKlient(v); setHotovo(null); }} placeholder="klient, dopyt alebo hocikto — napíš meno…" />
+        <VyberMena hodnota={klient} mena={ponukaMena} onZmen={(v) => { setKlient(v); setHotovo(null); setUvodnySukromnemu(false); setMenoKlienta(""); }} placeholder="klient, dopyt alebo hocikto — napíš meno…" />
         {!klient.trim() && (
           <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
             Nie je v zozname? Napíš jeho meno a pod ním sa objaví políčko na telefón — odkaz mu príde SMS.
@@ -380,8 +396,32 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
         {klient.trim() && !jeKlient && !cisloVMene && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {sukromny ? (
-              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.45 }}>
-                <b style={{ color: C.text }}>súkromný kontakt · {sukromny.aktivita}</b> — nie je klient. Vybraný termín sa ti zapíše do kalendára ako súkromné „{sukromny.aktivita}“; žiadny balíček, platba ani notifikácia.
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[{ uv: false, t: sukromny.aktivita }, { uv: true, t: "Úvodný tréning" }].map((x) => (
+                    <button key={String(x.uv)} type="button" onClick={() => setUvodnySukromnemu(x.uv)} style={{
+                      ...tl, flex: 1, fontWeight: uvodnySukromnemu === x.uv ? 700 : 400,
+                      border: `1px solid ${uvodnySukromnemu === x.uv ? C.accent : C.border}`,
+                      background: uvodnySukromnemu === x.uv ? mix(C.accent, 16) : C.bg,
+                      color: uvodnySukromnemu === x.uv ? C.accentLight : C.textMuted,
+                    }}>{x.t}</button>
+                  ))}
+                </div>
+                {!uvodnySukromnemu ? (
+                  <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.45 }}>
+                    <b style={{ color: C.text }}>súkromný kontakt · {sukromny.aktivita}</b> — nie je klient. Vybraný termín sa ti zapíše do kalendára ako súkromné „{sukromny.aktivita}“; žiadny balíček, platba ani notifikácia.
+                  </div>
+                ) : (
+                  <>
+                    <input value={menoKlienta} onChange={(e) => setMenoKlienta(e.target.value)} placeholder={`celé meno, napr. ${klient.trim().split(" ")[0]} Novák`}
+                      style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${menoKlienta.trim() && zleMenoKlienta ? C.orange : C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
+                    <div style={{ fontSize: 11.5, color: menoKlienta.trim() && zleMenoKlienta ? C.orange : C.textMuted, lineHeight: 1.45 }}>
+                      {menoKlienta.trim() && zleMenoKlienta
+                        ? `Pod „${komuNaozaj}“ sa to nedá — napíš jeho skutočné celé meno.`
+                        : <>Úvodný ide pod jeho celým menom — pod „{klient.trim()}“ by sa termín rátal ako {sukromny.aktivita}. Číslo sa prevezme, {sukromny.aktivita} ostáva, ako je.</>}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 11.5, color: C.textMuted }}>
@@ -408,6 +448,14 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                 a poslať mu to"). */}
             {telefon.trim() && !cisloPreBranu(telefon) && <div style={{ fontSize: 11.5, color: C.orange }}>Toto číslo nevyzerá ako telefón — skontroluj ho.</div>}
             {!telefon.trim() && <div style={{ fontSize: 11.5, color: C.textDim }}>Bez čísla odkaz vznikne, ale poslať ho budeš musieť sám.</div>}
+            {typPonuky === "uvodny" && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.textMuted }}>
+                Cena úvodného
+                <input value={cenaUvodu} onChange={(e) => setCenaUvodu(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric"
+                  style={{ width: 80, padding: "6px 8px", borderRadius: 8, border: `1px solid ${cenaZla ? C.orange : C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13 }} />
+                Kč <span style={{ color: C.textDim }}>{cenaUvodu.trim() === "0" ? "· zadarmo" : ""}</span>
+              </label>
+            )}
           </div>
         )}
         <div style={{ ...stitok, marginTop: 4 }}>Ponúkané termíny {zoradene.length ? `(${zoradene.length})` : ""}</div>
@@ -420,9 +468,9 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
           </div>
         ))}
         {zoradene.length > 0 && <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>Platí do nedele {dm(posunDen(pondelokTyzdna(zoradene[zoradene.length - 1].den), 6))} alebo kým si nevyberie. Vybraný termín zmizne aj z ponúk iným.</div>}
-        <button type="button" disabled={!klient.trim() || cisloVMene || !zoradene.length || bezi} onClick={() => void vytvor()} style={{
+        <button type="button" disabled={!komuNaozaj || cisloVMene || zleMenoKlienta || cenaZla || !zoradene.length || bezi} onClick={() => void vytvor()} style={{
           padding: "9px 14px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 16), color: C.accentLight,
-          fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !klient.trim() || cisloVMene || !zoradene.length || bezi ? 0.5 : 1,
+          fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !komuNaozaj || cisloVMene || zleMenoKlienta || cenaZla || !zoradene.length || bezi ? 0.5 : 1,
         }}>{bezi ? "Vytváram…" : "Vytvoriť odkaz a SMS"}</button>
         {chyba && <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>}
         {hotovo && (
@@ -431,7 +479,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
             <SmsKlientovi
               meno={hotovo.klient} trener={hotovo.trener} vlozene druhAuditu="ponuka"
               cisloNovehoCloveka={hotovo.telefon || undefined}
-              predvolenyText={textSmsPonuky(krstne(hotovo.klient), hotovo.url, PODPIS[hotovo.trener] || "")}
+              predvolenyText={(hotovo.typ === "uvodny" ? textSmsPonukyUvodnej : textSmsPonuky)(krstne(hotovo.klient), hotovo.url, PODPIS[hotovo.trener] || "")}
               onOdoslane={() => { oznam("kalendar"); void nacitajPonuky(); }}
             />
           </div>
@@ -464,7 +512,7 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
                     <SmsKlientovi
                       meno={p.klient} trener={p.casy[0]?.trener || trener || "Jerry"} vlozene druhAuditu="ponuka"
                       cisloNovehoCloveka={p.telefon || undefined}
-                      predvolenyText={textSmsPonuky(krstne(p.klient), p.url, PODPIS[p.casy[0]?.trener || trener || "Jerry"] || "")}
+                      predvolenyText={(p.typ === "uvodny" ? textSmsPonukyUvodnej : textSmsPonuky)(krstne(p.klient), p.url, PODPIS[p.casy[0]?.trener || trener || "Jerry"] || "")}
                       onOdoslane={() => { setSmsPonuka(""); oznam("kalendar"); void nacitajPonuky(); }}
                     />
                   )}

@@ -180,6 +180,16 @@ export function textSmsPonuky(oslovenie: string, url: string, podpis: string): s
 }
 
 /**
+ * Ponuka na ÚVODNÝ tréning (Jerry, 22. 11. 2026: „SMS pred úvodným a pridať
+ * tam termíny, kedy by som mohol"). Jedna SMS namiesto dvoch: privítanie z SMS
+ * pred úvodným + výber termínu. Adresu a čo si vziať ukáže stránka po výbere.
+ */
+export function textSmsPonukyUvodnej(oslovenie: string, url: string, podpis: string): string {
+  const o = vokativ(oslovenie.trim());
+  return bezDiakritiky(`Ahoj${o ? ` ${o}` : ""}, vitej v ProSapiens Biomechanic. Vyber si termin uvodni lekce: ${url} ${podpis}`).trim();
+}
+
+/**
  * Pražský čas bez pásma → UTC v tvare pre .ics (`20261013T080000Z`).
  * Posun sa berie v DANÝ okamih (letný/zimný čas), nie dnes.
  */

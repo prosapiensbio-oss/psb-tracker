@@ -10,6 +10,7 @@ import { ponukaStrankaHtml, type StavStranky } from "../lib/psb/ponukaStranka";
 import { DLZKA_TRENINGU, casHHMM, denCz, icsTerminu, prekryva, stavPonuky, volneCasy, vybranyUsek, zaciatkyVRozmedzi } from "../lib/psb/ponukaTerminov";
 import { nacitajPonuku, obsadeneVOkne, oknoCasov, pushTrenerovi } from "../lib/psb/ponukaTerminov.server";
 import { audit } from "../lib/psb/audit.server";
+import { verejnyOdkaz } from "../lib/psb/verejnyOdkaz";
 
 /**
  * PONUKA TERMÍNOV — stránka pre klienta `/t/<token>` (7. 10. 2026).
@@ -85,7 +86,13 @@ export const Route = createFileRoute("/t/$token")({
             ? "Termín se nepodařilo zapsat do kalendáře. Zkus to prosím znovu, nebo napiš."
             : undefined;
         const s = chyba && x.s.druh === "vyber" ? { ...x.s, chyba } : x.s;
-        return html(ponukaStrankaHtml({ token, oslovenie: krstne(x.p.klient), trener: x.trener, logoUrl: `${url.origin}/znacka-napis-tmava.svg`, stav: s, typ: x.p.typ }));
+        // Úvodný: stránka pred úvodným (adresa, čo si vziať, cena) — vzniká spolu s ponukou.
+        const uvodRiadok = x.p.typ === "uvodny"
+          ? await DB.prepare("SELECT token, cena_czk FROM uvodne_odkazy WHERE klient = ?1 AND druh = 'pred'")
+              .bind(x.p.klient).first<{ token: string; cena_czk: number | null }>().catch(() => null)
+          : null;
+        const uvod = uvodRiadok ? { url: verejnyOdkaz(`/u/${uvodRiadok.token}`, url.origin), cena: uvodRiadok.cena_czk } : undefined;
+        return html(ponukaStrankaHtml({ token, oslovenie: krstne(x.p.klient), trener: x.trener, logoUrl: `${url.origin}/znacka-napis-tmava.svg`, stav: s, typ: x.p.typ, uvod }));
       },
 
       POST: async ({ request, params }) => {

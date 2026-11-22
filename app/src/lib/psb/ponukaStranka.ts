@@ -1,6 +1,7 @@
 import { TRENERI } from "./mailFaktury";
 import { trenerovi } from "./oslovenie";
 import { casHHMM, denCz, type CasPonuky } from "./ponukaTerminov";
+import { UVODNY } from "./uvodnaStranka";
 
 /**
  * STRÁNKA PONUKY TERMÍNOV pre klienta — `/t/<token>` (variant B1, Jerry
@@ -84,8 +85,17 @@ ${tyzdne.map(tyzden).join("")}
 
 const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const cislo = (t: string) => t.replace(/[^\d+]/g, "");
+/** „ a stojí 1 100 Kč" / „ a je zdarma"; bez ceny pri odkaze bežná cena úvodného. */
+const cenaUvodu = (cena: number | null): string => {
+  const c = cena == null ? UVODNY.cenaCzk : cena;
+  return c === 0 ? " a je zdarma" : ` a stojí ${c.toLocaleString("cs-CZ").replace(/\s/g, "\u00A0")}\u00A0Kč`;
+};
 
-export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener: string; logoUrl: string; stav: StavStranky; typ: string }): string {
+/**
+ * `uvod` — ponuka na úvodný tréning so stránkou pred úvodným (22. 11. 2026):
+ * pri výbere povie dĺžku a cenu, po výbere vedie na adresu a čo si vziať.
+ */
+export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener: string; logoUrl: string; stav: StavStranky; typ: string; uvod?: { url: string; cena: number | null } }): string {
   const t = TRENERI[v.trener] ? v.trener : "Jerry";
   const tr = TRENERI[t];
   const komu = trenerovi(t);
@@ -110,7 +120,8 @@ export function ponukaStrankaHtml(v: { token: string; oslovenie: string; trener:
     const [, m, d] = v.stav.platiDo.split("-").map(Number);
     telo = `
 <h1>${esc(nadpisUvod)}</h1>
-<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yber si, kdy můžeš začít — trénink trvá hodinu. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
+<p class="veta">${v.oslovenie ? `${esc(v.oslovenie)}, v` : "V"}yber si, kdy můžeš začít — ${v.uvod ? `úvodní lekce trvá hodinu${cenaUvodu(v.uvod.cena)}` : "trénink trvá hodinu"}. Nabídka platí do neděle ${d}. ${m}. nebo do obsazení.</p>
+${v.uvod ? `<p class="veta" style="margin-top:8px">Po výběru ti ukážeme adresu a co si vzít s sebou.</p>` : ""}
 ${v.stav.chyba ? `<p class="chyba">${esc(v.stav.chyba)}</p>` : ""}
 <form method="post" class="kal">
 ${dni.map((den) => `
@@ -131,6 +142,7 @@ ${kalendarPonukyHtml(moznosti, volby)}
 <h1>Máš zarezervováno</h1>
 <p class="veta">Těšíme se na tebe. Kdyby se něco změnilo, stačí napsat.</p>
 <div class="kedy">${esc(denCz(c.zaciatok))}<br>${esc(casHHMM(c.zaciatok))}–${esc(casHHMM(c.koniec))}<small>${esc(t === "Terezka" ? "Terezka" : "Filip")} · ProSapiens Biomechanic</small></div>
+${v.uvod ? `<a class="tlacidlo" href="${esc(v.uvod.url)}" style="margin-bottom:10px">Adresa a co si vzít s sebou</a>` : ""}
 <a class="tlacidlo tmave" href="/t/${esc(v.token)}?ics=1">Přidat do kalendáře</a>
 <a class="nehodi" href="sms:${esc(cislo(tr.telefon))}">Napsat ${esc(komu)}</a>
 </div>`;

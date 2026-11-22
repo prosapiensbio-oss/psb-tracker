@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { textSmsPonuky } from "./ponukaTerminov";
+import { textSmsPonuky, textSmsPonukyUvodnej } from "./ponukaTerminov";
 import { akciaSmsAuditu, DRUHY_SMS_MIMO_HODIN, dlzkaSpravy } from "./sms";
 import { oslovenieDoSms, textSmsAnamnezy, textSmsFotiek, textSmsKalendara, textSmsPoUvodnom, textSmsPredUvodnym, zlozHromadnuSms } from "./smsSablony";
 import { jeNahladTrenera, verejnyOdkaz } from "./verejnyOdkaz";
@@ -37,6 +37,7 @@ describe("šablóny SMS sú jedna správa", () => {
       jednaSprava(textSmsKalendara(m, verejnyOdkaz(`/k/${TOKEN}`, WORKER), "Terezka"));
       jednaSprava(textSmsFotiek(m, verejnyOdkaz(`/f/${TOKEN}`, WORKER), "Terezka"));
       jednaSprava(textSmsPonuky(m.split(" ")[0], verejnyOdkaz(`/t/${TOKEN}`, WORKER), "Terezka"));
+      jednaSprava(textSmsPonukyUvodnej(m.split(" ")[0], verejnyOdkaz(`/t/${TOKEN}`, WORKER), "Terezka"));
     }
   });
 

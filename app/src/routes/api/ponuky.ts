@@ -11,6 +11,7 @@ import { cisloPreBranu } from "../../lib/psb/sms";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 import { najdiSukromny, upravSukromne } from "../../lib/psb/sukromneKontakty";
 import { nacitajSukromne, odklientuj, ulozSukromne } from "../../lib/psb/sukromneKontakty.server";
+import { zalozAleboNajdi } from "../../lib/psb/anamneza.server";
 
 /**
  * PONUKA TERMÍNOV — Kokpit (Workspace → Ponuka termínov), 7. 10. 2026.
@@ -159,6 +160,32 @@ export const Route = createFileRoute("/api/ponuky")({
          * kontaktom, ale existujúce číslo neprepíše. Ponuku to nezhodí — už stojí.
          */
         let upozornenie = "";
+        /**
+         * ÚVODNÝ: SPOLU S PONUKOU VZNIKNE AJ STRÁNKA PRED ÚVODNÝM (Jerry, 22. 11.
+         * 2026, Leon). Klient dostane jednu SMS — vyberie termín a stránka /t/
+         * ho potom pošle na /u/ (adresa, čo si vziať, cena, 3 otázky). Cena je
+         * pri odkaze ako v okne udalosti: prázdna = bežná, 0 = zadarmo.
+         */
+        if (typ === "uvodny") {
+          let cena: number | null = null;
+          if (b.cena !== undefined && b.cena !== null && b.cena !== "") {
+            const n = Number(b.cena);
+            if (Number.isFinite(n) && n >= 0 && n <= 100000) cena = Math.round(n);
+          }
+          const trenerUvodu = casy[0].trener === "Terezka" ? "Terezka" : "Jerry";
+          try {
+            await DB.prepare(
+              `INSERT INTO uvodne_odkazy (token, klient, druh, trener, kedy, cena_czk, vytvorene)
+               VALUES (?1, ?2, 'pred', ?3, NULL, ?4, ?5)
+               ON CONFLICT (klient, druh) DO UPDATE SET trener = excluded.trener, cena_czk = excluded.cena_czk, vytvorene = excluded.vytvorene`,
+            ).bind(novyToken(), klient, trenerUvodu, cena, new Date().toISOString()).run();
+            const { ANAMNEZA_KLUC } = bindings() as { ANAMNEZA_KLUC?: string };
+            if (ANAMNEZA_KLUC) await zalozAleboNajdi(DB, klient, ANAMNEZA_KLUC, kto || "app").catch(() => null);
+            await audit(DB, { action: "uvodny-odkaz", predmet: klient, neu: `pred úvodným · s ponukou${cena == null ? "" : ` · ${cena} Kč`}`, actor: kto || undefined });
+          } catch (e) {
+            upozornenie = `Ponuka je hotová, ale stránka pred úvodným nevznikla: ${String(e).slice(0, 160)}`;
+          }
+        }
         if (telefon && cisloPreBranu(telefon) && !sukromny) {
           await DB.prepare(
             `INSERT INTO klient_fakturacia (klient, telefon, updated_at) VALUES (?1,?2,?3)
@@ -166,7 +193,7 @@ export const Route = createFileRoute("/api/ponuky")({
           ).bind(klient, telefon, new Date().toISOString()).run()
             .catch((e) => { upozornenie = `Ponuka je hotová, ale číslo sa k menu neuložilo: ${String(e).slice(0, 160)}`; });
         }
-        return Response.json({ ok: true, token, url: verejnyOdkaz(`/t/${token}`, new URL(request.url).origin), platiDo: platiDo(casy), ...(upozornenie ? { upozornenie } : {}) });
+        return Response.json({ ok: true, token, typ, url: verejnyOdkaz(`/t/${token}`, new URL(request.url).origin), platiDo: platiDo(casy), ...(upozornenie ? { upozornenie } : {}) });
       },
     },
   },
