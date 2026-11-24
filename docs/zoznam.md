@@ -962,15 +962,12 @@ Mne sa zaškrtávacie políčko v zozname klikom neoznačí, Jerrymu áno.
 
 ## Z revízie októbra 2026 (24. 11. 2026, `docs/revizia-mesiac-2026-10.md`)
 
-- **Premenovanie klienta zahodí odpovede na notifikácie** — `/api/premenuj` nemení
-  `anomaly_ack` (meno je v kľúči). Návrh: `UPDATE OR IGNORE` kľúčov v tej istej
-  transakcii + test. Nenasadené (špinavý pracovný strom pri revízii).
-- **Čaká na Jerryho „áno“ (dáta):** prekľúčovať 12 odpovedí „Matej Prochadzka“ →
-  „Matěj Procházka“. Inak sa vracia „Platnosť končí“ k 10. 11. a neplatí
-  „nehlásiť Nechodí“.
-- **Zostatok účtu v rezerve** stojí na 1. 11. (61 563 Kč). Nočný import Fio
-  (`akcia: "auto"`) zostatok z odpovede banky nezapíše. Návrh: zapisovať ho pri
-  každom behu. Jerry rozhodne, či má zostatok ostať ručný.
+- [x] *(24. 11. 2026 hotové — Jerry „1 áno oprav“)* **Premenovanie klienta zahodí odpovede na notifikácie** —
+  `/api/premenuj` odteraz prekľúčuje aj `anomaly_ack` (`premenujKlucOdpovede`, celý diel kľúča,
+  aj tvar normName; `UPDATE OR IGNORE`). 12 odpovedí „Matej Prochadzka“ prekľúčovaných na
+  „Matěj Procházka“.
+- [x] *(24. 11. 2026 hotové — Jerry „nech to import prepisuje“)* **Zostatok účtu v rezerve**
+  zapisuje nočný import Fio pri každom behu (`zostatokNaZapis`, dátum behu).
 - **naostro.ts nečíta balíčky Kokpitu** (`balicky`, doplnenia, prenosy) —
   notifikácie „Platnosť končí“ v ňom nemusia sedieť s appkou. Doplniť ako pri
   dochádzke.

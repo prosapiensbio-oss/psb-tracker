@@ -7,7 +7,7 @@ import { jeOdPlanovaca } from "../../lib/psb/cronToken.server";
 import { fioKluc, MIN_VZOR, parseFio, type FioRiadok } from "../../lib/psb/fio";
 import { jeKategoriaPrijmu } from "../../lib/psb/kategoriePrijmov";
 import { dnesPraha } from "../../lib/psb/cas";
-import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
+import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokNaZapis, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
 import { poKusoch } from "../../lib/psb/vydavkySPravidlom";
 
 // Import bankového výpisu — dvojkrokovo.
@@ -244,11 +244,17 @@ export const Route = createFileRoute("/api/fio")({
             if (r.suma < 0) vydavky++;
             else { prijmy++; novePrijmy.push({ datum: r.datum, suma: r.suma, kto: (r.protistrana || r.poznamka || "").slice(0, 60) }); }
           }
+          // Zostatok z tej istej odpovede (24. 11. 2026) — dlaždica Rezerva bez ručného kliku.
+          const zostatok = zostatokNaZapis(json, doDna);
+          if (zostatok) {
+            stmts.push(DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('fio_zostatok',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+              .bind(JSON.stringify(zostatok)));
+          }
           if (stmts.length) await DB.batch(stmts);
           await audit(DB, {
             action: "import-banka-auto",
-            predmet: `${stmts.length} pohybov`,
-            neu: `${od} – ${doDna}: +${vydavky} výdavkov, +${prijmy} príjmov${zamknute ? `, ${zamknute} v uzavretom mesiaci preskočených` : ""}`,
+            predmet: `${stmts.length - (zostatok ? 1 : 0)} pohybov`,
+            neu: `${od} – ${doDna}: +${vydavky} výdavkov, +${prijmy} príjmov${zamknute ? `, ${zamknute} v uzavretom mesiaci preskočených` : ""}${zostatok ? `, zostatok ${zostatok.suma} Kč` : ""}`,
             actor: odPlanovaca ? "plánovač" : (await currentUser(request)) || undefined,
           });
           return Response.json({ ok: true, od, do: doDna, vydavky, prijmy, zamknute, novePrijmy });

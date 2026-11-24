@@ -5,6 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { menaPlatiZa, zapisPlatiZa } from "../../lib/psb/platiZa";
+import { premenujKlucOdpovede } from "../../lib/psb/premenujKluc";
 import { premenujVRozpise } from "../../lib/psb/btcSledovanie";
 import { normName } from "../../lib/psb/format";
 
@@ -263,6 +264,14 @@ export const Route = createFileRoute("/api/premenuj")({
           ).bind(zo).all().catch(() => ({ results: [] }))).results || []) as unknown as { nazov: string; trener: string }[])
             .filter((r) => r.nazov && normName(r.nazov) !== normName(na));
           if (nazvy.length) { dotknute["kal_mapovanie.nove"] = nazvy.length; spolu += nazvy.length; }
+          // Odpovede na notifikácie (24. 11. 2026, revízia októbra): meno je v kľúči
+          // `anomaly_ack`, bez prepisu sa odklepnuté vráti a „nehlásiť“ prestane platiť.
+          const odpovede = (((await DB.prepare(
+            "SELECT anomaly_key AS k FROM anomaly_ack WHERE instr('|' || anomaly_key || '|', '|' || ?1 || '|') > 0 OR instr('|' || anomaly_key || '|', '|' || ?2 || '|') > 0",
+          ).bind(zo, normName(zo)).all().catch(() => ({ results: [] }))).results || []) as unknown as { k: string }[])
+            .map((r) => ({ stary: r.k, novy: premenujKlucOdpovede(r.k, zo, na) }))
+            .filter((r): r is { stary: string; novy: string } => !!r.novy && r.novy !== r.stary);
+          if (odpovede.length) { dotknute["anomaly_ack"] = odpovede.length; }
           if (!spolu) return Response.json({ ok: false, error: `Pod menom „${zo}“ nič nie je.` }, { status: 404 });
           if (!naozaj) return Response.json({ ok: true, nahlad: true, dotknute, spolu });
 
@@ -296,6 +305,10 @@ export const Route = createFileRoute("/api/premenuj")({
             prikazy.push(DB.prepare(
               "INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?1, ?2, '', ?3, 'trening', ?4, 0)",
             ).bind(r.nazov, r.trener, na, new Date().toISOString()));
+          }
+          for (const r of odpovede) {
+            // OR IGNORE: keď už odpoveď pod novým menom existuje, platí tá novšia.
+            prikazy.push(DB.prepare("UPDATE OR IGNORE anomaly_ack SET anomaly_key = ?2 WHERE anomaly_key = ?1").bind(r.stary, r.novy));
           }
           for (const r of rozpisy) {
             prikazy.push(DB.prepare("UPDATE ln_faktury SET rozpis_json = ?2 WHERE id = ?1").bind(r.id, r.json));

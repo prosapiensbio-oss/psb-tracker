@@ -154,6 +154,19 @@ export const zostatokZOdpovede = (o: FioOdpoved): number | null => {
 };
 
 /**
+ * Zostatok na zápis do `vzas_settings.fio_zostatok` (dlaždica Rezerva).
+ *
+ * Jerry, 24. 11. 2026 (revízia októbra, nález 2): „nech to import prepisuje".
+ * Nočný import dostával zostatok v tej istej odpovedi ako pohyby, ale zapisoval
+ * len pohyby — Rezerva stála 23 dní na čísle z 1. 11. Odteraz ho zapíše každý
+ * beh, ktorý zostatok dostal; bez neho sa uložené číslo nemení.
+ */
+export const zostatokNaZapis = (o: FioOdpoved, den: string): { suma: number; datum: string; rucne: false } | null => {
+  const z = zostatokZOdpovede(o);
+  return z == null ? null : { suma: Math.round(z), datum: den, rucne: false };
+};
+
+/**
  * Čo s odpoveďou, ktorá nie je 200. Kódy sú z dokumentácie; rozlišujú sa,
  * lebo každý znamená inú vec pre človeka pri obrazovke.
  */

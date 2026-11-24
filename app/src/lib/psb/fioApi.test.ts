@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaOdpovede, datumPohybu, pohybyZOdpovede, poznamkaPohybu, protistranaPohybu, urlNove, urlObdobie, zostatokZOdpovede } from "./fioApi";
+import { chybaOdpovede, datumPohybu, pohybyZOdpovede, poznamkaPohybu, protistranaPohybu, urlNove, urlObdobie, zostatokNaZapis, zostatokZOdpovede } from "./fioApi";
 
 const st = (value: unknown, name = "", id = 0) => ({ value: value as string | number | null, name, id });
 
@@ -87,6 +87,9 @@ describe("pohyby z Fio API", () => {
     expect(pohybyZOdpovede({ accountStatement: { transactionList: null } })).toEqual([]);
     expect(zostatokZOdpovede({ accountStatement: { info: { closingBalance: 123.45 } } })).toBe(123.45);
     expect(zostatokZOdpovede({})).toBe(null);
+    // Nočný import zapisuje zostatok sám (24. 11. 2026) — zaokrúhlený, s dňom behu.
+    expect(zostatokNaZapis({ accountStatement: { info: { closingBalance: 61563.4 } } }, "2026-11-24")).toEqual({ suma: 61563, datum: "2026-11-24", rucne: false });
+    expect(zostatokNaZapis({}, "2026-11-24")).toBe(null);
   });
 
   it("adresy sedia s dokumentáciou", () => {
