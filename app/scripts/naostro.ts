@@ -20,6 +20,7 @@ import {
 } from "../src/lib/psb/compute";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { dnesPraha } from "../src/lib/psb/cas";
+import { KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.NAOSTRO_DATA;
 if (!D) throw new Error("chýba NAOSTRO_DATA — pusti ./scripts/naostro.sh");
@@ -93,6 +94,13 @@ for (const r of nacitaj("overrides")) base.clientOverrides[r.name] = {
   bitcoin: !!r.bitcoin, duch: String(r.duch || ""), zdroj: String(r.zdroj || ""), zdrojKto: String(r.zdroj_kto || ""),
   narodeniny: String(r.narodeniny || ""), prvyKontakt: String(r.prvy_kontakt || ""), v6m: String(r.v6m || ""),
   precoNeprisiel: String(r.preco_neprisiel || "") } as any;
+// Dochádzka ako v appke: pred KOKPIT_OD PTminder, od neho kalendár (`loadData`).
+// Cena tréningu tu nehrá rolu, preto bez balíčkov Kokpitu.
+{
+  const terazPraha = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+  const zKalendara = sedeniaZKalendara(nacitaj("kal_dochadzka") as UdalostKalendara[], [], terazPraha);
+  base.sessions = spojDochadzku(base.sessions, zKalendara, KOKPIT_OD).sessions;
+}
 for (const r of nacitaj("acks")) base.anomalyAck[r.anomaly_key] = { note: r.note || "", ackedAt: r.acked_at };
 
 // Appka číta len nezmiznuté udalosti a okno −21/+14 dní (api/kalendar.ts).
@@ -132,7 +140,17 @@ const vsetko = (d: PSBData, zm = zmeny, ud = udalosti) => {
   ]);
 };
 const otvorene = (r: any[]) => new Set(r.filter((x) => !x.acked).map((x) => x.key));
-const sAckom = (extra: Record<string, any>): PSBData => ({ ...base, anomalyAck: { ...base.anomalyAck, ...extra } });
+// Simulovaná odpoveď padla TERAZ. Bez `ackedAt` ju epizóda (`duch|`, `gone|`,
+// platneOd = posledný tréning) brala ako starú a test hlásil chybu, ktorú
+// appka nemá (revízia 10/2026: 3 falošné ✗ pri `duch|Tomaš Dvořak`).
+const terazAck = new Date().toISOString();
+const sAckom = (extra: Record<string, any>): PSBData => ({
+  ...base,
+  anomalyAck: {
+    ...base.anomalyAck,
+    ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, { ackedAt: terazAck, ...v }])),
+  },
+});
 
 const clients = deriveClients(base);
 const exportDo = base.sessions.reduce((m, s) => (s.date > m ? s.date : m), "").slice(0, 10);
@@ -323,13 +341,17 @@ h("8 · Export dorazí → čakajúci sa potvrdia");
 
 h("9 · Knižnica a obrazovka hovoria to isté");
 // Rovnaký dôvod ako pri bode 3: bez otvorenej položky nie je čo porovnávať.
-if (![...otvorene(reg(base))].length) console.log("  (register je prázdny — preskakujem)");
-else {
-  const kluc = [...otvorene(reg(base))][0];
-  const a = { [kluc]: { note: "odlozene|2099-01-01|" } };
-  const zK = reg(sAckom(a)).find((r) => r.key === kluc);
-  const zO = stavPolozkyRegistra(kluc, a);
-  ok(zK?.acked === zO.acked && zK?.note === zO.note, `${kluc.slice(0, 30)}: rovnaký stav aj poznámka`);
+// Epizóda ticha (`duch|`, `gone|`) sa po odpovedi vôbec nevyrobí (compute.ts,
+// `odpovedEpizody`) — v registri nie je čo porovnať, preto sa berie iný kľúč.
+{
+  const kluc = [...otvorene(reg(base))].find((k) => !/^(duch|gone)\|/.test(k));
+  if (!kluc) console.log("  (v registri je len epizóda ticha alebo nič — preskakujem)");
+  else {
+    const a = { [kluc]: { note: "odlozene|2099-01-01|", ackedAt: terazAck } };
+    const zK = reg(sAckom(a)).find((r) => r.key === kluc);
+    const zO = stavPolozkyRegistra(kluc, a);
+    ok(zK?.acked === zO.acked && zK?.note === zO.note, `${kluc.slice(0, 30)}: rovnaký stav aj poznámka`);
+  }
 }
 
 H("C · KOMU SA NOTIFIKÁCIA UKÁŽE");

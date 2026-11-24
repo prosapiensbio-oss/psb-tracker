@@ -959,3 +959,20 @@ Wordfence posiela ďalej, takže vynútenie nič iné nerozbilo.
 
 **Otvorené:** vo Postúre ostala moja kontrolná odpoveď **933** („Kontrola 18.11.").
 Mne sa zaškrtávacie políčko v zozname klikom neoznačí, Jerrymu áno.
+
+## Z revízie októbra 2026 (24. 11. 2026, `docs/revizia-mesiac-2026-10.md`)
+
+- **Premenovanie klienta zahodí odpovede na notifikácie** — `/api/premenuj` nemení
+  `anomaly_ack` (meno je v kľúči). Návrh: `UPDATE OR IGNORE` kľúčov v tej istej
+  transakcii + test. Nenasadené (špinavý pracovný strom pri revízii).
+- **Čaká na Jerryho „áno“ (dáta):** prekľúčovať 12 odpovedí „Matej Prochadzka“ →
+  „Matěj Procházka“. Inak sa vracia „Platnosť končí“ k 10. 11. a neplatí
+  „nehlásiť Nechodí“.
+- **Zostatok účtu v rezerve** stojí na 1. 11. (61 563 Kč). Nočný import Fio
+  (`akcia: "auto"`) zostatok z odpovede banky nezapíše. Návrh: zapisovať ho pri
+  každom behu. Jerry rozhodne, či má zostatok ostať ručný.
+- **naostro.ts nečíta balíčky Kokpitu** (`balicky`, doplnenia, prenosy) —
+  notifikácie „Platnosť končí“ v ňom nemusia sedieť s appkou. Doplniť ako pri
+  dochádzke.
+- Drobnosť: Jarvisova `SCHEMA_DB` nepozná `klient_merania.bolest`,
+  `platba_mapovanie` a `platba_nie_klient`.

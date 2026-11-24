@@ -58,6 +58,10 @@ stiahni poplatky     "SELECT id,datum,client_name,popis,suma_czk FROM poplatky"
 stiahni nova_posta   "SELECT id,od_meno,od_mail,predmet,datum,kategoria FROM email_spravy WHERE stav = 'nove' AND kategoria != 'ostatne' ORDER BY datum DESC LIMIT 50"
 stiahni platby_pohyby "SELECT date,amount_czk,category,counterparty,note FROM fio_transactions WHERE amount_czk < 0 AND date >= date('now','start of month','-1 month')"
 stiahni kal_udalosti "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zaciatok >= date('now','-40 days')"
+# Dochádzka od KOKPIT_OD je z kalendára, nie z PTmindera (export stojí od
+# 16. 10. 2026). Ten istý dopyt ako `loadData` v db.server.ts — bez neho
+# skript nevidel tréningy po exporte a hlásil falošného ducha (revízia 10/2026).
+stiahni kal_dochadzka "SELECT u.uid, u.klient, u.trener, u.zaciatok, u.koniec, u.nazov, u.typ FROM kal_udalosti u LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener WHERE u.klient IS NOT NULL AND u.typ IN ('trening','uvodny') AND (u.zmizla_at IS NULL OR k.konal = 1) AND u.zaciatok >= '2026-10-01'"
 stiahni kal_zmeny    "SELECT id,kedy,trener,druh,nazov,klient,pred,po,vysvetlene,poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300"
 # Dozor reklám (10. 10. 2026) — vstupuje do registra, preto musí byť aj tu.
 stiahni reklama_dozor "SELECT * FROM reklama_dozor"
