@@ -23,7 +23,6 @@ import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from ".
 import { anamnezyPodlaStavu, BEZ_FRONTY, hromadnePresuny, klucPolozky, krokyBety, odpovedPresunu, dniZmeny, popisZmeny, postavKarty, prijmyUInehoTrenera, terminSK, rozdelAnamnezy, trenerZPrihlasenia, zapisPoJednom, type AnamnezaRiadok, type PresunNaOdpoved, type VysledokPoJednom, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena, indexKartyPoZmene } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
 import { BankaUlozene } from "./BankaUlozene";
-import { BtcParovanie } from "./BtcParovanie";
 import { FioStiahnutie } from "./FioStiahnutie";
 import { BankovyImport } from "./Banka";
 import type { ExtraReportu, MesiacReportu } from "../../lib/psb/mesacnyReport";
@@ -245,6 +244,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
    * platby z banky rozbalené defaultne, presne tak, ako to bolo pôvodne."
    */
   const [platbyRozbalene, setPlatbyRozbalene] = useState(true);
+  /**
+   * Mesiac faktúr z Alzy v Kontrole peňazí. Predvolene bežný — faktúry sa od
+   * 24. 11. 2026 robia každý týždeň, nie pri uzávierke.
+   */
+  const [alzaMesiac, setAlzaMesiac] = useState(() => new Date().toISOString().slice(0, 7));
   const [pocetSms, setPocetSms] = useState<number | null>(null);
   const [pocetDopytov, setPocetDopytov] = useState(0);
   const [pocetUzavierky, setPocetUzavierky] = useState(0);
@@ -2041,7 +2045,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
           <div style={{ marginBottom: 16 }}>
             <BankaUlozene
               kontrola pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
-              fakturyPohybov={fakturyPohybov} onNahratFaktury={onNavigate ? () => onNavigate("udaje") : undefined}
+              fakturyPohybov={fakturyPohybov}
+              onNahratFaktury={() => document.getElementById("alza-faktury")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               onPlatby={() => {
                 const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "platby");
                 if (idx >= 0) setI(idx);
@@ -2056,14 +2061,26 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
               {!polozky.length && <VsetkoVybavene text="Všetko vybavené — náklady sedia a staré zaradenia sú vysvetlené." />}
             </>
           )}
-          {/* Bitcoinové platby bez dokladu cez VŠETKY mesiace. Patria k nákladom,
-              nie k nahrávaniu súborov (z Uploadu presunuté 1. 11. 2026). Krok
-              Alza v uzávierke ukazuje len svoj mesiac. */}
-          {btcUzavierky && (
-            <div style={{ marginTop: 16 }}>
-              <BtcParovanie platby={btcUzavierky.platby} faktury={btcUzavierky.faktury} parovanie={btcUzavierky.parovanie} onSparuj={btcUzavierky.onSparuj} />
+          {/* ALZA A NÁKUPY BITCOINOM — z uzávierky presunuté sem (Jerry,
+              24. 11. 2026: „budem to robiť na týždennej báze a tu sú aj platby
+              za Anthropic"). Nahratie faktúry, rozdelenie položiek a platby
+              bitcoinom bez dokladu cez VŠETKY mesiace (tie tu boli od 1. 11.). */}
+          <div id="alza-faktury" style={{ marginTop: 18, scrollMarginTop: 12 }}>
+            <NadpisSekcie>Faktúry z Alzy a nákupy bitcoinom</NadpisSekcie>
+            <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+              {[0, -1].map((o) => {
+                const d = new Date();
+                const m = new Date(Date.UTC(d.getFullYear(), d.getMonth() + o, 1)).toISOString().slice(0, 7);
+                const ma = alzaMesiac === m;
+                return (
+                  <button key={m} onClick={() => setAlzaMesiac(m)} style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${ma ? C.accent : C.border}`, background: ma ? mix(C.accent, 16) : "transparent", color: ma ? C.accentLight : C.textMuted }}>
+                    {o === 0 ? "tento mesiac" : "minulý mesiac"}
+                  </button>
+                );
+              })}
             </div>
-          )}
+            <AlzaUzavierka mesiac={alzaMesiac} btc={btcUzavierky} btcVsetky />
+          </div>
         </>
       );
     }
@@ -2105,7 +2122,21 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
             return {
               // Mesačné kontroly uzatváraného mesiaca — krok uzávierky, nie
               // samostatná karta (Jerry, 9. 10. 2026).
-              alza: <AlzaUzavierka mesiac={mk} btc={btcUzavierky} />,
+              // Presunuté do Kontroly peňazí (24. 11. 2026) — tu len odkaz;
+              // či je mesiac hotový, ďalej hovorí krok uzávierky.
+              alza: (
+                <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.5 }}>
+                  Faktúry z Alzy a platby bitcoinom sa robia každý týždeň v Kontrole peňazí.{" "}
+                  <button onClick={() => {
+                    setAlzaMesiac(mk);
+                    const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "kontroly");
+                    if (idx >= 0) setI(idx);
+                    setTimeout(() => document.getElementById("alza-faktury")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+                  }} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, cursor: "pointer", fontSize: 12.5, fontFamily: "inherit", textDecoration: "underline" }}>
+                    Otvoriť Kontrolu peňazí →
+                  </button>
+                </div>
+              ),
               /**
                * Štyri mesačné kontroly sú ZRUŠENÉ (Jerry, 11. 10. 2026:
                * „mesačná kontrola ako zoznam úloh nemá existovať vôbec").

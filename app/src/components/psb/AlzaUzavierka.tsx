@@ -55,7 +55,11 @@ export const ALZA_CAKA = "psb-alza-caka";
  * dvadsať minút a nemá ju zmazať zatvorené okno. To isté robí náhľad zošita.
  */
 
-export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavierky }) {
+/**
+ * `btcVsetky` — v Kontrole peňazí (týždenne, od 24. 11. 2026) sa platby
+ * bitcoinom bez faktúry ukazujú za VŠETKY mesiace, nie len za vybraný.
+ */
+export function AlzaUzavierka({ mesiac, btc, btcVsetky }: { mesiac: string; btc?: BtcUzavierky; btcVsetky?: boolean }) {
   const [nove, setNove] = useState<Faktura[]>(() => {
     try {
       const x = JSON.parse(localStorage.getItem(ALZA_CAKA) || "null") as { mesiac?: string; faktury?: Faktura[] } | null;
@@ -284,9 +288,11 @@ export function AlzaUzavierka({ mesiac, btc }: { mesiac: string; btc?: BtcUzavie
       )}
       {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 6 }}>{chyba}</div>}
 
-      {nadpis("3", "Platby bitcoinom bez faktúry")}
+      {nadpis("3", btcVsetky ? "Platby bitcoinom bez faktúry (všetky mesiace)" : "Platby bitcoinom bez faktúry")}
       {btc ? (
-        <BtcParovanie platby={platbyMesiaca} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} vsetkyMesiaca={btc.vsetkyMesiaca} />
+        btcVsetky
+          ? <BtcParovanie platby={btc.platby} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />
+          : <BtcParovanie platby={platbyMesiaca} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} vsetkyMesiaca={btc.vsetkyMesiaca} />
       ) : <div style={{ fontSize: 12, color: C.textDim }}>Bitcoinová kniha nie je načítaná.</div>}
       {/* Nahrávanie aj tu (Jerry, 8. 11. 2026): chýbajúcu faktúru vidí pri
           platbe bitcoinom, nie o dve sekcie vyššie. Ten istý vstup a náhľad. */}
