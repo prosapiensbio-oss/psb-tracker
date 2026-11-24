@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { fioKluc, jeVkladMojejRezervy, ocislujDuplicity, odhadniKategoriu, parseFio, type FioRiadok } from "./fio";
+import { describe, expect, it, test } from "bun:test";
+import { fioKluc, kategoriaZPravidiel, jeVkladMojejRezervy, ocislujDuplicity, odhadniKategoriu, parseFio, type FioRiadok } from "./fio";
 
 // Presný tvar exportu „Pohyby na všech účtech" (13. 9. 2026) — bez ID operace.
 const POHYBY = [
@@ -99,5 +99,18 @@ describe("Moja rezerva z Fio", () => {
     expect(jeVkladMojejRezervy("2323438022/3030", -3300)).toBe(false);
     expect(jeVkladMojejRezervy("2323438022/3030", 1000)).toBe(false);
     expect(jeVkladMojejRezervy("2323438014/3030", -10620)).toBe(false);
+  });
+});
+
+describe("poznámka výplata prebije obchod (Bolt, 24. 11. 2026)", () => {
+  const pravidla = [{ vzor: "bolt", kategoria: "vyplaty.jerry" }, { vzor: "terka", kategoria: "vyplaty.terezka" }];
+  it("Bolt s poznámkou Terka Výplata je Terezkin", () => {
+    expect(kategoriaZPravidiel("Bolt · Nákup: Bolt, Tallinn, EE · Terka Výplata NET transakce", pravidla)).toBe("vyplaty.terezka");
+  });
+  it("Bolt bez poznámky ide podľa pravidla", () => {
+    expect(kategoriaZPravidiel("Bolt · Nákup: Bolt, Tallinn, EE", pravidla)).toBe("vyplaty.jerry");
+  });
+  it("prevod Jerry vyplata box ostáva Jerryho", () => {
+    expect(kategoriaZPravidiel("2323438014/3030 · Jerry vyplata · Jerry vyplata box", pravidla)).toBe("vyplaty.jerry");
   });
 });

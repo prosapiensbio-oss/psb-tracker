@@ -34,6 +34,9 @@ const UCET_TEREZKA = "2325740014";
 export function komuVyplata(text: string): "jerry" | "terezka" | null {
   const t = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (!/vyplat/.test(t)) return null;
+  // Odvod štátu za trénera („Jerry vyplata stat", „socialka") je fixný náklad,
+  // nie výplata — 4 také prevody v roku 2026. Pri nich rozhoduje pravidlo.
+  if (/\bstat\b|socialk|zdravotn|odvod/.test(t)) return null;
   const terezka = /terk|terez/.test(t) || t.includes(UCET_TEREZKA);
   const jerry = /jerry/.test(t) || t.includes(UCET_JERRY);
   if (terezka === jerry) return null;

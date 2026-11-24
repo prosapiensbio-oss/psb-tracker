@@ -1,4 +1,5 @@
 import { jeUcetRezervy, REZERVA_PROTISTRANA } from "./rezervaOdlozenie";
+import { komuVyplata } from "./filtrePohybov";
 // Import bankového výpisu.
 //
 // Zámerne tolerantný parser a zámerne s NÁHĽADOM pred zápisom. Fio dáva výpis
@@ -311,6 +312,15 @@ export const MIN_VZOR = 4;
 
 /** Kategória z NAUČENÉHO pravidla (bez zabudovaných odhadov); prvé v poradí vyhráva. */
 export function kategoriaZPravidiel(text: string, pravidla: { vzor: string; kategoria: string }[] = []): string {
+  /**
+   * POZNÁMKA „TERKA VÝPLATA" PREBIJE OBCHOD (Jerry, 24. 11. 2026). Bolt 169 Kč
+   * s poznámkou „Terka Výplata" padol Jerrymu, lebo pravidlo „bolt" stálo
+   * v poradí pred „terka" a vzor „terka vyplata" bez dĺžňa sa s „Výplata"
+   * nestretol. Keď text výslovne hovorí výplata a jedného človeka, je to jeho
+   * výplata — to isté pravidlo, podľa ktorého sa taká výplata nepotvrdzuje.
+   */
+  const komu = komuVyplata(text);
+  if (komu) return `vyplaty.${komu}`;
   const t = text.toLowerCase();
   for (const p of pravidla) {
     if (p.vzor && p.vzor.trim().length >= MIN_VZOR && t.includes(p.vzor.toLowerCase())) return p.kategoria;

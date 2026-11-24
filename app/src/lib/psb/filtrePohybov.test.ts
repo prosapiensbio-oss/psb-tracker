@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, istaVyplata } from "./filtrePohybov";
+import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, istaVyplata, komuVyplata } from "./filtrePohybov";
 
 describe("filtre zapísaných pohybov", () => {
   const gerich = { suma: 15580, kategoria: "fixne.apps.ai", klienti: "Gerich Jakub" };
@@ -95,6 +95,11 @@ describe("istá výplata sa nepotvrdzuje (24. 11. 2026)", () => {
     expect(istaVyplata(v("vyplaty.jerry", "APPLE.COM/BILL", "Nákup: APPLE.COM/BILL"))).toBe(false);
     expect(istaVyplata(v("vyplaty", "4277589389/0800", "Ovečkárna.cz · Spoločna vyplata"))).toBe(false);
     expect(istaVyplata(v("vyplaty.delene", "ZDRAVI NAPROTI 01", "Potraviny"))).toBe(false);
+  });
+  it("odvod štátu s textom výplata nie je výplata", () => {
+    expect(komuVyplata("Jerry vyplata · Jerry vyplata/stat")).toBe(null);
+    expect(komuVyplata("Jerry · Jerry vyplata socialka")).toBe(null);
+    expect(komuVyplata("Terezka invest · Terezka štát/výplata")).toBe(null);
   });
   it("pohyb rozpísaný podľa faktúry nečaká", () => {
     expect(cakaNaPotvrdenie({ suma: -1269, kategoria: "variabilne.prevadzka2.pomocky", rozpisanyFakturou: true })).toBe(false);
