@@ -1172,6 +1172,12 @@ export function PSBApp() {
   const [fakturyMesiaca, setFakturyMesiaca] = useState<Record<string, number>>({});
   /** Doklady, ktoré Jerry ešte neoznačil za vybavené (krok Alza). */
   const [fakturyNepotvrdene, setFakturyNepotvrdene] = useState<Record<string, number>>({});
+  /**
+   * Bankové pohyby rozpísané podľa faktúry (Alza) → čísla dokladov a počet
+   * položiek. Kontrola peňazí z toho povie „rozpísané podľa faktúry" alebo
+   * „chýba faktúra" a takýto pohyb sa nepotvrdzuje (Jerry, 24. 11. 2026).
+   */
+  const [fakturyPohybov, setFakturyPohybov] = useState<Record<string, { cisla: string[]; poloziek: number }>>({});
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
@@ -1667,6 +1673,7 @@ function skupinaFaktur(
           for (const p of d.polozky) if (!p.kategoria) p.kategoria = hlavna;
         }
         const pouzite = new Set<string>();
+        const fakturyKPohybom: Record<string, { cisla: string[]; poloziek: number }> = {};
 
         /**
          * Jedna položka faktúry → správna kopa.
@@ -1809,6 +1816,11 @@ function skupinaFaktur(
             pouzite.add(cislo);
             for (const pol of d.polozky) zapocitajPolozku(mk, pol, `${pol.dodavatel ? `${pol.dodavatel} — ` : ""}${pol.nazov || "položka faktúry"}`, cislo);
             rozpisany = true;
+            if (p.kluc) {
+              const z = (fakturyKPohybom[p.kluc] ||= { cisla: [], poloziek: 0 });
+              z.cisla.push(cislo);
+              z.poloziek += d.polozky.length;
+            }
           }
           if (rozpisany) continue;
           (sumy[mk] ||= {});
@@ -1953,12 +1965,13 @@ function skupinaFaktur(
         const naPotvrdenie: Record<string, number> = {};
         for (const p of j.pohyby || []) {
           const maSplit = !!(p.kluc && platnySplit(pohybSplits[p.kluc]));
-          if (cakaNaPotvrdenie(p, maSplit) || patriDoFiltra(p, "nezaradene", maSplit)) {
+          if (cakaNaPotvrdenie({ ...p, rozpisanyFakturou: !!(p.kluc && fakturyKPohybom[p.kluc]) }, maSplit) || patriDoFiltra(p, "nezaradene", maSplit)) {
             const mk = String(p.datum).slice(0, 7);
             naPotvrdenie[mk] = (naPotvrdenie[mk] || 0) + 1;
           }
         }
         setBankaNaPotvrdenie(naPotvrdenie);
+        setFakturyPohybov(fakturyKPohybom);
         setBankaPohyby(pohybyPodla);
         // Rozdelený pohyb (split) rozhoduje rozdelením, nie kategóriou — pravidlo
         // sa ho netýka. Ostatné výdavky idú celé, aj potvrdené: hromadné
@@ -3526,7 +3539,7 @@ function skupinaFaktur(
             takže zisk vyzerá lepší, než je.{jeBeta() ? " V bete je to vždy (nemá kľúč k bitcoinovej appke) — peniaze over v ostrom Kokpite." : " Skús obnoviť stránku; keď to trvá, je chyba v bitcoinovej appke."}
           </div>
         )}
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} fakturyPohybov={fakturyPohybov} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} onNavigate={navigate} />}
         {active === "prechod" && (
           <Prechod
@@ -3536,7 +3549,7 @@ function skupinaFaktur(
             onKlient={onClientClick}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} buduceTreningy={buduceTreningy} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} vydavkyNaPotvrdenie={Object.entries(bankaNaPotvrdenie).filter(([m]) => !zamknuteMesiace.includes(m)).reduce((a, [, n]) => a + (n || 0), 0)} register={registerAll} rozpory={[
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} buduceTreningy={buduceTreningy} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} otvorKartu={workspaceKarta} onKartaOtvorena={() => setWorkspaceKartu(null)} onKde={setKdeWorkspace} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} reportUzavierky={vstupReportu} onNavigate={navigate} actions={actions} chat={chat} chatReklama={chatReklama} fakturyPohybov={fakturyPohybov} vydavkyNaPotvrdenie={Object.entries(bankaNaPotvrdenie).filter(([m]) => !zamknuteMesiace.includes(m)).reduce((a, [, n]) => a + (n || 0), 0)} register={registerAll} rozpory={[
             // Porovnania Kokpit vs PTminder sú od 20. 10. 2026 vypnuté (do PTmindera sa nezapisuje).
           ]} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} btcUzavierky={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc, vsetkyMesiaca: (btcNakupy[mesiacUzavierkyApp] || []).length }} />}
 

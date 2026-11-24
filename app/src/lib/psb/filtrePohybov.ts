@@ -12,7 +12,44 @@ import { jeZaradenyPrijem } from "./kategoriePrijmov";
 
 export type FilterPohybov = "nezaradene" | "potvrdit" | "potvrdene" | "naklady" | "vyplaty" | "sukromne" | "prijmy" | "vsetko";
 
-export type PohybNaFilter = { suma: number; kategoria: string; typ?: string; klienti?: string; nieKlient?: boolean; potvrdene?: boolean };
+export type PohybNaFilter = {
+  suma: number; kategoria: string; typ?: string; klienti?: string; nieKlient?: boolean; potvrdene?: boolean;
+  /** Text z banky — z neho sa pozná istá výplata (`istaVyplata`). */
+  protistrana?: string; poznamka?: string;
+  /** Pohyb je rozpísaný podľa faktúry (Alza): náklad nesú položky, nie kategória riadku. */
+  rozpisanyFakturou?: boolean;
+};
+
+/** Vlastné účty trénerov — prevod na ne je výplata toho človeka. */
+const UCET_JERRY = "2323438014";
+const UCET_TEREZKA = "2325740014";
+
+/**
+ * KOMU JE VÝPLATA PODĽA TEXTU Z BANKY (Jerry, 24. 11. 2026: výplaty, pri
+ * ktorých je isté, komu patria, sa nemajú potvrdzovať). Isté je to len vtedy,
+ * keď text hovorí slovo výplata A práve jedného človeka — menom („Jerry
+ * vyplata", „Terka výplata") alebo číslom jeho účtu. Nákup kartou bez
+ * poznámky (Apple, Bolt) nehovorí nič a ostáva na kontrolu.
+ */
+export function komuVyplata(text: string): "jerry" | "terezka" | null {
+  const t = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (!/vyplat/.test(t)) return null;
+  const terezka = /terk|terez/.test(t) || t.includes(UCET_TEREZKA);
+  const jerry = /jerry/.test(t) || t.includes(UCET_JERRY);
+  if (terezka === jerry) return null;
+  return terezka ? "terezka" : "jerry";
+}
+
+/**
+ * Výplata, pri ktorej text z banky aj kategória hovoria o tom istom
+ * človeku. Keď sa rozchádzajú (Bolt 17. 11. 2026: „Terka Výplata", ale
+ * zaradené Jerrymu), čaká na kontrolu — presne na to potvrdzovanie je.
+ */
+export function istaVyplata(p: PohybNaFilter): boolean {
+  if (p.suma >= 0 || !p.kategoria.startsWith("vyplaty.")) return false;
+  const komu = komuVyplata(`${p.protistrana || ""} ${p.poznamka || ""}`);
+  return !!komu && p.kategoria === `vyplaty.${komu}`;
+}
 
 export function patriDoFiltra(p: PohybNaFilter, f: FilterPohybov, maSplit = false): boolean {
   const kat = p.kategoria || "";
@@ -56,6 +93,8 @@ export function stavPrijmu(p: PohybNaFilter, maSplit = false): StavPrijmu {
 export function cakaNaPotvrdenie(p: PohybNaFilter, maSplit = false): boolean {
   // Rezervu Kokpit spozná podľa čísla účtu — istá vec, nie návrh.
   if (p.suma >= 0 || p.potvrdene || maSplit || p.typ === "hotovosť" || p.kategoria === "rezerva") return false;
+  // Istá výplata a pohyb rozpísaný podľa faktúry sa nepotvrdzujú (24. 11. 2026).
+  if (p.rozpisanyFakturou || istaVyplata(p)) return false;
   return !!p.kategoria;
 }
 

@@ -142,7 +142,7 @@ const pamatKopy: {
   platby: PlatbaRiadok[];
 } = { zdroje: null, balicky: [], platby: [] };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTreningy, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0 }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTreningy, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, otvorKartu, onKartaOtvorena, onKde, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, reportUzavierky, onNavigate, actions, chat, chatReklama, register, rozpory, pohybSplits, nastavPohybSplit, btcUzavierky, vydavkyNaPotvrdenie = 0, fakturyPohybov }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -184,6 +184,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
   /** Porovnania dvoch zdrojov pre kartu „Zdravie Kokpitu". */
   rozpory?: { nazov: string; pocet: number | null; detail?: string }[];
   pohybSplits?: PohybSplits;
+  /** Bankové pohyby rozpísané podľa faktúry (Alza) — Kontrola peňazí to povie pri riadku. */
+  fakturyPohybov?: Record<string, { cisla: string[]; poloziek: number }>;
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Platby bitcoinom a faktúry na párovanie — krok „Alza" v uzávierke. */
   /**
@@ -2039,6 +2041,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
           <div style={{ marginBottom: 16 }}>
             <BankaUlozene
               kontrola pohybSplits={pohybSplits} onSplit={nastavPohybSplit}
+              fakturyPohybov={fakturyPohybov} onNahratFaktury={onNavigate ? () => onNavigate("udaje") : undefined}
               onPlatby={() => {
                 const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === "platby");
                 if (idx >= 0) setI(idx);

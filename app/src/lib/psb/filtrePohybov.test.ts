@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu } from "./filtrePohybov";
+import { cakaNaPotvrdenie, jePotvrdeny, patriDoFiltra, stavPrijmu, istaVyplata } from "./filtrePohybov";
 
 describe("filtre zapísaných pohybov", () => {
   const gerich = { suma: 15580, kategoria: "fixne.apps.ai", klienti: "Gerich Jakub" };
@@ -72,5 +72,32 @@ describe("rezerva firmy (29. 10. 2026)", () => {
     expect(patriDoFiltra(rezerva, "naklady")).toBe(false);
     expect(cakaNaPotvrdenie(rezerva)).toBe(false);
     expect(jePotvrdeny(rezerva)).toBe(true);
+  });
+});
+
+describe("istá výplata sa nepotvrdzuje (24. 11. 2026)", () => {
+  const v = (kategoria: string, protistrana: string, poznamka: string) => ({ suma: -1500, kategoria, protistrana, poznamka });
+  it("prevod na vlastný účet s poznámkou výplata", () => {
+    expect(istaVyplata(v("vyplaty.jerry", "2323438014/3030", "Jerry vyplata"))).toBe(true);
+    expect(istaVyplata(v("vyplaty.terezka", "2325740014/3030", "Terezka · Terezka vyplata"))).toBe(true);
+    expect(cakaNaPotvrdenie(v("vyplaty.jerry", "2323438014/3030", "Jerry vyplata · Jerry vyplata box"))).toBe(false);
+  });
+  it("nákup kartou s poznámkou Terka výplata", () => {
+    expect(istaVyplata(v("vyplaty.terezka", "Perio Clinic S.R.O.", "Nákup: Perio Clinic · Terka výplata"))).toBe(true);
+    expect(istaVyplata(v("vyplaty.terezka", "SP *SKD MARTIN", "Vyplata terka NET transakce"))).toBe(true);
+  });
+  it("text a kategória sa rozchádzajú → čaká (Bolt 17. 11.)", () => {
+    expect(istaVyplata(v("vyplaty.jerry", "Bolt", "Nákup: Bolt · Terka Výplata"))).toBe(false);
+    expect(cakaNaPotvrdenie(v("vyplaty.jerry", "Bolt", "Nákup: Bolt · Terka Výplata"))).toBe(true);
+  });
+  it("bez slova výplata alebo bez človeka → čaká", () => {
+    expect(istaVyplata(v("vyplaty.jerry", "2323438014/3030", "Jerry Rezerva"))).toBe(false);
+    expect(istaVyplata(v("vyplaty.jerry", "APPLE.COM/BILL", "Nákup: APPLE.COM/BILL"))).toBe(false);
+    expect(istaVyplata(v("vyplaty", "4277589389/0800", "Ovečkárna.cz · Spoločna vyplata"))).toBe(false);
+    expect(istaVyplata(v("vyplaty.delene", "ZDRAVI NAPROTI 01", "Potraviny"))).toBe(false);
+  });
+  it("pohyb rozpísaný podľa faktúry nečaká", () => {
+    expect(cakaNaPotvrdenie({ suma: -1269, kategoria: "variabilne.prevadzka2.pomocky", rozpisanyFakturou: true })).toBe(false);
+    expect(cakaNaPotvrdenie({ suma: -1269, kategoria: "variabilne.prevadzka2.pomocky" })).toBe(true);
   });
 });

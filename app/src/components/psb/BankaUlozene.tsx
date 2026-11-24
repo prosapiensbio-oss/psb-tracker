@@ -48,7 +48,7 @@ type KrokSpat = { popis: string; stav: { kluc: string; kategoria: string; potvrd
 const KROKOV_SPAT = 10;
 const SPAT_KLUC = "psb-banka-spat";
 
-export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierkaProp, onPlatby, kontrola }: {
+export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierkaProp, onPlatby, kontrola, fakturyPohybov, onNahratFaktury }: {
   focus?: { month?: string; kategoria?: string; nonce?: number } | null;
   /** Rozdelenia/priradenia pohybov z App (split telefónu, príjem, vrátenie). */
   pohybSplits?: PohybSplits;
@@ -68,6 +68,14 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
    * potvrdiť nedalo nič a riadok by tam visel navždy.
    */
   kontrola?: boolean;
+  /**
+   * ALZA A FAKTÚRA (Jerry, 24. 11. 2026). Pohyb rozpísaný podľa faktúry nesie
+   * náklad v položkách, kategória riadku sa nepočíta — preto sa nepotvrdzuje
+   * a pri riadku stojí „rozpísané podľa faktúry". Platba Alze bez faktúry
+   * povie „chýba faktúra → nahrať".
+   */
+  fakturyPohybov?: Record<string, { cisla: string[]; poloziek: number }>;
+  onNahratFaktury?: () => void;
 } = {}) {
   const uzavierka = !!uzavierkaProp || !!kontrola;
   const [zamknute, setZamknute] = useState<Set<string>>(new Set());
@@ -82,7 +90,13 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
       .catch(() => {});
     return () => { zive = false; };
   }, [kontrola]);
-  const [pohyby, setPohyby] = useState<Pohyb[]>([]);
+  const [pohybyZBanky, setPohyby] = useState<Pohyb[]>([]);
+  // Značka „rozpísaný podľa faktúry" sa pridá ku každému riadku — pravidlo
+  // potvrdzovania (`cakaNaPotvrdenie`) ju číta, takže netreba meniť jeho volania.
+  const pohyby = useMemo(
+    () => (fakturyPohybov ? pohybyZBanky.map((p) => (fakturyPohybov[p.kluc] ? { ...p, rozpisanyFakturou: true } : p)) : pohybyZBanky),
+    [pohybyZBanky, fakturyPohybov],
+  );
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
   const [pravidlaOtvorene, setPravidlaOtvorene] = useState(false);
   const [nacitane, setNacitane] = useState(false);
@@ -536,14 +550,24 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
                             </div>
                           );
                         }
+                        const fakt = fakturyPohybov?.[p.kluc];
+                        const alzaBezFaktury = !fakt && fakturyPohybov && /alza/i.test(p.protistrana) && p.suma < 0;
                         return (
                           <div>
-                            <VyberKategorie
+                            {fakt && (
+                              <div style={{ fontSize: 11.5, color: C.green, marginBottom: 3 }} title={`Faktúra ${fakt.cisla.join(", ")}`}>
+                                ✓ rozpísané podľa faktúry ({fakt.poloziek} {fakt.poloziek === 1 ? "položka" : fakt.poloziek < 5 ? "položky" : "položiek"})
+                              </div>
+                            )}
+                            {alzaBezFaktury && (onNahratFaktury
+                              ? <button onClick={onNahratFaktury} style={{ display: "block", background: "none", border: "none", padding: 0, marginBottom: 3, color: C.orange, cursor: "pointer", fontSize: 11.5, textAlign: "left" }}>chýba faktúra → nahrať</button>
+                              : <div style={{ fontSize: 11.5, color: C.orange, marginBottom: 3 }}>chýba faktúra (Upload → Faktúry z Alzy)</div>)}
+                            {!fakt && <VyberKategorie
                               hodnota={p.kategoria}
                               pocetOznacenych={oznacene.has(p.kluc) ? oznacene.size : 0}
                               onZmena={(kat) => void zmen(kat, oznacene.has(p.kluc) && oznacene.size > 1 ? undefined : [p.kluc])}
-                            />
-                            {onSplit && (
+                            />}
+                            {onSplit && !fakt && (
                               <button onClick={() => otvorDelenie(p.kluc)} title="Rozdeliť pohyb na časti / označiť ako príjem alebo vrátenie" style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 11, padding: "2px 0" }}>⑂ rozdeliť / priradiť</button>
                             )}
                           </div>
