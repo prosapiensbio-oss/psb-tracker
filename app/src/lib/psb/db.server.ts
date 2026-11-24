@@ -541,6 +541,13 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     catch { chybySekcii.push("nočná kontrola dát (poškodený zápis)"); }
   }
 
+  // SMS pred úvodným (24. 11. 2026, `uvodnyBezSms.ts`): komu už odišla — bez toho by notifikácia svietila aj po odoslaní.
+  data.uvodnaSmsOdisla = ((await DB.prepare(
+    `SELECT payment_id AS m FROM vzas_audit WHERE action IN ('sms-uvodny', 'sms-ponuka') AND at >= datetime('now', '-60 days')
+     UNION SELECT klient AS m FROM uvodne_odkazy WHERE druh = 'pred' AND otvorene > 0`,
+  ).all().catch((e) => { volitelna("SMS pred úvodným")(e); return { results: [] }; })).results as { m: string | null }[])
+    .map((r) => String(r.m || "").split(" · ")[0].trim()).filter(Boolean);
+
   if (chybySekcii.length) data.chybySekcii = chybySekcii;
   return data;
 }

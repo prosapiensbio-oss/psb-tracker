@@ -16,6 +16,7 @@ import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
+import { uvodneBezSms } from "./uvodnyBezSms";
 import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
@@ -3306,7 +3307,7 @@ export function deriveRegister(
   clients: Record<string, ClientAgg>,
   sixM: SixMRow[],
   capacity: CapacityRow[],
-  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; zmeny?: ZmenaVKalendari[]; buduce?: { klient: string | null; zaciatok: string }[] },
+  kal?: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null; nazov?: string; trener?: string; zmizlaAt?: string | null }[]; zmeny?: ZmenaVKalendari[]; buduce?: { klient: string | null; zaciatok: string }[] },
 ): RegisterItem[] {
   const ack = data.anomalyAck || {};
   const items: RegisterItem[] = [];
@@ -3329,7 +3330,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string; platneOd?: string; reklama?: RegisterItem["reklama"] },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string; platneOd?: string; reklama?: RegisterItem["reklama"]; dalsiTrening?: string },
   ) =>
     items.push({
       key,
@@ -3345,6 +3346,7 @@ export function deriveRegister(
       akcie: kto?.akcie,
       telefon: kto?.telefon || undefined,
       reklama: kto?.reklama,
+      dalsiTrening: kto?.dalsiTrening,
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
@@ -3731,6 +3733,32 @@ export function deriveRegister(
       "odpoved",
       { trener: "Terezka", oKom: meno, telefon: String(l.telefon || "").trim() },
     );
+  }
+
+  // ÚVODNÝ BEZ SMS (Jerry, 24. 11. 2026, `uvodnyBezSms.ts`). Stojí na
+  // kalendári: referencia ani telefonát dopyt „nový" nemajú, a tak ich
+  // `odpoved|` vyššie nikdy nepripomenul. Tlačidlo v notifikácii vyrobí
+  // odkaz s termínom z kalendára a pošle SMS; chýbajúci telefón sa tam
+  // dá doplniť (`Dashboard.tsx`, kľúč `uvodny-sms|`).
+  {
+    const novyDopyt = new Set((data.leads || [])
+      .filter((l) => (l.druh || "dopyt") === "dopyt" && l.status === "novy" && !String(l.odpovedaneAt || "").trim())
+      .map((l) => normName(String(l.name || ""))).filter(Boolean));
+    const odisla = new Set((data.uvodnaSmsOdisla || []).map(normName));
+    for (const v of uvodneBezSms(kal?.udalosti || [], odisla, novyDopyt, terazPraha())) {
+      const kedySlovom = `${v.dni === 0 ? "dnes" : v.dni === 1 ? "zajtra" : fmtDMY(v.kedy.slice(0, 10))} o ${v.kedy.slice(11, 16)}`;
+      add(
+        v.kluc,
+        "Zápis",
+        v.dni <= 1 ? "red" : "orange",
+        `Úvodný bez SMS — ${v.meno} (${kedySlovom})`,
+        `${v.meno} má úvodný ${kedySlovom}${v.trener ? ` u ${v.trener === "Terezka" ? "Terezky" : "Jerryho"}` : ""}, ale SMS pred úvodným ešte neodišla. Je v nej adresa, čo si vziať, cena a tri otázky pred tréningom. Pošli ju tlačidlom tu — termín je z kalendára.`,
+        v.dni <= 1 ? 2 : 6,
+        undefined,
+        "uvodny-sms",
+        { trener: v.trener || "Terezka", oKom: v.meno, dalsiTrening: v.kedy },
+      );
+    }
   }
 
   for (const a of deriveAnomalies(data, clients, kal)) {

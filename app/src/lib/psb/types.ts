@@ -270,6 +270,12 @@ export type PSBData = {
    * Posledný beh nočnej kontroly dát (`nocnaKontrola.ts`, 16. 11. 2026): meno
    * toho istého klienta v inom tvare v kalendári alebo v banke.
    */
+  /**
+   * Komu už odišla SMS pred úvodným alebo ponuka úvodného (audit `sms-uvodny`,
+   * `sms-ponuka`, 60 dní) alebo kto stránku pred úvodným otvoril — mená tak,
+   * ako sú v audite. Číta `uvodneBezSms` (24. 11. 2026).
+   */
+  uvodnaSmsOdisla?: string[];
   nocnaKontrola?: { beh: string; nalezy: { druh: "kalendar" | "platba" | "meno"; kluc: string; trener: string; klient: string; kandidati: string[]; text: string }[] };
   /** Voliteľné sekcie, ktoré sa pri tomto načítaní nenačítali (Zdravie Kokpitu). */
   chybySekcii?: string[];

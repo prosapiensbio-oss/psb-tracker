@@ -2422,12 +2422,14 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
    */
   const jeNovyDopyt = item.key.startsWith("odpoved|");
   const jePoUvodnom = item.key.startsWith("sms|");
+  /** Úvodný v kalendári, SMS pred ním neodišla (24. 11. 2026) — termín je z kalendára. */
+  const jeUvodnyBezSms = item.key.startsWith("uvodny-sms|");
   const uvDruh: "pred" | "po" = jePoUvodnom ? "po" : "pred";
   const [uvOtvoreny, setUvOtvoreny] = useState(false);
   /** Okno SMS pri notifikácii „posledná hodina / mínus" (9. 10. 2026). */
   const [smsOtvorene, setSmsOtvorene] = useState(false);
-  const [uvDatum, setUvDatum] = useState("");
-  const [uvCas, setUvCas] = useState("10:00");
+  const [uvDatum, setUvDatum] = useState(jeUvodnyBezSms && item.dalsiTrening ? item.dalsiTrening.slice(0, 10) : "");
+  const [uvCas, setUvCas] = useState(jeUvodnyBezSms && item.dalsiTrening ? item.dalsiTrening.slice(11, 16) : "10:00");
   const [uvTrener, setUvTrener] = useState(item.trener === "Jerry" ? "Jerry" : "Terezka");
   const [uvCena, setUvCena] = useState("1100");
   const [uvText, setUvText] = useState("");
@@ -2440,15 +2442,38 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
    */
   const [uvTelefon, setUvTelefon] = useState(item.telefon || "");
   useEffect(() => {
-    if (!jePoUvodnom || !item.oKom || uvTelefon) return;
+    if ((!jePoUvodnom && !jeUvodnyBezSms) || !item.oKom || uvTelefon) return;
     void fetch("/api/vydane-faktury", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { udaje?: { klient: string; telefon?: string }[] }) => {
         setUvTelefon(String((j.udaje || []).find((u) => u.klient === item.oKom)?.telefon || ""));
       })
       .catch(() => setUvTelefon(""));
-  }, [jePoUvodnom, item.oKom, uvTelefon]);
+  }, [jePoUvodnom, jeUvodnyBezSms, item.oKom, uvTelefon]);
   const uvCislo = cisloPreBranu(uvTelefon);
+  /**
+   * Doplniť telefón priamo v notifikácii (Jerry, 24. 11. 2026: „keď tam neni
+   * telefónne číslo vyplnené, tak dať možnosť doplniť"). Ukladá sa do profilu
+   * tým istým zápisom ako v okne SMS (`/api/vydane-faktury` akcia `udaje`),
+   * takže ho má aj karta klienta a ďalšie SMS. Bez uloženia by SMS odišla,
+   * ale číslo by sa pri ďalšej stratilo.
+   */
+  const [noveCislo, setNoveCislo] = useState("");
+  const [ukladamCislo, setUkladamCislo] = useState(false);
+  const ulozCisloUvodneho = async () => {
+    const nove = noveCislo.trim();
+    if (!item.oKom || !cisloPreBranu(nove) || ukladamCislo) return;
+    setUkladamCislo(true); setUvChyba("");
+    const r = await fetch("/api/vydane-faktury", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "udaje", klient: item.oKom, telefon: nove }),
+    }).then((x) => x.json() as Promise<{ ok?: boolean; error?: string }>).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setUkladamCislo(false);
+    if (!r?.ok) { setUvChyba(r?.error || "Číslo sa neuložilo — skús znova."); return; }
+    setUvTelefon(nove);
+    setNoveCislo("");
+    oznam("klienti");
+  };
 
   const pripravUvodny = async () => {
     if (!item.oKom || !uvDatum || !uvCas || uvBusy) return;
@@ -2759,9 +2784,9 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
               {dopytOtvoreny ? "Zavrieť" : "Zapísať dopyt"}
             </button>
           )}
-          {jeNovyDopyt && !item.acked && (
+          {(jeNovyDopyt || jeUvodnyBezSms) && !item.acked && (
             <button onClick={() => setUvOtvoreny((o) => !o)} style={{ ...linkBtn, color: uvOtvoreny ? C.accentLight : C.green }}>
-              {uvOtvoreny ? "Zavrieť" : "Úvodný dohodnutý"}
+              {uvOtvoreny ? "Zavrieť" : jeUvodnyBezSms ? "Poslať SMS pred úvodným" : "Úvodný dohodnutý"}
             </button>
           )}
           {item.navrh && !item.acked && (
@@ -3037,13 +3062,27 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
             )}
           </div>
 
+          {!uvCislo && (jeUvodnyBezSms || jeNovyDopyt) && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: C.orange }}>{item.oKom} nemá v Kokpite telefón:</span>
+              <input value={noveCislo} onChange={(e) => setNoveCislo(e.target.value)} inputMode="tel" placeholder="+420 …"
+                name="psb-telefon" autoComplete="off" autoCorrect="off" spellCheck={false}
+                onKeyDown={(e) => { if (e.key === "Enter") void ulozCisloUvodneho(); }}
+                style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, width: 150 }} />
+              <button onClick={() => void ulozCisloUvodneho()} disabled={!cisloPreBranu(noveCislo.trim()) || ukladamCislo}
+                style={{ padding: "5px 13px", borderRadius: 7, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: !cisloPreBranu(noveCislo.trim()) || ukladamCislo ? 0.45 : 1, fontFamily: "inherit" }}>
+                {ukladamCislo ? "Ukladám…" : "Uložiť číslo"}
+              </button>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>uloží sa aj do profilu</span>
+            </div>
+          )}
           {!uvOdkaz ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <button onClick={() => void pripravUvodny()} disabled={!uvDatum || !uvCas || uvBusy}
                 style={{ padding: "5px 13px", borderRadius: 7, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, fontSize: 12, fontWeight: 600, cursor: !uvDatum || uvBusy ? "default" : "pointer", opacity: !uvDatum || uvBusy ? 0.45 : 1, fontFamily: "inherit" }}>
                 {uvBusy ? "Pripravujem…" : "Pripraviť odkaz a SMS"}
               </button>
-              {!uvCislo && <span style={{ fontSize: 12, color: C.orange }}>{uvDruh === "po" ? "Klient nemá v Kokpite telefón" : "Dopyt nemá telefón"} — odkaz vyrobím, poslať ho budeš musieť ručne.</span>}
+              {!uvCislo && !jeUvodnyBezSms && <span style={{ fontSize: 12, color: C.orange }}>{uvDruh === "po" ? "Klient nemá v Kokpite telefón" : "Dopyt nemá telefón"} — odkaz vyrobím, poslať ho budeš musieť ručne.</span>}
             </div>
           ) : (
             <>

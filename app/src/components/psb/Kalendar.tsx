@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { DOVODY_S_DOCHADZKOU, DOVODY_ZRUSENIA } from "../../lib/psb/kalendarZmeny";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { textSmsPredUvodnym } from "../../lib/psb/smsSablony";
+import { menoZNazvuUvodneho } from "../../lib/psb/kalendar";
 import { SmsKlientovi } from "./SmsKlientovi";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
@@ -1884,6 +1885,13 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   };
 
   const klientUdalosti = (klient.trim() || u?.klient || "").trim();
+  /**
+   * Komu ide SMS pred úvodným (Jerry, 24. 11. 2026: „neni to tam").
+   * Nový človek pri úvodnom ešte nemá mapovanie mena — `u.klient` je prázdne
+   * a tlačidlo sa pri „Tereza Šmídová-úvodná diagnostika" vôbec neukázalo.
+   * Meno sa vyčíta z názvu tak isto ako v registri (`klientUdalosti` v compute).
+   */
+  const klientUvodneho = klientUdalosti || (u && typ === "uvodny" ? menoZNazvuUvodneho(u.nazov || "") || "" : "");
   const duplikuj = async () => {
     if (!u || !klientUdalosti) return;
     setBezi(true); setChyba(""); setHlaska("");
@@ -1904,18 +1912,18 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     await onHotovo();
   };
   const pripravUvodnuSms = async () => {
-    if (!u || !klientUdalosti || uvBusy) return;
+    if (!u || !klientUvodneho || uvBusy) return;
     setUvBusy(true); setUvChyba("");
     type Odpoved = { ok?: boolean; odkaz?: string; token?: string; error?: string };
     const r = await fetch("/api/uvodny", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "odkaz", klient: klientUdalosti, druh: "pred", trener: u.trener, kedy: u.zaciatok.slice(0, 16), cena: uvCena.trim() === "" ? null : Number(uvCena) }),
+      body: JSON.stringify({ akcia: "odkaz", klient: klientUvodneho, druh: "pred", trener: u.trener, kedy: u.zaciatok.slice(0, 16), cena: uvCena.trim() === "" ? null : Number(uvCena) }),
     }).then((x) => x.json() as Promise<Odpoved>).catch((): Odpoved => ({ ok: false, error: "spojenie zlyhalo" }));
     setUvBusy(false);
     if (!r.ok || !r.odkaz) { setUvChyba(r.error || "Odkaz sa nepodarilo vyrobiť."); return; }
     setUvToken(r.token || "");
     // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov a z jednej správy by boli tri.
-    setUvText(textSmsPredUvodnym(klientUdalosti, r.odkaz));
+    setUvText(textSmsPredUvodnym(klientUvodneho, r.odkaz));
   };
   const inemuTrenerovi = async () => {
     if (!u || !novyTrener) return;
@@ -2085,7 +2093,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
             )}
           </>
         )}
-        {u && typ === "uvodny" && !!klientUdalosti && (
+        {u && typ === "uvodny" && !!klientUvodneho && (
           <button onClick={() => setUvOtvorene(!uvOtvorene)}
             style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${uvOtvorene ? C.accent : C.border}`, background: uvOtvorene ? C.accentBg : "transparent", color: uvOtvorene ? C.accentLight : C.textMuted }}>
             ✉ SMS pred úvodným
@@ -2103,10 +2111,10 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       </div>
 
       {hlaska && <div style={{ fontSize: 11.5, color: C.green, lineHeight: 1.5, marginTop: 8 }}>{hlaska}</div>}
-      {u && uvOtvorene && typ === "uvodny" && !!klientUdalosti && (
+      {u && uvOtvorene && typ === "uvodny" && !!klientUvodneho && (
         <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 7), display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
-            Odkaz na stránku pred úvodným pre <b style={{ color: C.text }}>{klientUdalosti}</b> · {den(u.zaciatok)} o {u.zaciatok.slice(11, 16)} · vedie {u.trener}. Termín sa na stránke drží podľa kalendára aj po presune.
+            Odkaz na stránku pred úvodným pre <b style={{ color: C.text }}>{klientUvodneho}</b> · {den(u.zaciatok)} o {u.zaciatok.slice(11, 16)} · vedie {u.trener}. Termín sa na stránke drží podľa kalendára aj po presune.
           </div>
           {!uvText ? (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -2127,7 +2135,7 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
                   onClick={(e) => otvorNahlad(e, `/u/${encodeURIComponent(uvToken)}?nahlad=1`)}
                   style={{ fontSize: 12, color: C.accentLight }}>👁 pozrieť, čo klient uvidí (náhľad sa nepočíta ako otvorenie)</a>
               )}
-              <SmsKlientovi meno={klientUdalosti} trener={u.trener} vlozene druhAuditu="uvodny" predvolenyText={uvText} />
+              <SmsKlientovi meno={klientUvodneho} trener={u.trener} vlozene druhAuditu="uvodny" predvolenyText={uvText} />
             </>
           )}
           {uvChyba && <div style={{ fontSize: 11.5, color: C.red }}>{uvChyba}</div>}
