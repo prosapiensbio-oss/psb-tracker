@@ -491,9 +491,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   }, [kalUdalosti, data.sessions, meno]);
 
   const buduce = useMemo(() => {
-    const d = dnesISO();
+    // Podľa času, nie dňa (24. 11. 2026): dnešný tréning, ktorý už začal, je na
+    // osi ako odtrénovaný — v „objednaných" by stál druhýkrát (Martin Vaško).
+    const teraz = terazPraha();
     return (kalUdalosti || [])
-      .filter((u) => u.klient && normName(u.klient) === normName(meno) && (u.typ === "trening" || u.typ === "uvodny") && u.zaciatok.slice(0, 10) >= d)
+      .filter((u) => u.klient && normName(u.klient) === normName(meno) && (u.typ === "trening" || u.typ === "uvodny") && u.zaciatok.slice(0, 16) > teraz)
       .map((u) => u.zaciatok)
       .sort();
   }, [kalUdalosti, meno]);

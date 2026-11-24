@@ -963,3 +963,13 @@ describe("zostatok prevzatý z PTmindera s koncom platnosti", () => {
     expect(priebehBalickov(os(r, "2026-10-10"), null, "2026-10-10").koniec).toBe(1);
   });
 });
+
+describe("prenesené hodiny v nezaplatenom balíčku (Martin Vaško, 24. 11. 2026)", () => {
+  it("prvé dva tréningy kryjú prenesené hodiny, tretí je až mínus", () => {
+    const os: Udalost[] = [bal("2026-11-24", 8, { nezaplatene: true, prenesene: 2 }), tre("2026-11-24"), tre("2026-12-01"), tre("2026-12-08")];
+    const v = vypisHodin(os, "", "2026-12-09", -1);
+    expect(v.riadky.filter((r) => r.druh === "trening").map((r) => [r.den, r.dlh ?? null])).toEqual([
+      ["2026-12-08", 1], ["2026-12-01", null], ["2026-11-24", null],
+    ]);
+  });
+});

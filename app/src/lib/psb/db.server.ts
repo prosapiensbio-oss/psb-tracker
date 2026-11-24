@@ -39,6 +39,7 @@ import { znamiKlienti } from "./nahodTrening.server";
 import { FAKTURA_OKNO_DNI } from "./fakturaKlienta";
 import { klientiSCakajucouFakturou } from "./fakturaNaDalsi.server";
 import { citajDohodu } from "./dohodaBalicka";
+import { preneseneZPoznamky } from "./zostatokKokpitu";
 
 const uid = () => crypto.randomUUID();
 
@@ -508,6 +509,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
       ukonceny: jeUkonceny(r),
       cena: r.cena_czk == null ? null : Number(r.cena_czk),
+      prenesene: preneseneZPoznamky(r.poznamka) || undefined,
     }));
   }
 

@@ -60,7 +60,24 @@ export type BalicekPreZostatok = {
   cena?: number | null;
   /** „rucne" / „ptminder" — os podľa toho rozlišuje staršie riadky. */
   zdroj?: string;
+  /** Hodiny prenesené z predošlého (zaplateného) balíčka — `preneseneZPoznamky`. */
+  prenesene?: number;
 };
+
+/**
+ * PRENESENÉ HODINY SÚ ZAPLATENÉ (Jerry, 24. 11. 2026, Martin Vaško).
+ *
+ * Předplatné od 24. 11. vzniklo s 8 h — 6 h nových a 2 h prenesené
+ * z októbrového, ktorý zaplatil. Pravidlo „nezaplatený balíček je nula"
+ * vynulovalo všetkých osem a dnešný tréning svietil ako „1 h nad rámec",
+ * hoci ho kryla zaplatená prenesená hodina. Nezaplatený balíček preto dáva
+ * aspoň svoje prenesené hodiny. Počet stojí v poznámke, ktorú píše
+ * `zapisBalicek` („+2 h prenesené z balíčka do …").
+ */
+export function preneseneZPoznamky(poznamka: string | null | undefined): number {
+  const m = /\+(\d+(?:[.,]\d+)?) h prenesen/i.exec(poznamka || "");
+  return m ? Number(m[1].replace(",", ".")) || 0 : 0;
+}
 
 export type SedeniePreZostatok = { client: string; date: string; duration?: number };
 
@@ -196,7 +213,8 @@ function prebehOdpoctu(
     if (jeZvysok(b)) for (const [x, r] of zvysok) if (koniec(x) <= d) { zdroj += Math.max(0, r); zdrojov++; zvysok.set(x, 0); }
     // Ukončený prevzatý zostatok Jerry uzavrel („v PTminderi už nie je") —
     // nedáva nič (Jitka Heinrichová: inak by mala 5 h namiesto 4).
-    let h = jeNezaplateny(b) || (b.kotva && b.ukonceny) ? 0 : b.hodiny || 0;
+    // Nezaplatený dáva len hodiny prenesené zo zaplateného (Martin Vaško, 24. 11. 2026).
+    let h = jeNezaplateny(b) ? Math.min(b.hodiny || 0, b.prenesene || 0) : b.kotva && b.ukonceny ? 0 : b.hodiny || 0;
     /**
      * PRENESENÉ HODINY NIE SÚ VIAC, NEŽ ZOSTALO (Jaroslav Kalva, 23. 10. 2026).
      * Presun sa zapisuje tri dni pred koncom s vtedajším zostatkom: Kalvovi
@@ -321,8 +339,10 @@ export function zostatokKokpitu(
   // inak by sa vynechal deň, ktorý iný aktívny balíček normálne pokrýva.
   const odVylucne = aktivne.some((b) => b.kotva && den(b.platnostOd) === od);
   const jeNezaplateny = (b: BalicekPreZostatok) => nezaplatene.has(klucNezaplateneho(b.klient, b.platnostOd));
-  const spolu = pausal ? 0 : aktivne.filter((b) => !jeNezaplateny(b)).reduce((a, b) => a + (b.hodiny || 0), 0);
-  const nezaplateneHodin = pausal ? 0 : aktivne.filter(jeNezaplateny).reduce((a, b) => a + (b.hodiny || 0), 0);
+  // Nezaplatený balíček dáva len hodiny prenesené zo zaplateného (24. 11. 2026).
+  const prenesene = (b: BalicekPreZostatok) => Math.min(b.hodiny || 0, b.prenesene || 0);
+  const spolu = pausal ? 0 : aktivne.reduce((a, b) => a + (jeNezaplateny(b) ? prenesene(b) : (b.hodiny || 0)), 0);
+  const nezaplateneHodin = pausal ? 0 : aktivne.filter(jeNezaplateny).reduce((a, b) => a + (b.hodiny || 0) - prenesene(b), 0);
 
   let minute = 0;
   for (const s of sedenia) {

@@ -22,6 +22,7 @@
  * zostatok nesedí (tá istá pasca ako pri „Posledné" v profile, 21. 9. 2026).
  */
 
+import { preneseneZPoznamky } from "./zostatokKokpitu";
 import { normName } from "./format";
 import { KOKPIT_OD } from "./sedeniaZKalendara";
 import { dnesPraha, terazPraha } from "./cas";
@@ -48,6 +49,8 @@ export type Udalost =
       uvodny?: boolean;
     }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean;
+      /** Hodiny prenesené zo zaplateného balíčka — tie dáva aj nezaplatený (`preneseneZPoznamky`). */
+      prenesene?: number;
       /** Ukončený s vrátením peňazí — jeho znížená cena nie je vzor pre ďalší predaj (Radek Baláž). */
       ukonceny?: boolean;
       /** Zostatok prevzatý z PTmindera pri štarte Kokpitu (snímka, nie predaj) — viď `priebehBalickov`. */
@@ -530,6 +533,7 @@ export function osCasuKlienta(
       nezaplatene: nezaplateneDniKokpit.has(d) || undefined,
       zKokpitu: true,
       ukonceny: b.ukonceny || undefined,
+      prenesene: preneseneZPoznamky(b.poznamka) || undefined,
     });
   }
 

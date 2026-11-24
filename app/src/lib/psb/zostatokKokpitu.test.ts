@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { klucNezaplateneho, treningyBezBalicka, zostatokKokpitu, type BalicekPreZostatok } from "./zostatokKokpitu";
+import { preneseneZPoznamky, klucNezaplateneho, treningyBezBalicka, zostatokKokpitu, type BalicekPreZostatok } from "./zostatokKokpitu";
 
 const b = (od: string, doDna: string | null, hodiny: number | null, nazov = "OFF - 6h", extra: Partial<BalicekPreZostatok> = {}): BalicekPreZostatok =>
   ({ klient: "Vitezslav Papiež", nazov, hodiny, platnostOd: od, platnostDo: doDna, ...extra });
@@ -213,5 +213,17 @@ describe("vyčerpané doplnenie bez konca nedrží členstvo", () => {
 
   it("riadny balíček kryje aj vyčerpaný — mínus hlási notifikácia hodín", () => {
     expect(treningyBezBalicka([b("2026-10-01", "2026-10-20", 1)], "Vitezslav Papiež", [s("2026-10-02"), s("2026-10-03")], "2026-10-01", "2026-11-01")).toEqual([]);
+  });
+});
+
+describe("prenesené hodiny v nezaplatenom balíčku (Martin Vaško, 24. 11. 2026)", () => {
+  it("poznámka zo zapisBalicek nesie počet", () => {
+    expect(preneseneZPoznamky("automaticky — pokračovanie · +2 h prenesené z balíčka do 2026-11-18")).toBe(2);
+    expect(preneseneZPoznamky("automaticky — vznikol prvým tréningom")).toBe(0);
+  });
+  it("nezaplatený balíček 8 h (z toho 2 prenesené) dá 2 h — prvý tréning nie je nad rámec", () => {
+    const z = zostatokKokpitu([b("2026-11-24", "2026-12-23", 8, "6h Předplatné", { prenesene: 2 })], "Vitezslav Papiež", [s("2026-11-24")],
+      "2026-11-24", new Set(), new Set([klucNezaplateneho("Vitezslav Papiež", "2026-11-24")]));
+    expect(z).toMatchObject({ zostatok: 1, nadRamec: 0, spolu: 2, nezaplateneHodin: 6 });
   });
 });

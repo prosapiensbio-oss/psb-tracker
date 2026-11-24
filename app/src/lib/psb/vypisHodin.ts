@@ -421,7 +421,8 @@ export function priebehBalickov(
     !(clenstvo?.doDna && u.den > clenstvo.doDna);
 
   /** Hodiny, z ktorých sa v období naozaj odpočítava: nezaplatené členstvo má nulu. */
-  const hodinUseku = (u: Usek): number => (u.balicek?.nezaplatene ? 0 : u.hodin);
+  // …okrem hodín prenesených zo zaplateného balíčka (Martin Vaško, 24. 11. 2026).
+  const hodinUseku = (u: Usek): number => (u.balicek?.nezaplatene ? Math.min(u.hodin, u.balicek.prenesene || 0) : u.hodin);
 
   /** Koľko hodín v období ešte zostáva podľa doterajších riadkov (samostatné hodiny sa nerátajú). */
   const zvysokUseku = (u: Usek): number => {
@@ -819,7 +820,9 @@ export function priebehBalickov(
         const poPlatnosti = koniecVKokpite && u.den > b!.doDna!;
         if (vycerpane && stareObdobie) vyrovnane = true;
         else if (neznameHodiny && !(vycerpane && b === posledny && (kartaVMinuse || poPlatnosti))) dlh = null;
-        else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
+        // Hodinu prenesenú zo zaplateného balíčka klient zaplatil — tréning na nej
+        // nie je dlh, ani keď nový balíček ešte zaplatený nie je (Vaško, 24. 11. 2026).
+        else if (vycerpane || (!zaplateneOd && !(b?.nezaplatene && (b.prenesene || 0) > 0)) || (!!zaplateneOd && u.den < zaplateneOd)) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
       // Stav po tréningu so znamienkom: pod nulou sú to tréningy bez hodiny.
