@@ -201,7 +201,15 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
     if (r.ok) {
-      if (!lenPoznamka) setSprava(`${uzavierka && kategoria ? "Zaradené a potvrdené" : "Prehodené"}: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. ⌘Z vráti.${r.upozornenie ? ` ${r.upozornenie}` : ""}`);
+      /**
+       * Jeden riadok sa zaraďuje BEZ HLÁŠKY (Jerry, 24. 11. 2026: „nepotrebujem,
+       * aby na mňa stále vyskakovalo, že cmd+z je krok späť"). Zmenu vidno na
+       * riadku a krok späť ponúka tlačidlo „Krok späť (N)". Hláška ostáva pri
+       * hromadnej zmene a pri všetkom, čo sa nepodarilo celé.
+       */
+      const hlasit = zmeny.length > 1 || !!r.zamknute || !!r.upozornenie;
+      if (!lenPoznamka && hlasit) setSprava(`${uzavierka && kategoria ? "Zaradené a potvrdené" : "Prehodené"}: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}.${r.upozornenie ? ` ${r.upozornenie}` : ""}`);
+      else if (!lenPoznamka) setSprava("");
       if (!kluce) setOznacene(new Set());
       nacitaj();
       oznam("peniaze");
@@ -242,7 +250,9 @@ export function BankaUlozene({ focus, pohybSplits, onSplit, uzavierka: uzavierka
     }).then((x) => x.json()).catch((e) => ({ ok: false, error: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` })) as { ok?: boolean; potvrdene?: number; preskocene?: number; error?: string };
     setBusy(false);
     if (r.ok) {
-      setSprava(`${zrus ? "Vrátené medzi návrhy" : "Potvrdené"}: ${r.potvrdene}${hromadne ? ` (${hromadne})` : ""}${r.preskocene ? ` · ${r.preskocene} preskočených (bez kategórie alebo uzavretý mesiac)` : ""}. ⌘Z vráti.`);
+      // Jeden potvrdený riadok zmizne zo zoznamu a to stačí — bez hlášky (24. 11. 2026).
+      if (kluce.length > 1 || hromadne || r.preskocene) setSprava(`${zrus ? "Vrátené medzi návrhy" : "Potvrdené"}: ${r.potvrdene}${hromadne ? ` (${hromadne})` : ""}${r.preskocene ? ` · ${r.preskocene} preskočených (bez kategórie alebo uzavretý mesiac)` : ""}.`);
+      else setSprava("");
       setOznacene(new Set());
       nacitaj();
       oznam("peniaze");
