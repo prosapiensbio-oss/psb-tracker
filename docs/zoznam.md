@@ -996,8 +996,36 @@ maily dorazili (15:01 a 15:15). Robot s opísaným `psb_ok`, ale bez lístka →
 odmietnutý na vstupe, bez záznamu v Kokpite aj bez mailu. Všetkých desať stránok
 magnetov má v zdroji `data-sitekey`.
 
-**Otvorené:** Cloudflare pri neviditeľnom režime žiada zmienku v zásadách ochrany
-údajov. Text pre `/gdpr/` je pripravený, čaká na Jerryho slovo.
+**Zmienka v GDPR je na webe (25. 11.).** Cloudflare pri neviditeľnom režime žiada
+zmienku v zásadách ochrany údajov. Na `/gdpr/` pribudla sekcia „Ochrana formulářů"
+s odkazom na zásady Cloudflare Turnstile. Zmena je v prototype
+`navrhy-webu/d-spready.tpl.html` (zdroj pravdy) a cez Editor šablón aj naživo
+(`parts/gdpr.html`, `inc/zdroj/gdpr.json`). Vložená je PRED vetu o účinnosti, takže
+sa posunul len kľúč dátumu (`gdpr-150` → `gdpr-152`); nové sú `gdpr-150` a `gdpr-151`.
+
+## Zásady a Obchodní podmínky ukazovali na počítači len polovicu — 25. 11. 2026
+
+Pri overovaní tej zmienky sa ukázalo, že **na počítači končili Zásady ochrany
+osobných údajov v polovici**: v stránke bolo 152 odstavcov, na obrazovku sa ich
+dostalo 72. Obchodní podmínky 78 → 69. Na telefóne boli obe celé, lebo tam sa
+sadzba do dvoch stĺpcov nerobí.
+
+Príčina je poistka proti zacykleniu v sadzbe do listov (`bkflow` v `js/app.js`):
+`while(q.length&&guard<80)`. Každé kolo uloží najviac jeden odstavec a časť kôl
+padne na „nezmestil sa, skús ďalší stĺpec". Pri 80 kolách sa dlhý dokument
+nedoukladá a **zvyšok sa ticho zahodí** — odstavce sú v tej chvíli už vybrané
+zo stĺpcov. Na bežných stránkach (do ~40 blokov) sa to nikdy neprejavilo.
+
+Opravené na `guard<items.length*3+80`. Overené headless Chromom na desiatich
+stránkach: zmenili sa len tie dve (gdpr 72 → 152 textov, op 69 → 78), ostatných
+osem má do bloku rovnaký počet textov aj listov. Telefón (390 px) nezmenený.
+
+**Pasca na nabudúce:** statický súbor na webe sa po zmene nemusí dostať
+k návštevníkovi. Proxy drží `app.js?ver=<mtime>` 120 dní a `curl` dostane nový
+súbor aj vtedy, keď prehliadač (s hlavičkami Chromu) dostane starý. Pomohlo až
+uloženie tých dvoch stránok vo WordPresse: premazalo sa `WP Fastest Cache`,
+nová stránka nesie nové `?ver=` a tú adresu proxy ešte nemá. **Overuj to
+prehliadačom s čistým profilom na adrese BEZ obídenia keše**, nie curlom.
 
 ## Magnety na webe konečne posielajú mail — 16. 11. 2026
 
