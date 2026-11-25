@@ -929,36 +929,47 @@ načítanie je teraz 429 kB a najťažšie v ňom je naše písmo
 
 - **1. 11. 2026, rozbor a veľká oprava:** 9 balíkov nasadených (verzia 2277), podrobne v CLAUDE.md „Rozbor a veľká oprava“.
 
-## Magnety zneužívajú boti — od 21. 11. 2026, OTVORENÉ
+## Magnety zneužívajú boti — nájdené a zavreté 25. 11. 2026
 
 Odkedy formuláre naozaj posielajú mail (16.–18. 11.), našli ich roboti.
-Zmerané 25. 11. v `leads`:
+Za päť dní 42 odoslaní na cudzie adresy — každé z nich poslalo PDF
+neznámemu človeku z `online@prosapiens.cz`, teda z tej istej schránky,
+z ktorej chodia faktúry a odkazy klientom.
 
-| deň | odoslaní | z toho bez mena |
-|---|---|---|
-| 20. 11. | 1 | 1 |
-| 21. 11. | 4 | 4 |
-| 22. 11. | 7 | 7 |
-| 23. 11. | 12 | 11 |
-| 24. 11. | 11 | 11 |
-| 25. 11. (do obeda) | 6 | 6 |
+**Ako to robili.** Nie cez našu stránku. Stiahli si HTML, vytiahli z neho
+skrytý formulár Forminatora aj s `forminator_nonce` a odoslali ho sami na
+`admin-ajax.php` — bez toho, aby spustili `formulare.js`. Chodili vo
+dvojiciach sekundu po sebe: raz s náhodným menom (`uRJdAEVIsrDcNExzQyqNai`),
+raz s prázdnym. Preto „povinné meno" nebolo riešenie — polovicu by prepustilo.
+Trafili presne dve stránky: `/dychani/` (23) a `/protokol…/` (18), teda tie
+dve, ktorých vysádzaný formulár meno nežiadal.
 
-Adresy sú cudzie a strojové: `woo.t.to.nhayl.ey1.357@gmail.com`,
-`s.ta.ndr.i.dg.ej.ame.s@gmail.com`, firemné americké schránky,
-`4848839594@vtext.com` (SMS brána), `jennifer@lop5@hotmail.com` (dve @).
-**Každé takéto odoslanie pošle PDF cudziemu človeku z `online@prosapiens.cz`** —
-teda z tej istej schránky, z ktorej chodia faktúry a odkazy klientom.
+**Čo bolo nasadené 25. 11.:**
 
-Príčina: magnety vo Forminatore nemajú **žiadnu ochranu** — v živom HTML
-nie je captcha ani honeypot a `name-1` aj `email-1` majú `aria-required="false"`.
-Formuláre cez Contact Form 7 (/kontakt/, /uvodni-trenink/, /test-postury/)
-reCAPTCHA majú a spam na nich NIE JE — za november jediný dopyt.
+1. `formulare.js` pridáva do odoslania pole **`psb_ok`** s dvoma časmi —
+   kedy sa stránka otvorila a kedy sa odoslalo. Vypĺňa ho jedine náš kód.
+2. Snippet **„PSB — magnety proti robotom" (id 30)** kontroluje `psb_ok`
+   na VSTUPE do AJAXu (`wp_ajax[_nopriv]_forminator_submit_form_custom-forms`,
+   priorita 1). Nie až vo validácii formulára: tam sa odoslanie stihlo
+   zapísať do Kokpitu skôr, než ho Forminator odmietol, a v Dopytoch
+   pribúdali falošné riadky. Overuje len TVAR a ROZDIEL časov (≥ 1,2 s),
+   nie absolútny čas — návštevník s posunutými hodinami sa nevyradí.
+3. `/dychani/` má konečne pole **Jméno** (vo vysádzanom formulári aj
+   v samotnom Forminatore, kde dovtedy nebolo vôbec), druhý formulár
+   na `/protokol…/` má meno povinné. Všetkých desať magnetov je rovnakých.
 
-**Čo s tým (neurobené, nedostal som sa do wp-adminu):** `wp-login.php` vracia
-404 a `/wp-admin/` presmeruje na `/404/` — prihlasovacia adresa je skrytá.
-Potrebujem od Jerryho tú adresu, alebo nech sa prihlási v Chrome.
-Potom: zapnúť vo Forminatore ochranu proti spamu na všetkých desiatich
-magnetoch (Akismet alebo captcha) a vyčistiť falošné riadky v `leads`.
+**Overené naživo:** robot (priamy POST bez `psb_ok`) → odmietnutý, bez
+záznamu a bez mailu. Človek cez stránku na `/dychani/`, `/protokol…/`
+a `/postura…/` → prejde a mail dorazí. 42 falošných riadkov je z `leads`
+zmazaných; ostali dvaja skutoční (Jakub Grim 21. 11., Maria Khatskevich 23. 11.).
+
+**Otvorené:**
+- V odpovediach Forminatora ležia robotie záznamy (na Protokole ich za
+  týždeň pribudlo ~60) a moje dnešné testy (`prosapiensbio@gmail.com`,
+  `robot-test@example.com`). Dajú sa zmazať hromadnou akciou.
+- `psb_ok` zastaví robota, ktorý náš JavaScript nespúšťa. Keby si niekto
+  dal prácu a stopu opísal, ďalší stupeň je **Cloudflare Turnstile**
+  vo Forminatore — treba naň kľúč z Jerryho účtu na Cloudflare.
 
 ## Magnety na webe konečne posielajú mail — 16. 11. 2026
 
