@@ -1020,6 +1020,17 @@ Opravené na `guard<items.length*3+80`. Overené headless Chromom na desiatich
 stránkach: zmenili sa len tie dve (gdpr 72 → 152 textov, op 69 → 78), ostatných
 osem má do bloku rovnaký počet textov aj listov. Telefón (390 px) nezmenený.
 
+**Prejdený celý web (25. 11.).** Všetkých 78 adries z mapy témy, každá v troch
+šírkach (1600 počítač, 1024 tablet, 390 telefón): porovnané kľúče `data-t`
+v stiahnutej stránke proti kľúčom v hotovom DOM po sadzbe. **Nikde inde sa text
+nestráca** — 234 vykreslení, 0 chýbajúcich blokov. V sitemapách nie je ani jedna
+adresa mimo mapy témy, takže nie je čo doplniť.
+
+Prečo to nechytilo aj články (132 blokov na `/deep-front-line/`): tie sa sádžu
+inou cestou než dvojstĺpcová „kniha". Overené lokálne so starým aj novým `app.js`
+— pri oboch 132 zo 132. `guard<80` hrýzol len `.book.legal`, teda Zásady
+a Obchodní podmínky.
+
 **Pasca na nabudúce:** statický súbor na webe sa po zmene nemusí dostať
 k návštevníkovi. Proxy drží `app.js?ver=<mtime>` 120 dní a `curl` dostane nový
 súbor aj vtedy, keď prehliadač (s hlavičkami Chromu) dostane starý. Pomohlo až
