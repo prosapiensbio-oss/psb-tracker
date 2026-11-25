@@ -22,9 +22,18 @@ nezapadlo medzi úlohami bez termínu):
   je nahraté a v zdrojovom CSS je, ale návštevníkom ide stará zlúčená kópia
   CSS. Z účtu „ProSapiens" sa nastavenia WPFC nedajú otvoriť („nemáte
   oprávnění"), z Jerryho účtu áno.
-- **24. 11. 2026** — vyhodnotiť prvú obrazovku úvodnej stránky: koľko ľudí
-  z POČÍTAČA prešlo z 1. na 2. obrazovku (pred zmenou 1 z 36) a koľko klikov
-  má `cta_odkaz` na „Rezervovat úvodní trénink".
+- [x] **24. 11. 2026** — vyhodnotené 25. 11.: **nedá sa a nikdy sa nedalo.**
+  Tých „36 ľudí z počítača" (27. 10. – 9. 11.) bola takmer celá moja vlastná
+  práca v Chrome — desktop na úvodnej spadol z 41 návštev na 5, a rovnako
+  spadol na VŠETKÝCH stránkach, kým mobil zostal rovnaký (10 → 12). Záver
+  z 10. 11. („štyria z piatich po prvej obrazovke neprejdú") stál na mojom
+  vlastnom prehliadači. Na mobile, kde sú skutoční ľudia, sa listuje hlboko
+  aj pred zmenou aj po nej (4·6·5·4·3·3·2·2·2·1). Zmeny na prvej obrazovke
+  neškodia, len dôvod pre ne bol meraný zo špinavých dát.
+  **Navyše `cta_odkaz` Kokpit vôbec nečíta** — web ho posiela (je v živom
+  `formulare.js`), ale zoznam udalostí v `api/google` akcii `hlbka` aj
+  `UDALOSTI` vo `webKontrolaMeranie.ts` ho nemajú. Treba ho tam dopísať,
+  inak sa každé ďalšie tlačidlo meria naslepo.
 
 - [x] **2. 11. 2026** — overené v `automaty`: ranná dávka odišla o 05:30Z (4 odbery), automatické balíčky z plánovača o 04:15Z (0 nových), všetkých 17 automatov bez chyby.
 - **6. 11. 2026** — prvá uzávierka po osobách: pripomienka má prísť Jerrymu aj Terezke zvlášť.
@@ -158,6 +167,7 @@ Pravidlo „najprv kruh s Terezkou“ zrušené 5. 11. 2026.
 - **10a13** [ ] Tréning Strižne na dvojiciach surové → hotové (10. 11. 2026): `npx tsx scripts/trening.ts` v strizna, dáta ~/Strizna-trening, reporty ~/Strizna-trening/reporty. Hotové v strizna main 53343c6: značka PSB záver A (predvolený) / B na výber, panáčik dole celý čas, hudba v každom PSB strihu (−22 dB pod rečou), záver PSB nahrádza kartu réžie D/F; karta pred/po z Kokpitu (editor fotiek, karta IG 4:5) celá v rámčeku; klient-rozhovor = odpoveď na jednu otázku, reč len zo záberu do kamery (strih naslepo po oprave: Natália 39,6 s vs 38,7 s, Danielka 45 s vs 59 s). Strih naslepo spolu 7 volaní Clauda. Ostáva: odborník do kamery: Jerry bez titulkov (Strižňa ich dáva, čaká Jerryho odpoveď), pauzy tesnejšie (Jerry 2,9× zhustenie, Strižňa 1,2×), zábery mimo surových 13 %; meranie tréningu nepozná novú kartu PSB a tréningová knižnica hudby je prázdna (hudba v porovnaní „nie“ je artefakt); záver 2,4 s vs Jerryho 1,5 s – doladiť podľa Jerryho.
 - **10a14** [ ] Hooky cvičiacich videí (11. 11. 2026): v strizna main dfd02a9. Úvodný záber: rozbor na pozadí (engine/hook_kandidati.py, server/hooky.ts), panel Rozhodnutia → Úvodný záber, prvý strih začne A, voľby do <koreň>/hooky-vyber.jsonl; žiadna farebná karta na snímke 0 (shared/prvaSnimka.ts). Váhy podľa Jerryho výberu 11. 11. (top-1 5→7 z 8, merané na tých istých dátach). Ostáva: prvý ostrý deň, po ~30 voľbách z hooky-vyber.jsonl prepočítať váhy; slabiny: dotyk trénera z 2D, otočenie klipov v ľahu (Jarek 180°), falošná ruka pri tvári pri gardě s činkou, rozbor ~reálny čas.
 - **10a15** [ ] Kontroly Strižne padajú pod záťažou (11. 11.): vitest raz 7 testov v 1 súbore, strážca strih-opravy-k2 / mapa / kalendar / vlozky; pri opakovaní prejdú. Nájsť časovanie a spraviť ich odolné.
+- **10a16** [ ] Réžie z kola Fable v Strižni (18. 11. 2026, vetva rezie-fb, nescommitované): PO Pointa na začiatok, LE Lekcia na plátne (reč), TO Tri okná, OD Otázka, dôkaz, odpoveď (cvičenie); ukážky ~/Desktop/Strizna-ukazky/fable-rezie. **Pridať pre Terezku:** OD na jej videách FP (1. 11., krk) by vzala za odpoveď „Functioneck + regen.trainer“ – rozhodnúť s Terezkou, či OD pre tereza-fp vypnúť, alebo brať odpoveď inak; Terezkine účty réžie FB zatiaľ len kreslia vo svojich farbách. Ostáva aj: Jerry ↻ Aktualizovať a vyskúšať na ostrom strihu; commit a zlúčenie do main.
 - **10a3** [ ] Výzva (5. 11., strizna main 82c222c): pevný Test postúry preč, výzva z karty v Pláne alebo z briefu, inak otázka v Zverejniť a Bez výzvy. Otvorené: motor ešte robí CTA z reči, keď Jerry „test postúry“ povie; Textár PSB v Kokpite ho stále odporúča pre fázu 2. Ostrý prvý strih s výzvou z plánu neoverený.
 - **10a4** [ ] Vzhľad videí pre Terezku (Jerry 5. 11.: navrhne si sama, základné veci len on). Plán hotový, ~9 dní, menšia verzia ~5; čaká na Jerryho tri odpovede (memy a infografiky áno/nie, môže Jerry prepísať jej vzhľad, zvuky a čiernobiely záber jej alebo jeho) a na /navrhy obrazovky.
 - **10y** [ ] Strižňa, menej strojovosti + konkurencia + Higgsfield (4. 11. 2026, strizna main f50b435, na GitHube, v appke beží od 4. 11. 22:00). Tri kolá kontroly; opravy po 3. kole overené v kóde a testami, nie ďalšou nezávislou kontrolou. Ostáva na Jerrym: (a) pozrieť a vypočuť ukážky naslepo na telefóne, ~/Desktop/Strizna-ukazky/menej-stroja; (b) kľúč z console.higgsfield.ai *(je v ~/.Strizna-tajne od 5. 11.)* a zostatok API, potom jeden obrázok a jedno video naostro (Nano Banana Pro v API nie je, ide Soul V2; kredity predplatného zrejme neplatia); (c) voľba aktívneho slova v štýle psb (nové strihy teraz bez neho); (d) 30 ťahov pera, vlastné zvuky, krátke zoznamy skladieb, Filipova veta k repostom, Terezkine hodnoty účtu. Vedome nepostavené: nápady 11 až 15 z konkurencia.md. Dávka dňa: druhá session vo vetve zj-davka, ešte nie v main.
@@ -918,6 +928,37 @@ načítanie je teraz 429 kB a najťažšie v ňom je naše písmo
 - **Dve klientky „Marketa"** — tým istým zásahom.
 
 - **1. 11. 2026, rozbor a veľká oprava:** 9 balíkov nasadených (verzia 2277), podrobne v CLAUDE.md „Rozbor a veľká oprava“.
+
+## Magnety zneužívajú boti — od 21. 11. 2026, OTVORENÉ
+
+Odkedy formuláre naozaj posielajú mail (16.–18. 11.), našli ich roboti.
+Zmerané 25. 11. v `leads`:
+
+| deň | odoslaní | z toho bez mena |
+|---|---|---|
+| 20. 11. | 1 | 1 |
+| 21. 11. | 4 | 4 |
+| 22. 11. | 7 | 7 |
+| 23. 11. | 12 | 11 |
+| 24. 11. | 11 | 11 |
+| 25. 11. (do obeda) | 6 | 6 |
+
+Adresy sú cudzie a strojové: `woo.t.to.nhayl.ey1.357@gmail.com`,
+`s.ta.ndr.i.dg.ej.ame.s@gmail.com`, firemné americké schránky,
+`4848839594@vtext.com` (SMS brána), `jennifer@lop5@hotmail.com` (dve @).
+**Každé takéto odoslanie pošle PDF cudziemu človeku z `online@prosapiens.cz`** —
+teda z tej istej schránky, z ktorej chodia faktúry a odkazy klientom.
+
+Príčina: magnety vo Forminatore nemajú **žiadnu ochranu** — v živom HTML
+nie je captcha ani honeypot a `name-1` aj `email-1` majú `aria-required="false"`.
+Formuláre cez Contact Form 7 (/kontakt/, /uvodni-trenink/, /test-postury/)
+reCAPTCHA majú a spam na nich NIE JE — za november jediný dopyt.
+
+**Čo s tým (neurobené, nedostal som sa do wp-adminu):** `wp-login.php` vracia
+404 a `/wp-admin/` presmeruje na `/404/` — prihlasovacia adresa je skrytá.
+Potrebujem od Jerryho tú adresu, alebo nech sa prihlási v Chrome.
+Potom: zapnúť vo Forminatore ochranu proti spamu na všetkých desiatich
+magnetoch (Akismet alebo captcha) a vyčistiť falošné riadky v `leads`.
 
 ## Magnety na webe konečne posielajú mail — 16. 11. 2026
 
