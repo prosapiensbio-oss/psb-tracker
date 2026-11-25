@@ -164,6 +164,7 @@ Pravidlo „najprv kruh s Terezkou“ zrušené 5. 11. 2026.
 - **10a10** [ ] *(Hľadanie HOTOVÉ 9. 11., strizna main 0803378: náradie + doslovné frázy, poradie podľa počtu zmienok; pre vetu o RG bare 3 streamy namiesto 0. Ostáva: Jerry ⌘Q, potom pri RG bare Príbeh znova a pozrieť, či text naozaj stojí na Naudiho myšlienke.)* Naudiho streamy (9. 11.): Strižňa má 77 prepisov (~/Strizna/zdroje/naudi-1, naudi-2), ale hľadanie pozná len pojmy tela (POJMY v shared/zdrojPredstavy.ts). „RG bar“ je v prepisoch ~80-krát, appka našla 0 a do zadania napísala „prepis nie je“. Treba: hľadať aj doslovné slová a náradie z predstavy (RG bar, RG bell, Leverage King, Vector Trainer).
 - **10a7** [ ] Edits a preklik (9. 11. 2026, strizna main a9044bb): Zverejniť → Otvoriť v Edits (projekt 9:16 s videom, zverejní Jerry); príbeh s poľom Preklik na web ide do Metricoolu ručne (autoPublish false, notifikácia v appke Metricool). Ostáva: prvý ostrý príbeh s odkazom overiť v telefóne (príde notifikácia? je odkaz na skopírovanie?); čip Vyšlo pri ručnom príbehu klame; hudba cez Edits nefunguje a netreba ju.
 - **10a8** [ ] Spotreba Clauda v Strižni (10. 11. 2026, strizna main 6b7e7e5): karta videa, opis raz, Sonnet len na opis záberov, ľahké volania bez nástrojov, dávka opisov po 6. Ostáva: pri prvom ostrom popise banky pozrieť ~/Strizna/spotreba-claude.jsonl (kolá, tokeny) a či sa opisy nepomiešali; neskôr odľahčiť konektorové úlohy (overiť na Najlepší čas) a skúsiť krátke --system-prompt na opisoch.
+- **10a17** [ ] Réžie príbehu klienta (25. 11. 2026, Jerry: všetky štyri „chcem“): KA Dokument, KB Pred → Dnes, KC Hlas cez tréning, KD Kapitoly; strizna vetva rezie-klient 06ee9c8 vo worktree ~/Downloads/psb-strih/strizna-klient, NIE v main. Overené na klone dňa 23. 11. (Regina A/B/D, pán s krkom A/B/C), videá ~/Desktop/Strizna-ukazky/pribeh-klienta/zo-strizne. Ostáva: Jerry pozrie videá a povie „naostro“ → zlúčiť do main (pozor: hlavný priečinok strizna je na vetve rezie-fb s nescommitnutou prácou inej session, réžie FB), náhľady dlaždíc KA–KD skopírovať do ~/Strizna/nahlady-rezii (sú v scratchpade session d1a58dbb, inak vyrobiť z kolo-pribeh/out). Hudbu v PŘED/DNES som neposlúchal, len test. Stará chyba šablóny: tréning na delenom obraze berie tréning celého dňa (aj iného klienta) – pod réžiami KA–KD sa nekreslí, bez réžie áno.
 - **10a13** [ ] Tréning Strižne na dvojiciach surové → hotové (10. 11. 2026): `npx tsx scripts/trening.ts` v strizna, dáta ~/Strizna-trening, reporty ~/Strizna-trening/reporty. Hotové v strizna main 53343c6: značka PSB záver A (predvolený) / B na výber, panáčik dole celý čas, hudba v každom PSB strihu (−22 dB pod rečou), záver PSB nahrádza kartu réžie D/F; karta pred/po z Kokpitu (editor fotiek, karta IG 4:5) celá v rámčeku; klient-rozhovor = odpoveď na jednu otázku, reč len zo záberu do kamery (strih naslepo po oprave: Natália 39,6 s vs 38,7 s, Danielka 45 s vs 59 s). Strih naslepo spolu 7 volaní Clauda. Ostáva: odborník do kamery: Jerry bez titulkov (Strižňa ich dáva, čaká Jerryho odpoveď), pauzy tesnejšie (Jerry 2,9× zhustenie, Strižňa 1,2×), zábery mimo surových 13 %; meranie tréningu nepozná novú kartu PSB a tréningová knižnica hudby je prázdna (hudba v porovnaní „nie“ je artefakt); záver 2,4 s vs Jerryho 1,5 s – doladiť podľa Jerryho.
 - **10a14** [ ] Hooky cvičiacich videí (11. 11. 2026): v strizna main dfd02a9. Úvodný záber: rozbor na pozadí (engine/hook_kandidati.py, server/hooky.ts), panel Rozhodnutia → Úvodný záber, prvý strih začne A, voľby do <koreň>/hooky-vyber.jsonl; žiadna farebná karta na snímke 0 (shared/prvaSnimka.ts). Váhy podľa Jerryho výberu 11. 11. (top-1 5→7 z 8, merané na tých istých dátach). Ostáva: prvý ostrý deň, po ~30 voľbách z hooky-vyber.jsonl prepočítať váhy; slabiny: dotyk trénera z 2D, otočenie klipov v ľahu (Jarek 180°), falošná ruka pri tvári pri gardě s činkou, rozbor ~reálny čas.
 - **10a15** [ ] Kontroly Strižne padajú pod záťažou (11. 11.): vitest raz 7 testov v 1 súbore, strážca strih-opravy-k2 / mapa / kalendar / vlozky; pri opakovaní prejdú. Nájsť časovanie a spraviť ich odolné.
@@ -967,9 +968,36 @@ zmazaných; ostali dvaja skutoční (Jakub Grim 21. 11., Maria Khatskevich 23. 1
 - V odpovediach Forminatora ležia robotie záznamy (na Protokole ich za
   týždeň pribudlo ~60) a moje dnešné testy (`prosapiensbio@gmail.com`,
   `robot-test@example.com`). Dajú sa zmazať hromadnou akciou.
-- `psb_ok` zastaví robota, ktorý náš JavaScript nespúšťa. Keby si niekto
-  dal prácu a stopu opísal, ďalší stupeň je **Cloudflare Turnstile**
-  vo Forminatore — treba naň kľúč z Jerryho účtu na Cloudflare.
+
+## Turnstile ako druhá vrstva — 25. 11. 2026
+
+`psb_ok` zastaví robota, ktorý náš JavaScript nespúšťa. Robot, ktorý by si
+stopu opísal, by prešiel. Preto je nad ňou **Cloudflare Turnstile**.
+
+Widget `prosapiens.cz magnety` (Cloudflare → Turnstile), režim **Invisible**,
+domény `prosapiens.cz` aj `www.prosapiens.cz`. Kľúče sú vo Forminatore
+(Nastavení → CAPTCHA → Cloudflare Turnstile); tajný kľúč vložil Jerry sám.
+Pole **Captcha** s poskytovateľom Cloudflare Turnstile je vo všetkých
+desiatich formulároch magnetov.
+
+Dôležité, že to vôbec ide: skrytý formulár `#psb-skryte` nie je `display:none`
+(je schovaný cez `clip`), takže sa v ňom widget vykreslí a sám vyrieši.
+Návštevník nič nevidí a nič nekliká.
+
+Pribudol snippet **„PSB — magnety: lístok od Turnstile" (id 31)** na tom istom
+vstupe do AJAXu ako id 30. Kontroluje len to, že lístok vôbec dorazil; pravosť
+overí Forminator u Cloudflare. Overiť ho v snippete nejde, lístok platí na jedno
+použitie. Je to tam preto, že snippet „PSB — dopyt do Kokpitu" zapisuje lead
+ešte pred validáciou: bez tejto kontroly by Turnstile zastavil mail, ale falošný
+lead by v Kokpite ostal. Zmerané naživo — pred id 31 taký lead vznikol, po ňom už nie.
+
+**Overené naživo 25. 11.:** človek cez `/protokol…/` aj `/postura…/` prejde a oba
+maily dorazili (15:01 a 15:15). Robot s opísaným `psb_ok`, ale bez lístka →
+odmietnutý na vstupe, bez záznamu v Kokpite aj bez mailu. Všetkých desať stránok
+magnetov má v zdroji `data-sitekey`.
+
+**Otvorené:** Cloudflare pri neviditeľnom režime žiada zmienku v zásadách ochrany
+údajov. Text pre `/gdpr/` je pripravený, čaká na Jerryho slovo.
 
 ## Magnety na webe konečne posielajú mail — 16. 11. 2026
 
