@@ -130,6 +130,11 @@ async function api<T>(url: string, body?: unknown): Promise<T & { ok: boolean; e
   try { return JSON.parse(t); } catch { return { ok: false, error: `HTTP ${r.status}: ${t.slice(0, 300)}` } as T & { ok: boolean; error?: string }; }
 }
 
+/** Nové maily mimo koša „Ostatní" — to isté, čo `novaPosta` pre notifikáciu. `null` = ešte nenačítané. */
+export function pocetNovychEmailov(emaily: { stav: string; kategoria: string }[] | null): number | null {
+  return emaily ? emaily.filter((e) => e.stav === "nove" && e.kategoria !== "ostatne").length : null;
+}
+
 type Clovek = { kluc: string; meno: string; kategoria: Kategoria; posledny: Email; pocet: number; nove: boolean; nevybavene: boolean };
 
 /** Kto je za mailom: klient podľa mena, inak adresa na odpoveď. */
@@ -162,9 +167,11 @@ function inicialy(meno: string): string {
   return ((slova[0][0] || "") + (slova.length > 1 ? slova[slova.length - 1][0] : slova[0][1] || "")).toUpperCase();
 }
 
-export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }: {
+export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy, onPocetNovych }: {
   data: PSBData; clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null;
   onProfil: (meno: string) => void; onTerminy?: () => void;
+  /** Počet nových mailov mimo „Ostatní" — pre číslo pri nápise karty. */
+  onPocetNovych?: (n: number) => void;
 }) {
   const uzke = useUzke();
   const [emaily, setEmaily] = useState<Email[] | null>(null);
@@ -208,6 +215,17 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
     })();
   }, [nacitaj]);
 
+  // Kokpit obnovuje dáta pri návrate do okna a každých 15 min. Keď s nimi
+  // prišla iná nová pošta, karta si zoznam načíta tiež — inak by číslo pri
+  // nápise hovorilo o mailoch, ktoré v zozname ešte nie sú.
+  const postaKluc = (data.novaPosta || []).map((p) => p.id).join(",");
+  const predoslaPosta = useRef(postaKluc);
+  useEffect(() => {
+    if (predoslaPosta.current === postaKluc) return;
+    predoslaPosta.current = postaKluc;
+    void nacitaj();
+  }, [postaKluc, nacitaj]);
+
   const nacitajTeraz = async () => {
     setNacitavam("Čítam schránku…");
     const r = await api<{ precitanych: number; pridanych: number }>("/api/mail-dopyty", { akcia: "stiahni" });
@@ -222,6 +240,8 @@ export function EmailKarta({ data, clients, mena, ktoSom, onProfil, onTerminy }:
   const vsetky = useMemo(() => [...(emaily || [])].sort((a, b) => (a.datum < b.datum ? 1 : -1)), [emaily]);
   const nevybavene = vsetky.filter((e) => e.stav !== "vybavene");
   const naVybavenie = nevybavene.filter((e) => e.kategoria !== "ostatne").length;
+  const novych = pocetNovychEmailov(emaily);
+  useEffect(() => { if (novych !== null) onPocetNovych?.(novych); }, [novych, onPocetNovych]);
   const otvoreny = vsetky.find((e) => e.id === vybrany) || null;
   const ludiaZoznam = useMemo(() => zoskupLudi(vsetky), [vsetky]);
   const klucOtvoreneho = otvoreny ? klucCloveka(otvoreny) : null;

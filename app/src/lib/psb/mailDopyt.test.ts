@@ -82,6 +82,10 @@ describe("IMAP — dekódovanie", () => {
   it("base64 aj quoted-printable v hlavičke", () => {
     expect(dekoduj("=?UTF-8?B?RG90YXogbmEgdHLDqW5pbms=?=")).toBe("Dotaz na trénink");
     expect(dekoduj("=?UTF-8?Q?Dotaz_na_tr=C3=A9nink?=")).toBe("Dotaz na trénink");
+    // Rozsekaný predmet: medzera medzi kúskami nie je text, kúsok vie deliť aj písmeno (26. 11. 2026).
+    expect(dekoduj("=?UTF-8?Q?Va=C5=A1e_str=C3=A1nka_ProSapie?= =?UTF-8?Q?ns_Biomechanic?=")).toBe("Vaše stránka ProSapiens Biomechanic");
+    expect(dekoduj("=?UTF-8?Q?reklamn=C3?=\r\n =?UTF-8?Q?=AD=5Fho_=C3=BA=C4=8Dtu?=")).toBe("reklamní_ho účtu");
+    expect(dekoduj("=?UTF-8?B?RG90YXo=?= na =?UTF-8?B?dHLDqW5pbms=?=")).toBe("Dotaz na trénink");
   });
   it("telo bez HTML značiek a bez zalomení", () => {
     expect(dekodujTelo("<p>Dobr=C3=BD den,</p><p>chci se objednat.</p>")).toBe("Dobrý den,\nchci se objednat.");

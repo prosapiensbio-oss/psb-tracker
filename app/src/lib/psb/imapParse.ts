@@ -83,12 +83,25 @@ export function rozoberOdpoved(r: string, maxZnakov = 3000): Omit<ImapSprava, "u
  * nedal prečítať.
  */
 export function dekoduj(s: string): string {
-  return s.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_, _kod, druh, data) => {
+  // Dlhý predmet príde rozsekaný na viac kúskov `=?…?= =?…?=`. Medzera medzi
+  // nimi NIE JE text (RFC 2047) a kúsok sa vie rozseknúť aj uprostred písmena:
+  // „ProSapie ns", „reklamní ho" (Jerry, 26. 11. 2026). Susedné kúsky sa preto
+  // najprv zlepia na bajty a dekódujú až spolu.
+  const SLOVO = /=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g;
+  const naBajty = (druh: string, data: string): string | null => {
     try {
-      if (druh.toUpperCase() === "B") return zBajtov(atob(data));
-      const bajty = data.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_m: string, h: string) => String.fromCharCode(parseInt(h, 16)));
-      return zBajtov(bajty);
-    } catch { return data; }
+      if (druh.toUpperCase() === "B") return atob(data);
+      return data.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_m: string, h: string) => String.fromCharCode(parseInt(h, 16)));
+    } catch { return null; }
+  };
+  return s.replace(/=\?[^?]+\?[BbQq]\?[^?]*\?=(?:\s*=\?[^?]+\?[BbQq]\?[^?]*\?=)*/g, (beh) => {
+    let bajty = "";
+    for (const m of beh.matchAll(SLOVO)) {
+      const b = naBajty(m[2], m[3]);
+      if (b === null) return beh;
+      bajty += b;
+    }
+    return zBajtov(bajty);
   }).replace(/\s+/g, " ").trim();
 }
 

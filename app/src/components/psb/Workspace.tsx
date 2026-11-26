@@ -249,6 +249,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
    * 24. 11. 2026 robia každý týždeň, nie pri uzávierke.
    */
   const [alzaMesiac, setAlzaMesiac] = useState(() => new Date().toISOString().slice(0, 7));
+  // Číslo pri nápise „Email" (Jerry, 26. 11. 2026: „keď dôjde nový mail, nech
+  // je tam číslo vedľa Email"). Nové maily bez koša „Ostatní" — tie isté, na
+  // ktoré chodí notifikácia. Kým sa karta nenačíta, počíta sa z `novaPosta`;
+  // potom ho drží karta sama (prečítaný mail ubudne hneď, nie po obnovení).
+  // Vyhráva to, čo prišlo neskôr.
+  const [novychEmailov, setNovychEmailov] = useState(() => (data.novaPosta || []).length);
+  useEffect(() => { setNovychEmailov((data.novaPosta || []).length); }, [data.novaPosta]);
   const [pocetSms, setPocetSms] = useState<number | null>(null);
   const [pocetDopytov, setPocetDopytov] = useState(0);
   const [pocetUzavierky, setPocetUzavierky] = useState(0);
@@ -1089,7 +1096,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
               {/* MOJA DOCHÁDZKA — súkromné aktivity (naostro 14. 11. 2026). */}
               {k.druh === "dochadzka" && <MojaDochadzkaKarta />}
               {/* EMAIL — schránka info@ (naostro 12. 11. 2026, návrh D). */}
-              {k.druh === "email" && <EmailKarta data={data} clients={clients} mena={mena} ktoSom={ktoSom} onProfil={naStol} onTerminy={onNavigate ? () => onNavigate("kalendar") : undefined} />}
+              {k.druh === "email" && <EmailKarta data={data} clients={clients} mena={mena} ktoSom={ktoSom} onPocetNovych={setNovychEmailov} onProfil={naStol} onTerminy={onNavigate ? () => onNavigate("kalendar") : undefined} />}
               {/* DOZOR REKLÁM — tá istá obrazovka ako bola v Marketingu (19. 10. 2026). */}
               {k.druh === "reklamy" && (
                 <NaCeluObrazovku nazov="Dozor reklám">
@@ -2289,6 +2296,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, buduceTren
       return x.krok === "platby" ? sekcii + otazkyKrokuPlatby().spolu + btcPrijmy.polozky.length : sekcii;
     }
     if (x.druh === "anamnezy") return anamnezyPodlaStavu(x.polozky as AnamnezaRiadok[]).naTrenera.length;
+    if (x.druh === "email") return novychEmailov;
     if (x.druh === "reklamy") return (register || []).filter((r) => jeReklamaDozoru(r.key) && !r.acked).length;
     return BEZ_FRONTY.includes(x.druh) ? 0 : zostava(x);
   };
