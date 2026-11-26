@@ -87,6 +87,18 @@ describe("IMAP — dekódovanie", () => {
     expect(dekoduj("=?UTF-8?Q?reklamn=C3?=\r\n =?UTF-8?Q?=AD=5Fho_=C3=BA=C4=8Dtu?=")).toBe("reklamní_ho účtu");
     expect(dekoduj("=?UTF-8?B?RG90YXo=?= na =?UTF-8?B?dHLDqW5pbms=?=")).toBe("Dotaz na trénink");
   });
+  it("textový diel aj vnorený (odpoveď z Gmailu na mail s logom)", () => {
+    const raw = [
+      "--A1b2c3d4", "Content-Type: multipart/alternative; boundary=\"000000000000ccf1\"", "",
+      "--000000000000ccf1", "Content-Type: text/plain; charset=\"UTF-8\"", "Content-Transfer-Encoding: quoted-printable", "",
+      "Mysl=C3=ADm, =C5=BEe v p=C3=A1tek", "",
+      "--000000000000ccf1", "Content-Type: text/html; charset=\"UTF-8\"", "", "<div>Myslím</div>",
+      "--000000000000ccf1--", "",
+      "--A1b2c3d4", "Content-Type: image/png", "Content-Transfer-Encoding: base64", "", "iVBORw0KGgo=",
+      "--A1b2c3d4--", "",
+    ].join("\r\n");
+    expect(dekodujTelo(raw)).toBe("Myslím, že v pátek");
+  });
   it("telo bez HTML značiek a bez zalomení", () => {
     expect(dekodujTelo("<p>Dobr=C3=BD den,</p><p>chci se objednat.</p>")).toBe("Dobrý den,\nchci se objednat.");
   });

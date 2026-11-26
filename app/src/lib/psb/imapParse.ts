@@ -126,9 +126,7 @@ function zBajtov(s: string): string {
  * a hlavičky dielu zahoď.
  */
 export function dekodujTelo(s: string): string {
-  const raw = String(s || "");
-  const diely = mimeDiely(raw);
-  const textovy = diely.find((d) => /text\/plain/i.test(d.typ)) || diely.find((d) => /text\/html/i.test(d.typ)) || diely[0];
+  const textovy = textovyDiel(String(s || ""), 0);
   if (!textovy) return "";
   let t = dekodujObsah(textovy.telo, textovy.kodovanie);
 
@@ -145,6 +143,25 @@ export function dekodujTelo(s: string): string {
 }
 
 type Diel = { typ: string; kodovanie: string; telo: string };
+
+/**
+ * Textový diel aj VNORENÝ. Odpoveď z Gmailu na náš mail s logom je
+ * `multipart/related` → `multipart/alternative` → text. Bez zanorenia karta
+ * ukázala Jakubovi Grimovi (26. 11. 2026) celú obálku: „--0000…
+ * Content-Type: text/plain…" a pod tým aj HTML diel.
+ */
+function textovyDiel(raw: string, hlbka: number): Diel | undefined {
+  const diely = mimeDiely(raw);
+  const priamy = diely.find((d) => /text\/plain/i.test(d.typ)) || diely.find((d) => /text\/html/i.test(d.typ));
+  if (priamy) return priamy;
+  if (hlbka < 4) {
+    for (const d of diely.filter((x) => /^multipart\//i.test(x.typ))) {
+      const vnoreny = textovyDiel(d.telo, hlbka + 1);
+      if (vnoreny) return vnoreny;
+    }
+  }
+  return diely[0];
+}
 
 /**
  * Rozdelí telo na MIME diely. Keď žiadne oddeľovače nie sú, je to jeden diel.
