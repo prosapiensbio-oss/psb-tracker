@@ -11,6 +11,7 @@ import { cas24, hod, prepadnuteRad, priebehBalickov, type StavRiadku } from "../
 import { vetaPrevzatych } from "../../lib/psb/mailKlientovi";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
+import { KalendarKlienta } from "./KalendarKlienta";
 import { adresyMailu } from "../../lib/psb/mime";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
@@ -148,6 +149,17 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
   const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "fotky" | "poznamky">("zdravie");
+  /**
+   * „Všetko" ako zoznam alebo kalendár (Jerry, 26. 11. 2026, návrh B — zatiaľ
+   * v bete). Voľba sa pamätá na zariadení; zlyhaná pamäť znamená len zoznam.
+   */
+  const [pohladVsetko, setPohladVsetko] = useState<"zoznam" | "kalendar">(() => {
+    try { return localStorage.getItem("psb-profil-pohlad") === "kalendar" ? "kalendar" : "zoznam"; } catch { return "zoznam"; }
+  });
+  const zmenPohlad = (v: "zoznam" | "kalendar") => {
+    setPohladVsetko(v);
+    try { localStorage.setItem("psb-profil-pohlad", v); } catch { /* pamäť nie je povinná */ }
+  };
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
@@ -1599,6 +1611,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               <button key={id} data-aktivna={filter === id ? "1" : undefined} onClick={() => setFilter(id)} style={{ ...prepinac(filter === id), flex: "none" }}>{l}</button>
             ))}
           </PrepinacFiltra>
+          {filter === "vsetko" && jeBeta() && (
+            <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 9, overflow: "hidden", flex: "none", marginLeft: uzke ? "auto" : undefined }}>
+              {([["zoznam", "☰ zoznam"], ["kalendar", "▦ kalendár"]] as const).map(([v, l]) => (
+                <button key={v} type="button" onClick={() => zmenPohlad(v)} aria-pressed={pohladVsetko === v}
+                  style={{ padding: "4px 9px", fontSize: 12, fontFamily: "inherit", border: "none", cursor: "pointer", background: pohladVsetko === v ? mix(C.text, 18) : "transparent", color: pohladVsetko === v ? C.text : C.textMuted, fontWeight: pohladVsetko === v ? 700 : 400 }}>{l}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pridávanie patrí k svojej záložke (Jerry, 23. 9. 2026). Tlačidlo
@@ -1737,7 +1757,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               postupne spomaľuje, alebo mal jeden hluchý mesiac a vrátil sa.
               Mesiac bez tréningu je nula, nie vynechaný stĺpec — medzera je
               to jediné, čo je na takom klientovi zaujímavé. */}
-          {filter === "vsetko" && poMesiacoch.length > 1 && (
+          {filter === "vsetko" && jeBeta() && pohladVsetko === "kalendar" && (
+            <KalendarKlienta os={os} objednane={buduce} dnes={dnesPraha()} uzke={uzke} />
+          )}
+          {filter === "vsetko" && !(jeBeta() && pohladVsetko === "kalendar") && poMesiacoch.length > 1 && (
             <div style={{ marginBottom: 16 }}>
               <div style={hlavicka}>SEDENIA PO MESIACOCH</div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 72, marginTop: 8 }}>
@@ -1762,7 +1785,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             </div>
           )}
 
-          {filter === "vsetko" && buduce.map((z) => (
+          {filter === "vsetko" && !(jeBeta() && pohladVsetko === "kalendar") && buduce.map((z) => (
             <div key={z} style={{ ...riadok, color: C.blue }}>
               <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
               <span style={{ flex: 1 }}>objednané {z.slice(11, 16)} · z kalendára</span>
@@ -2106,7 +2129,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )
           )}
 
-          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? os : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
+          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? (jeBeta() && pohladVsetko === "kalendar" ? [] : os) : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
             .map((x, i, vsetky) => (
               <Fragment key={i}>
               {/* Podpis zmluvy 6M stojí na osi na svojom dni (Jerry, 10. 11. 2026). */}
