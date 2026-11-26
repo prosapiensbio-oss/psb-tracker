@@ -150,8 +150,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const setMeno = setMenoZvonku ?? setMenoVnutri;
   const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "fotky" | "poznamky">("zdravie");
   /**
-   * „Všetko" ako zoznam alebo kalendár (Jerry, 26. 11. 2026, návrh B — zatiaľ
-   * v bete). Voľba sa pamätá na zariadení; zlyhaná pamäť znamená len zoznam.
+   * „Všetko" ako zoznam alebo kalendár (Jerry, 26. 11. 2026, návrh B; naostro
+   * v ten istý deň). Voľba sa pamätá na zariadení; zlyhaná pamäť znamená len zoznam.
    */
   const [pohladVsetko, setPohladVsetko] = useState<"zoznam" | "kalendar">(() => {
     try { return localStorage.getItem("psb-profil-pohlad") === "kalendar" ? "kalendar" : "zoznam"; } catch { return "zoznam"; }
@@ -1611,7 +1611,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               <button key={id} data-aktivna={filter === id ? "1" : undefined} onClick={() => setFilter(id)} style={{ ...prepinac(filter === id), flex: "none" }}>{l}</button>
             ))}
           </PrepinacFiltra>
-          {filter === "vsetko" && jeBeta() && (
+          {filter === "vsetko" && (
             <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 9, overflow: "hidden", flex: "none", marginLeft: uzke ? "auto" : undefined }}>
               {([["zoznam", "☰ zoznam"], ["kalendar", "▦ kalendár"]] as const).map(([v, l]) => (
                 <button key={v} type="button" onClick={() => zmenPohlad(v)} aria-pressed={pohladVsetko === v}
@@ -1757,10 +1757,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               postupne spomaľuje, alebo mal jeden hluchý mesiac a vrátil sa.
               Mesiac bez tréningu je nula, nie vynechaný stĺpec — medzera je
               to jediné, čo je na takom klientovi zaujímavé. */}
-          {filter === "vsetko" && jeBeta() && pohladVsetko === "kalendar" && (
+          {filter === "vsetko" && pohladVsetko === "kalendar" && (
             <KalendarKlienta os={os} objednane={buduce} dnes={dnesPraha()} uzke={uzke} />
           )}
-          {filter === "vsetko" && !(jeBeta() && pohladVsetko === "kalendar") && poMesiacoch.length > 1 && (
+          {filter === "vsetko" && pohladVsetko !== "kalendar" && poMesiacoch.length > 1 && (
             <div style={{ marginBottom: 16 }}>
               <div style={hlavicka}>SEDENIA PO MESIACOCH</div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 72, marginTop: 8 }}>
@@ -1785,7 +1785,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             </div>
           )}
 
-          {filter === "vsetko" && !(jeBeta() && pohladVsetko === "kalendar") && buduce.map((z) => (
+          {filter === "vsetko" && pohladVsetko !== "kalendar" && buduce.map((z) => (
             <div key={z} style={{ ...riadok, color: C.blue }}>
               <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
               <span style={{ flex: 1 }}>objednané {z.slice(11, 16)} · z kalendára</span>
@@ -2129,7 +2129,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )
           )}
 
-          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? (jeBeta() && pohladVsetko === "kalendar" ? [] : os) : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
+          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && (filter === "vsetko" ? (pohladVsetko === "kalendar" ? [] : os) : filter === "peniaze" ? historiaP : filter === "balicky" ? historiaB : [])
             .map((x, i, vsetky) => (
               <Fragment key={i}>
               {/* Podpis zmluvy 6M stojí na osi na svojom dni (Jerry, 10. 11. 2026). */}

@@ -17,8 +17,7 @@ import { C } from "../../lib/psb/theme";
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
   // Prezentácia uzávierky A naostro od 12. 11. 2026 — nič sa neskúša.
   // Moja dochádzka je naostro od 14. 11. 2026 — nič sa neskúša.
-  // Profil klienta → všetko → ▦ kalendár (návrh B, 26. 11. 2026).
-  { text: "Kalendár v profile klienta", tab: "workspace", sub: "klient" },
+  // Kalendár v profile klienta je naostro od 26. 11. 2026 — nič sa neskúša.
 ];
 
 /**
