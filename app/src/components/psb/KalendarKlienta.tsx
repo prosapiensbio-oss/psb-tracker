@@ -102,8 +102,10 @@ function Bunka({ d, dnes, vybrany, uzke, onKlik }: { d: DenKalendara; dnes: stri
   return (
     <button type="button" onClick={ma ? onKlik : undefined} title={nazov || undefined}
       style={{
-        position: "relative", height: uzke ? 32 : undefined, aspectRatio: uzke ? undefined : "1", minWidth: 0, padding: 0,
-        borderRadius: 5, fontFamily: "inherit", fontSize: uzke ? 11 : 9.5, fontVariantNumeric: "tabular-nums",
+        // Pevná výška, nie štvorec: na širokom monitore by štvorce narástli na
+        // 50 px a tri mesiace by sa do karty nezmestili (beta, 26. 11. 2026).
+        position: "relative", height: uzke ? 32 : 26, minWidth: 0, padding: 0,
+        borderRadius: 5, fontFamily: "inherit", fontSize: uzke ? 11 : 10.5, fontVariantNumeric: "tabular-nums",
         cursor: ma ? "pointer" : "default",
         background: trening ? C.green : mix(C.border, 50),
         color: trening ? "#14180f" : objednany ? C.green : C.textDim,
