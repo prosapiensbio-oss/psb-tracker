@@ -2279,7 +2279,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
             // „k:Meno|uvodny" — človek AJ prepínač (Kalendár → Termíny pri
             // naplánovanej ponuke úvodnej lekcie, 26. 11. 2026).
             : zapisCiel[2]?.startsWith("k:")
-            ? { client: zapisCiel[2].slice(2), filter: zapisCiel[3] || undefined, nonce: Date.now() }
+            ? { ponuka: { klient: zapisCiel[2].slice(2), uvodny: zapisCiel[3] === "uvodny" }, nonce: Date.now() }
             : /^\d{4}-\d{2}$/.test(zapisCiel[2] || "")
               ? { month: zapisCiel[2], kategoria: zapisCiel[3] || undefined, nonce: Date.now() }
               // Tretí diel nemusí byť dátum — pri „marketing|dopyty|Meno" je to

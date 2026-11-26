@@ -201,6 +201,11 @@ export type NavFocus = {
    * oba prekliky viedli na tú istú.
    */
   sekcia?: "zmeny" | "nezname" | "terminy";
+  /**
+   * Predvyplnenie Ponuky termínov (naplánovaná ponuka úvodnej lekcie,
+   * 26. 11. 2026). Zámerne NIE `client`: ten navigate presmeruje na profil.
+   */
+  ponuka?: { klient: string; uvodny: boolean };
 };
 
 // Five top-level areas, each answering a different question, left to right as a

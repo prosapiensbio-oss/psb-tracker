@@ -182,7 +182,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
     // a prepínačom úvodného, nie zoznam zmien.
     if (focus.sekcia === "terminy") {
       prepniZalozku("terminy");
-      setPredvyplnPonuku({ klient: focus.client || "", uvodny: focus.filter === "uvodny", nonce: focus.nonce });
+      if (focus.ponuka) setPredvyplnPonuku({ ...focus.ponuka, nonce: focus.nonce });
       return;
     }
     setZalozka("kalendar");
