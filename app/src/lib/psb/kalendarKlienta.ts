@@ -7,7 +7,13 @@
  * Čísla sa tu NEPOČÍTAJÚ nanovo — všetko je z osi času (`osCasuKlienta`),
  * ktorú kreslí aj zoznam. Kalendár je len iné rozloženie tých istých riadkov.
  */
-import type { Udalost } from "./klientOsCasu";
+import { jeDoplnenie, type Udalost } from "./klientOsCasu";
+
+/**
+ * Doplnenie z PTmindera nesie príznak, doplnenie nahodené v Kokpite len názov
+ * „Doplnenie členstva" (Robin, 26. 11. 2026) — rozhoduje oboje.
+ */
+export const jeDoplnenieNaOsi = (b: { doplnenie?: boolean; nazov: string }) => !!b.doplnenie || jeDoplnenie(b.nazov);
 
 export type DenKalendara = {
   den: string;
@@ -50,9 +56,9 @@ export function pasyBalickov(os: Udalost[], dnes: string): PasBalicka[] {
   return zac.map((b, i) => {
     // Doplnenie sa míňa pred ďalším balíčkom, takže končí jeho začiatkom
     // (akýmkoľvek); balíček bez konca končí až ďalším balíčkom, nie doplnením.
-    const dalsi = zac.slice(i + 1).find((x) => x.den > b.den && (b.doplnenie || !x.doplnenie));
+    const dalsi = zac.slice(i + 1).find((x) => x.den > b.den && (jeDoplnenieNaOsi(b) || !jeDoplnenieNaOsi(x)));
     const doDna = b.doDna ? b.doDna.slice(0, 10) : dalsi ? dalsi.den : dnes > b.den ? dnes : b.den;
-    return { od: b.den, do: doDna, nazov: b.nazov, hodin: b.hodin, doplnenie: !!b.doplnenie, nezaplatene: !!b.nezaplatene, otvoreny: !b.doDna && !dalsi };
+    return { od: b.den, do: doDna, nazov: b.nazov, hodin: b.hodin, doplnenie: jeDoplnenieNaOsi(b), nezaplatene: !!b.nezaplatene, otvoreny: !b.doDna && !dalsi };
   });
 }
 

@@ -48,6 +48,14 @@ describe("kalendár v profile klienta", () => {
     ]);
   });
 
+  it("doplnenie z Kokpitu bez príznaku sa pozná podľa názvu", () => {
+    const os: Udalost[] = [
+      { druh: "balicekOd", den: "2026-10-21", nazov: "6h Předplatné", hodin: 7, doDna: "2026-11-20" },
+      { druh: "balicekOd", den: "2026-11-20", nazov: "Doplnenie členstva", hodin: 3, zKokpitu: true },
+    ];
+    expect(pasyBalickov(os, "2026-11-26").map((p) => p.doplnenie)).toEqual([false, true]);
+  });
+
   it("pás sa oreže na mesiac", () => {
     const [sep, okt] = triMesiace("2026-11", OS, [], "2026-11-26");
     expect(sep.pasy).toEqual([expect.objectContaining({ od: "2026-09-21", do: "2026-09-30" })]);

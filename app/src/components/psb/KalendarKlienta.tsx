@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import type { Udalost } from "../../lib/psb/klientOsCasu";
-import { posunMesiac, triMesiace, type DenKalendara, type PasBalicka } from "../../lib/psb/kalendarKlienta";
+import { jeDoplnenieNaOsi, posunMesiac, triMesiace, type DenKalendara, type PasBalicka } from "../../lib/psb/kalendarKlienta";
 import { fmtCZK } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { C, mix } from "../../lib/psb/theme";
@@ -97,7 +97,7 @@ function Bunka({ d, dnes, vybrany, uzke, onKlik }: { d: DenKalendara; dnes: stri
     ...d.treningy.map((t) => `tréning${t.cas ? ` ${t.cas}` : ""}${t.uvodny ? " (úvodný)" : ""}${t.zdarma !== undefined ? " (zdarma)" : ""}`),
     ...d.objednane.map((c) => `objednané ${c}`),
     ...d.platby.map((p) => `platba ${fmtCZK(p.suma)}`),
-    ...d.balicky.map((b) => `${b.doplnenie ? "Doplnenie" : nazovProduktu(b.nazov)} · ${b.hodin} h`),
+    ...d.balicky.map((b) => `${jeDoplnenieNaOsi(b) ? "Doplnenie" : nazovProduktu(b.nazov)} · ${b.hodin} h`),
   ].join(" · ");
   return (
     <button type="button" onClick={ma ? onKlik : undefined} title={nazov || undefined}
@@ -116,7 +116,7 @@ function Bunka({ d, dnes, vybrany, uzke, onKlik }: { d: DenKalendara; dnes: stri
         ].filter(Boolean).join(", ") || undefined,
       }}>
       {+d.den.slice(8)}
-      {d.balicky.length > 0 && <span style={{ position: "absolute", top: 2, right: 2, width: 6, height: 6, borderRadius: "50%", background: d.balicky.some((b) => b.doplnenie) ? "#c9a2f0" : C.orange }} />}
+      {d.balicky.length > 0 && <span style={{ position: "absolute", top: 2, right: 2, width: 6, height: 6, borderRadius: "50%", background: d.balicky.some(jeDoplnenieNaOsi) ? "#c9a2f0" : C.orange }} />}
     </button>
   );
 }
@@ -135,7 +135,7 @@ function DetailDna({ d }: { d: DenKalendara }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5, marginBottom: 4 }}>
         {DNI_CELE[(dt.getUTCDay() + 6) % 7].toUpperCase()} {+d.den.slice(8)}. {+d.den.slice(5, 7)}. {d.den.slice(0, 4)}
       </div>
-      {d.balicky.map((b, i) => <div key={`b${i}`}>{riadok(b.doplnenie ? "#c9a2f0" : C.orange, `${b.doplnenie ? "Doplnenie členstva" : nazovProduktu(b.nazov)}${b.doDna ? ` · do ${+b.doDna.slice(8, 10)}. ${+b.doDna.slice(5, 7)}.` : ""}${b.nezaplatene ? " · nezaplatený" : ""}`, `${b.hodin} h`)}</div>)}
+      {d.balicky.map((b, i) => <div key={`b${i}`}>{riadok(jeDoplnenieNaOsi(b) ? "#c9a2f0" : C.orange, `${jeDoplnenieNaOsi(b) ? "Doplnenie členstva" : nazovProduktu(b.nazov)}${b.doDna ? ` · do ${+b.doDna.slice(8, 10)}. ${+b.doDna.slice(5, 7)}.` : ""}${b.nezaplatene ? " · nezaplatený" : ""}`, `${b.hodin} h`)}</div>)}
       {d.treningy.map((t, i) => <div key={`t${i}`}>{riadok(C.green, `${t.uvodny ? "Úvodný tréning" : "Tréning"}${t.cas ? ` ${t.cas}` : ""}${t.trener ? ` · ${t.trener}` : ""}${t.zdarma !== undefined ? " · zdarma" : ""}`)}</div>)}
       {d.objednane.map((c) => <div key={`o${c}`}>{riadok(C.green, `Objednané ${c}`)}</div>)}
       {d.platby.map((p, i) => <div key={`p${i}`}>{riadok(C.blue, `Platba · ${p.metoda}${p.poznamka ? ` · ${p.poznamka}` : ""}`, fmtCZK(p.suma))}</div>)}
