@@ -48,7 +48,9 @@ export function pasyBalickov(os: Udalost[], dnes: string): PasBalicka[] {
   const zac = os.filter((u): u is Extract<Udalost, { druh: "balicekOd" }> => u.druh === "balicekOd")
     .sort((a, b) => a.den.localeCompare(b.den));
   return zac.map((b, i) => {
-    const dalsi = zac.slice(i + 1).find((x) => x.den > b.den && !x.doplnenie === !b.doplnenie);
+    // Doplnenie sa míňa pred ďalším balíčkom, takže končí jeho začiatkom
+    // (akýmkoľvek); balíček bez konca končí až ďalším balíčkom, nie doplnením.
+    const dalsi = zac.slice(i + 1).find((x) => x.den > b.den && (b.doplnenie || !x.doplnenie));
     const doDna = b.doDna ? b.doDna.slice(0, 10) : dalsi ? dalsi.den : dnes > b.den ? dnes : b.den;
     return { od: b.den, do: doDna, nazov: b.nazov, hodin: b.hodin, doplnenie: !!b.doplnenie, nezaplatene: !!b.nezaplatene, otvoreny: !b.doDna && !dalsi };
   });
