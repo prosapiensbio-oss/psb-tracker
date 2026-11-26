@@ -200,7 +200,7 @@ export type NavFocus = {
    * Zmeny v kalendári, hoci potreboval Nové názvy — dve rôzne karty, dovtedy
    * oba prekliky viedli na tú istú.
    */
-  sekcia?: "zmeny" | "nezname";
+  sekcia?: "zmeny" | "nezname" | "terminy";
 };
 
 // Five top-level areas, each answering a different question, left to right as a

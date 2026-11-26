@@ -1,4 +1,5 @@
 // Server-only D1 access for the PSB Tracker. All reads/writes hit env.DB.
+import { citajPlanovanePonuky } from "./planovanaPonuka";
 import { hodinyNavysePoMesiacoch } from "./hodinyNavyse";
 import { REZERVA_CISLO } from "./rezervaOdlozenie";
 import { zjednotOverrides } from "./zjednotOverrides";
@@ -549,6 +550,20 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      UNION SELECT klient AS m FROM uvodne_odkazy WHERE druh = 'pred' AND otvorene > 0`,
   ).all().catch((e) => { volitelna("SMS pred úvodným")(e); return { results: [] }; })).results as { m: string | null }[])
     .map((r) => String(r.m || "").split(" · ")[0].trim()).filter(Boolean);
+
+  // Naplánované ponuky úvodnej lekcie (26. 11. 2026, `planovanaPonuka.ts`): hotová je tá,
+  // od ktorej naplánovania vznikla ponuka úvodného na to meno alebo telefón.
+  const plan = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'planovane_ponuky'")
+    .first<{ value: string }>().catch((e) => { volitelna("naplánované ponuky")(e); return null; });
+  const planovane = citajPlanovanePonuky(plan?.value);
+  for (const p of planovane) {
+    const r = await DB.prepare(
+      `SELECT 1 AS x FROM ponuky_terminov WHERE typ = 'uvodny' AND zrusene_at IS NULL AND created_at >= ?1
+         AND (klient = ?2 OR (?3 <> '' AND replace(telefon, ' ', '') = ?3)) LIMIT 1`,
+    ).bind(p.vytvorene, p.kontakt, String(p.telefon || "").replace(/\s+/g, "")).first().catch(() => null);
+    p.hotovo = !!r;
+  }
+  if (planovane.length) data.planovanePonuky = planovane;
 
   if (chybySekcii.length) data.chybySekcii = chybySekcii;
   return data;

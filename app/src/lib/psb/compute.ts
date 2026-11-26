@@ -17,6 +17,7 @@ import { dnesPraha, terazPraha, posunDen } from "./cas";
 import { polozkyDozoru, type ReklamaPolozka } from "./reklamaDozor";
 import { dalsiTreningPoUvodnom } from "./smsPoUvodnom";
 import { uvodneBezSms } from "./uvodnyBezSms";
+import { planovanePonukyNaDnes } from "./planovanaPonuka";
 import { odpovedeKlientov } from "./odpovedeKlientov";
 import { notifikacieFaktur } from "./fakturaKlienta";
 import { polozkyFotiek } from "./fotkyOdkazy";
@@ -3759,6 +3760,12 @@ export function deriveRegister(
         { trener: v.trener || "Terezka", oKom: v.meno, dalsiTrening: v.kedy },
       );
     }
+  }
+
+  // NAPLÁNOVANÁ PONUKA ÚVODNEJ LEKCIE (26. 11. 2026, `planovanaPonuka.ts`) —
+  // v deň, na ktorý ju Jerry naplánoval, s tlačidlom do Kalendár → Termíny.
+  for (const p of planovanePonukyNaDnes(data.planovanePonuky || [], dnesPraha())) {
+    add(p.kluc, "Zápis", "orange", p.nadpis, p.detail, 3, p.ciel, "planovana-ponuka", { trener: p.trener, oKom: p.kontakt });
   }
 
   for (const a of deriveAnomalies(data, clients, kal)) {

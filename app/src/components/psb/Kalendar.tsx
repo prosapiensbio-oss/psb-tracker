@@ -167,6 +167,8 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
   const [zalozka, setZalozka] = useState<"kalendar" | "terminy">(() => {
     try { return sessionStorage.getItem("psb-kalendar-zalozka") === "terminy" ? "terminy" : "kalendar"; } catch { return "kalendar"; }
   });
+  /** Predvyplnenie Ponuky termínov z notifikácie (naplánovaná ponuka úvodnej lekcie). */
+  const [predvyplnPonuku, setPredvyplnPonuku] = useState<{ klient: string; uvodny: boolean; nonce: number } | null>(null);
   const prepniZalozku = (z: "kalendar" | "terminy") => {
     setZalozka(z);
     try { sessionStorage.setItem("psb-kalendar-zalozka", z); } catch { /* len pohodlie */ }
@@ -176,6 +178,13 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
     // Preklik bez trénera nechá platiť to, čo je práve zvolené — nesmie
     // prepnúť na „Obaja".
     if (focus.trainer) setTrener(focus.trainer);
+    // Naplánovaná ponuka úvodnej lekcie (26. 11. 2026): rovno Termíny s menom
+    // a prepínačom úvodného, nie zoznam zmien.
+    if (focus.sekcia === "terminy") {
+      prepniZalozku("terminy");
+      setPredvyplnPonuku({ klient: focus.client || "", uvodny: focus.filter === "uvodny", nonce: focus.nonce });
+      return;
+    }
     setZalozka("kalendar");
     setRolovatNa(focus.sekcia === "nezname" ? "kal-nezname" : "kal-zmeny");
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -267,7 +276,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
       <div style={{ display: zalozka === "terminy" ? "block" : "none" }}>
         <Card>
           <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>Naťukaj voľné časy a pošli klientovi odkaz — vyberie si sám a termín sa mu zapíše do kalendára.</div>
-          <PonukaTerminov mena={menaKlientov} leads={data.leads || []} trener={KALENDAR_TRENERA[trener] ? trener : null} />
+          <PonukaTerminov mena={menaKlientov} leads={data.leads || []} trener={KALENDAR_TRENERA[trener] ? trener : null} predvyplnit={predvyplnPonuku} />
         </Card>
       </div>
       <div style={{ display: zalozka === "kalendar" ? "block" : "none" }}>

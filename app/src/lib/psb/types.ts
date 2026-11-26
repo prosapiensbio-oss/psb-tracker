@@ -276,6 +276,8 @@ export type PSBData = {
    * ako sú v audite. Číta `uvodneBezSms` (24. 11. 2026).
    */
   uvodnaSmsOdisla?: string[];
+  /** Naplánované ponuky úvodnej lekcie (`planovanaPonuka.ts`, 26. 11. 2026) s príznakom hotovo. */
+  planovanePonuky?: import("./planovanaPonuka").PlanovanaPonuka[];
   nocnaKontrola?: { beh: string; nalezy: { druh: "kalendar" | "platba" | "meno"; kluc: string; trener: string; klient: string; kandidati: string[]; text: string }[] };
   /** Voliteľné sekcie, ktoré sa pri tomto načítaní nenačítali (Zdravie Kokpitu). */
   chybySekcii?: string[];

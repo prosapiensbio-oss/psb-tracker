@@ -51,7 +51,7 @@ const pondelokTyzdna = (den: string) => {
 const krstne = (meno: string) => meno.trim().split(/\s+/)[0] || "";
 const PODPIS: Record<string, string> = { Jerry: TRENERI.Jerry?.krstne || "Filip", Terezka: TRENERI.Terezka?.krstne || "Terezka" };
 
-export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads: Lead[]; trener: string | null }) {
+export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: string[]; leads: Lead[]; trener: string | null; predvyplnit?: { klient: string; uvodny: boolean; nonce: number } | null }) {
   const uzke = useUzke();
   // Jedna definícia s Kalendárom (kalendarRozmer.ts).
   const ROZMER = rozmerKalendara(uzke);
@@ -92,6 +92,14 @@ export function PonukaTerminov({ mena, leads, trener }: { mena: string[]; leads:
   const [blik, setBlik] = useState("");
   const [dovodBliku, setDovodBliku] = useState("");
   const [dalsieId, setDalsieId] = useState(1);
+
+  // Z notifikácie „Poslať ponuku úvodnej lekcie" (26. 11. 2026): meno a prepínač
+  // úvodného sú nastavené, ostáva naťukať časy, celé meno a odoslať.
+  useEffect(() => {
+    if (!predvyplnit?.nonce || !predvyplnit.klient) return;
+    setKlient(predvyplnit.klient);
+    setUvodnySukromnemu(predvyplnit.uvodny);
+  }, [predvyplnit?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const treneri = trener ? [trener] : ["Jerry", "Terezka"];
   const dni = useMemo(() => Array.from({ length: 7 }, (_, i) => posunDen(pondelok, i)), [pondelok]);
