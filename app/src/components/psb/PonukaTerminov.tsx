@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PlanovanaPonuka } from "../../lib/psb/planovanaPonuka";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 
 import { dnesPraha, posunDen, terazPraha } from "../../lib/psb/cas";
@@ -79,6 +80,14 @@ export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: str
   /** Cena úvodného pri odkaze; prázdna = bežná, 0 = zadarmo. */
   const [cenaUvodu, setCenaUvodu] = useState("1100");
   const [ponuky, setPonuky] = useState<Ponuka[]>([]);
+  /**
+   * Pripomenúť ponuku v deň (Jerry, 26. 11. 2026: „urob mi na to obrazovku").
+   * Časy sa naťukajú až v ten deň — teraz sa ukladá len komu a kedy.
+   */
+  const [planovane, setPlanovane] = useState<PlanovanaPonuka[] | null>([]);
+  const [planDen, setPlanDen] = useState(() => posunDen(dnesPraha(), 1));
+  const [planBezi, setPlanBezi] = useState(false);
+  const [planHlaska, setPlanHlaska] = useState("");
   /** Mená s číslom, aj ľudia bez profilu (`klient_fakturacia`). */
   const [kontakty, setKontakty] = useState<{ klient: string; telefon: string }[]>([]);
   /** Súkromné kontakty — dostanú termíny, klientmi nie sú (Leon Box, 14. 11. 2026). */
@@ -112,7 +121,7 @@ export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: str
   }, [pondelok]);
   const nacitajPonuky = useCallback(async () => {
     const j = await fetch("/api/ponuky", { credentials: "same-origin", cache: "no-store" }).then((r) => r.json()).catch(() => null);
-    if (j?.ok) { setPonuky(j.ponuky || []); setKontakty(j.kontakty || []); setSukromne(j.sukromne || []); }
+    if (j?.ok) { setPonuky(j.ponuky || []); setKontakty(j.kontakty || []); setSukromne(j.sukromne || []); setPlanovane(j.planovane ?? null); }
   }, []);
   useEffect(() => { setUdalosti(null); void nacitajTyzden(); }, [nacitajTyzden]);
   useEffect(() => { void nacitajPonuky(); }, [nacitajPonuky]);
@@ -285,6 +294,25 @@ export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: str
     setHotovo({ url: r.url, klient: komuNaozaj, telefon: telefon.trim(), trener: tr, typ: String(r.typ || typPonuky) });
     if (r.upozornenie) setChyba(r.upozornenie);
     setNavrhy([]);
+    void nacitajPonuky();
+  };
+  const naplanuj = async () => {
+    const kontakt = klient.replace(/\s+/g, " ").trim();
+    if (!kontakt || cisloVMene || planBezi) return;
+    setPlanBezi(true); setPlanHlaska("");
+    const r = await fetch("/api/ponuky", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "planuj", kontakt, den: planDen, telefon: telefon.trim() || undefined, uvodny: typPonuky === "uvodny" }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setPlanBezi(false);
+    if (!r?.ok) { setPlanHlaska(r?.error || "Pripomienka sa neuložila."); return; }
+    setPlanHlaska(`Uložené — ${dm(planDen)} príde notifikácia.`);
+    void nacitajPonuky();
+  };
+  const zrusPlan = async (id: string) => {
+    const r = await fetch("/api/ponuky", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ akcia: "zrus-plan", id }) })
+      .then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    if (!r?.ok) setPlanHlaska(r?.error || "Nezrušilo sa.");
     void nacitajPonuky();
   };
   const zrus = async (token: string) => {
@@ -481,6 +509,18 @@ export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: str
           fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !komuNaozaj || cisloVMene || zleMenoKlienta || cenaZla || !zoradene.length || bezi ? 0.5 : 1,
         }}>{bezi ? "Vytváram…" : "Vytvoriť odkaz a SMS"}</button>
         {chyba && <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>}
+        {!hotovo && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, color: C.textMuted }}>
+            Teraz nie? Pripomenúť
+            <input type="date" value={planDen} min={dnesPraha()} onChange={(e) => setPlanDen(e.target.value)}
+              style={{ padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, colorScheme: "dark" }} />
+            <button type="button" disabled={!klient.trim() || cisloVMene || !planDen || planBezi} onClick={() => void naplanuj()} style={{
+              padding: "5px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.accentLight,
+              fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: !klient.trim() || cisloVMene || !planDen || planBezi ? 0.5 : 1,
+            }}>{planBezi ? "Ukladám…" : "Pripomenúť"}</button>
+            {planHlaska && <span style={{ color: planHlaska.startsWith("Uložené") ? C.green : C.red }}>{planHlaska}</span>}
+          </div>
+        )}
         {hotovo && (
           <div style={{ padding: 10, borderRadius: 10, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 8), display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 12.5, color: C.green }}>Odkaz je hotový — <a href={hotovo.url} target="_blank" rel="noreferrer" onClick={(e) => otvorNahlad(e, hotovo.url)} style={{ color: C.green }}>pozrieť, čo uvidí</a>.</div>
@@ -490,6 +530,25 @@ export function PonukaTerminov({ mena, leads, trener, predvyplnit }: { mena: str
               predvolenyText={(hotovo.typ === "uvodny" ? textSmsPonukyUvodnej : textSmsPonuky)(krstne(hotovo.klient), hotovo.url, PODPIS[hotovo.trener] || "")}
               onOdoslane={() => { oznam("kalendar"); void nacitajPonuky(); }}
             />
+          </div>
+        )}
+
+        {/* ── NAPLÁNOVANÉ PRIPOMIENKY (26. 11. 2026) ── */}
+        {planovane === null && <div style={{ fontSize: 12, color: C.orange }}>Naplánované pripomienky sa teraz nenačítali.</div>}
+        {!!planovane?.length && (
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={stitok}>Naplánované pripomienky</div>
+            {planovane.filter((p) => !p.hotovo || p.den >= posunDen(dnesPraha(), -7)).map((p) => (
+              <div key={p.id} style={{ padding: "7px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${mix(C.border, 100)}`, fontSize: 12.5, display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
+                <button type="button" title="Predvyplniť hore" onClick={() => { setKlient(p.kontakt); setUvodnySukromnemu(p.uvodny !== false); }}
+                  style={{ background: "none", border: 0, padding: 0, color: C.text, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>{p.kontakt}</button>
+                <span style={{ fontSize: 11.5, color: C.textDim }}>{p.uvodny === false ? "termíny" : "úvodná lekcia"}</span>
+                <span style={{ fontSize: 11.5, color: p.hotovo ? C.green : p.den <= dnesPraha() ? C.orange : C.accentLight }}>
+                  {p.hotovo ? "✓ ponuka odišla" : p.den <= dnesPraha() ? `notifikácia od ${dm(p.den)}` : `pripomenie ${DNI[(new Date(`${p.den}T12:00:00Z`).getUTCDay() + 6) % 7]} ${dm(p.den)}`}
+                </span>
+                {!p.hotovo && <button type="button" onClick={() => void zrusPlan(p.id)} style={{ marginLeft: "auto", background: "none", border: 0, padding: 0, color: C.red, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" }}>zrušiť</button>}
+              </div>
+            ))}
           </div>
         )}
 

@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { nacitajPlanovane, ulozPlanovane } from "../../lib/psb/planovanaPonuka.server";
+import { pridajPlan } from "../../lib/psb/planovanaPonuka";
 import { audit } from "../../lib/psb/audit.server";
 import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -20,6 +22,8 @@ import { zalozAleboNajdi } from "../../lib/psb/anamneza.server";
  *   POST { akcia: "vytvor", klient, telefon?, typ?, casy: [{ trener, den, cas, minut }] }
  *                             → token a adresa /t/<token>
  *   POST { akcia: "zrus", token }
+ *   POST { akcia: "planuj", kontakt, den, telefon?, uvodny? } → pripomienka v deň (notifikácia)
+ *   POST { akcia: "zrus-plan", id }
  *
  * Klient si vyberá na verejnej stránke `routes/t.$token.tsx`.
  */
@@ -66,8 +70,10 @@ export const Route = createFileRoute("/api/ponuky")({
           });
         }
         const sukromne = await nacitajSukromne(DB);
+        // Naplánované pripomienky (26. 11. 2026) — výpadok nesmie zhodiť ponuky, zoznam len chýba.
+        const planovane = await nacitajPlanovane(DB).catch(() => null);
         return Response.json({
-          ok: true, ponuky: von, sukromne,
+          ok: true, ponuky: von, sukromne, planovane,
           // Súkromný kontakt sa ukazuje so svojím číslom zo zoznamu súkromných, nie ako klient.
           kontakty: [...kontakty.filter((k) => !najdiSukromny(k.klient, sukromne)), ...sukromne.map((k) => ({ klient: k.meno, telefon: k.telefon }))],
         }, { headers: { "cache-control": "no-store" } });
@@ -110,6 +116,31 @@ export const Route = createFileRoute("/api/ponuky")({
           const v = await odklientuj(DB, meno);
           await audit(DB, { action: "sukromny-kontakt", predmet: meno, neu: { aktivita, ...v }, actor: kto || undefined });
           return Response.json({ ok: true, ...v });
+        }
+
+        /**
+         * PRIPOMENÚŤ PONUKU V DEŇ (Jerry, 26. 11. 2026: „urob mi na to obrazovku").
+         * V zvolený deň príde notifikácia s preklikom sem (`planovanaPonuka.ts`).
+         */
+        if (b.akcia === "planuj") {
+          const plan = await nacitajPlanovane(DB);
+          const trener = kto === "Terezka" ? "Terezka" : "Jerry";
+          const novy = pridajPlan(plan, {
+            kontakt: String(b.kontakt || ""), den: String(b.den || ""), telefon: b.telefon ? String(b.telefon) : undefined,
+            uvodny: b.uvodny !== false, poznamka: b.poznamka ? String(b.poznamka) : undefined, trener, kto: kto || undefined,
+          }, dnesPraha(), new Date().toISOString(), novyToken());
+          if (typeof novy === "string") return chyba(novy);
+          await ulozPlanovane(DB, novy);
+          await audit(DB, { action: "ponuka-naplanovana", predmet: String(b.kontakt || ""), neu: { den: b.den, uvodny: b.uvodny !== false }, actor: kto || undefined });
+          return Response.json({ ok: true });
+        }
+        if (b.akcia === "zrus-plan") {
+          const id = String(b.id || "");
+          const plan = await nacitajPlanovane(DB);
+          if (!plan.some((p) => p.id === id)) return chyba("Pripomienka už neexistuje.", 404);
+          await ulozPlanovane(DB, plan.filter((p) => p.id !== id));
+          await audit(DB, { action: "ponuka-plan-zruseny", predmet: id, actor: kto || undefined });
+          return Response.json({ ok: true });
         }
 
         if (b.akcia !== "vytvor") return chyba("neznáma akcia");

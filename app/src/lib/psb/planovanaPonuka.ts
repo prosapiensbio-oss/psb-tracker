@@ -19,6 +19,10 @@ export type PlanovanaPonuka = {
   den: string;
   trener: string;
   poznamka?: string;
+  /** Ponuka úvodnej lekcie (predvolené) alebo bežných termínov klientovi. */
+  uvodny?: boolean;
+  /** Kto pripomienku naplánoval. */
+  kto?: string;
   vytvorene: string;
   /** Ponuka úvodného od naplánovania už vznikla — dopĺňa loadData. */
   hotovo?: boolean;
@@ -51,9 +55,41 @@ export function planovanePonukyNaDnes(plan: PlanovanaPonuka[], dnes: string): Pl
         kluc: `planovana-ponuka|${p.id}`,
         kontakt: p.kontakt,
         trener: p.trener || "Jerry",
-        nadpis: `Poslať ponuku úvodnej lekcie — ${p.kontakt}`,
-        detail: `${p.den < dnes ? `Naplánované na ${Number(p.den.slice(8, 10))}. ${Number(p.den.slice(5, 7))}. — ` : ""}${p.poznamka ? `${p.poznamka}. ` : ""}Tlačidlo otvorí Kalendár → Termíny s ${p.kontakt} a zapnutým úvodným tréningom: naťukaj časy, doplň celé meno a odošli SMS. Zhasne samo, keď ponuka odíde.`,
-        ciel: `kalendar|terminy|k:${p.kontakt}|uvodny`,
+        nadpis: `Poslať ponuku ${p.uvodny === false ? "termínov" : "úvodnej lekcie"} — ${p.kontakt}`,
+        detail: `${p.den < dnes ? `Naplánované na ${Number(p.den.slice(8, 10))}. ${Number(p.den.slice(5, 7))}. — ` : ""}${p.poznamka ? `${p.poznamka.replace(/\.\s*$/, "")}. ` : ""}${p.uvodny === false
+          ? `Tlačidlo otvorí Kalendár → Termíny s ${p.kontakt}: naťukaj časy a odošli SMS.`
+          : `Tlačidlo otvorí Kalendár → Termíny s ${p.kontakt} a úvodným tréningom: naťukaj časy a odošli SMS.`} Zhasne samo, keď ponuka odíde.`,
+        ciel: `kalendar|terminy|k:${p.kontakt}|${p.uvodny === false ? "trening" : "uvodny"}`,
       };
     });
+}
+
+/**
+ * Pridanie z obrazovky (Kalendár → Termíny, 26. 11. 2026). Vráti nový zoznam
+ * alebo vetu, prečo sa pridať nedá. Ten istý človek na ten istý deň je jedna
+ * pripomienka — druhé kliknutie ju len aktualizuje.
+ */
+export function pridajPlan(
+  plan: PlanovanaPonuka[],
+  v: { kontakt: string; den: string; telefon?: string; uvodny: boolean; poznamka?: string; trener: string; kto?: string },
+  dnes: string,
+  teraz: string,
+  id: string,
+): PlanovanaPonuka[] | string {
+  const kontakt = String(v.kontakt || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  if (!kontakt) return "Chýba komu.";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.den) || Number.isNaN(Date.parse(`${v.den}T12:00:00Z`))) return "Vyber deň.";
+  if (v.den < dnes) return "Deň už bol.";
+  const zvysok = plan.filter((p) => !(p.kontakt === kontakt && p.den === v.den && !p.hotovo));
+  const novy: PlanovanaPonuka = {
+    id, kontakt, den: v.den, trener: v.trener || "Jerry", uvodny: v.uvodny, vytvorene: teraz,
+    ...(v.telefon ? { telefon: String(v.telefon).trim().slice(0, 40) } : {}),
+    ...(v.poznamka ? { poznamka: String(v.poznamka).replace(/\s+/g, " ").trim().slice(0, 200) } : {}),
+    ...(v.kto ? { kto: v.kto } : {}),
+  };
+  // Hotové staršie ako mesiac sa zahodia — zoznam nesmie rásť donekonečna.
+  const hranica = new Date(Date.parse(`${dnes}T12:00:00Z`) - 31 * 86400000).toISOString().slice(0, 10);
+  return [...zvysok.filter((p) => !(p.hotovo && p.den < hranica)), novy]
+    .map(({ hotovo: _h, ...p }) => p)
+    .sort((a, b) => a.den.localeCompare(b.den));
 }
