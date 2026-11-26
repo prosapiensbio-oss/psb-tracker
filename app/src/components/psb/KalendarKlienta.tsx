@@ -4,6 +4,10 @@ import type { Udalost } from "../../lib/psb/klientOsCasu";
 import { jeDoplnenieNaOsi, posunMesiac, triMesiace, type DenKalendara, type PasBalicka } from "../../lib/psb/kalendarKlienta";
 import { fmtCZK } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
+import { cas24 } from "../../lib/psb/vypisHodin";
+
+/** Spôsob platby slovom — tak, ako ho píše zoznam (prevodom / hotovosť). */
+const sposob = (m: string) => (m === "bank" || m === "banka" ? "prevodom" : m === "cash" || m === "hotovost" || m === "hotovosť" ? "hotovosť" : m === "btc" ? "bitcoin" : m || "iné");
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -94,7 +98,7 @@ function Bunka({ d, dnes, vybrany, uzke, onKlik }: { d: DenKalendara; dnes: stri
   const objednany = !trening && d.objednane.length > 0;
   const ma = trening || objednany || d.platby.length > 0 || d.balicky.length > 0;
   const nazov = [
-    ...d.treningy.map((t) => `tréning${t.cas ? ` ${t.cas}` : ""}${t.uvodny ? " (úvodný)" : ""}${t.zdarma !== undefined ? " (zdarma)" : ""}`),
+    ...d.treningy.map((t) => `tréning${t.cas ? ` ${cas24(t.cas)}` : ""}${t.uvodny ? " (úvodný)" : ""}${t.zdarma !== undefined ? " (zdarma)" : ""}`),
     ...d.objednane.map((c) => `objednané ${c}`),
     ...d.platby.map((p) => `platba ${fmtCZK(p.suma)}`),
     ...d.balicky.map((b) => `${jeDoplnenieNaOsi(b) ? "Doplnenie" : nazovProduktu(b.nazov)} · ${b.hodin} h`),
@@ -138,9 +142,9 @@ function DetailDna({ d }: { d: DenKalendara }) {
         {DNI_CELE[(dt.getUTCDay() + 6) % 7].toUpperCase()} {+d.den.slice(8)}. {+d.den.slice(5, 7)}. {d.den.slice(0, 4)}
       </div>
       {d.balicky.map((b, i) => <div key={`b${i}`}>{riadok(jeDoplnenieNaOsi(b) ? "#c9a2f0" : C.orange, `${jeDoplnenieNaOsi(b) ? "Doplnenie členstva" : nazovProduktu(b.nazov)}${b.doDna ? ` · do ${+b.doDna.slice(8, 10)}. ${+b.doDna.slice(5, 7)}.` : ""}${b.nezaplatene ? " · nezaplatený" : ""}`, `${b.hodin} h`)}</div>)}
-      {d.treningy.map((t, i) => <div key={`t${i}`}>{riadok(C.green, `${t.uvodny ? "Úvodný tréning" : "Tréning"}${t.cas ? ` ${t.cas}` : ""}${t.trener ? ` · ${t.trener}` : ""}${t.zdarma !== undefined ? " · zdarma" : ""}`)}</div>)}
+      {d.treningy.map((t, i) => <div key={`t${i}`}>{riadok(C.green, `${t.uvodny ? "Úvodný tréning" : "Tréning"}${t.cas ? ` ${cas24(t.cas)}` : ""}${t.trener ? ` · ${t.trener}` : ""}${t.zdarma !== undefined ? " · zdarma" : ""}`)}</div>)}
       {d.objednane.map((c) => <div key={`o${c}`}>{riadok(C.green, `Objednané ${c}`)}</div>)}
-      {d.platby.map((p, i) => <div key={`p${i}`}>{riadok(C.blue, `Platba · ${p.metoda}${p.poznamka ? ` · ${p.poznamka}` : ""}`, fmtCZK(p.suma))}</div>)}
+      {d.platby.map((p, i) => <div key={`p${i}`}>{riadok(C.blue, `Platba ${sposob(p.metoda)}${p.poznamka ? ` · ${p.poznamka}` : ""}`, fmtCZK(p.suma))}</div>)}
     </div>
   );
 }
