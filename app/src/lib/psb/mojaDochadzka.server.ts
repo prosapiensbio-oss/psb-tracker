@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit } from "./audit.server";
 import { btcVyplatySurove } from "./btcVyplaty.server";
-import { citajDochadzku, KLUC_DOCHADZKY, navrhyNakupov, type Aktivita, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
+import { citajDochadzku, KLUC_DOCHADZKY, navrhyNakupov, platiSaJosemu, type Aktivita, type DataDochadzky, type UdalostDochadzky } from "./mojaDochadzka";
 
 export async function nacitajDochadzku(DB: D1Database): Promise<DataDochadzky> {
   const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(KLUC_DOCHADZKY).first<{ value: string }>().catch(() => null);
@@ -112,7 +112,7 @@ export async function doplnPlatbyDochadzky(DB: D1Database, d: DataDochadzky): Pr
     `SELECT id, date, amount_czk, counterparty, note, moja_poznamka FROM fio_transactions WHERE amount_czk < 0 AND date >= ?1`,
   ).bind(od).all<{ id: string | number; date: string; amount_czk: number; counterparty: string | null; note: string | null; moja_poznamka: string | null }>().catch(() => ({ results: [] }))).results || [])
     .map((r) => ({ id: String(r.id), datum: String(r.date).slice(0, 10), suma: -Number(r.amount_czk), text: [r.counterparty, r.note, r.moja_poznamka].filter(Boolean).join(" · ") }));
-  const guillermo = d.aktivity.some((a) => a.guillermo);
+  const guillermo = d.aktivity.some(platiSaJosemu);
   const btc = guillermo ? (await btcVyplatySurove()) || [] : [];
   const kurz = guillermo ? await kurzBtcMeny(DB) : null;
   const navrhy = navrhyNakupov(d, fio, btc, kurz ? kurz.czk / kurz.eur : null);

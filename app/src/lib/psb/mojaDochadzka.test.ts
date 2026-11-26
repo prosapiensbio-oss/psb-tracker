@@ -139,8 +139,15 @@ describe("platby zapísané samy", async () => {
     const r = navrhyNakupov(d, [], btc, 24.4);
     expect(r).toEqual([expect.objectContaining({ aktivitaId: "g", hodiny: 6, sats: 700000, zdroj: "btc:2026-11-14|700000" })]);
   });
+  it("„Jose FP“ sa spáruje aj s aktivitou bez príznaku guillermo (Jerryho z 14. 11. 2026)", () => {
+    // Tvar aktivity presne ako v ostrých dátach: séria z kalendára, bez `guillermo`.
+    const ostra: Aktivita = { id: "mwgq", kto: "Jerry", nazov: "Guillermo", nazvy: ["Gulliermo"], serie: ["5h9bl318t8n7j4o68ru7p92nl5"], cenaHodiny: 65, mena: "EUR", vytvorene: "" };
+    const d = { aktivity: [ostra], nakupy: [n("mwgq", "2026-07-29", { sats: 922296 })], rucne: [] };
+    const r = navrhyNakupov(d, [], [{ datum: "2026-11-25", sats: 723931, czk: 9530, poznamka: "Jose FP" }], 24.4);
+    expect(r).toEqual([expect.objectContaining({ aktivitaId: "mwgq", hodiny: 6, sats: 723931, zdroj: "btc:2026-11-25|723931" })]);
+  });
   it("rozpozná platbu Guillermovi podľa poznámky", () => {
-    expect(["Jerry vyplata fp", "FpSpain", "FP spain jerry", "guillermo"].every(jePlatbaGuillermovi)).toBe(true);
+    expect(["Jerry vyplata fp", "FpSpain", "FP spain jerry", "guillermo", "Jose FP"].every(jePlatbaGuillermovi)).toBe(true);
     expect(["Confirmo invILFpS7slx2Vy", "Jerry vyplata", "Pay to Blink Wallet User"].some(jePlatbaGuillermovi)).toBe(false);
   });
 });

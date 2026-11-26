@@ -263,7 +263,16 @@ export type PlatbaBtc = { datum: string; sats: number; czk: number | null; pozna
 export type NavrhNakupu = Omit<Nakup, "id" | "vytvorene"> & { zdroj: string };
 
 const slova = (t: string) => new Set(normName(t).split(/[^a-z0-9]+/).filter(Boolean));
-export const jePlatbaGuillermovi = (poznamka: string) => /(^|[^a-z])fp([^a-z]|$)|fp\s*spain|guillerm/i.test(poznamka || "");
+export const jePlatbaGuillermovi = (poznamka: string) => /(^|[^a-z])fp([^a-z]|$)|fp\s*spain|guillerm|(^|\s)jos[eé](\s|$)/i.test(poznamka || "");
+
+/**
+ * Aktivita, ktorej sa platí bitcoinom Josému. Príznak `guillermo` má len
+ * aktivita prevzatá zo starej karty; Jerryho Guillermo (14. 11. 2026) vznikol
+ * nanovo, ráta sedenia podľa sérií a príznak nemá — platby z BTC knihy sa preto
+ * k nemu nikdy nepárovali (26. 11. 2026, „Jose FP“). Meno stačí, ale len pre
+ * PLATBY; počítanie sedení ostáva na `guillermo` a `serie`.
+ */
+export const platiSaJosemu = (a: Aktivita) => !!a.guillermo || /gu[il]{1,3}ermo/i.test(a.nazov);
 
 function poslednyNakup(d: DataDochadzky, aktivitaId: string): string {
   return d.nakupy.filter((n) => n.aktivitaId === aktivitaId).reduce((a, n) => (n.datum > a ? n.datum : a), "");
@@ -293,7 +302,7 @@ export function navrhyNakupov(d: DataDochadzky, fio: PlatbaFio[], btc: PlatbaBtc
     if (!hodiny) continue;
     out.push({ aktivitaId: a.id, datum: p.datum, hodiny, sumaKc: Math.round(p.suma), poznamka: `zapísané samo z Fio: ${p.text.slice(0, 80)}`, zdroj });
   }
-  const g = d.aktivity.filter((a) => a.guillermo);
+  const g = d.aktivity.filter(platiSaJosemu);
   if (g.length === 1 && eurCzk && eurCzk > 0) {
     const a = g[0];
     const sats = new Set(d.nakupy.filter((n) => n.aktivitaId === a.id && n.sats).map((n) => n.sats));

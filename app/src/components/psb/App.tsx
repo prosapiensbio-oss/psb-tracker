@@ -1070,7 +1070,8 @@ export function PSBApp() {
         const e = (podlaMesiaca[mk] ||= { jerry: 0, terezka: 0, jerryFp: 0 });
         const czk = v.czk || 0;
         // „FP spain" nie je bežná výplata — v Exceli má vlastný riadok.
-        if (/fp\s*spain/i.test(v.poznamka)) e.jerryFp += czk;
+        // „Jose FP" (25. 11. 2026) je to isté — platba Josému za Guillerma.
+        if (/fp\s*spain|(^|\s)jos[eé](\s|$)/i.test(v.poznamka)) e.jerryFp += czk;
         else if (v.kto === "terezka") e.terezka += czk;
         else if (v.kto === "jerry") e.jerry += czk;
         // Poznámka bez mena („Vyplata") sa delí na polovicu — ROVNAKO ako
