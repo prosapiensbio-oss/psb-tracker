@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { zastupcaKlienta } from "../../lib/psb/narodeniny";
 import { otvorNahlad } from "../../lib/psb/nahladOkno";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { VyberMena } from "./VyberMena";
@@ -190,6 +191,12 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       setDopyty(d);
       const svoje = String(u.find((x) => x.klient === meno)?.telefon || "");
       if (!svoje && cisloNovehoCloveka) { setKomu(JINE_PRIJEMCA); setJineJeKlient(true); setTelefon(cisloNovehoCloveka); return; }
+      // Dieťa bez čísla (Jerry, 27. 11. 2026, Luky Kríž): správa ide rodičovi,
+      // ktorý je pri ňom vedený (`zastupcaKlienta`) — „Ahoj Dominiko, posílám
+      // ti přehled hodin (Luky Križ)". Dá sa prepísať v poli Komu.
+      const zastupca = !svoje ? zastupcaKlienta(meno) : null;
+      const cisloZastupcu = zastupca ? String(u.find((x) => x.klient === zastupca)?.telefon || "") : "";
+      if (zastupca && cisloZastupcu) { setKomu(zastupca); setTelefon(cisloZastupcu); return; }
       setTelefon(svoje);
     });
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
@@ -458,15 +465,19 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       {telefon !== null && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10, fontSize: 12 }}>
           <span style={{ color: C.textDim }}>Komu:</span>
-          <div style={{ width: 230 }}>
+          {/* Šípka hovorí, že je to výber (27. 11. 2026: Jerry nevedel, že sa
+              tu dá zvoliť iný klient — pole vyzeralo ako nápis). */}
+          <div style={{ width: 230, position: "relative" }} title="Poslať inému klientovi alebo na iné číslo">
             <VyberMena
               hodnota={komu}
               mena={[meno, ...vsetkyKontakty.map((x) => x.klient).filter((m) => m !== meno).sort((a, b) => a.localeCompare(b, "cs")), JINE_PRIJEMCA]}
               onZmen={(v) => { if (v === meno || v === JINE_PRIJEMCA || vsetkyKontakty.some((x) => x.klient === v)) vyberKomu(v); else setKomu(v); }}
               placeholder="komu poslať…"
-              style={{ width: "100%", padding: "4px 8px", fontSize: 12 }}
+              style={{ width: "100%", padding: "4px 22px 4px 8px", fontSize: 12 }}
             />
+            <span aria-hidden style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: C.textDim, fontSize: 10, pointerEvents: "none" }}>▾</span>
           </div>
+          {komu !== meno && !jeJine && platnyKomu && <span style={{ color: C.textDim }}>za {meno}</span>}
           {upravaCisla === null ? (
             <>
               <span style={{ color: cislo ? C.text : C.orange, fontVariantNumeric: "tabular-nums" }}>
@@ -519,7 +530,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         <div style={{ fontSize: 11.5, color: C.textDim }}>hľadám číslo…</div>
       ) : !telefon ? (
         <div style={{ fontSize: 11.5, color: C.orange }}>
-          {jeJine ? "Napíš číslo, na ktoré má správa odísť." : `${komu} nemá v Kokpite telefón — doplň ho vyššie, uloží sa aj do profilu.`}
+          {jeJine ? "Napíš číslo, na ktoré má správa odísť." : `${komu} nemá v Kokpite telefón — doplň ho vyššie (uloží sa aj do profilu), alebo v poli Komu vyber iného klienta, napríklad rodiča.`}
           {/* Meno v kalendári sa od dopytu líši („Jolona" × „Jolana") —
               číslo sa NAVRHNE s menom z dopytu, potvrdí ho človek. */}
           {!jeJine && upravaCisla === null && navrhyCislaZDopytu(komu, dopyty).map((d) => (
